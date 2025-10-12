@@ -23,6 +23,8 @@ use function strtoupper;
  */
 final class PathFinderService
 {
+    private const COST_SCALE = 18;
+
     public function __construct(private readonly GraphBuilder $graphBuilder)
     {
     }
@@ -50,30 +52,59 @@ final class PathFinderService
         }
 
         $pathFinder = new PathFinder($config->maximumHops(), $config->pathFinderTolerance());
-        $rawPath = $pathFinder->findBestPath($graph, $sourceCurrency, $targetCurrency);
-        if (null === $rawPath) {
+
+        $materializedResult = null;
+        $materializedCost = null;
+        $rawPath = $pathFinder->findBestPath(
+            $graph,
+            $sourceCurrency,
+            $targetCurrency,
+            $config->minimumSpendAmount(),
+            function (array $candidate) use (&$materializedResult, &$materializedCost, $config, $sourceCurrency, $targetCurrency) {
+                if ($candidate['hops'] < $config->minimumHops() || $candidate['hops'] > $config->maximumHops()) {
+                    return false;
+                }
+
+                if ([] === $candidate['edges']) {
+                    return false;
+                }
+
+                $firstEdge = $candidate['edges'][0];
+                if ($firstEdge['from'] !== $sourceCurrency) {
+                    return false;
+                }
+
+                $initialSpend = $this->determineInitialSpendAmount($config, $firstEdge);
+                if (null === $initialSpend) {
+                    return false;
+                }
+
+                $result = $this->materializePath(
+                    $candidate['edges'],
+                    $config->spendAmount(),
+                    $initialSpend,
+                    $targetCurrency,
+                    $config,
+                );
+
+                if (null === $result) {
+                    return false;
+                }
+
+                if (null === $materializedCost || -1 === BcMath::comp($candidate['cost'], $materializedCost, self::COST_SCALE)) {
+                    $materializedCost = $candidate['cost'];
+                    $materializedResult = $result;
+                }
+
+                return true;
+            }
+        );
+
+        if (null === $rawPath || null === $materializedResult) {
             return null;
         }
 
-        if ($rawPath['hops'] < $config->minimumHops() || $rawPath['hops'] > $config->maximumHops()) {
-            return null;
-        }
-
-        if ([] === $rawPath['edges']) {
-            return null;
-        }
-
-        $firstEdge = $rawPath['edges'][0];
-        if ($firstEdge['from'] !== $sourceCurrency) {
-            return null;
-        }
-
-        $initialSpend = $this->determineInitialSpendAmount($config, $firstEdge);
-        if (null === $initialSpend) {
-            return null;
-        }
-
-        return $this->materializePath($rawPath['edges'], $config->spendAmount(), $initialSpend, $targetCurrency, $config);
+        return $materializedResult;
     }
 
     /**
