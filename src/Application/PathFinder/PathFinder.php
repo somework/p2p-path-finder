@@ -9,6 +9,7 @@ use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
+use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SplPriorityQueue;
 
 use function array_key_exists;
@@ -19,6 +20,22 @@ use function strtoupper;
 
 /**
  * Implementation of a tolerance-aware best-path search through the trading graph.
+ *
+ * @phpstan-type GraphEdge array{
+ *     from: string,
+ *     to: string,
+ *     orderSide: OrderSide,
+ *     order: Order,
+ *     rate: ExchangeRate,
+ *     baseCapacity: array{min: Money, max: Money},
+ *     quoteCapacity: array{min: Money, max: Money},
+ *     segments: list<array{
+ *         isMandatory: bool,
+ *         base: array{min: Money, max: Money},
+ *         quote: array{min: Money, max: Money},
+ *     }>,
+ * }
+ * @phpstan-type Graph array<string, array{currency: string, edges: list<GraphEdge>}>
  */
 final class PathFinder
 {
@@ -50,7 +67,8 @@ final class PathFinder
     }
 
     /**
-     * @param array<string, array{currency: string, edges: list<array{from: string, to: string, orderSide: OrderSide, rate: ExchangeRate, order: Order}>}> $graph
+     * @param Graph                                    $graph
+     * @param callable(array<string, mixed>):bool|null $acceptCandidate
      *
      * @return array{
      *     cost: string,
@@ -66,8 +84,13 @@ final class PathFinder
      *     }>,
      * }|null
      */
-    public function findBestPath(array $graph, string $source, string $target): ?array
-    {
+    public function findBestPath(
+        array $graph,
+        string $source,
+        string $target,
+        ?Money $desiredSpend = null,
+        ?callable $acceptCandidate = null
+    ): ?array {
         $source = strtoupper($source);
         $target = strtoupper($target);
 
@@ -84,6 +107,7 @@ final class PathFinder
             'product' => $this->unitValue,
             'hops' => 0,
             'path' => [],
+            'amount' => $desiredSpend,
         ], ['cost' => $this->unitValue, 'order' => $insertionOrder++]);
 
         /**
@@ -93,15 +117,42 @@ final class PathFinder
 
         $bestTargetState = null;
         $bestTargetCost = null;
+        $bestFeasibleCandidate = null;
+        $bestFeasibleCost = null;
 
         while (!$queue->isEmpty()) {
-            /** @var array{node: string, cost: string, product: string, hops: int, path: list<array<string, mixed>>} $state */
+            /** @var array{node: string, cost: string, product: string, hops: int, path: list<array<string, mixed>>, amount: Money|null} $state */
             $state = $queue->extract();
 
             if ($state['node'] === $target) {
                 if (null === $bestTargetCost || -1 === BcMath::comp($state['cost'], $bestTargetCost, self::SCALE)) {
                     $bestTargetCost = $state['cost'];
-                    $bestTargetState = $state;
+                }
+
+                $candidate = [
+                    'cost' => $state['cost'],
+                    'product' => $state['product'],
+                    'hops' => $state['hops'],
+                    'edges' => $state['path'],
+                ];
+
+                if (null !== $acceptCandidate) {
+                    if ($acceptCandidate($candidate)) {
+                        if (null === $bestFeasibleCost || -1 === BcMath::comp($state['cost'], $bestFeasibleCost, self::SCALE)) {
+                            $bestFeasibleCost = $state['cost'];
+                            $bestFeasibleCandidate = $candidate;
+                        }
+                    }
+
+                    if (null === $bestTargetState || -1 === BcMath::comp($state['cost'], $bestTargetState['cost'], self::SCALE)) {
+                        $bestTargetState = $candidate;
+                    }
+
+                    continue;
+                }
+
+                if (null === $bestTargetState || -1 === BcMath::comp($state['cost'], $bestTargetState['cost'], self::SCALE)) {
+                    $bestTargetState = $candidate;
                 }
 
                 continue;
@@ -124,6 +175,17 @@ final class PathFinder
                 $conversionRate = $this->edgeConversionRate($edge);
                 if (1 !== BcMath::comp($conversionRate, '0', self::SCALE)) {
                     continue;
+                }
+
+                $currentAmount = $state['amount'];
+                if ($currentAmount instanceof Money) {
+                    if (!$this->edgeSupportsAmount($edge, $currentAmount)) {
+                        continue;
+                    }
+
+                    $nextAmount = $this->calculateNextAmount($edge, $currentAmount);
+                } else {
+                    $nextAmount = null;
                 }
 
                 $nextCost = BcMath::div($state['cost'], $conversionRate, self::SCALE);
@@ -159,6 +221,7 @@ final class PathFinder
                     'product' => $nextProduct,
                     'hops' => $nextHops,
                     'path' => $nextPath,
+                    'amount' => $nextAmount,
                 ];
 
                 $this->recordState($bestPerNode, $nextNode, $nextCost, $nextHops);
@@ -167,16 +230,15 @@ final class PathFinder
             }
         }
 
+        if (null !== $acceptCandidate) {
+            return $bestFeasibleCandidate;
+        }
+
         if (null === $bestTargetState) {
             return null;
         }
 
-        return [
-            'cost' => $bestTargetState['cost'],
-            'product' => $bestTargetState['product'],
-            'hops' => $bestTargetState['hops'],
-            'edges' => $bestTargetState['path'],
-        ];
+        return $bestTargetState;
     }
 
     /**
@@ -230,7 +292,7 @@ final class PathFinder
     }
 
     /**
-     * @return SplPriorityQueue<array{cost: string, order: int}, array{node: string, cost: string, product: string, hops: int, path: list<array<string, mixed>>}>
+     * @return SplPriorityQueue<array{cost: string, order: int}, array{node: string, cost: string, product: string, hops: int, path: list<array<string, mixed>>, amount: Money|null}>
      */
     private function createQueue(): SplPriorityQueue
     {
@@ -252,6 +314,46 @@ final class PathFinder
         };
 
         return $queue;
+    }
+
+    /**
+     * @param array{orderSide: OrderSide, segments: list<array{base: array{max: Money}, quote: array{max: Money}}>} $edge
+     */
+    private function edgeSupportsAmount(array $edge, Money $amount): bool
+    {
+        $key = OrderSide::BUY === $edge['orderSide'] ? 'base' : 'quote';
+
+        $scale = $amount->scale();
+        foreach ($edge['segments'] as $segment) {
+            $scale = max($scale, $segment[$key]['max']->scale());
+        }
+
+        $normalized = $amount->withScale($scale);
+        $total = Money::zero($normalized->currency(), $scale);
+
+        foreach ($edge['segments'] as $segment) {
+            $total = $total->add($segment[$key]['max']->withScale($scale));
+        }
+
+        if ($total->isZero()) {
+            return $normalized->isZero();
+        }
+
+        return $normalized->compare($total) <= 0;
+    }
+
+    /**
+     * @param array{orderSide: OrderSide, rate: ExchangeRate} $edge
+     */
+    private function calculateNextAmount(array $edge, Money $current): Money
+    {
+        $rate = OrderSide::BUY === $edge['orderSide']
+            ? $edge['rate']
+            : $edge['rate']->invert();
+
+        $scale = max($current->scale(), $rate->scale());
+
+        return $rate->convert($current->withScale($scale), $scale);
     }
 
     private function calculateToleranceAmplifier(float $tolerance): string
