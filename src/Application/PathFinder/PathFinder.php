@@ -18,6 +18,9 @@ use function strtoupper;
 
 use const INF;
 
+/**
+ * Implementation of a tolerance-aware best-path search through the trading graph.
+ */
 final class PathFinder
 {
     /**

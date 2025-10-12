@@ -10,6 +10,9 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 use function sprintf;
 
+/**
+ * Immutable configuration carrying constraints used by {@see PathFinderService}.
+ */
 final class PathSearchConfig
 {
     private readonly Money $minimumSpendAmount;
@@ -43,46 +46,73 @@ final class PathSearchConfig
         $this->maximumSpendAmount = $this->calculateBoundedSpend(1.0 + $maximumTolerance);
     }
 
+    /**
+     * Returns a fluent builder for constructing configuration instances.
+     */
     public static function builder(): PathSearchConfigBuilder
     {
         return new PathSearchConfigBuilder();
     }
 
+    /**
+     * Returns the target spend amount expressed in the source asset.
+     */
     public function spendAmount(): Money
     {
         return $this->spendAmount;
     }
 
+    /**
+     * Returns the lower relative tolerance bound expressed as a fraction.
+     */
     public function minimumTolerance(): float
     {
         return $this->minimumTolerance;
     }
 
+    /**
+     * Returns the upper relative tolerance bound expressed as a fraction.
+     */
     public function maximumTolerance(): float
     {
         return $this->maximumTolerance;
     }
 
+    /**
+     * Returns the minimum number of hops allowed in a resulting path.
+     */
     public function minimumHops(): int
     {
         return $this->minimumHops;
     }
 
+    /**
+     * Returns the maximum number of hops allowed in a resulting path.
+     */
     public function maximumHops(): int
     {
         return $this->maximumHops;
     }
 
+    /**
+     * Returns the minimum amount that can be spent after tolerance adjustments.
+     */
     public function minimumSpendAmount(): Money
     {
         return $this->minimumSpendAmount;
     }
 
+    /**
+     * Returns the maximum amount that can be spent after tolerance adjustments.
+     */
     public function maximumSpendAmount(): Money
     {
         return $this->maximumSpendAmount;
     }
 
+    /**
+     * Returns the tolerance value used by the graph search heuristic.
+     */
     public function pathFinderTolerance(): float
     {
         return min(max($this->minimumTolerance, $this->maximumTolerance), 0.999999);

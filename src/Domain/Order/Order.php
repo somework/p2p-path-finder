@@ -10,6 +10,9 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 
+/**
+ * Domain entity describing an order that can be traversed within a path search.
+ */
 final class Order
 {
     public function __construct(
@@ -22,31 +25,49 @@ final class Order
         $this->assertConsistency();
     }
 
+    /**
+     * Returns whether the order is a buy or sell side order.
+     */
     public function side(): OrderSide
     {
         return $this->side;
     }
 
+    /**
+     * Returns the asset pair quoted by the order.
+     */
     public function assetPair(): AssetPair
     {
         return $this->assetPair;
     }
 
+    /**
+     * Returns the admissible fill bounds for the order's base asset.
+     */
     public function bounds(): OrderBounds
     {
         return $this->bounds;
     }
 
+    /**
+     * Returns the effective exchange rate applied when filling the order.
+     */
     public function effectiveRate(): ExchangeRate
     {
         return $this->effectiveRate;
     }
 
+    /**
+     * Returns the fee policy, if any, associated with the order.
+     */
     public function feePolicy(): ?FeePolicy
     {
         return $this->feePolicy;
     }
 
+    /**
+     * Validates that the provided amount can be used to partially fill the order.
+     */
     public function validatePartialFill(Money $baseAmount): void
     {
         $this->assertBaseCurrency($baseAmount);
@@ -56,6 +77,9 @@ final class Order
         }
     }
 
+    /**
+     * Calculates the quote currency proceeds for the provided base amount.
+     */
     public function calculateQuoteAmount(Money $baseAmount): Money
     {
         $this->assertBaseCurrency($baseAmount);
@@ -65,6 +89,9 @@ final class Order
         return $this->effectiveRate->convert($baseAmount, $scale);
     }
 
+    /**
+     * Calculates the quote amount adjusted by the fee policy when present.
+     */
     public function calculateEffectiveQuoteAmount(Money $baseAmount): Money
     {
         $this->validatePartialFill($baseAmount);

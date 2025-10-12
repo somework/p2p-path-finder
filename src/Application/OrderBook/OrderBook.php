@@ -29,6 +29,9 @@ final class OrderBook implements IteratorAggregate
         }
     }
 
+    /**
+     * Appends an order to the in-memory order book.
+     */
     public function add(Order $order): void
     {
         $this->orders[] = $order;

@@ -12,6 +12,9 @@ use function sprintf;
 
 use const PHP_EOL;
 
+/**
+ * Provides machine and human friendly representations of {@see PathResult} instances.
+ */
 final class PathResultFormatter
 {
     /**
@@ -50,6 +53,9 @@ final class PathResultFormatter
         return $payload;
     }
 
+    /**
+     * Produces a multi-line human readable summary of the conversion path.
+     */
     public function formatHuman(PathResult $result): string
     {
         $lines = [];

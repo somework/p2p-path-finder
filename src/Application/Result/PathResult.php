@@ -10,6 +10,9 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 use function array_is_list;
 
+/**
+ * Aggregated representation of a discovered conversion path.
+ */
 final class PathResult implements JsonSerializable
 {
     /**
@@ -44,21 +47,33 @@ final class PathResult implements JsonSerializable
         $this->legs = $legs;
     }
 
+    /**
+     * Returns the total amount of source asset spent across the entire path.
+     */
     public function totalSpent(): Money
     {
         return $this->totalSpent;
     }
 
+    /**
+     * Returns the total amount of destination asset received across the path.
+     */
     public function totalReceived(): Money
     {
         return $this->totalReceived;
     }
 
+    /**
+     * Returns the cumulative fees charged across all legs.
+     */
     public function totalFees(): Money
     {
         return $this->totalFees;
     }
 
+    /**
+     * Returns the remaining tolerance after accounting for the chosen path.
+     */
     public function residualTolerance(): float
     {
         return $this->residualTolerance;

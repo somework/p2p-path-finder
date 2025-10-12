@@ -6,6 +6,9 @@ namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
 use InvalidArgumentException;
 
+/**
+ * Value object describing a directed asset pair (base -> quote).
+ */
 final class AssetPair
 {
     private function __construct(
@@ -14,6 +17,9 @@ final class AssetPair
     ) {
     }
 
+    /**
+     * Creates an asset pair ensuring the provided currencies are distinct and valid.
+     */
     public static function fromString(string $base, string $quote): self
     {
         $normalizedBase = self::assertCurrency($base);
@@ -26,11 +32,17 @@ final class AssetPair
         return new self($normalizedBase, $normalizedQuote);
     }
 
+    /**
+     * Returns the normalized base asset symbol.
+     */
     public function base(): string
     {
         return $this->base;
     }
 
+    /**
+     * Returns the normalized quote asset symbol.
+     */
     public function quote(): string
     {
         return $this->quote;
