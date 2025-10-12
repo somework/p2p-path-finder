@@ -46,6 +46,11 @@ The builder enforces presence and validity of each piece of configuration. Inter
 configuration pre-computes minimum/maximum spend amounts derived from the tolerance window,
 which are then used when filtering the order book.
 
+During graph exploration the path finder also aggregates the mandatory minimum of every
+edge segment and drops candidates that would undershoot those thresholds before checking
+capacity. As a result, requests that fall just below an order's minimum are pruned earlier
+in the search rather than reaching the materialisation phase.
+
 ## BCMath-based precision
 
 All arithmetic is delegated to `SomeWork\P2PPathFinder\Domain\ValueObject\BcMath`, a thin

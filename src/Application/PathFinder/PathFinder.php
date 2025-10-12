@@ -317,7 +317,7 @@ final class PathFinder
     }
 
     /**
-     * @param array{orderSide: OrderSide, segments: list<array{base: array{max: Money}, quote: array{max: Money}}>} $edge
+     * @param array{orderSide: OrderSide, segments: list<array{isMandatory: bool, base: array{min: Money, max: Money}, quote: array{min: Money, max: Money}}>} $edge
      */
     private function edgeSupportsAmount(array $edge, Money $amount): bool
     {
@@ -325,21 +325,34 @@ final class PathFinder
 
         $scale = $amount->scale();
         foreach ($edge['segments'] as $segment) {
-            $scale = max($scale, $segment[$key]['max']->scale());
+            $scale = max(
+                $scale,
+                $segment[$key]['min']->scale(),
+                $segment[$key]['max']->scale(),
+            );
         }
 
         $normalized = $amount->withScale($scale);
-        $total = Money::zero($normalized->currency(), $scale);
+        $minimum = Money::zero($normalized->currency(), $scale);
+        $maximum = Money::zero($normalized->currency(), $scale);
 
         foreach ($edge['segments'] as $segment) {
-            $total = $total->add($segment[$key]['max']->withScale($scale));
+            if ($segment['isMandatory']) {
+                $minimum = $minimum->add($segment[$key]['min']->withScale($scale));
+            }
+
+            $maximum = $maximum->add($segment[$key]['max']->withScale($scale));
         }
 
-        if ($total->isZero()) {
+        if ($normalized->compare($minimum) < 0) {
+            return false;
+        }
+
+        if ($maximum->isZero()) {
             return $normalized->isZero();
         }
 
-        return $normalized->compare($total) <= 0;
+        return $normalized->compare($maximum) <= 0;
     }
 
     /**
