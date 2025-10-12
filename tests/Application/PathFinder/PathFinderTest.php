@@ -10,6 +10,8 @@ use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
+use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
 final class PathFinderTest extends TestCase
@@ -213,6 +215,56 @@ final class PathFinderTest extends TestCase
             'USD',
             'IDR',
             BcMath::normalize('15400.000', self::SCALE),
+        ];
+    }
+
+    /**
+     * @dataProvider provideSpendBelowMandatoryMinimum
+     */
+    public function test_it_prunes_paths_below_mandatory_minimum(
+        Order $order,
+        string $source,
+        string $target,
+        Money $desiredSpend
+    ): void {
+        $graph = (new GraphBuilder())->build([$order]);
+
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $accepted = false;
+
+        $result = $finder->findBestPath(
+            $graph,
+            $source,
+            $target,
+            $desiredSpend,
+            static function () use (&$accepted): bool {
+                $accepted = true;
+
+                return true;
+            },
+        );
+
+        self::assertNull($result);
+        self::assertFalse($accepted);
+    }
+
+    /**
+     * @return iterable<string, array{Order, string, string, Money}>
+     */
+    public static function provideSpendBelowMandatoryMinimum(): iterable
+    {
+        yield 'buy_edge_below_base_minimum' => [
+            OrderFactory::buy('EUR', 'USD', '10.000', '100.000', '1.050', 3, 3),
+            'EUR',
+            'USD',
+            CurrencyScenarioFactory::money('EUR', '9.999', 3),
+        ];
+
+        yield 'sell_edge_below_quote_minimum' => [
+            OrderFactory::sell('EUR', 'USD', '10.000', '100.000', '1.050', 3, 3),
+            'USD',
+            'EUR',
+            CurrencyScenarioFactory::money('USD', '10.499', 3),
         ];
     }
 
