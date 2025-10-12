@@ -12,7 +12,7 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 interface FeePolicy
 {
     /**
-     * Calculates the fee to apply for the provided order side and amounts.
+     * Calculates the fee components to apply for the provided order side and amounts.
      */
-    public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): Money;
+    public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown;
 }

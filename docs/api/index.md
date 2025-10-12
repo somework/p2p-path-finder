@@ -312,9 +312,9 @@ Describes how fees are computed for an order fill.
 ### Public methods
 
 ### calculate
-`FeePolicy::calculate(SomeWork\P2PPathFinder\Domain\Order\OrderSide $side, SomeWork\P2PPathFinder\Domain\ValueObject\Money $baseAmount, SomeWork\P2PPathFinder\Domain\ValueObject\Money $quoteAmount): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
+`FeePolicy::calculate(SomeWork\P2PPathFinder\Domain\Order\OrderSide $side, SomeWork\P2PPathFinder\Domain\ValueObject\Money $baseAmount, SomeWork\P2PPathFinder\Domain\ValueObject\Money $quoteAmount): SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown`
 
-Calculates the fee to apply for the provided order side and amounts.
+Calculates the fee components to apply for the provided order side and amounts.
 
 ## SomeWork\P2PPathFinder\Domain\Order\Order
 Domain entity describing an order that can be traversed within a path search.
@@ -363,6 +363,11 @@ Calculates the quote currency proceeds for the provided base amount.
 `Order::calculateEffectiveQuoteAmount(SomeWork\P2PPathFinder\Domain\ValueObject\Money $baseAmount): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
 
 Calculates the quote amount adjusted by the fee policy when present.
+
+### calculateGrossBaseSpend
+`Order::calculateGrossBaseSpend(SomeWork\P2PPathFinder\Domain\ValueObject\Money $baseAmount, ?SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown $feeBreakdown = null): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
+
+Calculates the total base asset required to fill the provided net amount, including any base-denominated fees when applicable.
 
 ## SomeWork\P2PPathFinder\Domain\Order\OrderSide
 

@@ -102,12 +102,53 @@ final class Order
             return $quoteAmount;
         }
 
-        $fee = $this->feePolicy->calculate($this->side, $baseAmount, $quoteAmount);
-        if ($fee->currency() !== $quoteAmount->currency()) {
-            throw new InvalidArgumentException('Fee policy must return money in quote asset currency.');
+        $fees = $this->feePolicy->calculate($this->side, $baseAmount, $quoteAmount);
+        $quoteFee = $fees->quoteFee();
+
+        if (null === $quoteFee || $quoteFee->isZero()) {
+            $baseFee = $fees->baseFee();
+            if (null !== $baseFee && !$baseFee->isZero()) {
+                $this->assertBaseFeeCurrency($baseFee, $baseAmount);
+            }
+
+            return $quoteAmount;
         }
 
-        return $quoteAmount->subtract($fee);
+        $this->assertQuoteFeeCurrency($quoteFee, $quoteAmount);
+
+        $baseFee = $fees->baseFee();
+        if (null !== $baseFee && !$baseFee->isZero()) {
+            $this->assertBaseFeeCurrency($baseFee, $baseAmount);
+        }
+
+        return $quoteAmount->subtract($quoteFee);
+    }
+
+    /**
+     * Calculates the total base asset required to fill the provided net amount.
+     */
+    public function calculateGrossBaseSpend(Money $baseAmount, ?FeeBreakdown $feeBreakdown = null): Money
+    {
+        $this->validatePartialFill($baseAmount);
+
+        $fees = $feeBreakdown;
+        if (null === $fees) {
+            if (null === $this->feePolicy) {
+                return $baseAmount;
+            }
+
+            $quoteAmount = $this->calculateQuoteAmount($baseAmount);
+            $fees = $this->feePolicy->calculate($this->side, $baseAmount, $quoteAmount);
+        }
+
+        $baseFee = $fees->baseFee();
+        if (null === $baseFee || $baseFee->isZero()) {
+            return $baseAmount;
+        }
+
+        $this->assertBaseFeeCurrency($baseFee, $baseAmount);
+
+        return $baseAmount->add($baseFee);
     }
 
     private function assertConsistency(): void
@@ -130,6 +171,20 @@ final class Order
     {
         if ($money->currency() !== $this->assetPair->base()) {
             throw new InvalidArgumentException('Fill amount must use the order base asset.');
+        }
+    }
+
+    private function assertQuoteFeeCurrency(Money $fee, Money $quoteAmount): void
+    {
+        if ($fee->currency() !== $quoteAmount->currency()) {
+            throw new InvalidArgumentException('Fee policy must return money in quote asset currency.');
+        }
+    }
+
+    private function assertBaseFeeCurrency(Money $fee, Money $baseAmount): void
+    {
+        if ($fee->currency() !== $baseAmount->currency()) {
+            throw new InvalidArgumentException('Fee policy must return money in base asset currency.');
         }
     }
 }

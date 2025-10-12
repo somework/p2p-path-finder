@@ -6,6 +6,7 @@ namespace SomeWork\P2PPathFinder\Tests\Domain\Order;
 
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
@@ -85,6 +86,26 @@ final class OrderTest extends TestCase
         self::assertTrue($quote->equals(CurrencyScenarioFactory::money('USD', '13500.000', 3)));
     }
 
+    public function test_calculate_gross_base_spend_adds_fee_for_buy_order(): void
+    {
+        $order = OrderFactory::buy(feePolicy: $this->baseSurchargePolicy('0.005'));
+
+        $baseAmount = CurrencyScenarioFactory::money('BTC', '0.500', 3);
+        $grossBase = $order->calculateGrossBaseSpend($baseAmount);
+
+        self::assertTrue($grossBase->equals(CurrencyScenarioFactory::money('BTC', '0.505', 3)));
+    }
+
+    public function test_calculate_effective_quote_amount_is_unaffected_by_base_fee(): void
+    {
+        $order = OrderFactory::buy(feePolicy: $this->baseSurchargePolicy('0.005'));
+
+        $baseAmount = CurrencyScenarioFactory::money('BTC', '0.500', 3);
+        $quote = $order->calculateEffectiveQuoteAmount($baseAmount);
+
+        self::assertTrue($quote->equals(CurrencyScenarioFactory::money('USD', '15000.000', 3)));
+    }
+
     public function test_calculate_effective_quote_amount_with_fee_lowers_buy_totals(): void
     {
         $order = OrderFactory::buy(feePolicy: $this->percentageFeePolicy('0.10'));
@@ -108,9 +129,9 @@ final class OrderTest extends TestCase
     public function test_calculate_effective_quote_amount_rejects_fee_currency_mismatch(): void
     {
         $order = OrderFactory::buy(feePolicy: new class implements FeePolicy {
-            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): Money
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
             {
-                return CurrencyScenarioFactory::money('BTC', '1.000', 3);
+                return FeeBreakdown::forQuote(CurrencyScenarioFactory::money('BTC', '1.000', 3));
             }
         });
 
@@ -146,9 +167,27 @@ final class OrderTest extends TestCase
             {
             }
 
-            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): Money
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
             {
-                return $quoteAmount->multiply($this->percentage, $quoteAmount->scale());
+                $fee = $quoteAmount->multiply($this->percentage, $quoteAmount->scale());
+
+                return FeeBreakdown::forQuote($fee);
+            }
+        };
+    }
+
+    private function baseSurchargePolicy(string $flatFee): FeePolicy
+    {
+        return new class($flatFee) implements FeePolicy {
+            public function __construct(private readonly string $flatFee)
+            {
+            }
+
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                $fee = Money::fromString($baseAmount->currency(), $this->flatFee, $baseAmount->scale());
+
+                return FeeBreakdown::forBase($fee);
             }
         };
     }

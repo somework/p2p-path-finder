@@ -9,6 +9,7 @@ use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
+use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
@@ -388,7 +389,9 @@ final class PathFinderServiceTest extends TestCase
         $leg = $legs[0];
 
         $rawQuote = $order->calculateQuoteAmount($leg->received());
-        $expectedFee = $feePolicy->calculate(OrderSide::SELL, $leg->received(), $rawQuote);
+        $expectedBreakdown = $feePolicy->calculate(OrderSide::SELL, $leg->received(), $rawQuote);
+        $expectedFee = $expectedBreakdown->quoteFee();
+        self::assertNotNull($expectedFee);
         $effectiveQuote = $order->calculateEffectiveQuoteAmount($leg->received());
 
         $comparisonScale = max($effectiveQuote->scale(), $leg->spent()->scale(), 6);
@@ -455,9 +458,11 @@ final class PathFinderServiceTest extends TestCase
             {
             }
 
-            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): Money
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
             {
-                return $quoteAmount->multiply($this->percentage, $quoteAmount->scale());
+                $fee = $quoteAmount->multiply($this->percentage, $quoteAmount->scale());
+
+                return FeeBreakdown::forQuote($fee);
             }
         };
     }
@@ -473,7 +478,7 @@ final class PathFinderServiceTest extends TestCase
             ) {
             }
 
-            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): Money
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
             {
                 $scale = max($quoteAmount->scale(), 6);
                 $threshold = Money::fromString($quoteAmount->currency(), $this->threshold, $scale);
@@ -482,10 +487,14 @@ final class PathFinderServiceTest extends TestCase
                     $percentageComponent = $quoteAmount->multiply($this->highPercentage, $scale);
                     $fixedComponent = Money::fromString($quoteAmount->currency(), $this->fixed, $scale);
 
-                    return $percentageComponent->add($fixedComponent, $scale);
+                    $fee = $percentageComponent->add($fixedComponent, $scale);
+
+                    return FeeBreakdown::forQuote($fee);
                 }
 
-                return $quoteAmount->multiply($this->lowPercentage, $scale);
+                $fee = $quoteAmount->multiply($this->lowPercentage, $scale);
+
+                return FeeBreakdown::forQuote($fee);
             }
         };
     }

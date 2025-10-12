@@ -11,6 +11,7 @@ use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
+use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
@@ -242,17 +243,22 @@ final class PathFinderService
             }
 
             if (OrderSide::BUY === $orderSide) {
-                $spent = $current->withScale(max($current->scale(), $order->bounds()->min()->scale()));
-                if (!$order->bounds()->contains($spent)) {
+                $netBase = $current->withScale(max($current->scale(), $order->bounds()->min()->scale()));
+                if (!$order->bounds()->contains($netBase)) {
                     return null;
                 }
 
-                $rawQuote = $order->calculateQuoteAmount($spent);
-                $fee = $this->resolveFee($order, $orderSide, $spent, $rawQuote);
+                $rawQuote = $order->calculateQuoteAmount($netBase);
+                $fees = $this->resolveFeeBreakdown($order, $orderSide, $netBase, $rawQuote);
+                $quoteFee = $fees->quoteFee();
+
                 $received = $rawQuote;
-                if (!$fee->isZero()) {
-                    $received = $rawQuote->subtract($fee);
+                if (null !== $quoteFee && !$quoteFee->isZero()) {
+                    $received = $rawQuote->subtract($quoteFee);
                 }
+
+                $spent = $order->calculateGrossBaseSpend($netBase, $fees);
+                $legFee = $this->resolveQuoteFeeForLeg($fees, $rawQuote);
             } else {
                 $targetEffectiveQuote = $current->withScale(max($current->scale(), $order->bounds()->min()->scale()));
                 $resolved = $this->resolveSellLegAmounts($order, $targetEffectiveQuote);
@@ -261,12 +267,13 @@ final class PathFinderService
                     return null;
                 }
 
-                [$spent, $received, $fee] = $resolved;
+                [$spent, $received, $fees] = $resolved;
+                $legFee = $this->resolveQuoteFeeForLeg($fees, $spent);
             }
 
-            $this->accumulateFee($feeBreakdown, $fee);
+            $this->accumulateFeeBreakdown($feeBreakdown, $fees);
 
-            $legs[] = new PathLeg($from, $to, $spent, $received, $fee);
+            $legs[] = new PathLeg($from, $to, $spent, $received, $legFee);
             $current = $received;
             $currentCurrency = $current->currency();
         }
@@ -300,6 +307,22 @@ final class PathFinderService
     /**
      * @param array<string, Money> $feeBreakdown
      */
+    private function accumulateFeeBreakdown(array &$feeBreakdown, FeeBreakdown $fees): void
+    {
+        $baseFee = $fees->baseFee();
+        if (null !== $baseFee && !$baseFee->isZero()) {
+            $this->accumulateFee($feeBreakdown, $baseFee);
+        }
+
+        $quoteFee = $fees->quoteFee();
+        if (null !== $quoteFee && !$quoteFee->isZero()) {
+            $this->accumulateFee($feeBreakdown, $quoteFee);
+        }
+    }
+
+    /**
+     * @param array<string, Money> $feeBreakdown
+     */
     private function accumulateFee(array &$feeBreakdown, Money $fee): void
     {
         if ($fee->isZero()) {
@@ -317,18 +340,29 @@ final class PathFinderService
         $feeBreakdown[$currency] = $fee;
     }
 
-    private function resolveFee(Order $order, OrderSide $side, Money $baseAmount, Money $rawQuote): Money
+    private function resolveFeeBreakdown(Order $order, OrderSide $side, Money $baseAmount, Money $rawQuote): FeeBreakdown
     {
         $policy = $order->feePolicy();
         if (null === $policy) {
-            return Money::zero($rawQuote->currency(), $rawQuote->scale());
+            return FeeBreakdown::none();
         }
 
         return $policy->calculate($side, $baseAmount, $rawQuote);
     }
 
+    private function resolveQuoteFeeForLeg(FeeBreakdown $fees, Money $fallback): Money
+    {
+        $quoteFee = $fees->quoteFee();
+
+        if (null === $quoteFee) {
+            return Money::zero($fallback->currency(), $fallback->scale());
+        }
+
+        return $quoteFee;
+    }
+
     /**
-     * @return array{0: Money, 1: Money, 2: Money}|null
+     * @return array{0: Money, 1: Money, 2: FeeBreakdown}|null
      */
     private function resolveSellLegAmounts(Order $order, Money $targetEffectiveQuote): ?array
     {
@@ -352,7 +386,7 @@ final class PathFinderService
             return [
                 $spent,
                 $received,
-                Money::zero($spent->currency(), $spent->scale()),
+                FeeBreakdown::none(),
             ];
         }
 
@@ -372,7 +406,7 @@ final class PathFinderService
         $converged = false;
 
         for ($attempt = 0; $attempt < self::SELL_RESOLUTION_MAX_ITERATIONS; ++$attempt) {
-            [$rawQuote, $fee, $effectiveQuoteAmount] = $this->evaluateSellQuote($order, $baseAmount);
+            [$rawQuote, $fees, $effectiveQuoteAmount] = $this->evaluateSellQuote($order, $baseAmount);
 
             $comparisonScale = max(
                 $effectiveQuoteAmount->scale(),
@@ -406,14 +440,13 @@ final class PathFinderService
         }
 
         $baseAmount = $baseAmount->withScale($bounds->min()->scale());
-        [$rawQuote, $fee, $effectiveQuoteAmount] = $this->evaluateSellQuote($order, $baseAmount);
+        [$rawQuote, $fees, $effectiveQuoteAmount] = $this->evaluateSellQuote($order, $baseAmount);
         $effectiveQuoteAmount = $effectiveQuoteAmount->withScale(max($effectiveQuoteAmount->scale(), $originalTarget->scale()));
-        $fee = $fee->withScale(max($fee->scale(), $effectiveQuoteAmount->scale()));
 
         return [
             $effectiveQuoteAmount,
             $baseAmount,
-            $fee,
+            $fees,
         ];
     }
 
@@ -469,19 +502,20 @@ final class PathFinderService
     }
 
     /**
-     * @return array{0: Money, 1: Money, 2: Money}
+     * @return array{0: Money, 1: FeeBreakdown, 2: Money}
      */
     private function evaluateSellQuote(Order $order, Money $baseAmount): array
     {
         $rawQuote = $order->calculateQuoteAmount($baseAmount);
-        $fee = $this->resolveFee($order, OrderSide::SELL, $baseAmount, $rawQuote);
+        $fees = $this->resolveFeeBreakdown($order, OrderSide::SELL, $baseAmount, $rawQuote);
+        $quoteFee = $fees->quoteFee();
         $effectiveQuote = $rawQuote;
 
-        if (!$fee->isZero()) {
-            $effectiveQuote = $rawQuote->subtract($fee);
+        if (null !== $quoteFee && !$quoteFee->isZero()) {
+            $effectiveQuote = $rawQuote->subtract($quoteFee);
         }
 
-        return [$rawQuote, $fee, $effectiveQuote];
+        return [$rawQuote, $fees, $effectiveQuote];
     }
 
     private function calculateResidualTolerance(Money $desired, Money $actual): float

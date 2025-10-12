@@ -6,6 +6,7 @@ namespace SomeWork\P2PPathFinder\Tests\Application\Graph;
 
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
+use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
@@ -260,9 +261,11 @@ final class GraphBuilderTest extends TestCase
             {
             }
 
-            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): Money
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
             {
-                return $quoteAmount->multiply($this->percentage, $quoteAmount->scale());
+                $fee = $quoteAmount->multiply($this->percentage, $quoteAmount->scale());
+
+                return FeeBreakdown::forQuote($fee);
             }
         };
     }
