@@ -7,6 +7,8 @@ namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
+use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
@@ -260,6 +262,22 @@ final class PathFinderTest extends TestCase
             CurrencyScenarioFactory::money('EUR', '9.999', 3),
         ];
 
+        yield 'buy_edge_below_gross_base_requirement' => [
+            OrderFactory::buy(
+                'EUR',
+                'USD',
+                '10.000',
+                '100.000',
+                '1.050',
+                3,
+                3,
+                self::basePercentageFeePolicy('0.02'),
+            ),
+            'EUR',
+            'USD',
+            CurrencyScenarioFactory::money('EUR', '10.150', 3),
+        ];
+
         yield 'sell_edge_below_quote_minimum' => [
             OrderFactory::sell('EUR', 'USD', '10.000', '100.000', '1.050', 3, 3),
             'USD',
@@ -301,6 +319,36 @@ final class PathFinderTest extends TestCase
         self::assertSame(OrderSide::BUY, $result['edges'][1]['orderSide']);
 
         self::assertSame(1, BcMath::comp($result['product'], BcMath::normalize('0.92', self::SCALE), self::SCALE));
+    }
+
+    public function test_it_accounts_for_gross_base_when_scoring_buy_edges(): void
+    {
+        $order = OrderFactory::buy(
+            'EUR',
+            'USD',
+            '1.000',
+            '1.000',
+            '1.100',
+            3,
+            3,
+            self::basePercentageFeePolicy('0.05'),
+        );
+
+        $graph = (new GraphBuilder())->build([$order]);
+
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $grossSpend = CurrencyScenarioFactory::money('EUR', '1.050', 3);
+
+        $result = $finder->findBestPath($graph, 'EUR', 'USD', $grossSpend);
+
+        self::assertNotNull($result);
+        self::assertSame(1, $result['hops']);
+        self::assertCount(1, $result['edges']);
+
+        $expectedProduct = BcMath::div('1.100', '1.050', self::SCALE);
+        self::assertSame($expectedProduct, $result['product']);
+        self::assertSame(BcMath::div('1', $expectedProduct, self::SCALE), $result['cost']);
+        self::assertSame($expectedProduct, $result['edges'][0]['conversionRate']);
     }
 
     public function test_it_returns_zero_hop_path_when_source_equals_target(): void
@@ -631,6 +679,22 @@ final class PathFinderTest extends TestCase
                 rateScale: 2,
             ),
         ];
+    }
+
+    private static function basePercentageFeePolicy(string $percentage): FeePolicy
+    {
+        return new class($percentage) implements FeePolicy {
+            public function __construct(private readonly string $percentage)
+            {
+            }
+
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                $fee = $baseAmount->multiply($this->percentage, $baseAmount->scale());
+
+                return FeeBreakdown::forBase($fee);
+            }
+        };
     }
 
     private static function formatAmount(float $amount): string

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Graph;
 
+use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
@@ -66,10 +67,12 @@ final class GraphBuilder
      *     rate: ExchangeRate,
      *     baseCapacity: array{min: Money, max: Money},
      *     quoteCapacity: array{min: Money, max: Money},
+     *     grossBaseCapacity: array{min: Money, max: Money},
      *     segments: list<array{
      *         isMandatory: bool,
      *         base: array{min: Money, max: Money},
      *         quote: array{min: Money, max: Money},
+     *         grossBase: array{min: Money, max: Money},
      *     }>,
      * }
      */
@@ -80,8 +83,8 @@ final class GraphBuilder
         $minBase = $bounds->min();
         $maxBase = $bounds->max();
 
-        $minQuote = $order->calculateEffectiveQuoteAmount($minBase);
-        $maxQuote = $order->calculateEffectiveQuoteAmount($maxBase);
+        [$minQuote, $minGrossBase] = $this->evaluateFill($order, $minBase);
+        [$maxQuote, $maxGrossBase] = $this->evaluateFill($order, $maxBase);
 
         return [
             'from' => $fromCurrency,
@@ -97,7 +100,18 @@ final class GraphBuilder
                 'min' => $minQuote,
                 'max' => $maxQuote,
             ],
-            'segments' => $this->buildSegments($minBase, $maxBase, $minQuote, $maxQuote),
+            'grossBaseCapacity' => [
+                'min' => $minGrossBase,
+                'max' => $maxGrossBase,
+            ],
+            'segments' => $this->buildSegments(
+                $minBase,
+                $maxBase,
+                $minQuote,
+                $maxQuote,
+                $minGrossBase,
+                $maxGrossBase,
+            ),
         ];
     }
 
@@ -106,10 +120,17 @@ final class GraphBuilder
      *     isMandatory: bool,
      *     base: array{min: Money, max: Money},
      *     quote: array{min: Money, max: Money},
+     *     grossBase: array{min: Money, max: Money},
      * }>
      */
-    private function buildSegments(Money $minBase, Money $maxBase, Money $minQuote, Money $maxQuote): array
-    {
+    private function buildSegments(
+        Money $minBase,
+        Money $maxBase,
+        Money $minQuote,
+        Money $maxQuote,
+        Money $minGrossBase,
+        Money $maxGrossBase
+    ): array {
         $segments = [];
 
         if (!$minBase->isZero()) {
@@ -123,12 +144,17 @@ final class GraphBuilder
                     'min' => $minQuote,
                     'max' => $minQuote,
                 ],
+                'grossBase' => [
+                    'min' => $minGrossBase,
+                    'max' => $minGrossBase,
+                ],
             ];
         }
 
         $baseRemainder = $maxBase->subtract($minBase);
         if (!$baseRemainder->isZero()) {
             $quoteRemainder = $maxQuote->subtract($minQuote);
+            $grossBaseRemainder = $maxGrossBase->subtract($minGrossBase);
 
             $segments[] = [
                 'isMandatory' => false,
@@ -139,6 +165,10 @@ final class GraphBuilder
                 'quote' => [
                     'min' => Money::zero($quoteRemainder->currency(), $quoteRemainder->scale()),
                     'max' => $quoteRemainder,
+                ],
+                'grossBase' => [
+                    'min' => Money::zero($grossBaseRemainder->currency(), $grossBaseRemainder->scale()),
+                    'max' => $grossBaseRemainder,
                 ],
             ];
         }
@@ -154,9 +184,43 @@ final class GraphBuilder
                     'min' => Money::zero($minQuote->currency(), $minQuote->scale()),
                     'max' => Money::zero($maxQuote->currency(), $maxQuote->scale()),
                 ],
+                'grossBase' => [
+                    'min' => Money::zero($minGrossBase->currency(), $minGrossBase->scale()),
+                    'max' => Money::zero($maxGrossBase->currency(), $maxGrossBase->scale()),
+                ],
             ];
         }
 
         return $segments;
+    }
+
+    /**
+     * @return array{0: Money, 1: Money}
+     */
+    private function evaluateFill(Order $order, Money $baseAmount): array
+    {
+        $rawQuote = $order->calculateQuoteAmount($baseAmount);
+        $fees = $this->resolveFeeBreakdown($order, $baseAmount, $rawQuote);
+
+        $grossBase = $order->calculateGrossBaseSpend($baseAmount, $fees);
+
+        $quoteFee = $fees->quoteFee();
+        if (null === $quoteFee || $quoteFee->isZero()) {
+            return [$rawQuote, $grossBase];
+        }
+
+        $netQuote = $rawQuote->subtract($quoteFee);
+
+        return [$netQuote, $grossBase];
+    }
+
+    private function resolveFeeBreakdown(Order $order, Money $baseAmount, Money $rawQuote): FeeBreakdown
+    {
+        $feePolicy = $order->feePolicy();
+        if (null === $feePolicy) {
+            return FeeBreakdown::none();
+        }
+
+        return $feePolicy->calculate($order->side(), $baseAmount, $rawQuote);
     }
 }

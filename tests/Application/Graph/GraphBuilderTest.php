@@ -52,14 +52,18 @@ final class GraphBuilderTest extends TestCase
         self::assertTrue($primaryBtcEdge['baseCapacity']['max']->equals(Money::fromString('BTC', '1.000', 3)));
         self::assertTrue($primaryBtcEdge['quoteCapacity']['min']->equals(Money::fromString('USD', '3000.000', 3)));
         self::assertTrue($primaryBtcEdge['quoteCapacity']['max']->equals(Money::fromString('USD', '30000.000', 3)));
+        self::assertTrue($primaryBtcEdge['grossBaseCapacity']['min']->equals($primaryBtcEdge['baseCapacity']['min']));
+        self::assertTrue($primaryBtcEdge['grossBaseCapacity']['max']->equals($primaryBtcEdge['baseCapacity']['max']));
 
         self::assertCount(2, $primaryBtcEdge['segments']);
         self::assertTrue($primaryBtcEdge['segments'][0]['isMandatory']);
         self::assertTrue($primaryBtcEdge['segments'][0]['base']['max']->equals(Money::fromString('BTC', '0.100', 3)));
         self::assertTrue($primaryBtcEdge['segments'][0]['quote']['max']->equals(Money::fromString('USD', '3000.000', 3)));
+        self::assertTrue($primaryBtcEdge['segments'][0]['grossBase']['max']->equals(Money::fromString('BTC', '0.100', 3)));
         self::assertFalse($primaryBtcEdge['segments'][1]['isMandatory']);
         self::assertTrue($primaryBtcEdge['segments'][1]['base']['max']->equals(Money::fromString('BTC', '0.900', 3)));
         self::assertTrue($primaryBtcEdge['segments'][1]['quote']['max']->equals(Money::fromString('USD', '27000.000', 3)));
+        self::assertTrue($primaryBtcEdge['segments'][1]['grossBase']['max']->equals(Money::fromString('BTC', '0.900', 3)));
 
         $secondaryBtcEdge = $btcEdges[1];
         self::assertSame('BTC', $secondaryBtcEdge['from']);
@@ -70,14 +74,18 @@ final class GraphBuilderTest extends TestCase
         self::assertTrue($secondaryBtcEdge['baseCapacity']['max']->equals(Money::fromString('BTC', '0.800', 3)));
         self::assertTrue($secondaryBtcEdge['quoteCapacity']['min']->equals(Money::fromString('EUR', '5600.000', 3)));
         self::assertTrue($secondaryBtcEdge['quoteCapacity']['max']->equals(Money::fromString('EUR', '22400.000', 3)));
+        self::assertTrue($secondaryBtcEdge['grossBaseCapacity']['min']->equals($secondaryBtcEdge['baseCapacity']['min']));
+        self::assertTrue($secondaryBtcEdge['grossBaseCapacity']['max']->equals($secondaryBtcEdge['baseCapacity']['max']));
 
         self::assertCount(2, $secondaryBtcEdge['segments']);
         self::assertTrue($secondaryBtcEdge['segments'][0]['isMandatory']);
         self::assertTrue($secondaryBtcEdge['segments'][0]['base']['max']->equals(Money::fromString('BTC', '0.200', 3)));
         self::assertTrue($secondaryBtcEdge['segments'][0]['quote']['max']->equals(Money::fromString('EUR', '5600.000', 3)));
+        self::assertTrue($secondaryBtcEdge['segments'][0]['grossBase']['max']->equals(Money::fromString('BTC', '0.200', 3)));
         self::assertFalse($secondaryBtcEdge['segments'][1]['isMandatory']);
         self::assertTrue($secondaryBtcEdge['segments'][1]['base']['max']->equals(Money::fromString('BTC', '0.600', 3)));
         self::assertTrue($secondaryBtcEdge['segments'][1]['quote']['max']->equals(Money::fromString('EUR', '16800.000', 3)));
+        self::assertTrue($secondaryBtcEdge['segments'][1]['grossBase']['max']->equals(Money::fromString('BTC', '0.600', 3)));
 
         $usdEdges = $graph['USD']['edges'];
         self::assertCount(2, $usdEdges);
@@ -144,6 +152,8 @@ final class GraphBuilderTest extends TestCase
 
         self::assertTrue($edge['quoteCapacity']['min']->equals(Money::fromString('USD', '90.000', 3)));
         self::assertTrue($edge['quoteCapacity']['max']->equals(Money::fromString('USD', '270.000', 3)));
+        self::assertTrue($edge['grossBaseCapacity']['min']->equals($edge['baseCapacity']['min']));
+        self::assertTrue($edge['grossBaseCapacity']['max']->equals($edge['baseCapacity']['max']));
 
         $rawMin = Money::fromString('USD', '100.000', 3);
         $rawMax = Money::fromString('USD', '300.000', 3);
@@ -155,10 +165,49 @@ final class GraphBuilderTest extends TestCase
         $mandatory = $edge['segments'][0];
         self::assertTrue($mandatory['isMandatory']);
         self::assertTrue($mandatory['quote']['max']->equals(Money::fromString('USD', '90.000', 3)));
+        self::assertTrue($mandatory['grossBase']['max']->equals($mandatory['base']['max']));
 
         $optional = $edge['segments'][1];
         self::assertFalse($optional['isMandatory']);
         self::assertTrue($optional['quote']['max']->equals(Money::fromString('USD', '180.000', 3)));
+        self::assertTrue($optional['grossBase']['max']->equals($optional['base']['max']));
+    }
+
+    public function test_build_calculates_gross_base_capacity_for_buy_orders_with_base_fee(): void
+    {
+        $order = $this->createOrder(
+            OrderSide::BUY,
+            'BTC',
+            'USD',
+            '0.500',
+            '2.500',
+            '30000.000',
+            $this->basePercentageFeePolicy('0.02'),
+        );
+
+        $graph = (new GraphBuilder())->build([$order]);
+
+        $edges = $graph['BTC']['edges'];
+        self::assertCount(1, $edges);
+
+        $edge = $edges[0];
+
+        self::assertTrue($edge['baseCapacity']['min']->equals(Money::fromString('BTC', '0.500', 3)));
+        self::assertTrue($edge['baseCapacity']['max']->equals(Money::fromString('BTC', '2.500', 3)));
+        self::assertTrue($edge['grossBaseCapacity']['min']->equals(Money::fromString('BTC', '0.510', 3)));
+        self::assertTrue($edge['grossBaseCapacity']['max']->equals(Money::fromString('BTC', '2.550', 3)));
+
+        self::assertCount(2, $edge['segments']);
+
+        $mandatory = $edge['segments'][0];
+        self::assertTrue($mandatory['isMandatory']);
+        self::assertTrue($mandatory['base']['max']->equals(Money::fromString('BTC', '0.500', 3)));
+        self::assertTrue($mandatory['grossBase']['max']->equals(Money::fromString('BTC', '0.510', 3)));
+
+        $optional = $edge['segments'][1];
+        self::assertFalse($optional['isMandatory']);
+        self::assertTrue($optional['base']['max']->equals(Money::fromString('BTC', '2.000', 3)));
+        self::assertTrue($optional['grossBase']['max']->equals(Money::fromString('BTC', '2.040', 3)));
     }
 
     public function test_build_encodes_fully_flexible_orders_as_single_segment(): void
@@ -266,6 +315,22 @@ final class GraphBuilderTest extends TestCase
                 $fee = $quoteAmount->multiply($this->percentage, $quoteAmount->scale());
 
                 return FeeBreakdown::forQuote($fee);
+            }
+        };
+    }
+
+    private function basePercentageFeePolicy(string $percentage): FeePolicy
+    {
+        return new class($percentage) implements FeePolicy {
+            public function __construct(private readonly string $percentage)
+            {
+            }
+
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                $fee = $baseAmount->multiply($this->percentage, $baseAmount->scale());
+
+                return FeeBreakdown::forBase($fee);
             }
         };
     }

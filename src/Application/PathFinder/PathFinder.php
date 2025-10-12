@@ -29,10 +29,12 @@ use function strtoupper;
  *     rate: ExchangeRate,
  *     baseCapacity: array{min: Money, max: Money},
  *     quoteCapacity: array{min: Money, max: Money},
+ *     grossBaseCapacity: array{min: Money, max: Money},
  *     segments: list<array{
  *         isMandatory: bool,
  *         base: array{min: Money, max: Money},
  *         quote: array{min: Money, max: Money},
+ *         grossBase: array{min: Money, max: Money},
  *     }>,
  * }
  * @phpstan-type Graph array<string, array{currency: string, edges: list<GraphEdge>}>
@@ -304,11 +306,11 @@ final class PathFinder
     }
 
     /**
-     * @param array{orderSide: OrderSide, segments: list<array{isMandatory: bool, base: array{min: Money, max: Money}, quote: array{min: Money, max: Money}}>} $edge
+     * @param array{orderSide: OrderSide, segments: list<array{isMandatory: bool, base: array{min: Money, max: Money}, quote: array{min: Money, max: Money}, grossBase: array{min: Money, max: Money}}>} $edge
      */
     private function edgeSupportsAmount(array $edge, Money $amount): bool
     {
-        $key = OrderSide::BUY === $edge['orderSide'] ? 'base' : 'quote';
+        $key = OrderSide::BUY === $edge['orderSide'] ? 'grossBase' : 'quote';
 
         $scale = $amount->scale();
         foreach ($edge['segments'] as $segment) {
@@ -343,7 +345,7 @@ final class PathFinder
     }
 
     /**
-     * @param array{to: string, orderSide: OrderSide, baseCapacity: array{min: Money, max: Money}, quoteCapacity: array{min: Money, max: Money}} $edge
+     * @param array{to: string, orderSide: OrderSide, baseCapacity: array{min: Money, max: Money}, quoteCapacity: array{min: Money, max: Money}, grossBaseCapacity: array{min: Money, max: Money}} $edge
      */
     private function calculateNextAmount(array $edge, Money $current): Money
     {
@@ -352,12 +354,38 @@ final class PathFinder
             return Money::zero($edge['to'], max($current->scale(), self::SCALE));
         }
 
-        $targetScale = match ($edge['orderSide']) {
-            OrderSide::BUY => max($edge['quoteCapacity']['max']->scale(), $edge['quoteCapacity']['min']->scale(), $current->scale(), self::SCALE),
-            OrderSide::SELL => max($edge['baseCapacity']['max']->scale(), $edge['baseCapacity']['min']->scale(), $current->scale(), self::SCALE),
+        [$sourceScale, $targetScale] = match ($edge['orderSide']) {
+            OrderSide::BUY => [
+                max(
+                    $edge['grossBaseCapacity']['max']->scale(),
+                    $edge['grossBaseCapacity']['min']->scale(),
+                    $current->scale(),
+                    self::SCALE,
+                ),
+                max(
+                    $edge['quoteCapacity']['max']->scale(),
+                    $edge['quoteCapacity']['min']->scale(),
+                    $current->scale(),
+                    self::SCALE,
+                ),
+            ],
+            OrderSide::SELL => [
+                max(
+                    $edge['quoteCapacity']['max']->scale(),
+                    $edge['quoteCapacity']['min']->scale(),
+                    $current->scale(),
+                    self::SCALE,
+                ),
+                max(
+                    $edge['baseCapacity']['max']->scale(),
+                    $edge['baseCapacity']['min']->scale(),
+                    $current->scale(),
+                    self::SCALE,
+                ),
+            ],
         };
 
-        $operationScale = max($current->scale(), $targetScale, self::SCALE);
+        $operationScale = max($sourceScale, $targetScale, self::SCALE);
         $normalizedCurrent = $current->withScale($operationScale)->amount();
         $raw = BcMath::mul($normalizedCurrent, $conversionRate, $operationScale + 2);
         $normalized = BcMath::normalize($raw, $targetScale);
@@ -366,7 +394,7 @@ final class PathFinder
     }
 
     /**
-     * @param array{orderSide: OrderSide, baseCapacity: array{min: Money, max: Money}, quoteCapacity: array{min: Money, max: Money}} $edge
+     * @param array{orderSide: OrderSide, baseCapacity: array{min: Money, max: Money}, quoteCapacity: array{min: Money, max: Money}, grossBaseCapacity: array{min: Money, max: Money}} $edge
      */
     private function edgeEffectiveConversionRate(array $edge): string
     {
@@ -383,14 +411,18 @@ final class PathFinder
     }
 
     /**
-     * @param array{baseCapacity: array{min: Money, max: Money}, quoteCapacity: array{min: Money, max: Money}} $edge
+     * @param array{orderSide: OrderSide, baseCapacity: array{min: Money, max: Money}, quoteCapacity: array{min: Money, max: Money}, grossBaseCapacity: array{min: Money, max: Money}} $edge
      */
     private function edgeBaseToQuoteRatio(array $edge): string
     {
-        $baseScale = max($edge['baseCapacity']['min']->scale(), $edge['baseCapacity']['max']->scale());
+        $baseCapacity = OrderSide::BUY === $edge['orderSide']
+            ? $edge['grossBaseCapacity']
+            : $edge['baseCapacity'];
+
+        $baseScale = max($baseCapacity['min']->scale(), $baseCapacity['max']->scale());
         $quoteScale = max($edge['quoteCapacity']['min']->scale(), $edge['quoteCapacity']['max']->scale());
 
-        $baseMax = $edge['baseCapacity']['max']->withScale($baseScale)->amount();
+        $baseMax = $baseCapacity['max']->withScale($baseScale)->amount();
         if (0 === BcMath::comp($baseMax, '0', $baseScale)) {
             return BcMath::normalize('0', self::SCALE);
         }
