@@ -139,6 +139,58 @@ final class GraphBuilderTest extends TestCase
         self::assertTrue($edge['segments'][0]['quote']['max']->equals(Money::fromString('USN', '10000.000', 3)));
     }
 
+    public function test_build_splits_bounds_into_mandatory_and_optional_segments(): void
+    {
+        $order = $this->createOrder(OrderSide::BUY, 'BTC', 'USD', '1.250', '3.750', '2500.000');
+
+        $graph = (new GraphBuilder())->build([$order]);
+
+        $edges = $graph['BTC']['edges'];
+        self::assertCount(1, $edges);
+
+        $edge = $edges[0];
+        self::assertTrue($edge['baseCapacity']['min']->equals(Money::fromString('BTC', '1.250', 3)));
+        self::assertTrue($edge['baseCapacity']['max']->equals(Money::fromString('BTC', '3.750', 3)));
+        self::assertTrue($edge['quoteCapacity']['min']->equals(Money::fromString('USD', '3125.000', 3)));
+        self::assertTrue($edge['quoteCapacity']['max']->equals(Money::fromString('USD', '9375.000', 3)));
+
+        self::assertCount(2, $edge['segments']);
+
+        $mandatory = $edge['segments'][0];
+        self::assertTrue($mandatory['isMandatory']);
+        self::assertTrue($mandatory['base']['min']->equals(Money::fromString('BTC', '1.250', 3)));
+        self::assertTrue($mandatory['base']['max']->equals(Money::fromString('BTC', '1.250', 3)));
+        self::assertTrue($mandatory['quote']['min']->equals(Money::fromString('USD', '3125.000', 3)));
+        self::assertTrue($mandatory['quote']['max']->equals(Money::fromString('USD', '3125.000', 3)));
+
+        $optional = $edge['segments'][1];
+        self::assertFalse($optional['isMandatory']);
+        self::assertTrue($optional['base']['min']->equals(Money::fromString('BTC', '0.000', 3)));
+        self::assertTrue($optional['base']['max']->equals(Money::fromString('BTC', '2.500', 3)));
+        self::assertTrue($optional['quote']['min']->equals(Money::fromString('USD', '0.000', 3)));
+        self::assertTrue($optional['quote']['max']->equals(Money::fromString('USD', '6250.000', 3)));
+    }
+
+    public function test_build_creates_zero_capacity_segment_for_point_orders(): void
+    {
+        $order = $this->createOrder(OrderSide::BUY, 'ETH', 'USD', '0.000', '0.000', '1800.000');
+
+        $graph = (new GraphBuilder())->build([$order]);
+
+        $edges = $graph['ETH']['edges'];
+        self::assertCount(1, $edges);
+
+        $edge = $edges[0];
+        self::assertCount(1, $edge['segments']);
+
+        $segment = $edge['segments'][0];
+        self::assertFalse($segment['isMandatory']);
+        self::assertTrue($segment['base']['min']->equals(Money::fromString('ETH', '0.000', 3)));
+        self::assertTrue($segment['base']['max']->equals(Money::fromString('ETH', '0.000', 3)));
+        self::assertTrue($segment['quote']['min']->equals(Money::fromString('USD', '0.000', 3)));
+        self::assertTrue($segment['quote']['max']->equals(Money::fromString('USD', '0.000', 3)));
+    }
+
     /**
      * @param non-empty-string $base
      * @param non-empty-string $quote

@@ -12,54 +12,56 @@ use SomeWork\P2PPathFinder\Application\Filter\MinimumAmountFilter;
 use SomeWork\P2PPathFinder\Application\Filter\ToleranceWindowFilter;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
-use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
-use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
-use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
+use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
+use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
 final class OrderFiltersTest extends TestCase
 {
     public function test_filter_composes_multiple_criteria(): void
     {
         $book = new OrderBook([
-            $this->createOrder('BTC', 'USD', '0.100', '1.000', '30000'),
-            $this->createOrder('BTC', 'USD', '0.600', '2.000', '30500'),
-            $this->createOrder('BTC', 'USD', '0.050', '0.400', '29900'),
-            $this->createOrder('ETH', 'USD', '0.100', '5.000', '2000'),
+            OrderFactory::buy(),
+            OrderFactory::buy(minAmount: '0.600', maxAmount: '2.000', rate: '30500'),
+            OrderFactory::buy(minAmount: '0.050', maxAmount: '0.400', rate: '29900'),
+            OrderFactory::buy(base: 'ETH', rate: '2000'),
         ]);
 
         $filters = [
-            new CurrencyPairFilter(AssetPair::fromString('BTC', 'USD')),
-            new MinimumAmountFilter(Money::fromString('BTC', '0.500', 3)),
-            new MaximumAmountFilter(Money::fromString('BTC', '0.500', 3)),
+            new CurrencyPairFilter(CurrencyScenarioFactory::assetPair('BTC', 'USD')),
+            new MinimumAmountFilter(CurrencyScenarioFactory::money('BTC', '0.500', 3)),
+            new MaximumAmountFilter(CurrencyScenarioFactory::money('BTC', '0.500', 3)),
         ];
 
         $filtered = iterator_to_array($book->filter(...$filters));
 
         self::assertCount(1, $filtered);
-        self::assertTrue($filtered[0]->bounds()->min()->equals(Money::fromString('BTC', '0.100', 3)));
+        self::assertTrue($filtered[0]->bounds()->min()->equals(CurrencyScenarioFactory::money('BTC', '0.100', 3)));
     }
 
-    public function test_tolerance_window_filter_handles_rate_window(): void
+    /**
+     * @dataProvider provideToleranceWindowCandidates
+     */
+    public function test_tolerance_window_filter_handles_rate_window(Order $order, bool $expected): void
     {
-        $reference = ExchangeRate::fromString('BTC', 'USD', '30000', 2);
-        $filter = new ToleranceWindowFilter($reference, '0.05');
+        $filter = new ToleranceWindowFilter(CurrencyScenarioFactory::exchangeRate('BTC', 'USD', '30000', 2), '0.05');
 
-        $matching = $this->createOrder('BTC', 'USD', '0.100', '1.000', '31500');
-        $lowerEdge = $this->createOrder('BTC', 'USD', '0.100', '1.000', '28500');
-        $outside = $this->createOrder('BTC', 'USD', '0.100', '1.000', '32000');
-        $differentPair = $this->createOrder('ETH', 'USD', '0.100', '1.000', '31500');
+        self::assertSame($expected, $filter->accepts($order));
+    }
 
-        self::assertTrue($filter->accepts($matching));
-        self::assertTrue($filter->accepts($lowerEdge));
-        self::assertFalse($filter->accepts($outside));
-        self::assertFalse($filter->accepts($differentPair));
+    /**
+     * @return iterable<string, array{Order, bool}>
+     */
+    public static function provideToleranceWindowCandidates(): iterable
+    {
+        yield 'upper boundary inside window' => [OrderFactory::buy(rate: '31500'), true];
+        yield 'lower boundary inside window' => [OrderFactory::buy(rate: '28500'), true];
+        yield 'outside tolerance window' => [OrderFactory::buy(rate: '32000'), false];
+        yield 'different asset pair' => [OrderFactory::buy(base: 'ETH', rate: '31500'), false];
     }
 
     public function test_tolerance_window_filter_rejects_negative_tolerance(): void
     {
-        $reference = ExchangeRate::fromString('BTC', 'USD', '30000', 2);
+        $reference = CurrencyScenarioFactory::exchangeRate('BTC', 'USD', '30000', 2);
 
         $this->expectException(InvalidArgumentException::class);
 
@@ -68,26 +70,10 @@ final class OrderFiltersTest extends TestCase
 
     public function test_amount_filters_ignore_currency_mismatches(): void
     {
-        $order = $this->createOrder('BTC', 'USD', '0.100', '1.000', '30000');
-        $foreignMoney = Money::fromString('ETH', '1.000', 3);
+        $order = OrderFactory::buy();
+        $foreignMoney = CurrencyScenarioFactory::money('ETH', '1.000', 3);
 
         self::assertFalse((new MinimumAmountFilter($foreignMoney))->accepts($order));
         self::assertFalse((new MaximumAmountFilter($foreignMoney))->accepts($order));
-    }
-
-    /**
-     * @param non-empty-string $base
-     * @param non-empty-string $quote
-     */
-    private function createOrder(string $base, string $quote, string $min, string $max, string $rate): Order
-    {
-        $assetPair = AssetPair::fromString($base, $quote);
-        $bounds = OrderBounds::from(
-            Money::fromString($base, $min, 3),
-            Money::fromString($base, $max, 3),
-        );
-        $exchangeRate = ExchangeRate::fromString($base, $quote, $rate, 2);
-
-        return new Order(OrderSide::BUY, $assetPair, $bounds, $exchangeRate);
     }
 }
