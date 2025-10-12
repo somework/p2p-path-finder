@@ -27,9 +27,9 @@ final class PathResultFormatterTest extends TestCase
         $result = new PathResult(
             Money::fromString('USD', '100', 2),
             Money::fromString('EUR', '95', 2),
-            Money::fromString('USD', '1.50', 2),
             0.025,
             [$leg],
+            ['USD' => Money::fromString('USD', '1.50', 2)],
         );
 
         $formatter = new PathResultFormatter();

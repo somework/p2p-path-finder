@@ -16,19 +16,25 @@ use function array_is_list;
 final class PathResult implements JsonSerializable
 {
     /**
+     * @var array<string, Money>
+     */
+    private readonly array $feeBreakdown;
+
+    /**
      * @var list<PathLeg>
      */
     private readonly array $legs;
 
     /**
-     * @param list<PathLeg> $legs
+     * @param list<PathLeg>        $legs
+     * @param array<string, Money> $feeBreakdown
      */
     public function __construct(
         private readonly Money $totalSpent,
         private readonly Money $totalReceived,
-        private readonly Money $totalFees,
         private readonly float $residualTolerance,
         array $legs = [],
+        array $feeBreakdown = [],
     ) {
         if ($residualTolerance < 0.0 || $residualTolerance > 1.0) {
             throw new InvalidArgumentException('Residual tolerance must be a value between 0 and 1 inclusive.');
@@ -45,6 +51,7 @@ final class PathResult implements JsonSerializable
         }
 
         $this->legs = $legs;
+        $this->feeBreakdown = $this->normalizeFeeBreakdown($feeBreakdown);
     }
 
     /**
@@ -64,11 +71,11 @@ final class PathResult implements JsonSerializable
     }
 
     /**
-     * Returns the cumulative fees charged across all legs.
+     * @return array<string, Money>
      */
-    public function totalFees(): Money
+    public function feeBreakdown(): array
     {
-        return $this->totalFees;
+        return $this->feeBreakdown;
     }
 
     /**
@@ -91,8 +98,8 @@ final class PathResult implements JsonSerializable
      * @return array{
      *     totalSpent: array{currency: string, amount: string, scale: int},
      *     totalReceived: array{currency: string, amount: string, scale: int},
-     *     totalFees: array{currency: string, amount: string, scale: int},
      *     residualTolerance: float,
+     *     feeBreakdown: array<string, array{currency: string, amount: string, scale: int}>,
      *     legs: list<array{
      *         from: string,
      *         to: string,
@@ -104,13 +111,48 @@ final class PathResult implements JsonSerializable
      */
     public function jsonSerialize(): array
     {
+        $fees = [];
+        foreach ($this->feeBreakdown as $currency => $fee) {
+            $fees[$currency] = self::serializeMoney($fee);
+        }
+
         return [
             'totalSpent' => self::serializeMoney($this->totalSpent),
             'totalReceived' => self::serializeMoney($this->totalReceived),
-            'totalFees' => self::serializeMoney($this->totalFees),
             'residualTolerance' => $this->residualTolerance,
+            'feeBreakdown' => $fees,
             'legs' => array_map(static fn (PathLeg $leg): array => $leg->jsonSerialize(), $this->legs),
         ];
+    }
+
+    /**
+     * @param array<string, Money> $feeBreakdown
+     *
+     * @return array<string, Money>
+     */
+    private function normalizeFeeBreakdown(array $feeBreakdown): array
+    {
+        $normalized = [];
+
+        foreach ($feeBreakdown as $entry) {
+            if (!$entry instanceof Money) {
+                throw new InvalidArgumentException('Fee breakdown must contain instances of Money.');
+            }
+
+            $currency = $entry->currency();
+
+            if (isset($normalized[$currency])) {
+                $normalized[$currency] = $normalized[$currency]->add($entry);
+
+                continue;
+            }
+
+            $normalized[$currency] = $entry;
+        }
+
+        ksort($normalized);
+
+        return $normalized;
     }
 
     /**

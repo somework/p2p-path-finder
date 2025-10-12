@@ -9,6 +9,7 @@ use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
+use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
@@ -54,6 +55,45 @@ final class PathFinderServiceTest extends TestCase
         self::assertSame('JPY', $legs[1]->to());
         self::assertSame('111.100', $legs[1]->spent()->amount());
         self::assertSame('16665.000', $legs[1]->received()->amount());
+    }
+
+    public function test_it_materializes_leg_fees_and_breakdown(): void
+    {
+        $orderBook = new OrderBook([
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '200.000', '0.900', 3, $this->percentageFeePolicy('0.01')),
+            $this->createOrder(OrderSide::BUY, 'USD', 'JPY', '50.000', '200.000', '150.000', 3, $this->percentageFeePolicy('0.02')),
+        ]);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.25)
+            ->withHopLimits(1, 2)
+            ->build();
+
+        $service = new PathFinderService(new GraphBuilder());
+        $result = $service->findBestPath($orderBook, $config, 'JPY');
+
+        self::assertNotNull($result);
+
+        $legs = $result->legs();
+        self::assertCount(2, $legs);
+
+        self::assertSame('100.000', $legs[0]->spent()->amount());
+        self::assertSame('112.233', $legs[0]->received()->amount());
+        self::assertSame('EUR', $legs[0]->fee()->currency());
+        self::assertSame('1.010', $legs[0]->fee()->amount());
+
+        self::assertSame('112.233', $legs[1]->spent()->amount());
+        self::assertSame('17171.649', $legs[1]->received()->amount());
+        self::assertSame('JPY', $legs[1]->fee()->currency());
+        self::assertSame('336.699', $legs[1]->fee()->amount());
+
+        $feeBreakdown = $result->feeBreakdown();
+        self::assertCount(2, $feeBreakdown);
+        self::assertArrayHasKey('EUR', $feeBreakdown);
+        self::assertArrayHasKey('JPY', $feeBreakdown);
+        self::assertSame('1.010', $feeBreakdown['EUR']->amount());
+        self::assertSame('336.699', $feeBreakdown['JPY']->amount());
     }
 
     public function test_it_returns_null_when_tolerance_window_filters_out_orders(): void
@@ -118,7 +158,7 @@ final class PathFinderServiceTest extends TestCase
         self::assertEqualsWithDelta(0.1, $result->residualTolerance(), 1e-9);
     }
 
-    private function createOrder(OrderSide $side, string $base, string $quote, string $min, string $max, string $rate, int $rateScale): Order
+    private function createOrder(OrderSide $side, string $base, string $quote, string $min, string $max, string $rate, int $rateScale, ?FeePolicy $feePolicy = null): Order
     {
         $assetPair = AssetPair::fromString($base, $quote);
         $bounds = OrderBounds::from(
@@ -127,6 +167,20 @@ final class PathFinderServiceTest extends TestCase
         );
         $exchangeRate = ExchangeRate::fromString($base, $quote, $rate, $rateScale);
 
-        return new Order($side, $assetPair, $bounds, $exchangeRate);
+        return new Order($side, $assetPair, $bounds, $exchangeRate, $feePolicy);
+    }
+
+    private function percentageFeePolicy(string $percentage): FeePolicy
+    {
+        return new class($percentage) implements FeePolicy {
+            public function __construct(private readonly string $percentage)
+            {
+            }
+
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): Money
+            {
+                return $quoteAmount->multiply($this->percentage, $quoteAmount->scale());
+            }
+        };
     }
 }

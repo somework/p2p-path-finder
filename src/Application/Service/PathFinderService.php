@@ -192,7 +192,7 @@ final class PathFinderService
         $legs = [];
         $current = $actualSpend;
         $currentCurrency = $current->currency();
-        $totalFees = Money::zero($requestedSpend->currency(), $requestedSpend->scale());
+        $feeBreakdown = [];
 
         foreach ($edges as $edge) {
             $order = $edge['order'];
@@ -210,21 +210,24 @@ final class PathFinderService
                     return null;
                 }
 
-                $received = $order->calculateEffectiveQuoteAmount($spent);
-                $fee = Money::zero($spent->currency(), $spent->scale());
+                $rawQuote = $order->calculateQuoteAmount($spent);
+                $fee = $this->resolveFee($order, $orderSide, $spent, $rawQuote);
+                $received = $rawQuote;
+                if (!$fee->isZero()) {
+                    $received = $rawQuote->add($fee);
+                }
             } else {
-                $spent = $current;
-                $rate = $order->effectiveRate()->invert();
-                $scale = max($spent->scale(), $order->bounds()->min()->scale(), $rate->scale());
-                $spent = $spent->withScale($scale);
-                $received = $rate->convert($spent, $scale);
+                $targetEffectiveQuote = $current->withScale(max($current->scale(), $order->bounds()->min()->scale()));
+                $resolved = $this->resolveSellLegAmounts($order, $targetEffectiveQuote);
 
-                if (!$order->bounds()->contains($received->withScale(max($received->scale(), $order->bounds()->min()->scale())))) {
+                if (null === $resolved) {
                     return null;
                 }
 
-                $fee = Money::zero($spent->currency(), $spent->scale());
+                [$spent, $received, $fee] = $resolved;
             }
+
+            $this->accumulateFee($feeBreakdown, $fee);
 
             $legs[] = new PathLeg($from, $to, $spent, $received, $fee);
             $current = $received;
@@ -251,10 +254,153 @@ final class PathFinderService
         return new PathResult(
             $actualSpend,
             $current,
-            $totalFees,
             $residual,
             $legs,
+            $feeBreakdown,
         );
+    }
+
+    /**
+     * @param array<string, Money> $feeBreakdown
+     */
+    private function accumulateFee(array &$feeBreakdown, Money $fee): void
+    {
+        if ($fee->isZero()) {
+            return;
+        }
+
+        $currency = $fee->currency();
+
+        if (isset($feeBreakdown[$currency])) {
+            $feeBreakdown[$currency] = $feeBreakdown[$currency]->add($fee);
+
+            return;
+        }
+
+        $feeBreakdown[$currency] = $fee;
+    }
+
+    private function resolveFee(Order $order, OrderSide $side, Money $baseAmount, Money $rawQuote): Money
+    {
+        $policy = $order->feePolicy();
+        if (null === $policy) {
+            return Money::zero($rawQuote->currency(), $rawQuote->scale());
+        }
+
+        return $policy->calculate($side, $baseAmount, $rawQuote);
+    }
+
+    /**
+     * @return array{0: Money, 1: Money, 2: Money}|null
+     */
+    private function resolveSellLegAmounts(Order $order, Money $targetEffectiveQuote): ?array
+    {
+        $bounds = $order->bounds();
+
+        if (null === $order->feePolicy()) {
+            $rate = $order->effectiveRate()->invert();
+            $scale = max(
+                $targetEffectiveQuote->scale(),
+                $bounds->min()->scale(),
+                $rate->scale(),
+            );
+
+            $spent = $targetEffectiveQuote->withScale($scale);
+            $received = $rate->convert($spent, $scale);
+
+            if (!$bounds->contains($received->withScale(max($received->scale(), $bounds->min()->scale())))) {
+                return null;
+            }
+
+            return [
+                $spent,
+                $received,
+                Money::zero($spent->currency(), $spent->scale()),
+            ];
+        }
+
+        $rate = $order->effectiveRate()->invert();
+        $scale = max(
+            $targetEffectiveQuote->scale(),
+            $bounds->min()->scale(),
+            $bounds->max()->scale(),
+            $rate->scale(),
+        );
+
+        $effectiveQuote = $targetEffectiveQuote->withScale($scale);
+        $baseAmount = $rate->convert($effectiveQuote, $scale);
+        $baseAmount = $this->alignBaseScale($bounds->min()->scale(), $bounds->max()->scale(), $baseAmount);
+
+        [$rawQuote, $fee, $effectiveQuoteAmount] = $this->evaluateSellQuote($order, $baseAmount);
+
+        $effectiveQuoteAmount = $effectiveQuoteAmount->withScale(max($effectiveQuoteAmount->scale(), $effectiveQuote->scale()));
+        $effectiveQuote = $effectiveQuote->withScale($effectiveQuoteAmount->scale());
+
+        for ($attempt = 0; $attempt < 2; ++$attempt) {
+            if (0 === $effectiveQuoteAmount->compare($effectiveQuote)) {
+                break;
+            }
+
+            if ($effectiveQuoteAmount->isZero()) {
+                $effectiveQuoteAmount = $effectiveQuote;
+
+                break;
+            }
+
+            $ratioScale = max($effectiveQuoteAmount->scale(), $effectiveQuote->scale(), 12);
+            $targetAmount = $effectiveQuote->withScale($ratioScale)->amount();
+            $currentAmount = $effectiveQuoteAmount->withScale($ratioScale)->amount();
+
+            if (0 === BcMath::comp($currentAmount, '0', $ratioScale)) {
+                return null;
+            }
+
+            $ratio = BcMath::div($targetAmount, $currentAmount, $ratioScale + 6);
+            $baseAmount = $baseAmount->multiply($ratio, max($baseAmount->scale(), $ratioScale));
+            $baseAmount = $this->alignBaseScale($bounds->min()->scale(), $bounds->max()->scale(), $baseAmount);
+
+            [$rawQuote, $fee, $effectiveQuoteAmount] = $this->evaluateSellQuote($order, $baseAmount);
+            $effectiveQuoteAmount = $effectiveQuoteAmount->withScale(max($effectiveQuoteAmount->scale(), $effectiveQuote->scale()));
+            $effectiveQuote = $effectiveQuote->withScale($effectiveQuoteAmount->scale());
+        }
+
+        $effectiveQuoteAmount = $targetEffectiveQuote->withScale(max($targetEffectiveQuote->scale(), $bounds->min()->scale()));
+        $fee = $fee->withScale($effectiveQuoteAmount->scale());
+
+        if (!$bounds->contains($baseAmount->withScale(max($baseAmount->scale(), $bounds->min()->scale())))) {
+            return null;
+        }
+
+        $baseAmount = $baseAmount->withScale($bounds->min()->scale());
+
+        return [
+            $effectiveQuoteAmount,
+            $baseAmount,
+            $fee,
+        ];
+    }
+
+    private function alignBaseScale(int $minScale, int $maxScale, Money $baseAmount): Money
+    {
+        $scale = max($baseAmount->scale(), $minScale, $maxScale);
+
+        return $baseAmount->withScale($scale);
+    }
+
+    /**
+     * @return array{0: Money, 1: Money, 2: Money}
+     */
+    private function evaluateSellQuote(Order $order, Money $baseAmount): array
+    {
+        $rawQuote = $order->calculateQuoteAmount($baseAmount);
+        $fee = $this->resolveFee($order, OrderSide::SELL, $baseAmount, $rawQuote);
+        $effectiveQuote = $rawQuote;
+
+        if (!$fee->isZero()) {
+            $effectiveQuote = $rawQuote->subtract($fee);
+        }
+
+        return [$rawQuote, $fee, $effectiveQuote];
     }
 
     private function calculateResidualTolerance(Money $desired, Money $actual): float

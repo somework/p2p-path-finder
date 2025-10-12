@@ -32,17 +32,23 @@ final class PathResultTest extends TestCase
         $result = new PathResult(
             Money::fromString('USD', '60', 2),
             Money::fromString('EUR', '55', 2),
-            Money::fromString('USD', '0.30', 2),
             0.05,
             [$firstLeg, $secondLeg],
+            [
+                'USD' => Money::fromString('USD', '0.30', 2),
+                'EUR' => Money::fromString('EUR', '0.10', 2),
+            ],
         );
 
         $this->assertSame(
             [
                 'totalSpent' => ['currency' => 'USD', 'amount' => '60.00', 'scale' => 2],
                 'totalReceived' => ['currency' => 'EUR', 'amount' => '55.00', 'scale' => 2],
-                'totalFees' => ['currency' => 'USD', 'amount' => '0.30', 'scale' => 2],
                 'residualTolerance' => 0.05,
+                'feeBreakdown' => [
+                    'EUR' => ['currency' => 'EUR', 'amount' => '0.10', 'scale' => 2],
+                    'USD' => ['currency' => 'USD', 'amount' => '0.30', 'scale' => 2],
+                ],
                 'legs' => [
                     [
                         'from' => 'USD',
