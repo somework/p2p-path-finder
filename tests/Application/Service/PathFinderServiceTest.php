@@ -85,13 +85,15 @@ final class PathFinderServiceTest extends TestCase
 
         self::assertSame('100.000', $legs[0]->spent()->amount());
         self::assertSame('112.233', $legs[0]->received()->amount());
-        self::assertSame('EUR', $legs[0]->fee()->currency());
-        self::assertSame('1.010', $legs[0]->fee()->amount());
+        $firstLegFees = $legs[0]->fees();
+        self::assertArrayHasKey('EUR', $firstLegFees);
+        self::assertSame('1.010', $firstLegFees['EUR']->amount());
 
         self::assertSame('112.233', $legs[1]->spent()->amount());
         self::assertSame('16498.251', $legs[1]->received()->amount());
-        self::assertSame('JPY', $legs[1]->fee()->currency());
-        self::assertSame('336.699', $legs[1]->fee()->amount());
+        $secondLegFees = $legs[1]->fees();
+        self::assertArrayHasKey('JPY', $secondLegFees);
+        self::assertSame('336.699', $secondLegFees['JPY']->amount());
 
         $rawWithoutFee = Money::fromString('JPY', '16834.950', 3);
         self::assertTrue($legs[1]->received()->lessThan($rawWithoutFee));
@@ -104,6 +106,49 @@ final class PathFinderServiceTest extends TestCase
         self::assertSame('336.699', $feeBreakdown['JPY']->amount());
 
         self::assertTrue($result->totalReceived()->lessThan($rawWithoutFee));
+    }
+
+    public function test_it_includes_base_fee_in_total_spent(): void
+    {
+        $orderBook = new OrderBook([
+            $this->createOrder(
+                OrderSide::BUY,
+                'EUR',
+                'USD',
+                '10.000',
+                '200.000',
+                '1.200',
+                3,
+                $this->basePercentageFeePolicy('0.02'),
+            ),
+        ]);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.05)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $service = new PathFinderService(new GraphBuilder());
+        $result = $service->findBestPath($orderBook, $config, 'USD');
+
+        self::assertNotNull($result);
+
+        self::assertSame('EUR', $result->totalSpent()->currency());
+        self::assertSame('102.000', $result->totalSpent()->amount());
+        self::assertEqualsWithDelta(0.02, $result->residualTolerance(), 0.0000001);
+
+        $legs = $result->legs();
+        self::assertCount(1, $legs);
+        self::assertSame('102.000', $legs[0]->spent()->amount());
+
+        $fees = $legs[0]->fees();
+        self::assertArrayHasKey('EUR', $fees);
+        self::assertSame('2.000', $fees['EUR']->amount());
+
+        $feeBreakdown = $result->feeBreakdown();
+        self::assertArrayHasKey('EUR', $feeBreakdown);
+        self::assertSame('2.000', $feeBreakdown['EUR']->amount());
     }
 
     public function test_it_materializes_chained_buy_legs_with_fees_using_net_quotes(): void
@@ -136,15 +181,17 @@ final class PathFinderServiceTest extends TestCase
         self::assertSame('USD', $legs[0]->to());
         self::assertSame('100.000', $legs[0]->spent()->amount());
         self::assertSame('104.500', $legs[0]->received()->amount());
-        self::assertSame('USD', $legs[0]->fee()->currency());
-        self::assertSame('5.500', $legs[0]->fee()->amount());
+        $firstLegFees = $legs[0]->fees();
+        self::assertArrayHasKey('USD', $firstLegFees);
+        self::assertSame('5.500', $firstLegFees['USD']->amount());
 
         self::assertSame('USD', $legs[1]->from());
         self::assertSame('JPY', $legs[1]->to());
         self::assertSame('104.500', $legs[1]->spent()->amount());
         self::assertSame('15361.500', $legs[1]->received()->amount());
-        self::assertSame('JPY', $legs[1]->fee()->currency());
-        self::assertSame('313.500', $legs[1]->fee()->amount());
+        $secondLegFees = $legs[1]->fees();
+        self::assertArrayHasKey('JPY', $secondLegFees);
+        self::assertSame('313.500', $secondLegFees['JPY']->amount());
 
         $rawUsdWithoutFee = Money::fromString('USD', '110.000', 3);
         $rawJpyWithoutFee = Money::fromString('JPY', '15675.000', 3);
@@ -184,8 +231,9 @@ final class PathFinderServiceTest extends TestCase
         self::assertCount(1, $legs);
         self::assertSame('USD', $legs[0]->to());
         self::assertSame('118.800', $legs[0]->received()->amount());
-        self::assertSame('USD', $legs[0]->fee()->currency());
-        self::assertSame('1.200', $legs[0]->fee()->amount());
+        $fees = $legs[0]->fees();
+        self::assertArrayHasKey('USD', $fees);
+        self::assertSame('1.200', $fees['USD']->amount());
     }
 
     public function test_it_prefers_fee_efficient_multi_hop_route_over_high_fee_alternative(): void
@@ -414,10 +462,14 @@ final class PathFinderServiceTest extends TestCase
             sprintf('Effective quote mismatch of %s exceeds tolerance.', $difference),
         );
 
-        $feeScale = max($expectedFee->scale(), $leg->fee()->scale(), 6);
+        $legFees = $leg->fees();
+        self::assertArrayHasKey($expectedFee->currency(), $legFees);
+        $actualFee = $legFees[$expectedFee->currency()];
+
+        $feeScale = max($expectedFee->scale(), $actualFee->scale(), 6);
         self::assertSame(
             $expectedFee->withScale($feeScale)->amount(),
-            $leg->fee()->withScale($feeScale)->amount(),
+            $actualFee->withScale($feeScale)->amount(),
         );
     }
 
@@ -449,6 +501,22 @@ final class PathFinderServiceTest extends TestCase
         $exchangeRate = ExchangeRate::fromString($base, $quote, $rate, $rateScale);
 
         return new Order($side, $assetPair, $bounds, $exchangeRate, $feePolicy);
+    }
+
+    private function basePercentageFeePolicy(string $percentage): FeePolicy
+    {
+        return new class($percentage) implements FeePolicy {
+            public function __construct(private readonly string $percentage)
+            {
+            }
+
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                $fee = $baseAmount->multiply($this->percentage, $baseAmount->scale());
+
+                return FeeBreakdown::forBase($fee);
+            }
+        };
     }
 
     private function percentageFeePolicy(string $percentage): FeePolicy

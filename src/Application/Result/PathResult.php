@@ -105,7 +105,7 @@ final class PathResult implements JsonSerializable
      *         to: string,
      *         spent: array{currency: string, amount: string, scale: int},
      *         received: array{currency: string, amount: string, scale: int},
-     *         fee: array{currency: string, amount: string, scale: int},
+     *         fees: array<string, array{currency: string, amount: string, scale: int}>,
      *     }>,
      * }
      */

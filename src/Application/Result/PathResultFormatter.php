@@ -28,7 +28,7 @@ final class PathResultFormatter
      *         to: string,
      *         spent: array{currency: string, amount: string, scale: int},
      *         received: array{currency: string, amount: string, scale: int},
-     *         fee: array{currency: string, amount: string, scale: int},
+     *         fees: array<string, array{currency: string, amount: string, scale: int}>,
      *     }>,
      * }
      */
@@ -44,7 +44,7 @@ final class PathResultFormatter
          *         to: string,
          *         spent: array{currency: string, amount: string, scale: int},
          *         received: array{currency: string, amount: string, scale: int},
-         *         fee: array{currency: string, amount: string, scale: int},
+         *         fees: array<string, array{currency: string, amount: string, scale: int}>,
          *     }>,
          * } $payload
          */
@@ -70,13 +70,13 @@ final class PathResultFormatter
         $lines[] = 'Legs:';
         foreach ($result->legs() as $index => $leg) {
             $lines[] = sprintf(
-                '  %d. %s -> %s | Spent %s | Received %s | Fee %s',
+                '  %d. %s -> %s | Spent %s | Received %s | Fees %s',
                 $index + 1,
                 $leg->from(),
                 $leg->to(),
                 $this->formatMoney($leg->spent()),
                 $this->formatMoney($leg->received()),
-                $this->formatMoney($leg->fee()),
+                $this->formatFeeSummary($leg->fees()),
             );
         }
 

@@ -17,7 +17,7 @@ final class PathLegTest extends TestCase
             'eur',
             Money::fromString('USD', '50', 2),
             Money::fromString('EUR', '45', 2),
-            Money::fromString('USD', '0.50', 2),
+            [Money::fromString('USD', '0.50', 2)],
         );
 
         $this->assertSame(
@@ -26,7 +26,9 @@ final class PathLegTest extends TestCase
                 'to' => 'EUR',
                 'spent' => ['currency' => 'USD', 'amount' => '50.00', 'scale' => 2],
                 'received' => ['currency' => 'EUR', 'amount' => '45.00', 'scale' => 2],
-                'fee' => ['currency' => 'USD', 'amount' => '0.50', 'scale' => 2],
+                'fees' => [
+                    'USD' => ['currency' => 'USD', 'amount' => '0.50', 'scale' => 2],
+                ],
             ],
             $leg->jsonSerialize(),
         );
