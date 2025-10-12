@@ -172,7 +172,7 @@ final class PathFinder
                     continue;
                 }
 
-                $conversionRate = $this->edgeConversionRate($edge);
+                $conversionRate = $this->edgeEffectiveConversionRate($edge);
                 if (1 !== BcMath::comp($conversionRate, '0', self::SCALE)) {
                     continue;
                 }
@@ -279,19 +279,6 @@ final class PathFinder
     }
 
     /**
-     * @param array{orderSide: OrderSide, rate: ExchangeRate} $edge
-     */
-    private function edgeConversionRate(array $edge): string
-    {
-        $rate = $edge['rate']->rate();
-
-        return match ($edge['orderSide']) {
-            OrderSide::BUY => BcMath::normalize($rate, self::SCALE),
-            OrderSide::SELL => BcMath::div('1', $rate, self::SCALE),
-        };
-    }
-
-    /**
      * @return SplPriorityQueue<array{cost: string, order: int}, array{node: string, cost: string, product: string, hops: int, path: list<array<string, mixed>>, amount: Money|null}>
      */
     private function createQueue(): SplPriorityQueue
@@ -356,17 +343,61 @@ final class PathFinder
     }
 
     /**
-     * @param array{orderSide: OrderSide, rate: ExchangeRate} $edge
+     * @param array{to: string, orderSide: OrderSide, baseCapacity: array{min: Money, max: Money}, quoteCapacity: array{min: Money, max: Money}} $edge
      */
     private function calculateNextAmount(array $edge, Money $current): Money
     {
-        $rate = OrderSide::BUY === $edge['orderSide']
-            ? $edge['rate']
-            : $edge['rate']->invert();
+        $conversionRate = $this->edgeEffectiveConversionRate($edge);
+        if (1 !== BcMath::comp($conversionRate, '0', self::SCALE)) {
+            return Money::zero($edge['to'], max($current->scale(), self::SCALE));
+        }
 
-        $scale = max($current->scale(), $rate->scale());
+        $targetScale = match ($edge['orderSide']) {
+            OrderSide::BUY => max($edge['quoteCapacity']['max']->scale(), $edge['quoteCapacity']['min']->scale(), $current->scale(), self::SCALE),
+            OrderSide::SELL => max($edge['baseCapacity']['max']->scale(), $edge['baseCapacity']['min']->scale(), $current->scale(), self::SCALE),
+        };
 
-        return $rate->convert($current->withScale($scale), $scale);
+        $operationScale = max($current->scale(), $targetScale, self::SCALE);
+        $normalizedCurrent = $current->withScale($operationScale)->amount();
+        $raw = BcMath::mul($normalizedCurrent, $conversionRate, $operationScale + 2);
+        $normalized = BcMath::normalize($raw, $targetScale);
+
+        return Money::fromString($edge['to'], $normalized, $targetScale);
+    }
+
+    /**
+     * @param array{orderSide: OrderSide, baseCapacity: array{min: Money, max: Money}, quoteCapacity: array{min: Money, max: Money}} $edge
+     */
+    private function edgeEffectiveConversionRate(array $edge): string
+    {
+        $baseToQuote = $this->edgeBaseToQuoteRatio($edge);
+        if (1 !== BcMath::comp($baseToQuote, '0', self::SCALE)) {
+            return $baseToQuote;
+        }
+
+        if (OrderSide::SELL === $edge['orderSide']) {
+            return BcMath::div('1', $baseToQuote, self::SCALE);
+        }
+
+        return $baseToQuote;
+    }
+
+    /**
+     * @param array{baseCapacity: array{min: Money, max: Money}, quoteCapacity: array{min: Money, max: Money}} $edge
+     */
+    private function edgeBaseToQuoteRatio(array $edge): string
+    {
+        $baseScale = max($edge['baseCapacity']['min']->scale(), $edge['baseCapacity']['max']->scale());
+        $quoteScale = max($edge['quoteCapacity']['min']->scale(), $edge['quoteCapacity']['max']->scale());
+
+        $baseMax = $edge['baseCapacity']['max']->withScale($baseScale)->amount();
+        if (0 === BcMath::comp($baseMax, '0', $baseScale)) {
+            return BcMath::normalize('0', self::SCALE);
+        }
+
+        $quoteMax = $edge['quoteCapacity']['max']->withScale($quoteScale)->amount();
+
+        return BcMath::div($quoteMax, $baseMax, self::SCALE);
     }
 
     private function calculateToleranceAmplifier(float $tolerance): string

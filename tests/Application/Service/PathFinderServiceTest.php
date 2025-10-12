@@ -159,6 +159,63 @@ final class PathFinderServiceTest extends TestCase
         self::assertSame('313.500', $feeBreakdown['JPY']->amount());
     }
 
+    public function test_it_prefers_fee_efficient_direct_route_over_higher_raw_rate(): void
+    {
+        $orderBook = new OrderBook([
+            $this->createOrder(OrderSide::BUY, 'EUR', 'USD', '50.000', '200.000', '1.250', 3, $this->percentageFeePolicy('0.10')),
+            $this->createOrder(OrderSide::BUY, 'EUR', 'USD', '50.000', '200.000', '1.200', 3, $this->percentageFeePolicy('0.01')),
+        ]);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.0)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $service = new PathFinderService(new GraphBuilder());
+        $result = $service->findBestPath($orderBook, $config, 'USD');
+
+        self::assertNotNull($result);
+        self::assertSame('USD', $result->totalReceived()->currency());
+        self::assertSame('118.800', $result->totalReceived()->amount());
+
+        $legs = $result->legs();
+        self::assertCount(1, $legs);
+        self::assertSame('USD', $legs[0]->to());
+        self::assertSame('118.800', $legs[0]->received()->amount());
+        self::assertSame('USD', $legs[0]->fee()->currency());
+        self::assertSame('1.200', $legs[0]->fee()->amount());
+    }
+
+    public function test_it_prefers_fee_efficient_multi_hop_route_over_high_fee_alternative(): void
+    {
+        $orderBook = new OrderBook([
+            $this->createOrder(OrderSide::BUY, 'EUR', 'USD', '50.000', '200.000', '1.250', 3, $this->percentageFeePolicy('0.10')),
+            $this->createOrder(OrderSide::BUY, 'EUR', 'USD', '50.000', '200.000', '1.200', 3, $this->percentageFeePolicy('0.01')),
+            $this->createOrder(OrderSide::BUY, 'USD', 'JPY', '50.000', '200.000', '140.000', 3),
+        ]);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.10)
+            ->withHopLimits(1, 2)
+            ->build();
+
+        $service = new PathFinderService(new GraphBuilder());
+        $result = $service->findBestPath($orderBook, $config, 'JPY');
+
+        self::assertNotNull($result);
+        self::assertSame('JPY', $result->totalReceived()->currency());
+        self::assertSame('16632.000', $result->totalReceived()->amount());
+
+        $legs = $result->legs();
+        self::assertCount(2, $legs);
+        self::assertSame('USD', $legs[0]->to());
+        self::assertSame('118.800', $legs[0]->received()->amount());
+        self::assertSame('JPY', $legs[1]->to());
+        self::assertSame('16632.000', $legs[1]->received()->amount());
+    }
+
     public function test_it_skips_highest_scoring_path_when_complex_book_lacks_capacity(): void
     {
         $orderBook = new OrderBook([
