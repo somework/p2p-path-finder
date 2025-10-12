@@ -66,7 +66,11 @@ final class PathFinderService
             $graph,
             $sourceCurrency,
             $targetCurrency,
-            $config->minimumSpendAmount(),
+            [
+                'min' => $config->minimumSpendAmount(),
+                'max' => $config->maximumSpendAmount(),
+                'desired' => $config->spendAmount(),
+            ],
             function (array $candidate) use (&$materializedResult, &$materializedCost, $config, $sourceCurrency, $targetCurrency) {
                 if ($candidate['hops'] < $config->minimumHops() || $candidate['hops'] > $config->maximumHops()) {
                     return false;
