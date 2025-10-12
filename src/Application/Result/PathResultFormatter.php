@@ -21,8 +21,8 @@ final class PathResultFormatter
      * @return array{
      *     totalSpent: array{currency: string, amount: string, scale: int},
      *     totalReceived: array{currency: string, amount: string, scale: int},
-     *     totalFees: array{currency: string, amount: string, scale: int},
      *     residualTolerance: float,
+     *     feeBreakdown: array<string, array{currency: string, amount: string, scale: int}>,
      *     legs: list<array{
      *         from: string,
      *         to: string,
@@ -37,8 +37,8 @@ final class PathResultFormatter
         /** @var array{
          *     totalSpent: array{currency: string, amount: string, scale: int},
          *     totalReceived: array{currency: string, amount: string, scale: int},
-         *     totalFees: array{currency: string, amount: string, scale: int},
          *     residualTolerance: float,
+         *     feeBreakdown: array<string, array{currency: string, amount: string, scale: int}>,
          *     legs: list<array{
          *         from: string,
          *         to: string,
@@ -63,7 +63,7 @@ final class PathResultFormatter
             'Total spent: %s; total received: %s; total fees: %s; residual tolerance: %s%%.',
             $this->formatMoney($result->totalSpent()),
             $this->formatMoney($result->totalReceived()),
-            $this->formatMoney($result->totalFees()),
+            $this->formatFeeSummary($result->feeBreakdown()),
             number_format($result->residualTolerance() * 100, 2, '.', ''),
         );
 
@@ -81,6 +81,23 @@ final class PathResultFormatter
         }
 
         return implode(PHP_EOL, $lines);
+    }
+
+    /**
+     * @param array<string, Money> $fees
+     */
+    private function formatFeeSummary(array $fees): string
+    {
+        if ([] === $fees) {
+            return 'none';
+        }
+
+        $parts = [];
+        foreach ($fees as $fee) {
+            $parts[] = $this->formatMoney($fee);
+        }
+
+        return implode(', ', $parts);
     }
 
     private function formatMoney(Money $money): string
