@@ -18,12 +18,18 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 use function strtoupper;
 
+/**
+ * High level facade orchestrating order filtering, graph building and path search.
+ */
 final class PathFinderService
 {
     public function __construct(private readonly GraphBuilder $graphBuilder)
     {
     }
 
+    /**
+     * Searches for the best conversion path from the configured spend asset to the target asset.
+     */
     public function findBestPath(OrderBook $orderBook, PathSearchConfig $config, string $targetAsset): ?PathResult
     {
         if ('' === $targetAsset) {

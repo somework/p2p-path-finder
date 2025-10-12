@@ -11,6 +11,9 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 use function array_key_exists;
 
+/**
+ * Converts a collection of domain orders into a weighted directed graph representation.
+ */
 final class GraphBuilder
 {
     /**

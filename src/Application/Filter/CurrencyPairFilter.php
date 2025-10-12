@@ -7,6 +7,9 @@ namespace SomeWork\P2PPathFinder\Application\Filter;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
 
+/**
+ * Accepts orders that match an exact asset pair.
+ */
 final class CurrencyPairFilter implements OrderFilterInterface
 {
     public function __construct(private readonly AssetPair $assetPair)

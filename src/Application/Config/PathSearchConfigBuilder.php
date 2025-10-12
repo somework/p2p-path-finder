@@ -10,6 +10,9 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use function is_float;
 use function is_int;
 
+/**
+ * Fluent builder used to construct {@see PathSearchConfig} instances.
+ */
 final class PathSearchConfigBuilder
 {
     private ?Money $spendAmount = null;
@@ -22,6 +25,9 @@ final class PathSearchConfigBuilder
 
     private ?int $maximumHops = null;
 
+    /**
+     * Sets the amount of the source asset that will be spent during path search.
+     */
     public function withSpendAmount(Money $amount): self
     {
         $this->spendAmount = $amount;
@@ -29,6 +35,9 @@ final class PathSearchConfigBuilder
         return $this;
     }
 
+    /**
+     * Configures the acceptable relative deviation from the desired spend amount.
+     */
     public function withToleranceBounds(float $minimumTolerance, float $maximumTolerance): self
     {
         if ($minimumTolerance < 0.0 || $minimumTolerance >= 1.0) {
@@ -45,6 +54,9 @@ final class PathSearchConfigBuilder
         return $this;
     }
 
+    /**
+     * Configures the minimum and maximum allowed number of hops in a resulting path.
+     */
     public function withHopLimits(int $minimumHops, int $maximumHops): self
     {
         if ($minimumHops < 1) {
@@ -61,6 +73,9 @@ final class PathSearchConfigBuilder
         return $this;
     }
 
+    /**
+     * Builds a validated {@see PathSearchConfig} instance.
+     */
     public function build(): PathSearchConfig
     {
         if (!$this->spendAmount instanceof Money) {

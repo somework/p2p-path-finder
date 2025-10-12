@@ -11,6 +11,9 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use function sprintf;
 use function strtoupper;
 
+/**
+ * Describes a single conversion leg in a path finder result.
+ */
 final class PathLeg implements JsonSerializable
 {
     private readonly string $fromAsset;
@@ -28,26 +31,41 @@ final class PathLeg implements JsonSerializable
         $this->toAsset = self::normalizeAsset($toAsset, 'to');
     }
 
+    /**
+     * Returns the asset symbol of the leg's source.
+     */
     public function from(): string
     {
         return $this->fromAsset;
     }
 
+    /**
+     * Returns the asset symbol of the leg's destination.
+     */
     public function to(): string
     {
         return $this->toAsset;
     }
 
+    /**
+     * Returns the amount of source asset spent in this leg.
+     */
     public function spent(): Money
     {
         return $this->spent;
     }
 
+    /**
+     * Returns the amount of destination asset received in this leg.
+     */
     public function received(): Money
     {
         return $this->received;
     }
 
+    /**
+     * Returns the fee charged for this leg.
+     */
     public function fee(): Money
     {
         return $this->fee;

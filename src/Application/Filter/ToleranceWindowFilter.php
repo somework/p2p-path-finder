@@ -9,6 +9,9 @@ use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 
+/**
+ * Accepts orders whose effective rates fall within a tolerance window around a reference rate.
+ */
 final class ToleranceWindowFilter implements OrderFilterInterface
 {
     private readonly string $lowerBound;

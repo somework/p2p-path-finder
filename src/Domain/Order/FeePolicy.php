@@ -6,7 +6,13 @@ namespace SomeWork\P2PPathFinder\Domain\Order;
 
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
+/**
+ * Describes how fees are computed for an order fill.
+ */
 interface FeePolicy
 {
+    /**
+     * Calculates the fee to apply for the provided order side and amounts.
+     */
     public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): Money;
 }
