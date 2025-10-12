@@ -9,10 +9,13 @@ use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
+use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
 final class PathFinderTest extends TestCase
 {
+    private const SCALE = 18;
+
     /**
      * @dataProvider provideRubToIdrConstraintScenarios
      *
@@ -23,7 +26,7 @@ final class PathFinderTest extends TestCase
         float $tolerance,
         int $expectedHopCount,
         array $expectedRoute,
-        float $expectedProduct
+        string $expectedProduct
     ): void {
         $orders = self::buildComprehensiveOrderBook();
         $graph = (new GraphBuilder())->build($orders);
@@ -40,12 +43,13 @@ final class PathFinderTest extends TestCase
             self::assertSame($edge['to'], $result['edges'][$index]['to']);
         }
 
-        self::assertEqualsWithDelta($expectedProduct, $result['product'], 1e-6);
-        self::assertEqualsWithDelta(-log($expectedProduct), $result['cost'], 1e-6);
+        self::assertSame($expectedProduct, $result['product']);
+        $expectedCost = BcMath::div('1', $expectedProduct, self::SCALE);
+        self::assertSame($expectedCost, $result['cost']);
     }
 
     /**
-     * @return iterable<string, array{int, float, int, list<array{from: string, to: string}>, float}>
+     * @return iterable<string, array{int, float, int, list<array{from: string, to: string}>, string}>
      */
     public static function provideRubToIdrConstraintScenarios(): iterable
     {
@@ -56,10 +60,15 @@ final class PathFinderTest extends TestCase
             [
                 ['from' => 'RUB', 'to' => 'IDR'],
             ],
-            165.0,
+            BcMath::normalize('165.000', self::SCALE),
         ];
 
-        $twoHopProduct = 15400.0 / 90.5;
+        $rubToUsd = BcMath::div('1', '90.500', self::SCALE);
+        $twoHopProduct = BcMath::mul(
+            $rubToUsd,
+            BcMath::normalize('15400.000', self::SCALE),
+            self::SCALE,
+        );
         yield 'two_hop_best_path_with_strict_tolerance' => [
             2,
             0.0,
@@ -82,7 +91,15 @@ final class PathFinderTest extends TestCase
             $twoHopProduct,
         ];
 
-        $threeHopProduct = (1 / 90.5) * 149.5 * 112.75;
+        $threeHopProduct = BcMath::mul(
+            BcMath::mul(
+                $rubToUsd,
+                BcMath::normalize('149.500', self::SCALE),
+                self::SCALE,
+            ),
+            BcMath::normalize('112.750', self::SCALE),
+            self::SCALE,
+        );
         yield 'three_hop_path_outperforms_direct_conversion' => [
             3,
             0.995,
@@ -164,7 +181,7 @@ final class PathFinderTest extends TestCase
         array $orders,
         string $source,
         string $target,
-        float $expectedProduct
+        string $expectedProduct
     ): void {
         $graph = (new GraphBuilder())->build($orders);
 
@@ -176,11 +193,11 @@ final class PathFinderTest extends TestCase
         self::assertCount(1, $result['edges']);
         self::assertSame($source, $result['edges'][0]['from']);
         self::assertSame($target, $result['edges'][0]['to']);
-        self::assertEqualsWithDelta($expectedProduct, $result['product'], 1e-6);
+        self::assertSame($expectedProduct, $result['product']);
     }
 
     /**
-     * @return iterable<string, array{list<Order>, string, string, float}>
+     * @return iterable<string, array{list<Order>, string, string, string}>
      */
     public static function provideSingleLegMarkets(): iterable
     {
@@ -188,14 +205,14 @@ final class PathFinderTest extends TestCase
             self::createRubToUsdSellOrders(),
             'RUB',
             'USD',
-            1 / 90.5,
+            BcMath::div('1', '90.500', self::SCALE),
         ];
 
         yield 'usd_to_idr_order_book' => [
             self::createUsdToIdrBuyOrders(),
             'USD',
             'IDR',
-            15400.0,
+            BcMath::normalize('15400.000', self::SCALE),
         ];
     }
 
@@ -216,8 +233,12 @@ final class PathFinderTest extends TestCase
         self::assertSame(2, $result['hops']);
         self::assertCount(2, $result['edges']);
 
-        $expectedProduct = (1 / 1800.00) * 1700.00;
-        self::assertEqualsWithDelta($expectedProduct, $result['product'], 1e-9);
+        $expectedProduct = BcMath::mul(
+            BcMath::div('1', '1800.00', self::SCALE),
+            BcMath::normalize('1700.00', self::SCALE),
+            self::SCALE,
+        );
+        self::assertSame($expectedProduct, $result['product']);
 
         self::assertSame('USD', $result['edges'][0]['from']);
         self::assertSame('ETH', $result['edges'][0]['to']);
@@ -227,11 +248,7 @@ final class PathFinderTest extends TestCase
         self::assertSame('EUR', $result['edges'][1]['to']);
         self::assertSame(OrderSide::BUY, $result['edges'][1]['orderSide']);
 
-        self::assertGreaterThan(
-            0.92,
-            $result['product'],
-            'The multi-leg path should outperform the direct USD/EUR quote.',
-        );
+        self::assertSame(1, BcMath::comp($result['product'], BcMath::normalize('0.92', self::SCALE), self::SCALE));
     }
 
     public function test_it_returns_zero_hop_path_when_source_equals_target(): void
@@ -245,8 +262,128 @@ final class PathFinderTest extends TestCase
         self::assertNotNull($result);
         self::assertSame(0, $result['hops']);
         self::assertSame([], $result['edges']);
-        self::assertEqualsWithDelta(1.0, $result['product'], 1e-9);
-        self::assertEqualsWithDelta(0.0, $result['cost'], 1e-9);
+        self::assertSame(BcMath::normalize('1', self::SCALE), $result['product']);
+        self::assertSame(BcMath::normalize('1', self::SCALE), $result['cost']);
+    }
+
+    /**
+     * @param list<Order> $orders
+     *
+     * @dataProvider provideExtremeRateScenarios
+     */
+    public function test_it_remains_deterministic_with_extreme_rate_scales(
+        array $orders,
+        string $source,
+        string $target,
+        string $expectedProduct,
+        int $expectedHops
+    ): void {
+        $graph = (new GraphBuilder())->build($orders);
+
+        $finder = new PathFinder(maxHops: 3, tolerance: 0.0);
+        $first = $finder->findBestPath($graph, $source, $target);
+        $second = $finder->findBestPath($graph, $source, $target);
+
+        self::assertNotNull($first);
+        self::assertNotNull($second);
+
+        self::assertSame($first, $second, 'Extreme rate scenarios should produce deterministic outcomes.');
+
+        self::assertSame($expectedHops, $first['hops']);
+        self::assertSame($expectedProduct, $first['product']);
+        $expectedCost = BcMath::div('1', $expectedProduct, self::SCALE);
+        self::assertSame($expectedCost, $first['cost']);
+    }
+
+    /**
+     * @return iterable<string, array{list<Order>, string, string, string, int}>
+     */
+    public static function provideExtremeRateScenarios(): iterable
+    {
+        $highGrowthFirstLeg = BcMath::div('1', '0.000000000123456789', self::SCALE);
+        $astronomicalProduct = BcMath::mul(
+            $highGrowthFirstLeg,
+            BcMath::normalize('987654321.987654321', self::SCALE),
+            self::SCALE,
+        );
+
+        yield 'astronomical_precision_path' => [
+            [
+                OrderFactory::createOrder(
+                    OrderSide::SELL,
+                    'MIC',
+                    'SRC',
+                    '1.000000000000000000',
+                    '1.000000000000000000',
+                    '0.000000000123456789',
+                    amountScale: 18,
+                    rateScale: 18,
+                ),
+                OrderFactory::createOrder(
+                    OrderSide::BUY,
+                    'MIC',
+                    'MEG',
+                    '1.000000000000000000',
+                    '1.000000000000000000',
+                    '987654321.987654321',
+                    amountScale: 18,
+                    rateScale: 9,
+                ),
+                OrderFactory::createOrder(
+                    OrderSide::BUY,
+                    'SRC',
+                    'MEG',
+                    '1.000000000000000000',
+                    '1.000000000000000000',
+                    '100.000000000000000000',
+                    amountScale: 18,
+                    rateScale: 18,
+                ),
+            ],
+            'SRC',
+            'MEG',
+            $astronomicalProduct,
+            2,
+        ];
+
+        yield 'microscopic_precision_path' => [
+            [
+                OrderFactory::createOrder(
+                    OrderSide::SELL,
+                    'MIC',
+                    'SRC',
+                    '1.000000000000000000',
+                    '1.000000000000000000',
+                    '987654321.987654321',
+                    amountScale: 18,
+                    rateScale: 9,
+                ),
+                OrderFactory::createOrder(
+                    OrderSide::BUY,
+                    'MIC',
+                    'MEG',
+                    '1.000000000000000000',
+                    '1.000000000000000000',
+                    '0.000000000123456789',
+                    amountScale: 18,
+                    rateScale: 18,
+                ),
+                OrderFactory::createOrder(
+                    OrderSide::BUY,
+                    'SRC',
+                    'MEG',
+                    '1.000000000000000000',
+                    '1.000000000000000000',
+                    '0.000000000200000000',
+                    amountScale: 18,
+                    rateScale: 18,
+                ),
+            ],
+            'SRC',
+            'MEG',
+            BcMath::normalize('0.000000000200000000', self::SCALE),
+            1,
+        ];
     }
 
     /**
