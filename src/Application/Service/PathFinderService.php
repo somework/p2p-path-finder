@@ -231,6 +231,7 @@ final class PathFinderService
         $current = $actualSpend;
         $currentCurrency = $current->currency();
         $feeBreakdown = [];
+        $grossSpent = $actualSpend;
 
         foreach ($edges as $edge) {
             $order = $edge['order'];
@@ -258,7 +259,6 @@ final class PathFinderService
                 }
 
                 $spent = $order->calculateGrossBaseSpend($netBase, $fees);
-                $legFee = $this->resolveQuoteFeeForLeg($fees, $rawQuote);
             } else {
                 $targetEffectiveQuote = $current->withScale(max($current->scale(), $order->bounds()->min()->scale()));
                 $resolved = $this->resolveSellLegAmounts($order, $targetEffectiveQuote);
@@ -268,12 +268,17 @@ final class PathFinderService
                 }
 
                 [$spent, $received, $fees] = $resolved;
-                $legFee = $this->resolveQuoteFeeForLeg($fees, $spent);
             }
 
-            $this->accumulateFeeBreakdown($feeBreakdown, $fees);
+            $legFees = $this->convertFeesToMap($fees);
+            $this->accumulateFeeBreakdown($feeBreakdown, $legFees);
 
-            $legs[] = new PathLeg($from, $to, $spent, $received, $legFee);
+            $baseFee = $fees->baseFee();
+            if (null !== $baseFee && !$baseFee->isZero() && $baseFee->currency() === $grossSpent->currency()) {
+                $grossSpent = $grossSpent->add($baseFee);
+            }
+
+            $legs[] = new PathLeg($from, $to, $spent, $received, $legFees);
             $current = $received;
             $currentCurrency = $current->currency();
         }
@@ -282,10 +287,10 @@ final class PathFinderService
             return null;
         }
 
-        $residual = $this->calculateResidualTolerance($requestedSpend, $actualSpend);
+        $residual = $this->calculateResidualTolerance($requestedSpend, $grossSpent);
 
-        $requestedComparable = $requestedSpend->withScale(max($requestedSpend->scale(), $actualSpend->scale()));
-        $actualComparable = $actualSpend->withScale($requestedComparable->scale());
+        $requestedComparable = $requestedSpend->withScale(max($requestedSpend->scale(), $grossSpent->scale()));
+        $actualComparable = $grossSpent->withScale($requestedComparable->scale());
 
         if ($actualComparable->lessThan($requestedComparable) && $residual > $config->minimumTolerance()) {
             return null;
@@ -296,7 +301,7 @@ final class PathFinderService
         }
 
         return new PathResult(
-            $actualSpend,
+            $grossSpent,
             $current,
             $residual,
             $legs,
@@ -306,17 +311,12 @@ final class PathFinderService
 
     /**
      * @param array<string, Money> $feeBreakdown
+     * @param array<string, Money> $legFees
      */
-    private function accumulateFeeBreakdown(array &$feeBreakdown, FeeBreakdown $fees): void
+    private function accumulateFeeBreakdown(array &$feeBreakdown, array $legFees): void
     {
-        $baseFee = $fees->baseFee();
-        if (null !== $baseFee && !$baseFee->isZero()) {
-            $this->accumulateFee($feeBreakdown, $baseFee);
-        }
-
-        $quoteFee = $fees->quoteFee();
-        if (null !== $quoteFee && !$quoteFee->isZero()) {
-            $this->accumulateFee($feeBreakdown, $quoteFee);
+        foreach ($legFees as $fee) {
+            $this->accumulateFee($feeBreakdown, $fee);
         }
     }
 
@@ -350,15 +350,26 @@ final class PathFinderService
         return $policy->calculate($side, $baseAmount, $rawQuote);
     }
 
-    private function resolveQuoteFeeForLeg(FeeBreakdown $fees, Money $fallback): Money
+    /**
+     * @return array<string, Money>
+     */
+    private function convertFeesToMap(FeeBreakdown $fees): array
     {
-        $quoteFee = $fees->quoteFee();
+        $normalized = [];
 
-        if (null === $quoteFee) {
-            return Money::zero($fallback->currency(), $fallback->scale());
+        $baseFee = $fees->baseFee();
+        if (null !== $baseFee && !$baseFee->isZero()) {
+            $this->accumulateFee($normalized, $baseFee);
         }
 
-        return $quoteFee;
+        $quoteFee = $fees->quoteFee();
+        if (null !== $quoteFee && !$quoteFee->isZero()) {
+            $this->accumulateFee($normalized, $quoteFee);
+        }
+
+        ksort($normalized);
+
+        return $normalized;
     }
 
     /**

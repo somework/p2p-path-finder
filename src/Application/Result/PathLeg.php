@@ -20,15 +20,24 @@ final class PathLeg implements JsonSerializable
 
     private readonly string $toAsset;
 
+    /**
+     * @var array<string, Money>
+     */
+    private readonly array $fees;
+
+    /**
+     * @param array<array-key, Money> $fees
+     */
     public function __construct(
         string $fromAsset,
         string $toAsset,
         private readonly Money $spent,
         private readonly Money $received,
-        private readonly Money $fee,
+        array $fees = [],
     ) {
         $this->fromAsset = self::normalizeAsset($fromAsset, 'from');
         $this->toAsset = self::normalizeAsset($toAsset, 'to');
+        $this->fees = $this->normalizeFees($fees);
     }
 
     /**
@@ -64,24 +73,35 @@ final class PathLeg implements JsonSerializable
     }
 
     /**
-     * Returns the fee charged for this leg.
+     * @return array<string, Money>
      */
-    public function fee(): Money
+    public function fees(): array
     {
-        return $this->fee;
+        return $this->fees;
     }
 
     /**
-     * @return array{from: string, to: string, spent: array{currency: string, amount: string, scale: int}, received: array{currency: string, amount: string, scale: int}, fee: array{currency: string, amount: string, scale: int}}
+     * @return array{
+     *     from: string,
+     *     to: string,
+     *     spent: array{currency: string, amount: string, scale: int},
+     *     received: array{currency: string, amount: string, scale: int},
+     *     fees: array<string, array{currency: string, amount: string, scale: int}>,
+     * }
      */
     public function jsonSerialize(): array
     {
+        $fees = [];
+        foreach ($this->fees as $currency => $fee) {
+            $fees[$currency] = self::serializeMoney($fee);
+        }
+
         return [
             'from' => $this->fromAsset,
             'to' => $this->toAsset,
             'spent' => self::serializeMoney($this->spent),
             'received' => self::serializeMoney($this->received),
-            'fee' => self::serializeMoney($this->fee),
+            'fees' => $fees,
         ];
     }
 
@@ -92,6 +112,40 @@ final class PathLeg implements JsonSerializable
         if ('' === $normalized) {
             throw new InvalidArgumentException(sprintf('Path leg %s asset cannot be empty.', $field));
         }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<array-key, Money> $fees
+     *
+     * @return array<string, Money>
+     */
+    private function normalizeFees(array $fees): array
+    {
+        $normalized = [];
+
+        foreach ($fees as $fee) {
+            if (!$fee instanceof Money) {
+                throw new InvalidArgumentException('Path leg fees must be instances of Money.');
+            }
+
+            if ($fee->isZero()) {
+                continue;
+            }
+
+            $currency = $fee->currency();
+
+            if (isset($normalized[$currency])) {
+                $normalized[$currency] = $normalized[$currency]->add($fee);
+
+                continue;
+            }
+
+            $normalized[$currency] = $fee;
+        }
+
+        ksort($normalized);
 
         return $normalized;
     }
