@@ -6,8 +6,19 @@ namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
 use InvalidArgumentException;
 
+use function bcadd;
+use function bccomp;
+use function bcdiv;
+use function bcmul;
+use function bcsub;
+use function ltrim;
+use function max;
+use function preg_match;
+use function rtrim;
 use function sprintf;
 use function strlen;
+use function strpos;
+use function substr;
 
 /**
  * Thin wrappers around BCMath functions that provide input validation and
@@ -21,10 +32,12 @@ final class BcMath
     {
     }
 
-    public static function ensureNumeric(string $value): void
+    public static function ensureNumeric(string ...$values): void
     {
-        if (!self::isNumeric($value)) {
-            throw new InvalidArgumentException(sprintf('Value "%s" is not numeric.', $value));
+        foreach ($values as $value) {
+            if (!self::isNumeric($value)) {
+                throw new InvalidArgumentException(sprintf('Value "%s" is not numeric.', $value));
+            }
         }
     }
 
@@ -48,37 +61,60 @@ final class BcMath
     public static function add(string $left, string $right, int $scale): string
     {
         self::ensureScale($scale);
+        self::ensureNumeric($left, $right);
 
-        return bcadd($left, $right, $scale);
+        $workingScale = self::workingScaleForAddition($left, $right, $scale);
+
+        $result = bcadd($left, $right, $workingScale);
+
+        return self::round($result, $scale);
     }
 
     public static function sub(string $left, string $right, int $scale): string
     {
         self::ensureScale($scale);
+        self::ensureNumeric($left, $right);
 
-        return bcsub($left, $right, $scale);
+        $workingScale = self::workingScaleForAddition($left, $right, $scale);
+
+        $result = bcsub($left, $right, $workingScale);
+
+        return self::round($result, $scale);
     }
 
     public static function mul(string $left, string $right, int $scale): string
     {
         self::ensureScale($scale);
+        self::ensureNumeric($left, $right);
 
-        return bcmul($left, $right, $scale);
+        $workingScale = self::workingScaleForMultiplication($left, $right, $scale);
+
+        $result = bcmul($left, $right, $workingScale);
+
+        return self::round($result, $scale);
     }
 
     public static function div(string $left, string $right, int $scale): string
     {
         self::ensureScale($scale);
+        self::ensureNumeric($left, $right);
         self::ensureNonZero($right);
 
-        return bcdiv($left, $right, $scale);
+        $workingScale = self::workingScaleForDivision($left, $right, $scale);
+
+        $result = bcdiv($left, $right, $workingScale);
+
+        return self::round($result, $scale);
     }
 
     public static function comp(string $left, string $right, int $scale): int
     {
         self::ensureScale($scale);
+        self::ensureNumeric($left, $right);
 
-        return bccomp($left, $right, $scale);
+        $comparisonScale = self::workingScaleForComparison($left, $right, $scale);
+
+        return bccomp($left, $right, $comparisonScale);
     }
 
     public static function round(string $value, int $scale): string
@@ -105,9 +141,7 @@ final class BcMath
 
     public static function scaleForComparison(string $first, string $second, int $fallbackScale = self::DEFAULT_SCALE): int
     {
-        $scale = max(self::scaleOf($first), self::scaleOf($second), $fallbackScale);
-
-        return $scale;
+        return self::workingScaleForComparison($first, $second, $fallbackScale);
     }
 
     private static function scaleOf(string $value): int
@@ -133,8 +167,35 @@ final class BcMath
     private static function ensureNonZero(string $value): void
     {
         self::ensureNumeric($value);
-        if (0 === bccomp($value, '0', max(self::scaleOf($value), 0))) {
+        $scale = max(self::scaleOf($value), 1);
+
+        if (0 === bccomp($value, '0', $scale)) {
             throw new InvalidArgumentException('Division by zero.');
         }
+    }
+
+    private static function workingScaleForAddition(string $left, string $right, int $scale): int
+    {
+        return max($scale, self::scaleOf($left), self::scaleOf($right));
+    }
+
+    private static function workingScaleForMultiplication(string $left, string $right, int $scale): int
+    {
+        $fractionalDigits = self::scaleOf($left) + self::scaleOf($right);
+
+        return max($scale + $fractionalDigits, $fractionalDigits);
+    }
+
+    private static function workingScaleForDivision(string $left, string $right, int $scale): int
+    {
+        $fractionalLeft = self::scaleOf($left);
+        $fractionalRight = max(self::scaleOf($right), 1);
+
+        return max($scale + $fractionalLeft + $fractionalRight, $fractionalLeft + $fractionalRight);
+    }
+
+    private static function workingScaleForComparison(string $left, string $right, int $scale): int
+    {
+        return max($scale, self::scaleOf($left), self::scaleOf($right));
     }
 }
