@@ -414,6 +414,52 @@ final class PathFinderServiceTest extends TestCase
         self::assertEqualsWithDelta(0.1, $result->residualTolerance(), 1e-9);
     }
 
+    public function test_it_discovers_buy_path_when_order_minimum_exceeds_configured_minimum(): void
+    {
+        $orderBook = new OrderBook([
+            $this->createOrder(OrderSide::BUY, 'EUR', 'USD', '50.000', '120.000', '1.200', 3),
+        ]);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '40.00', 2))
+            ->withToleranceBounds(0.5, 0.5)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $service = new PathFinderService(new GraphBuilder());
+        $result = $service->findBestPath($orderBook, $config, 'USD');
+
+        self::assertNotNull($result);
+        self::assertSame('EUR', $result->totalSpent()->currency());
+        self::assertSame('50.000', $result->totalSpent()->amount());
+        self::assertSame('USD', $result->totalReceived()->currency());
+        self::assertSame('60.000', $result->totalReceived()->amount());
+        self::assertEqualsWithDelta(0.25, $result->residualTolerance(), 1e-9);
+    }
+
+    public function test_it_discovers_sell_path_when_order_minimum_exceeds_configured_minimum(): void
+    {
+        $orderBook = new OrderBook([
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '30.000', '120.000', '0.800', 3),
+        ]);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '22.00', 2))
+            ->withToleranceBounds(0.1, 0.5)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $service = new PathFinderService(new GraphBuilder());
+        $result = $service->findBestPath($orderBook, $config, 'USD');
+
+        self::assertNotNull($result);
+        self::assertSame('EUR', $result->totalSpent()->currency());
+        self::assertSame('24.000', $result->totalSpent()->amount());
+        self::assertSame('USD', $result->totalReceived()->currency());
+        self::assertSame('30.000', $result->totalReceived()->amount());
+        self::assertEqualsWithDelta(2 / 22, $result->residualTolerance(), 1e-9);
+    }
+
     public function test_it_refines_sell_legs_until_effective_quote_matches(): void
     {
         $feePolicy = $this->tieredFeePolicy('310.000', '0.05', '0.35', '25.000');

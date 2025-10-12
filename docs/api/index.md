@@ -169,7 +169,7 @@ Implementation of a tolerance-aware best-path search through the trading graph.
 `PathFinder::__construct(int $maxHops = 4, float $tolerance = 0)`
 
 ### findBestPath
-`PathFinder::findBestPath(array $graph, string $source, string $target): ?array`
+`PathFinder::findBestPath(array $graph, string $source, string $target, ?array $spendConstraints = null, ?callable $acceptCandidate = null): ?array`
 
 cost: float,
 product: float,
@@ -182,6 +182,8 @@ rate: ExchangeRate,
 orderSide: OrderSide,
 conversionRate: float,
 }>,
+amountRange: array{min: Money, max: Money}|null,
+desiredAmount: Money|null,
 }|null
 
 ## SomeWork\P2PPathFinder\Application\Result\PathLeg

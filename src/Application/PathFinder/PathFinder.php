@@ -38,6 +38,8 @@ use function strtoupper;
  *     }>,
  * }
  * @phpstan-type Graph array<string, array{currency: string, edges: list<GraphEdge>}>
+ * @phpstan-type SpendRange array{min: Money, max: Money}
+ * @phpstan-type SpendConstraints array{min?: Money, max?: Money, desired?: Money|null}
  */
 final class PathFinder
 {
@@ -70,6 +72,7 @@ final class PathFinder
 
     /**
      * @param Graph                                    $graph
+     * @param SpendConstraints|null                    $spendConstraints
      * @param callable(array<string, mixed>):bool|null $acceptCandidate
      *
      * @return array{
@@ -84,13 +87,15 @@ final class PathFinder
      *         orderSide: OrderSide,
      *         conversionRate: string,
      *     }>,
+     *     amountRange: SpendRange|null,
+     *     desiredAmount: Money|null,
      * }|null
      */
     public function findBestPath(
         array $graph,
         string $source,
         string $target,
-        ?Money $desiredSpend = null,
+        ?array $spendConstraints = null,
         ?callable $acceptCandidate = null
     ): ?array {
         $source = strtoupper($source);
@@ -98,6 +103,20 @@ final class PathFinder
 
         if (!array_key_exists($source, $graph) || !array_key_exists($target, $graph)) {
             return null;
+        }
+
+        $range = null;
+        $desiredSpend = null;
+        if (null !== $spendConstraints) {
+            if (!isset($spendConstraints['min'], $spendConstraints['max'])) {
+                throw new InvalidArgumentException('Spend constraints must include both minimum and maximum bounds.');
+            }
+
+            $range = [
+                'min' => $spendConstraints['min'],
+                'max' => $spendConstraints['max'],
+            ];
+            $desiredSpend = $spendConstraints['desired'] ?? null;
         }
 
         $queue = $this->createQueue();
@@ -109,7 +128,8 @@ final class PathFinder
             'product' => $this->unitValue,
             'hops' => 0,
             'path' => [],
-            'amount' => $desiredSpend,
+            'amountRange' => $range,
+            'desiredAmount' => $desiredSpend,
         ], ['cost' => $this->unitValue, 'order' => $insertionOrder++]);
 
         /**
@@ -123,7 +143,7 @@ final class PathFinder
         $bestFeasibleCost = null;
 
         while (!$queue->isEmpty()) {
-            /** @var array{node: string, cost: string, product: string, hops: int, path: list<array<string, mixed>>, amount: Money|null} $state */
+            /** @var array{node: string, cost: string, product: string, hops: int, path: list<array<string, mixed>>, amountRange: SpendRange|null, desiredAmount: Money|null} $state */
             $state = $queue->extract();
 
             if ($state['node'] === $target) {
@@ -136,6 +156,8 @@ final class PathFinder
                     'product' => $state['product'],
                     'hops' => $state['hops'],
                     'edges' => $state['path'],
+                    'amountRange' => $state['amountRange'],
+                    'desiredAmount' => $state['desiredAmount'],
                 ];
 
                 if (null !== $acceptCandidate) {
@@ -179,15 +201,26 @@ final class PathFinder
                     continue;
                 }
 
-                $currentAmount = $state['amount'];
-                if ($currentAmount instanceof Money) {
-                    if (!$this->edgeSupportsAmount($edge, $currentAmount)) {
+                $currentRange = $state['amountRange'];
+                $currentDesired = $state['desiredAmount'];
+                if (null !== $currentRange) {
+                    $feasibleRange = $this->edgeSupportsAmount($edge, $currentRange);
+                    if (null === $feasibleRange) {
                         continue;
                     }
 
-                    $nextAmount = $this->calculateNextAmount($edge, $currentAmount);
+                    $nextRange = $this->calculateNextRange($edge, $feasibleRange);
+                    $nextDesired = null;
+
+                    if ($currentDesired instanceof Money) {
+                        $clamped = $this->clampToRange($currentDesired, $feasibleRange);
+                        $nextDesired = $this->convertEdgeAmount($edge, $clamped);
+                    }
                 } else {
-                    $nextAmount = null;
+                    $nextRange = null;
+                    $nextDesired = $currentDesired instanceof Money
+                        ? $this->convertEdgeAmount($edge, $currentDesired)
+                        : null;
                 }
 
                 $nextCost = BcMath::div($state['cost'], $conversionRate, self::SCALE);
@@ -223,7 +256,8 @@ final class PathFinder
                     'product' => $nextProduct,
                     'hops' => $nextHops,
                     'path' => $nextPath,
-                    'amount' => $nextAmount,
+                    'amountRange' => $nextRange,
+                    'desiredAmount' => $nextDesired,
                 ];
 
                 $this->recordState($bestPerNode, $nextNode, $nextCost, $nextHops);
@@ -281,7 +315,7 @@ final class PathFinder
     }
 
     /**
-     * @return SplPriorityQueue<array{cost: string, order: int}, array{node: string, cost: string, product: string, hops: int, path: list<array<string, mixed>>, amount: Money|null}>
+     * @return SplPriorityQueue<array{cost: string, order: int}, array{node: string, cost: string, product: string, hops: int, path: list<array<string, mixed>>, amountRange: SpendRange|null, desiredAmount: Money|null}>
      */
     private function createQueue(): SplPriorityQueue
     {
@@ -307,12 +341,15 @@ final class PathFinder
 
     /**
      * @param array{orderSide: OrderSide, segments: list<array{isMandatory: bool, base: array{min: Money, max: Money}, quote: array{min: Money, max: Money}, grossBase: array{min: Money, max: Money}}>} $edge
+     * @param SpendRange                                                                                                                                                                                 $range
+     *
+     * @return SpendRange|null
      */
-    private function edgeSupportsAmount(array $edge, Money $amount): bool
+    private function edgeSupportsAmount(array $edge, array $range): ?array
     {
         $key = OrderSide::BUY === $edge['orderSide'] ? 'grossBase' : 'quote';
 
-        $scale = $amount->scale();
+        $scale = max($range['min']->scale(), $range['max']->scale());
         foreach ($edge['segments'] as $segment) {
             $scale = max(
                 $scale,
@@ -321,9 +358,15 @@ final class PathFinder
             );
         }
 
-        $normalized = $amount->withScale($scale);
-        $minimum = Money::zero($normalized->currency(), $scale);
-        $maximum = Money::zero($normalized->currency(), $scale);
+        $requestedMin = $range['min']->withScale($scale);
+        $requestedMax = $range['max']->withScale($scale);
+
+        if ($requestedMin->greaterThan($requestedMax)) {
+            [$requestedMin, $requestedMax] = [$requestedMax, $requestedMin];
+        }
+
+        $minimum = Money::zero($requestedMin->currency(), $scale);
+        $maximum = Money::zero($requestedMin->currency(), $scale);
 
         foreach ($edge['segments'] as $segment) {
             if ($segment['isMandatory']) {
@@ -333,21 +376,52 @@ final class PathFinder
             $maximum = $maximum->add($segment[$key]['max']->withScale($scale));
         }
 
-        if ($normalized->compare($minimum) < 0) {
-            return false;
-        }
-
         if ($maximum->isZero()) {
-            return $normalized->isZero();
+            $zero = Money::zero($requestedMin->currency(), $scale);
+
+            if ($minimum->greaterThan($zero)) {
+                return null;
+            }
+
+            if ($requestedMin->compare($zero) > 0 || $requestedMax->compare($zero) < 0) {
+                return null;
+            }
+
+            return ['min' => $zero, 'max' => $zero];
         }
 
-        return $normalized->compare($maximum) <= 0;
+        if ($requestedMax->lessThan($minimum) || $requestedMin->greaterThan($maximum)) {
+            return null;
+        }
+
+        $lowerBound = $requestedMin->greaterThan($minimum) ? $requestedMin : $minimum;
+        $upperBound = $requestedMax->lessThan($maximum) ? $requestedMax : $maximum;
+
+        return ['min' => $lowerBound, 'max' => $upperBound];
+    }
+
+    /**
+     * @param array{to: string, orderSide: OrderSide, baseCapacity: array{min: Money, max: Money}, quoteCapacity: array{min: Money, max: Money}, grossBaseCapacity: array{min: Money, max: Money}} $edge
+     * @param SpendRange                                                                                                                                                                           $range
+     *
+     * @return SpendRange
+     */
+    private function calculateNextRange(array $edge, array $range): array
+    {
+        $minimum = $this->convertEdgeAmount($edge, $range['min']);
+        $maximum = $this->convertEdgeAmount($edge, $range['max']);
+
+        if ($minimum->greaterThan($maximum)) {
+            [$minimum, $maximum] = [$maximum, $minimum];
+        }
+
+        return ['min' => $minimum, 'max' => $maximum];
     }
 
     /**
      * @param array{to: string, orderSide: OrderSide, baseCapacity: array{min: Money, max: Money}, quoteCapacity: array{min: Money, max: Money}, grossBaseCapacity: array{min: Money, max: Money}} $edge
      */
-    private function calculateNextAmount(array $edge, Money $current): Money
+    private function convertEdgeAmount(array $edge, Money $current): Money
     {
         $conversionRate = $this->edgeEffectiveConversionRate($edge);
         if (1 !== BcMath::comp($conversionRate, '0', self::SCALE)) {
@@ -391,6 +465,28 @@ final class PathFinder
         $normalized = BcMath::normalize($raw, $targetScale);
 
         return Money::fromString($edge['to'], $normalized, $targetScale);
+    }
+
+    /**
+     * @param SpendRange $range
+     */
+    private function clampToRange(Money $value, array $range): Money
+    {
+        $scale = max($value->scale(), $range['min']->scale(), $range['max']->scale());
+
+        $normalizedValue = $value->withScale($scale);
+        $minimum = $range['min']->withScale($scale);
+        $maximum = $range['max']->withScale($scale);
+
+        if ($normalizedValue->lessThan($minimum)) {
+            return $minimum;
+        }
+
+        if ($normalizedValue->greaterThan($maximum)) {
+            return $maximum;
+        }
+
+        return $normalizedValue;
     }
 
     /**

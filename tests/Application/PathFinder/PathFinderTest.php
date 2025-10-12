@@ -238,7 +238,11 @@ final class PathFinderTest extends TestCase
             $graph,
             $source,
             $target,
-            $desiredSpend,
+            [
+                'min' => $desiredSpend,
+                'max' => $desiredSpend,
+                'desired' => $desiredSpend,
+            ],
             static function () use (&$accepted): bool {
                 $accepted = true;
 
@@ -339,7 +343,16 @@ final class PathFinderTest extends TestCase
         $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
         $grossSpend = CurrencyScenarioFactory::money('EUR', '1.050', 3);
 
-        $result = $finder->findBestPath($graph, 'EUR', 'USD', $grossSpend);
+        $result = $finder->findBestPath(
+            $graph,
+            'EUR',
+            'USD',
+            [
+                'min' => $grossSpend,
+                'max' => $grossSpend,
+                'desired' => $grossSpend,
+            ],
+        );
 
         self::assertNotNull($result);
         self::assertSame(1, $result['hops']);
