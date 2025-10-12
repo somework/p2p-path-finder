@@ -17,6 +17,7 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 use function strtoupper;
+use function substr;
 
 /**
  * High level facade orchestrating order filtering, graph building and path search.
@@ -24,6 +25,11 @@ use function strtoupper;
 final class PathFinderService
 {
     private const COST_SCALE = 18;
+    private const SELL_RESOLUTION_MAX_ITERATIONS = 16;
+    private const SELL_RESOLUTION_RELATIVE_TOLERANCE = '0.000001';
+    private const SELL_RESOLUTION_COMPARISON_SCALE = 18;
+    private const SELL_RESOLUTION_RATIO_EXTRA_SCALE = 6;
+    private const SELL_RESOLUTION_TOLERANCE_SCALE = 12;
 
     public function __construct(private readonly GraphBuilder $graphBuilder)
     {
@@ -358,57 +364,101 @@ final class PathFinderService
             $rate->scale(),
         );
 
-        $effectiveQuote = $targetEffectiveQuote->withScale($scale);
-        $baseAmount = $rate->convert($effectiveQuote, $scale);
+        $originalTarget = $targetEffectiveQuote;
+        $targetEffectiveQuote = $targetEffectiveQuote->withScale($scale);
+        $baseAmount = $rate->convert($targetEffectiveQuote, $scale);
         $baseAmount = $this->alignBaseScale($bounds->min()->scale(), $bounds->max()->scale(), $baseAmount);
 
-        [$rawQuote, $fee, $effectiveQuoteAmount] = $this->evaluateSellQuote($order, $baseAmount);
+        $converged = false;
 
-        $effectiveQuoteAmount = $effectiveQuoteAmount->withScale(max($effectiveQuoteAmount->scale(), $effectiveQuote->scale()));
-        $effectiveQuote = $effectiveQuote->withScale($effectiveQuoteAmount->scale());
+        for ($attempt = 0; $attempt < self::SELL_RESOLUTION_MAX_ITERATIONS; ++$attempt) {
+            [$rawQuote, $fee, $effectiveQuoteAmount] = $this->evaluateSellQuote($order, $baseAmount);
 
-        for ($attempt = 0; $attempt < 2; ++$attempt) {
-            if (0 === $effectiveQuoteAmount->compare($effectiveQuote)) {
+            $comparisonScale = max(
+                $effectiveQuoteAmount->scale(),
+                $targetEffectiveQuote->scale(),
+                self::SELL_RESOLUTION_COMPARISON_SCALE,
+            );
+
+            $effectiveQuoteAmount = $effectiveQuoteAmount->withScale($comparisonScale);
+            $targetEffectiveQuote = $targetEffectiveQuote->withScale($comparisonScale);
+
+            if ($this->isWithinSellResolutionTolerance($targetEffectiveQuote, $effectiveQuoteAmount)) {
+                $converged = true;
                 break;
             }
 
-            if ($effectiveQuoteAmount->isZero()) {
-                $effectiveQuoteAmount = $effectiveQuote;
-
-                break;
-            }
-
-            $ratioScale = max($effectiveQuoteAmount->scale(), $effectiveQuote->scale(), 12);
-            $targetAmount = $effectiveQuote->withScale($ratioScale)->amount();
-            $currentAmount = $effectiveQuoteAmount->withScale($ratioScale)->amount();
-
-            if (0 === BcMath::comp($currentAmount, '0', $ratioScale)) {
+            $ratio = $this->calculateSellAdjustmentRatio($targetEffectiveQuote, $effectiveQuoteAmount, $comparisonScale);
+            if (null === $ratio) {
                 return null;
             }
 
-            $ratio = BcMath::div($targetAmount, $currentAmount, $ratioScale + 6);
-            $baseAmount = $baseAmount->multiply($ratio, max($baseAmount->scale(), $ratioScale));
+            $baseAmount = $baseAmount->multiply($ratio, max($baseAmount->scale(), $comparisonScale));
             $baseAmount = $this->alignBaseScale($bounds->min()->scale(), $bounds->max()->scale(), $baseAmount);
-
-            [$rawQuote, $fee, $effectiveQuoteAmount] = $this->evaluateSellQuote($order, $baseAmount);
-            $effectiveQuoteAmount = $effectiveQuoteAmount->withScale(max($effectiveQuoteAmount->scale(), $effectiveQuote->scale()));
-            $effectiveQuote = $effectiveQuote->withScale($effectiveQuoteAmount->scale());
         }
 
-        $effectiveQuoteAmount = $targetEffectiveQuote->withScale(max($targetEffectiveQuote->scale(), $bounds->min()->scale()));
-        $fee = $fee->withScale($effectiveQuoteAmount->scale());
+        if (!$converged) {
+            return null;
+        }
 
         if (!$bounds->contains($baseAmount->withScale(max($baseAmount->scale(), $bounds->min()->scale())))) {
             return null;
         }
 
         $baseAmount = $baseAmount->withScale($bounds->min()->scale());
+        [$rawQuote, $fee, $effectiveQuoteAmount] = $this->evaluateSellQuote($order, $baseAmount);
+        $effectiveQuoteAmount = $effectiveQuoteAmount->withScale(max($effectiveQuoteAmount->scale(), $originalTarget->scale()));
+        $fee = $fee->withScale(max($fee->scale(), $effectiveQuoteAmount->scale()));
 
         return [
             $effectiveQuoteAmount,
             $baseAmount,
             $fee,
         ];
+    }
+
+    private function isWithinSellResolutionTolerance(Money $target, Money $actual): bool
+    {
+        $comparisonScale = max($target->scale(), $actual->scale(), self::SELL_RESOLUTION_COMPARISON_SCALE);
+
+        $targetAmount = $target->withScale($comparisonScale)->amount();
+        $actualAmount = $actual->withScale($comparisonScale)->amount();
+
+        if (0 === BcMath::comp($targetAmount, '0', $comparisonScale)) {
+            return 0 === BcMath::comp($actualAmount, '0', $comparisonScale);
+        }
+
+        $difference = BcMath::sub($actualAmount, $targetAmount, $comparisonScale + self::SELL_RESOLUTION_RATIO_EXTRA_SCALE);
+        if ('-' === $difference[0]) {
+            $difference = substr($difference, 1);
+        }
+
+        if ('' === $difference) {
+            $difference = '0';
+        }
+
+        $relative = BcMath::div($difference, $targetAmount, $comparisonScale + self::SELL_RESOLUTION_RATIO_EXTRA_SCALE);
+
+        return BcMath::comp($relative, self::SELL_RESOLUTION_RELATIVE_TOLERANCE, self::SELL_RESOLUTION_TOLERANCE_SCALE) <= 0;
+    }
+
+    private function calculateSellAdjustmentRatio(Money $target, Money $actual, int $scale): ?string
+    {
+        $targetAmount = $target->withScale($scale)->amount();
+        $actualAmount = $actual->withScale($scale)->amount();
+
+        if (0 === BcMath::comp($actualAmount, '0', $scale)) {
+            return null;
+        }
+
+        $targetSignNegative = '-' === $targetAmount[0];
+        $actualSignNegative = '-' === $actualAmount[0];
+
+        if ($targetSignNegative !== $actualSignNegative && 0 !== BcMath::comp($targetAmount, '0', $scale)) {
+            return null;
+        }
+
+        return BcMath::div($targetAmount, $actualAmount, $scale + self::SELL_RESOLUTION_RATIO_EXTRA_SCALE);
     }
 
     private function alignBaseScale(int $minScale, int $maxScale, Money $baseAmount): Money
