@@ -6,6 +6,7 @@ namespace SomeWork\P2PPathFinder\Tests\Application\Graph;
 
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
+use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
@@ -121,6 +122,44 @@ final class GraphBuilderTest extends TestCase
         self::assertCount(0, $graph['LTC']['edges']);
     }
 
+    public function test_build_uses_net_quote_capacity_for_buy_orders_with_fee(): void
+    {
+        $order = $this->createOrder(
+            OrderSide::BUY,
+            'BTC',
+            'USD',
+            '1.000',
+            '3.000',
+            '100.000',
+            $this->percentageFeePolicy('0.10'),
+        );
+
+        $graph = (new GraphBuilder())->build([$order]);
+
+        $edges = $graph['BTC']['edges'];
+        self::assertCount(1, $edges);
+
+        $edge = $edges[0];
+
+        self::assertTrue($edge['quoteCapacity']['min']->equals(Money::fromString('USD', '90.000', 3)));
+        self::assertTrue($edge['quoteCapacity']['max']->equals(Money::fromString('USD', '270.000', 3)));
+
+        $rawMin = Money::fromString('USD', '100.000', 3);
+        $rawMax = Money::fromString('USD', '300.000', 3);
+        self::assertTrue($edge['quoteCapacity']['min']->lessThan($rawMin));
+        self::assertTrue($edge['quoteCapacity']['max']->lessThan($rawMax));
+
+        self::assertCount(2, $edge['segments']);
+
+        $mandatory = $edge['segments'][0];
+        self::assertTrue($mandatory['isMandatory']);
+        self::assertTrue($mandatory['quote']['max']->equals(Money::fromString('USD', '90.000', 3)));
+
+        $optional = $edge['segments'][1];
+        self::assertFalse($optional['isMandatory']);
+        self::assertTrue($optional['quote']['max']->equals(Money::fromString('USD', '180.000', 3)));
+    }
+
     public function test_build_encodes_fully_flexible_orders_as_single_segment(): void
     {
         $order = $this->createOrder(OrderSide::BUY, 'ETH', 'USN', '0.000', '5.000', '2000');
@@ -195,8 +234,15 @@ final class GraphBuilderTest extends TestCase
      * @param non-empty-string $base
      * @param non-empty-string $quote
      */
-    private function createOrder(OrderSide $side, string $base, string $quote, string $min, string $max, string $rate): Order
-    {
+    private function createOrder(
+        OrderSide $side,
+        string $base,
+        string $quote,
+        string $min,
+        string $max,
+        string $rate,
+        ?FeePolicy $feePolicy = null,
+    ): Order {
         $assetPair = AssetPair::fromString($base, $quote);
         $bounds = OrderBounds::from(
             Money::fromString($base, $min, 3),
@@ -204,6 +250,20 @@ final class GraphBuilderTest extends TestCase
         );
         $exchangeRate = ExchangeRate::fromString($base, $quote, $rate, 3);
 
-        return new Order($side, $assetPair, $bounds, $exchangeRate);
+        return new Order($side, $assetPair, $bounds, $exchangeRate, $feePolicy);
+    }
+
+    private function percentageFeePolicy(string $percentage): FeePolicy
+    {
+        return new class($percentage) implements FeePolicy {
+            public function __construct(private readonly string $percentage)
+            {
+            }
+
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): Money
+            {
+                return $quoteAmount->multiply($this->percentage, $quoteAmount->scale());
+            }
+        };
     }
 }

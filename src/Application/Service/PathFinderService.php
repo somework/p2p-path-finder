@@ -251,7 +251,7 @@ final class PathFinderService
                 $fee = $this->resolveFee($order, $orderSide, $spent, $rawQuote);
                 $received = $rawQuote;
                 if (!$fee->isZero()) {
-                    $received = $rawQuote->add($fee);
+                    $received = $rawQuote->subtract($fee);
                 }
             } else {
                 $targetEffectiveQuote = $current->withScale(max($current->scale(), $order->bounds()->min()->scale()));
