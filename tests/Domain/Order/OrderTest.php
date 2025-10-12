@@ -76,13 +76,24 @@ final class OrderTest extends TestCase
         self::assertTrue($quote->equals(CurrencyScenarioFactory::money('USD', '15000.000', 3)));
     }
 
-    public function test_calculate_effective_quote_amount_adds_fee_for_buy_order(): void
+    public function test_calculate_effective_quote_amount_subtracts_fee_for_buy_order(): void
     {
         $order = OrderFactory::buy(feePolicy: $this->percentageFeePolicy('0.10'));
 
         $quote = $order->calculateEffectiveQuoteAmount(CurrencyScenarioFactory::money('BTC', '0.500', 3));
 
-        self::assertTrue($quote->equals(CurrencyScenarioFactory::money('USD', '16500.000', 3)));
+        self::assertTrue($quote->equals(CurrencyScenarioFactory::money('USD', '13500.000', 3)));
+    }
+
+    public function test_calculate_effective_quote_amount_with_fee_lowers_buy_totals(): void
+    {
+        $order = OrderFactory::buy(feePolicy: $this->percentageFeePolicy('0.10'));
+
+        $baseAmount = CurrencyScenarioFactory::money('BTC', '0.500', 3);
+        $rawQuote = $order->calculateQuoteAmount($baseAmount);
+        $effectiveQuote = $order->calculateEffectiveQuoteAmount($baseAmount);
+
+        self::assertTrue($effectiveQuote->lessThan($rawQuote));
     }
 
     public function test_calculate_effective_quote_amount_subtracts_fee_for_sell_order(): void

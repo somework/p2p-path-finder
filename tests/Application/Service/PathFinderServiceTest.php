@@ -88,9 +88,12 @@ final class PathFinderServiceTest extends TestCase
         self::assertSame('1.010', $legs[0]->fee()->amount());
 
         self::assertSame('112.233', $legs[1]->spent()->amount());
-        self::assertSame('17171.649', $legs[1]->received()->amount());
+        self::assertSame('16498.251', $legs[1]->received()->amount());
         self::assertSame('JPY', $legs[1]->fee()->currency());
         self::assertSame('336.699', $legs[1]->fee()->amount());
+
+        $rawWithoutFee = Money::fromString('JPY', '16834.950', 3);
+        self::assertTrue($legs[1]->received()->lessThan($rawWithoutFee));
 
         $feeBreakdown = $result->feeBreakdown();
         self::assertCount(2, $feeBreakdown);
@@ -98,6 +101,62 @@ final class PathFinderServiceTest extends TestCase
         self::assertArrayHasKey('JPY', $feeBreakdown);
         self::assertSame('1.010', $feeBreakdown['EUR']->amount());
         self::assertSame('336.699', $feeBreakdown['JPY']->amount());
+
+        self::assertTrue($result->totalReceived()->lessThan($rawWithoutFee));
+    }
+
+    public function test_it_materializes_chained_buy_legs_with_fees_using_net_quotes(): void
+    {
+        $orderBook = new OrderBook([
+            $this->createOrder(OrderSide::BUY, 'EUR', 'USD', '50.000', '200.000', '1.100', 3, $this->percentageFeePolicy('0.05')),
+            $this->createOrder(OrderSide::BUY, 'USD', 'JPY', '50.000', '200.000', '150.000', 3, $this->percentageFeePolicy('0.02')),
+        ]);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.10)
+            ->withHopLimits(1, 3)
+            ->build();
+
+        $service = new PathFinderService(new GraphBuilder());
+        $result = $service->findBestPath($orderBook, $config, 'JPY');
+
+        self::assertNotNull($result);
+        self::assertSame('EUR', $result->totalSpent()->currency());
+        self::assertSame('100.000', $result->totalSpent()->amount());
+        self::assertSame('JPY', $result->totalReceived()->currency());
+        self::assertSame('15361.500', $result->totalReceived()->amount());
+        self::assertSame(0.0, $result->residualTolerance());
+
+        $legs = $result->legs();
+        self::assertCount(2, $legs);
+
+        self::assertSame('EUR', $legs[0]->from());
+        self::assertSame('USD', $legs[0]->to());
+        self::assertSame('100.000', $legs[0]->spent()->amount());
+        self::assertSame('104.500', $legs[0]->received()->amount());
+        self::assertSame('USD', $legs[0]->fee()->currency());
+        self::assertSame('5.500', $legs[0]->fee()->amount());
+
+        self::assertSame('USD', $legs[1]->from());
+        self::assertSame('JPY', $legs[1]->to());
+        self::assertSame('104.500', $legs[1]->spent()->amount());
+        self::assertSame('15361.500', $legs[1]->received()->amount());
+        self::assertSame('JPY', $legs[1]->fee()->currency());
+        self::assertSame('313.500', $legs[1]->fee()->amount());
+
+        $rawUsdWithoutFee = Money::fromString('USD', '110.000', 3);
+        $rawJpyWithoutFee = Money::fromString('JPY', '15675.000', 3);
+
+        self::assertTrue($legs[0]->received()->lessThan($rawUsdWithoutFee));
+        self::assertTrue($legs[1]->received()->lessThan($rawJpyWithoutFee));
+        self::assertTrue($result->totalReceived()->lessThan($rawJpyWithoutFee));
+
+        $feeBreakdown = $result->feeBreakdown();
+        self::assertArrayHasKey('USD', $feeBreakdown);
+        self::assertArrayHasKey('JPY', $feeBreakdown);
+        self::assertSame('5.500', $feeBreakdown['USD']->amount());
+        self::assertSame('313.500', $feeBreakdown['JPY']->amount());
     }
 
     public function test_it_skips_highest_scoring_path_when_complex_book_lacks_capacity(): void

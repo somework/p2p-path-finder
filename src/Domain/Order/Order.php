@@ -107,10 +107,7 @@ final class Order
             throw new InvalidArgumentException('Fee policy must return money in quote asset currency.');
         }
 
-        return match ($this->side) {
-            OrderSide::BUY => $quoteAmount->add($fee),
-            OrderSide::SELL => $quoteAmount->subtract($fee),
-        };
+        return $quoteAmount->subtract($fee);
     }
 
     private function assertConsistency(): void
