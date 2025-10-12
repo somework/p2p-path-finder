@@ -13,9 +13,13 @@ use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
+use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
+
+use function sprintf;
+use function substr;
 
 final class PathFinderServiceTest extends TestCase
 {
@@ -245,6 +249,77 @@ final class PathFinderServiceTest extends TestCase
         self::assertEqualsWithDelta(0.1, $result->residualTolerance(), 1e-9);
     }
 
+    public function test_it_refines_sell_legs_until_effective_quote_matches(): void
+    {
+        $feePolicy = $this->tieredFeePolicy('310.000', '0.05', '0.35', '25.000');
+        $order = $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '0.001', '1000.000', '0.400', 3, $feePolicy);
+
+        $orderBook = new OrderBook([$order]);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '220.000', 3))
+            ->withToleranceBounds(0.0, 0.0)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $service = new PathFinderService(new GraphBuilder());
+        $result = $service->findBestPath($orderBook, $config, 'USD');
+
+        self::assertNotNull($result);
+        $legs = $result->legs();
+        self::assertCount(1, $legs);
+
+        $leg = $legs[0];
+
+        $rawQuote = $order->calculateQuoteAmount($leg->received());
+        $expectedFee = $feePolicy->calculate(OrderSide::SELL, $leg->received(), $rawQuote);
+        $effectiveQuote = $order->calculateEffectiveQuoteAmount($leg->received());
+
+        $comparisonScale = max($effectiveQuote->scale(), $leg->spent()->scale(), 6);
+        $actualAmount = $effectiveQuote->withScale($comparisonScale)->amount();
+        $reportedAmount = $leg->spent()->withScale($comparisonScale)->amount();
+        $difference = BcMath::sub($actualAmount, $reportedAmount, $comparisonScale + 6);
+        if ('-' === $difference[0]) {
+            $difference = substr($difference, 1);
+        }
+
+        if ('' === $difference) {
+            $difference = '0';
+        }
+
+        $difference = BcMath::normalize($difference, $comparisonScale + 6);
+        $relativeDifference = BcMath::div($difference, $actualAmount, $comparisonScale + 6);
+
+        self::assertTrue(
+            BcMath::comp($relativeDifference, '0.000001', $comparisonScale + 6) <= 0,
+            sprintf('Effective quote mismatch of %s exceeds tolerance.', $difference),
+        );
+
+        $feeScale = max($expectedFee->scale(), $leg->fee()->scale(), 6);
+        self::assertSame(
+            $expectedFee->withScale($feeScale)->amount(),
+            $leg->fee()->withScale($feeScale)->amount(),
+        );
+    }
+
+    public function test_it_returns_null_when_sell_leg_cannot_meet_target_after_refinement(): void
+    {
+        $feePolicy = $this->tieredFeePolicy('310.000', '0.05', '0.35', '25.000');
+        $order = $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '0.001', '1000.000', '0.400', 3, $feePolicy);
+
+        $orderBook = new OrderBook([$order]);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '450.000', 3))
+            ->withToleranceBounds(0.0, 0.0)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $service = new PathFinderService(new GraphBuilder());
+
+        self::assertNull($service->findBestPath($orderBook, $config, 'USD'));
+    }
+
     private function createOrder(OrderSide $side, string $base, string $quote, string $min, string $max, string $rate, int $rateScale, ?FeePolicy $feePolicy = null): Order
     {
         $assetPair = AssetPair::fromString($base, $quote);
@@ -267,6 +342,34 @@ final class PathFinderServiceTest extends TestCase
             public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): Money
             {
                 return $quoteAmount->multiply($this->percentage, $quoteAmount->scale());
+            }
+        };
+    }
+
+    private function tieredFeePolicy(string $threshold, string $lowPercentage, string $highPercentage, string $fixed): FeePolicy
+    {
+        return new class($threshold, $lowPercentage, $highPercentage, $fixed) implements FeePolicy {
+            public function __construct(
+                private readonly string $threshold,
+                private readonly string $lowPercentage,
+                private readonly string $highPercentage,
+                private readonly string $fixed,
+            ) {
+            }
+
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): Money
+            {
+                $scale = max($quoteAmount->scale(), 6);
+                $threshold = Money::fromString($quoteAmount->currency(), $this->threshold, $scale);
+
+                if ($quoteAmount->greaterThan($threshold)) {
+                    $percentageComponent = $quoteAmount->multiply($this->highPercentage, $scale);
+                    $fixedComponent = Money::fromString($quoteAmount->currency(), $this->fixed, $scale);
+
+                    return $percentageComponent->add($fixedComponent, $scale);
+                }
+
+                return $quoteAmount->multiply($this->lowPercentage, $scale);
             }
         };
     }
