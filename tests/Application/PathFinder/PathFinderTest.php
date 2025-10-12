@@ -9,10 +9,7 @@ use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
-use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
-use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
+use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
 final class PathFinderTest extends TestCase
 {
@@ -28,7 +25,7 @@ final class PathFinderTest extends TestCase
         array $expectedRoute,
         float $expectedProduct
     ): void {
-        $orders = $this->buildComprehensiveOrderBook();
+        $orders = self::buildComprehensiveOrderBook();
         $graph = (new GraphBuilder())->build($orders);
 
         $finder = new PathFinder($maxHops, $tolerance);
@@ -50,7 +47,7 @@ final class PathFinderTest extends TestCase
     /**
      * @return iterable<string, array{int, float, int, list<array{from: string, to: string}>, float}>
      */
-    public function provideRubToIdrConstraintScenarios(): iterable
+    public static function provideRubToIdrConstraintScenarios(): iterable
     {
         yield 'direct_route_only' => [
             1,
@@ -120,10 +117,10 @@ final class PathFinderTest extends TestCase
     /**
      * @return iterable<string, array{list<Order>, int, float, string, string}>
      */
-    public function provideImpossibleScenarios(): iterable
+    public static function provideImpossibleScenarios(): iterable
     {
         yield 'missing_second_leg' => [
-            $this->createRubToUsdSellOrders(),
+            self::createRubToUsdSellOrders(),
             3,
             0.05,
             'RUB',
@@ -131,9 +128,9 @@ final class PathFinderTest extends TestCase
         ];
 
         $withoutDirectEdge = array_merge(
-            $this->createRubToUsdSellOrders(),
-            $this->createUsdToIdrBuyOrders(),
-            $this->createMultiHopSupplement(),
+            self::createRubToUsdSellOrders(),
+            self::createUsdToIdrBuyOrders(),
+            self::createMultiHopSupplement(),
         );
         yield 'hop_budget_too_strict' => [
             $withoutDirectEdge,
@@ -144,7 +141,7 @@ final class PathFinderTest extends TestCase
         ];
 
         yield 'missing_source_currency' => [
-            $this->buildComprehensiveOrderBook(),
+            self::buildComprehensiveOrderBook(),
             3,
             0.0,
             'GBP',
@@ -152,7 +149,7 @@ final class PathFinderTest extends TestCase
         ];
 
         yield 'missing_target_currency' => [
-            $this->buildComprehensiveOrderBook(),
+            self::buildComprehensiveOrderBook(),
             3,
             0.0,
             'RUB',
@@ -185,40 +182,90 @@ final class PathFinderTest extends TestCase
     /**
      * @return iterable<string, array{list<Order>, string, string, float}>
      */
-    public function provideSingleLegMarkets(): iterable
+    public static function provideSingleLegMarkets(): iterable
     {
         yield 'rub_to_usd_order_book' => [
-            $this->createRubToUsdSellOrders(),
+            self::createRubToUsdSellOrders(),
             'RUB',
             'USD',
             1 / 90.5,
         ];
 
         yield 'usd_to_idr_order_book' => [
-            $this->createUsdToIdrBuyOrders(),
+            self::createUsdToIdrBuyOrders(),
             'USD',
             'IDR',
             15400.0,
         ];
     }
 
+    public function test_it_prefers_profitable_multi_leg_route_with_mixed_order_sides(): void
+    {
+        $orders = array_merge(
+            self::createUsdToEurDirectOrders(),
+            self::createUsdToEthSellOrders(),
+            self::createEthToEurBuyOrders(),
+        );
+
+        $graph = (new GraphBuilder())->build($orders);
+
+        $finder = new PathFinder(maxHops: 3, tolerance: 0.0);
+        $result = $finder->findBestPath($graph, 'USD', 'EUR');
+
+        self::assertNotNull($result);
+        self::assertSame(2, $result['hops']);
+        self::assertCount(2, $result['edges']);
+
+        $expectedProduct = (1 / 1800.00) * 1700.00;
+        self::assertEqualsWithDelta($expectedProduct, $result['product'], 1e-9);
+
+        self::assertSame('USD', $result['edges'][0]['from']);
+        self::assertSame('ETH', $result['edges'][0]['to']);
+        self::assertSame(OrderSide::SELL, $result['edges'][0]['orderSide']);
+
+        self::assertSame('ETH', $result['edges'][1]['from']);
+        self::assertSame('EUR', $result['edges'][1]['to']);
+        self::assertSame(OrderSide::BUY, $result['edges'][1]['orderSide']);
+
+        self::assertGreaterThan(
+            0.92,
+            $result['product'],
+            'The multi-leg path should outperform the direct USD/EUR quote.',
+        );
+    }
+
+    public function test_it_returns_zero_hop_path_when_source_equals_target(): void
+    {
+        $orders = self::buildComprehensiveOrderBook();
+        $graph = (new GraphBuilder())->build($orders);
+
+        $finder = new PathFinder(maxHops: 3, tolerance: 0.15);
+        $result = $finder->findBestPath($graph, 'USD', 'USD');
+
+        self::assertNotNull($result);
+        self::assertSame(0, $result['hops']);
+        self::assertSame([], $result['edges']);
+        self::assertEqualsWithDelta(1.0, $result['product'], 1e-9);
+        self::assertEqualsWithDelta(0.0, $result['cost'], 1e-9);
+    }
+
     /**
      * @return list<Order>
      */
-    private function buildComprehensiveOrderBook(): array
+    private static function buildComprehensiveOrderBook(): array
     {
         return array_merge(
-            $this->createRubToUsdSellOrders(),
-            $this->createUsdToIdrBuyOrders(),
-            $this->createDirectRubToIdrOrders(),
-            $this->createMultiHopSupplement(),
+            self::createRubToUsdSellOrders(),
+            self::createUsdToIdrBuyOrders(),
+            self::createDirectRubToIdrOrders(),
+            self::createMultiHopSupplement(),
         );
     }
 
     /**
      * @return list<Order>
      */
-    private function createRubToUsdSellOrders(): array
+    private static function createRubToUsdSellOrders(): array
     {
         $rates = [
             '96.500', '97.250', '94.400', '95.100', '98.600',
@@ -232,13 +279,14 @@ final class PathFinderTest extends TestCase
             $maxBase = 100 + ($index * 5);
             $minBase = 0 === $index % 2 ? $maxBase : $maxBase / 2;
 
-            $orders[] = $this->createOrder(
+            $orders[] = OrderFactory::createOrder(
                 OrderSide::SELL,
                 'USD',
                 'RUB',
-                $this->formatAmount($minBase),
-                $this->formatAmount($maxBase),
-                $rate
+                self::formatAmount($minBase),
+                self::formatAmount($maxBase),
+                $rate,
+                rateScale: 3,
             );
         }
 
@@ -248,7 +296,7 @@ final class PathFinderTest extends TestCase
     /**
      * @return list<Order>
      */
-    private function createUsdToIdrBuyOrders(): array
+    private static function createUsdToIdrBuyOrders(): array
     {
         $rates = [
             '15050.000', '15120.000', '14980.000', '15240.000', '15090.000',
@@ -262,13 +310,14 @@ final class PathFinderTest extends TestCase
             $maxBase = 50 + ($index * 3);
             $minBase = 0 === $index % 2 ? $maxBase : $maxBase / 2;
 
-            $orders[] = $this->createOrder(
+            $orders[] = OrderFactory::createOrder(
                 OrderSide::BUY,
                 'USD',
                 'IDR',
-                $this->formatAmount($minBase),
-                $this->formatAmount($maxBase),
-                $rate
+                self::formatAmount($minBase),
+                self::formatAmount($maxBase),
+                $rate,
+                rateScale: 3,
             );
         }
 
@@ -278,16 +327,17 @@ final class PathFinderTest extends TestCase
     /**
      * @return list<Order>
      */
-    private function createDirectRubToIdrOrders(): array
+    private static function createDirectRubToIdrOrders(): array
     {
         return [
-            $this->createOrder(
+            OrderFactory::createOrder(
                 OrderSide::BUY,
                 'RUB',
                 'IDR',
                 '200.000',
                 '200.000',
-                '165.000'
+                '165.000',
+                rateScale: 3,
             ),
         ];
     }
@@ -295,64 +345,107 @@ final class PathFinderTest extends TestCase
     /**
      * @return list<Order>
      */
-    private function createMultiHopSupplement(): array
+    private static function createMultiHopSupplement(): array
     {
         return [
-            $this->createOrder(
+            OrderFactory::createOrder(
                 OrderSide::BUY,
                 'USD',
                 'JPY',
                 '25.000',
                 '50.000',
-                '149.500'
+                '149.500',
+                rateScale: 3,
             ),
-            $this->createOrder(
+            OrderFactory::createOrder(
                 OrderSide::BUY,
                 'JPY',
                 'IDR',
                 '2500.000',
                 '5000.000',
-                '112.750'
+                '112.750',
+                rateScale: 3,
             ),
-            $this->createOrder(
+            OrderFactory::createOrder(
                 OrderSide::BUY,
                 'USD',
                 'SGD',
                 '15.000',
                 '30.000',
-                '1.350'
+                '1.350',
+                rateScale: 3,
             ),
-            $this->createOrder(
+            OrderFactory::createOrder(
                 OrderSide::BUY,
                 'SGD',
                 'IDR',
                 '20.000',
                 '40.000',
-                '11250.000'
+                '11250.000',
+                rateScale: 3,
             ),
         ];
     }
 
-    private function formatAmount(float $amount): string
+    /**
+     * @return list<Order>
+     */
+    private static function createUsdToEurDirectOrders(): array
     {
-        return number_format($amount, 3, '.', '');
+        return [
+            OrderFactory::createOrder(
+                OrderSide::BUY,
+                'USD',
+                'EUR',
+                '10.000',
+                '10.000',
+                '0.9200',
+                amountScale: 3,
+                rateScale: 4,
+            ),
+        ];
     }
 
-    private function createOrder(
-        OrderSide $side,
-        string $base,
-        string $quote,
-        string $min,
-        string $max,
-        string $rate
-    ): Order {
-        $assetPair = AssetPair::fromString($base, $quote);
-        $bounds = OrderBounds::from(
-            Money::fromString($base, $min, 3),
-            Money::fromString($base, $max, 3),
-        );
-        $exchangeRate = ExchangeRate::fromString($base, $quote, $rate, 3);
+    /**
+     * @return list<Order>
+     */
+    private static function createUsdToEthSellOrders(): array
+    {
+        return [
+            OrderFactory::createOrder(
+                OrderSide::SELL,
+                'ETH',
+                'USD',
+                '5.000',
+                '5.000',
+                '1800.00',
+                amountScale: 3,
+                rateScale: 2,
+            ),
+        ];
+    }
 
-        return new Order($side, $assetPair, $bounds, $exchangeRate);
+    /**
+     * @return list<Order>
+     */
+    private static function createEthToEurBuyOrders(): array
+    {
+        return [
+            OrderFactory::createOrder(
+                OrderSide::BUY,
+                'ETH',
+                'EUR',
+                '5.000',
+                '5.000',
+                '1700.00',
+                amountScale: 3,
+                rateScale: 2,
+            ),
+        ];
+    }
+
+    private static function formatAmount(float $amount): string
+    {
+        return number_format($amount, 3, '.', '');
     }
 }
