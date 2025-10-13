@@ -135,20 +135,20 @@ final class PathFinderServiceTest extends TestCase
         self::assertNotNull($result);
 
         self::assertSame('EUR', $result->totalSpent()->currency());
-        self::assertSame('102.000', $result->totalSpent()->amount());
-        self::assertEqualsWithDelta(0.02, $result->residualTolerance(), 0.0000001);
+        self::assertSame('100.000', $result->totalSpent()->amount());
+        self::assertSame(0.0, $result->residualTolerance());
 
         $legs = $result->legs();
         self::assertCount(1, $legs);
-        self::assertSame('102.000', $legs[0]->spent()->amount());
+        self::assertSame('100.000', $legs[0]->spent()->amount());
 
         $fees = $legs[0]->fees();
         self::assertArrayHasKey('EUR', $fees);
-        self::assertSame('2.000', $fees['EUR']->amount());
+        self::assertSame('1.961', $fees['EUR']->amount());
 
         $feeBreakdown = $result->feeBreakdown();
         self::assertArrayHasKey('EUR', $feeBreakdown);
-        self::assertSame('2.000', $feeBreakdown['EUR']->amount());
+        self::assertSame('1.961', $feeBreakdown['EUR']->amount());
     }
 
     public function test_it_materializes_chained_buy_legs_with_fees_using_net_quotes(): void
@@ -205,6 +205,64 @@ final class PathFinderServiceTest extends TestCase
         self::assertArrayHasKey('JPY', $feeBreakdown);
         self::assertSame('5.500', $feeBreakdown['USD']->amount());
         self::assertSame('313.500', $feeBreakdown['JPY']->amount());
+    }
+
+    public function test_it_limits_gross_spend_for_buy_legs_with_base_fees(): void
+    {
+        $orderBook = new OrderBook([
+            $this->createOrder(
+                OrderSide::BUY,
+                'EUR',
+                'USD',
+                '20.000',
+                '300.000',
+                '1.250',
+                3,
+                $this->basePercentageFeePolicy('0.10'),
+            ),
+            $this->createOrder(
+                OrderSide::BUY,
+                'USD',
+                'JPY',
+                '20.000',
+                '300.000',
+                '140.000',
+                3,
+                $this->basePercentageFeePolicy('0.05'),
+            ),
+        ]);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.20)
+            ->withHopLimits(1, 3)
+            ->build();
+
+        $service = new PathFinderService(new GraphBuilder());
+        $result = $service->findBestPath($orderBook, $config, 'JPY');
+
+        self::assertNotNull($result);
+
+        $legs = $result->legs();
+        self::assertCount(2, $legs);
+
+        $firstLeg = $legs[0];
+        $secondLeg = $legs[1];
+
+        self::assertFalse($firstLeg->spent()->greaterThan($config->spendAmount()));
+        self::assertFalse($secondLeg->spent()->greaterThan($firstLeg->received()));
+
+        self::assertArrayHasKey('EUR', $firstLeg->fees());
+        self::assertArrayHasKey('USD', $secondLeg->fees());
+
+        $totalSpent = $result->totalSpent();
+        self::assertSame($firstLeg->spent()->currency(), $totalSpent->currency());
+
+        $comparisonScale = max($firstLeg->spent()->scale(), $totalSpent->scale());
+        self::assertSame(
+            $firstLeg->spent()->withScale($comparisonScale)->amount(),
+            $totalSpent->withScale($comparisonScale)->amount(),
+        );
     }
 
     public function test_it_prefers_fee_efficient_direct_route_over_higher_raw_rate(): void
