@@ -331,7 +331,7 @@ final class PathFinderService
                 [$spent, $received, $fees] = $resolved;
             } else {
                 $targetEffectiveQuote = $current->withScale(max($current->scale(), $order->bounds()->min()->scale()));
-                $resolved = $this->resolveSellLegAmounts($order, $targetEffectiveQuote);
+                $resolved = $this->resolveSellLegAmounts($order, $targetEffectiveQuote, $current);
 
                 if (null === $resolved) {
                     return null;
@@ -527,7 +527,7 @@ final class PathFinderService
     /**
      * @return array{0: Money, 1: Money, 2: FeeBreakdown}|null
      */
-    private function resolveSellLegAmounts(Order $order, Money $targetEffectiveQuote): ?array
+    private function resolveSellLegAmounts(Order $order, Money $targetEffectiveQuote, ?Money $availableQuoteBudget = null): ?array
     {
         $bounds = $order->bounds();
 
@@ -543,6 +543,10 @@ final class PathFinderService
             $received = $rate->convert($spent, $scale);
 
             if (!$bounds->contains($received->withScale(max($received->scale(), $bounds->min()->scale())))) {
+                return null;
+            }
+
+            if (null !== $availableQuoteBudget && $spent->greaterThan($availableQuoteBudget)) {
                 return null;
             }
 
@@ -562,8 +566,8 @@ final class PathFinderService
         );
 
         $originalTarget = $targetEffectiveQuote;
-        $targetEffectiveQuote = $targetEffectiveQuote->withScale($scale);
-        $baseAmount = $rate->convert($targetEffectiveQuote, $scale);
+        $currentTarget = $targetEffectiveQuote->withScale($scale);
+        $baseAmount = $rate->convert($currentTarget, $scale);
         $baseAmount = $this->alignBaseScale($bounds->min()->scale(), $bounds->max()->scale(), $baseAmount);
 
         $converged = false;
@@ -572,22 +576,60 @@ final class PathFinderService
             $evaluation = $this->evaluateSellQuote($order, $baseAmount);
             $fees = $evaluation['fees'];
             $effectiveQuoteAmount = $evaluation['effectiveQuote'];
+            $grossQuoteAmount = $evaluation['grossQuote'];
+
+            if (null !== $availableQuoteBudget) {
+                $grossComparisonScale = max(
+                    $grossQuoteAmount->scale(),
+                    $availableQuoteBudget->scale(),
+                    self::SELL_RESOLUTION_COMPARISON_SCALE,
+                );
+
+                $grossComparable = $grossQuoteAmount->withScale($grossComparisonScale);
+                $availableComparable = $availableQuoteBudget->withScale($grossComparisonScale);
+
+                if ($grossComparable->greaterThan($availableComparable)) {
+                    if ($this->isWithinSellResolutionTolerance($availableComparable, $grossComparable)) {
+                        $grossComparable = $availableComparable;
+                    } else {
+                        $ratio = $this->calculateSellAdjustmentRatio($availableComparable, $grossComparable, $grossComparisonScale);
+                        if (null === $ratio) {
+                            return null;
+                        }
+
+                        $previousBase = $baseAmount;
+                        $baseAmount = $baseAmount->multiply($ratio, max($baseAmount->scale(), $grossComparisonScale));
+                        $baseAmount = $this->alignBaseScale($bounds->min()->scale(), $bounds->max()->scale(), $baseAmount);
+
+                        if ($baseAmount->equals($previousBase)) {
+                            return null;
+                        }
+
+                        $currentTarget = $effectiveQuoteAmount->multiply($ratio, max($effectiveQuoteAmount->scale(), $grossComparisonScale));
+                        $currentTarget = $currentTarget->withScale(max($currentTarget->scale(), $scale, $grossComparisonScale));
+
+                        continue;
+                    }
+                }
+            }
 
             $comparisonScale = max(
                 $effectiveQuoteAmount->scale(),
-                $targetEffectiveQuote->scale(),
+                $currentTarget->scale(),
                 self::SELL_RESOLUTION_COMPARISON_SCALE,
             );
 
-            $effectiveQuoteAmount = $effectiveQuoteAmount->withScale($comparisonScale);
-            $targetEffectiveQuote = $targetEffectiveQuote->withScale($comparisonScale);
+            $effectiveComparable = $effectiveQuoteAmount->withScale($comparisonScale);
+            $targetComparable = $currentTarget->withScale($comparisonScale);
 
-            if ($this->isWithinSellResolutionTolerance($targetEffectiveQuote, $effectiveQuoteAmount)) {
+            if ($this->isWithinSellResolutionTolerance($targetComparable, $effectiveComparable)) {
+                $currentTarget = $targetComparable;
                 $converged = true;
+
                 break;
             }
 
-            $ratio = $this->calculateSellAdjustmentRatio($targetEffectiveQuote, $effectiveQuoteAmount, $comparisonScale);
+            $ratio = $this->calculateSellAdjustmentRatio($targetComparable, $effectiveComparable, $comparisonScale);
             if (null === $ratio) {
                 return null;
             }
@@ -610,8 +652,34 @@ final class PathFinderService
         $fees = $evaluation['fees'];
         $effectiveQuoteAmount = $evaluation['effectiveQuote'];
         $netBaseAmount = $evaluation['netBase'];
-        $effectiveQuoteAmount = $effectiveQuoteAmount->withScale(max($effectiveQuoteAmount->scale(), $originalTarget->scale()));
-        $grossQuoteSpend = $grossQuoteSpend->withScale(max($grossQuoteSpend->scale(), $originalTarget->scale()));
+
+        if (null !== $availableQuoteBudget) {
+            $grossComparisonScale = max(
+                $grossQuoteSpend->scale(),
+                $availableQuoteBudget->scale(),
+                self::SELL_RESOLUTION_COMPARISON_SCALE,
+            );
+
+            $grossComparable = $grossQuoteSpend->withScale($grossComparisonScale);
+            $availableComparable = $availableQuoteBudget->withScale($grossComparisonScale);
+
+            if ($grossComparable->greaterThan($availableComparable)) {
+                if ($this->isWithinSellResolutionTolerance($availableComparable, $grossComparable)) {
+                    $grossComparable = $availableComparable;
+                } else {
+                    return null;
+                }
+            }
+        }
+
+        $effectiveQuoteAmount = $effectiveQuoteAmount->withScale(max(
+            $effectiveQuoteAmount->scale(),
+            $originalTarget->scale(),
+        ));
+        $grossQuoteSpend = $grossQuoteSpend->withScale(max(
+            $grossQuoteSpend->scale(),
+            $originalTarget->scale(),
+        ));
         $netBaseAmount = $netBaseAmount->withScale(max(
             $netBaseAmount->scale(),
             $baseAmount->scale(),
