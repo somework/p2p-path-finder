@@ -154,6 +154,48 @@ final class PathFinderServiceTest extends TestCase
         self::assertTrue($result->totalReceived()->lessThan($rawWithoutFee));
     }
 
+    public function test_it_reduces_sell_leg_receipts_by_base_fee(): void
+    {
+        $orderBook = new OrderBook([
+            $this->createOrder(
+                OrderSide::SELL,
+                'BTC',
+                'USD',
+                '1.000',
+                '3.000',
+                '2.000',
+                3,
+                $this->basePercentageFeePolicy('0.10'),
+            ),
+        ]);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '2.00', 2))
+            ->withToleranceBounds(0.0, 0.0)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $service = new PathFinderService(new GraphBuilder());
+        $result = $service->findBestPath($orderBook, $config, 'BTC');
+
+        self::assertNotNull($result);
+        self::assertSame('BTC', $result->totalReceived()->currency());
+        self::assertSame('0.900', $result->totalReceived()->amount());
+
+        $legs = $result->legs();
+        self::assertCount(1, $legs);
+
+        $leg = $legs[0];
+        self::assertSame('USD', $leg->from());
+        self::assertSame('BTC', $leg->to());
+        self::assertSame('2.000', $leg->spent()->amount());
+        self::assertSame('0.900', $leg->received()->amount());
+
+        $fees = $leg->fees();
+        self::assertArrayHasKey('BTC', $fees);
+        self::assertSame('0.100', $fees['BTC']->amount());
+    }
+
     public function test_it_includes_base_fee_in_total_spent(): void
     {
         $orderBook = new OrderBook([
@@ -634,11 +676,17 @@ final class PathFinderServiceTest extends TestCase
 
         [$grossSpent, $baseReceived, $fees] = $resolved;
 
-        $rawQuote = $order->calculateQuoteAmount($baseReceived);
-        $expectedBreakdown = $feePolicy->calculate(OrderSide::SELL, $baseReceived, $rawQuote);
+        $baseFill = $baseReceived;
+        $baseFee = $fees->baseFee();
+        if (null !== $baseFee && !$baseFee->isZero()) {
+            $baseFill = $baseReceived->add($baseFee);
+        }
+
+        $rawQuote = $order->calculateQuoteAmount($baseFill);
+        $expectedBreakdown = $feePolicy->calculate(OrderSide::SELL, $baseFill, $rawQuote);
         $expectedFee = $expectedBreakdown->quoteFee();
         self::assertNotNull($expectedFee);
-        $effectiveQuote = $order->calculateEffectiveQuoteAmount($baseReceived);
+        $effectiveQuote = $order->calculateEffectiveQuoteAmount($baseFill);
 
         $comparisonScale = max($effectiveQuote->scale(), $target->scale(), 6);
         $actualAmount = $effectiveQuote->withScale($comparisonScale)->amount();

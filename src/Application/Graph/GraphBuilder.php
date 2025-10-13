@@ -83,8 +83,8 @@ final class GraphBuilder
         $minBase = $bounds->min();
         $maxBase = $bounds->max();
 
-        [$minQuote, $minGrossBase] = $this->evaluateFill($order, $minBase);
-        [$maxQuote, $maxGrossBase] = $this->evaluateFill($order, $maxBase);
+        $minFill = $this->evaluateFill($order, $minBase);
+        $maxFill = $this->evaluateFill($order, $maxBase);
 
         return [
             'from' => $fromCurrency,
@@ -93,24 +93,24 @@ final class GraphBuilder
             'order' => $order,
             'rate' => $order->effectiveRate(),
             'baseCapacity' => [
-                'min' => $minBase,
-                'max' => $maxBase,
+                'min' => $minFill['netBase'],
+                'max' => $maxFill['netBase'],
             ],
             'quoteCapacity' => [
-                'min' => $minQuote,
-                'max' => $maxQuote,
+                'min' => $minFill['quote'],
+                'max' => $maxFill['quote'],
             ],
             'grossBaseCapacity' => [
-                'min' => $minGrossBase,
-                'max' => $maxGrossBase,
+                'min' => $minFill['grossBase'],
+                'max' => $maxFill['grossBase'],
             ],
             'segments' => $this->buildSegments(
-                $minBase,
-                $maxBase,
-                $minQuote,
-                $maxQuote,
-                $minGrossBase,
-                $maxGrossBase,
+                $minFill['netBase'],
+                $maxFill['netBase'],
+                $minFill['quote'],
+                $maxFill['quote'],
+                $minFill['grossBase'],
+                $maxFill['grossBase'],
             ),
         ];
     }
@@ -195,7 +195,11 @@ final class GraphBuilder
     }
 
     /**
-     * @return array{0: Money, 1: Money}
+     * @return array{
+     *     quote: Money,
+     *     grossBase: Money,
+     *     netBase: Money,
+     * }
      */
     private function evaluateFill(Order $order, Money $baseAmount): array
     {
@@ -204,20 +208,40 @@ final class GraphBuilder
 
         $grossBase = $order->calculateGrossBaseSpend($baseAmount, $fees);
 
+        $netBase = $baseAmount;
+        if (OrderSide::SELL === $order->side()) {
+            $baseFee = $fees->baseFee();
+            if (null !== $baseFee && !$baseFee->isZero()) {
+                $netBase = $baseAmount->subtract($baseFee);
+            }
+        }
+
         $quoteFee = $fees->quoteFee();
         if (null === $quoteFee || $quoteFee->isZero()) {
-            return [$rawQuote, $grossBase];
+            return [
+                'quote' => $rawQuote,
+                'grossBase' => $grossBase,
+                'netBase' => $netBase,
+            ];
         }
 
         if (OrderSide::SELL === $order->side()) {
             $grossQuote = $rawQuote->add($quoteFee);
 
-            return [$grossQuote, $grossBase];
+            return [
+                'quote' => $grossQuote,
+                'grossBase' => $grossBase,
+                'netBase' => $netBase,
+            ];
         }
 
         $netQuote = $rawQuote->subtract($quoteFee);
 
-        return [$netQuote, $grossBase];
+        return [
+            'quote' => $netQuote,
+            'grossBase' => $grossBase,
+            'netBase' => $netBase,
+        ];
     }
 
     private function resolveFeeBreakdown(Order $order, Money $baseAmount, Money $rawQuote): FeeBreakdown
