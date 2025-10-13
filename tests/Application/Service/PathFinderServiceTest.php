@@ -90,16 +90,15 @@ final class PathFinderServiceTest extends TestCase
 
         $grossFirstLegSpend = $legs[0]->spent();
         $firstLegFee = $firstLegFees['EUR'];
-        $netFirstLegSpend = $grossFirstLegSpend->subtract($firstLegFee);
 
-        $netScale = max(
-            $netFirstLegSpend->scale(),
+        $grossScale = max(
+            $grossFirstLegSpend->scale(),
             $config->spendAmount()->scale(),
         );
 
-        $requestedAmount = $config->spendAmount()->withScale($netScale)->amount();
-        $actualNetAmount = $netFirstLegSpend->withScale($netScale)->amount();
-        $difference = BcMath::sub($actualNetAmount, $requestedAmount, $netScale + 6);
+        $requestedGross = $config->spendAmount()->withScale($grossScale)->amount();
+        $actualGross = $grossFirstLegSpend->withScale($grossScale)->amount();
+        $difference = BcMath::sub($actualGross, $requestedGross, $grossScale + 6);
         if ('-' === $difference[0]) {
             $difference = substr($difference, 1);
         }
@@ -108,31 +107,16 @@ final class PathFinderServiceTest extends TestCase
             $difference = '0';
         }
 
-        $difference = BcMath::normalize($difference, $netScale + 6);
-        $relativeDifference = BcMath::div($difference, $requestedAmount, $netScale + 6);
+        $difference = BcMath::normalize($difference, $grossScale + 6);
+        $relativeDifference = BcMath::div($difference, $requestedGross, $grossScale + 6);
 
         self::assertTrue(
             BcMath::comp(
                 $relativeDifference,
-                BcMath::normalize(sprintf('%.'.($netScale + 6).'F', $config->maximumTolerance()), $netScale + 6),
-                $netScale + 6,
+                BcMath::normalize(sprintf('%.'.($grossScale + 6).'F', $config->maximumTolerance()), $grossScale + 6),
+                $grossScale + 6,
             ) <= 0,
-            sprintf('Net spend mismatch of %s exceeds tolerance.', $difference),
-        );
-
-        $grossScale = max(
-            $config->spendAmount()->scale(),
-            $firstLegFee->scale(),
-            $grossFirstLegSpend->scale(),
-        );
-
-        $expectedGross = $netFirstLegSpend
-            ->withScale($grossScale)
-            ->add($firstLegFee->withScale($grossScale), $grossScale);
-
-        self::assertSame(
-            $expectedGross->amount(),
-            $grossFirstLegSpend->withScale($grossScale)->amount(),
+            sprintf('Gross spend mismatch of %s exceeds tolerance.', $difference),
         );
 
         self::assertSame('112.233', $legs[1]->spent()->amount());
@@ -568,6 +552,32 @@ final class PathFinderServiceTest extends TestCase
         $result = $service->findBestPath($orderBook, $config, 'USD');
 
         self::assertNull($result);
+    }
+
+    public function test_it_filters_sell_orders_exceeding_gross_tolerance(): void
+    {
+        $orderBook = new OrderBook([
+            $this->createOrder(
+                OrderSide::SELL,
+                'USD',
+                'EUR',
+                '100.000',
+                '200.000',
+                '1.000',
+                3,
+                $this->percentageFeePolicy('0.10'),
+            ),
+        ]);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.05)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $service = new PathFinderService(new GraphBuilder());
+
+        self::assertNull($service->findBestPath($orderBook, $config, 'USD'));
     }
 
     public function test_it_enforces_minimum_hop_requirement(): void
