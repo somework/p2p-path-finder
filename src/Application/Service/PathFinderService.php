@@ -239,6 +239,7 @@ final class PathFinderService
         $feeBreakdown = [];
         $grossSpentScale = max($requestedSpend->scale(), $actualSpend->scale());
         $grossSpent = Money::zero($actualSpend->currency(), $grossSpentScale);
+        $toleranceSpent = Money::zero($actualSpend->currency(), $grossSpentScale);
 
         foreach ($edges as $edge) {
             $order = $edge['order'];
@@ -276,6 +277,18 @@ final class PathFinderService
                 $grossSpent = $grossSpent->add($spent);
             }
 
+            $toleranceContribution = $spent;
+            if (OrderSide::SELL === $orderSide) {
+                $quoteFee = $fees->quoteFee();
+                if (null !== $quoteFee && !$quoteFee->isZero()) {
+                    $toleranceContribution = $spent->subtract($quoteFee);
+                }
+            }
+
+            if ($toleranceContribution->currency() === $toleranceSpent->currency()) {
+                $toleranceSpent = $toleranceSpent->add($toleranceContribution);
+            }
+
             $legs[] = new PathLeg($from, $to, $spent, $received, $legFees);
             $current = $received;
             $currentCurrency = $current->currency();
@@ -285,10 +298,10 @@ final class PathFinderService
             return null;
         }
 
-        $residual = $this->calculateResidualTolerance($requestedSpend, $grossSpent);
+        $residual = $this->calculateResidualTolerance($requestedSpend, $toleranceSpent);
 
-        $requestedComparable = $requestedSpend->withScale(max($requestedSpend->scale(), $grossSpent->scale()));
-        $actualComparable = $grossSpent->withScale($requestedComparable->scale());
+        $requestedComparable = $requestedSpend->withScale(max($requestedSpend->scale(), $toleranceSpent->scale()));
+        $actualComparable = $toleranceSpent->withScale($requestedComparable->scale());
 
         if (
             $actualComparable->lessThan($requestedComparable)
@@ -494,7 +507,7 @@ final class PathFinderService
         $converged = false;
 
         for ($attempt = 0; $attempt < self::SELL_RESOLUTION_MAX_ITERATIONS; ++$attempt) {
-            [$rawQuote, $fees, $effectiveQuoteAmount] = $this->evaluateSellQuote($order, $baseAmount);
+            [, $fees, $effectiveQuoteAmount] = $this->evaluateSellQuote($order, $baseAmount);
 
             $comparisonScale = max(
                 $effectiveQuoteAmount->scale(),
@@ -528,11 +541,12 @@ final class PathFinderService
         }
 
         $baseAmount = $baseAmount->withScale($bounds->min()->scale());
-        [$rawQuote, $fees, $effectiveQuoteAmount] = $this->evaluateSellQuote($order, $baseAmount);
+        [$grossQuoteSpend, $fees, $effectiveQuoteAmount] = $this->evaluateSellQuote($order, $baseAmount);
         $effectiveQuoteAmount = $effectiveQuoteAmount->withScale(max($effectiveQuoteAmount->scale(), $originalTarget->scale()));
+        $grossQuoteSpend = $grossQuoteSpend->withScale(max($grossQuoteSpend->scale(), $originalTarget->scale()));
 
         return [
-            $effectiveQuoteAmount,
+            $grossQuoteSpend,
             $baseAmount,
             $fees,
         ];
@@ -598,12 +612,14 @@ final class PathFinderService
         $fees = $this->resolveFeeBreakdown($order, OrderSide::SELL, $baseAmount, $rawQuote);
         $quoteFee = $fees->quoteFee();
         $effectiveQuote = $rawQuote;
+        $grossQuote = $rawQuote;
 
         if (null !== $quoteFee && !$quoteFee->isZero()) {
             $effectiveQuote = $rawQuote->subtract($quoteFee);
+            $grossQuote = $rawQuote->add($quoteFee);
         }
 
-        return [$rawQuote, $fees, $effectiveQuote];
+        return [$grossQuote, $fees, $effectiveQuote];
     }
 
     private function calculateResidualTolerance(Money $desired, Money $actual): float

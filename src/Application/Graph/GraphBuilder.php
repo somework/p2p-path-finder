@@ -209,6 +209,12 @@ final class GraphBuilder
             return [$rawQuote, $grossBase];
         }
 
+        if (OrderSide::SELL === $order->side()) {
+            $grossQuote = $rawQuote->add($quoteFee);
+
+            return [$grossQuote, $grossBase];
+        }
+
         $netQuote = $rawQuote->subtract($quoteFee);
 
         return [$netQuote, $grossBase];

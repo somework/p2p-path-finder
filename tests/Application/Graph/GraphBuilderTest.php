@@ -173,6 +173,45 @@ final class GraphBuilderTest extends TestCase
         self::assertTrue($optional['grossBase']['max']->equals($optional['base']['max']));
     }
 
+    public function test_build_uses_gross_quote_capacity_for_sell_orders_with_fee(): void
+    {
+        $order = $this->createOrder(
+            OrderSide::SELL,
+            'USD',
+            'EUR',
+            '1.000',
+            '3.000',
+            '0.500',
+            $this->percentageFeePolicy('0.10'),
+        );
+
+        $graph = (new GraphBuilder())->build([$order]);
+
+        $edges = $graph['EUR']['edges'];
+        self::assertCount(1, $edges);
+
+        $edge = $edges[0];
+
+        self::assertTrue($edge['quoteCapacity']['min']->equals(Money::fromString('EUR', '0.550', 3)));
+        self::assertTrue($edge['quoteCapacity']['max']->equals(Money::fromString('EUR', '1.650', 3)));
+
+        $rawMin = Money::fromString('EUR', '0.500', 3);
+        $rawMax = Money::fromString('EUR', '1.500', 3);
+
+        self::assertTrue($edge['quoteCapacity']['min']->greaterThan($rawMin));
+        self::assertTrue($edge['quoteCapacity']['max']->greaterThan($rawMax));
+
+        self::assertCount(2, $edge['segments']);
+
+        $mandatory = $edge['segments'][0];
+        self::assertTrue($mandatory['isMandatory']);
+        self::assertTrue($mandatory['quote']['max']->equals(Money::fromString('EUR', '0.550', 3)));
+
+        $optional = $edge['segments'][1];
+        self::assertFalse($optional['isMandatory']);
+        self::assertTrue($optional['quote']['max']->equals(Money::fromString('EUR', '1.100', 3)));
+    }
+
     public function test_build_calculates_gross_base_capacity_for_buy_orders_with_base_fee(): void
     {
         $order = $this->createOrder(
