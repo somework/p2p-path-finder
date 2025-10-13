@@ -212,6 +212,46 @@ final class GraphBuilderTest extends TestCase
         self::assertTrue($optional['quote']['max']->equals(Money::fromString('EUR', '1.100', 3)));
     }
 
+    public function test_build_reduces_base_capacity_for_sell_orders_with_base_fee(): void
+    {
+        $order = $this->createOrder(
+            OrderSide::SELL,
+            'BTC',
+            'USD',
+            '1.000',
+            '3.000',
+            '2.000',
+            $this->basePercentageFeePolicy('0.10'),
+        );
+
+        $graph = (new GraphBuilder())->build([$order]);
+
+        $edges = $graph['USD']['edges'];
+        self::assertCount(1, $edges);
+
+        $edge = $edges[0];
+
+        self::assertTrue($edge['baseCapacity']['min']->equals(Money::fromString('BTC', '0.900', 3)));
+        self::assertTrue($edge['baseCapacity']['max']->equals(Money::fromString('BTC', '2.700', 3)));
+
+        $rawMin = Money::fromString('BTC', '1.000', 3);
+        $rawMax = Money::fromString('BTC', '3.000', 3);
+
+        self::assertTrue($edge['baseCapacity']['min']->lessThan($rawMin));
+        self::assertTrue($edge['baseCapacity']['max']->lessThan($rawMax));
+
+        $segments = $edge['segments'];
+        self::assertCount(2, $segments);
+
+        $mandatory = $segments[0];
+        self::assertTrue($mandatory['isMandatory']);
+        self::assertTrue($mandatory['base']['max']->equals(Money::fromString('BTC', '0.900', 3)));
+
+        $optional = $segments[1];
+        self::assertFalse($optional['isMandatory']);
+        self::assertTrue($optional['base']['max']->equals(Money::fromString('BTC', '1.800', 3)));
+    }
+
     public function test_build_calculates_gross_base_capacity_for_buy_orders_with_base_fee(): void
     {
         $order = $this->createOrder(

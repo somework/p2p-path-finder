@@ -507,7 +507,9 @@ final class PathFinderService
         $converged = false;
 
         for ($attempt = 0; $attempt < self::SELL_RESOLUTION_MAX_ITERATIONS; ++$attempt) {
-            [, $fees, $effectiveQuoteAmount] = $this->evaluateSellQuote($order, $baseAmount);
+            $evaluation = $this->evaluateSellQuote($order, $baseAmount);
+            $fees = $evaluation['fees'];
+            $effectiveQuoteAmount = $evaluation['effectiveQuote'];
 
             $comparisonScale = max(
                 $effectiveQuoteAmount->scale(),
@@ -541,13 +543,22 @@ final class PathFinderService
         }
 
         $baseAmount = $baseAmount->withScale($bounds->min()->scale());
-        [$grossQuoteSpend, $fees, $effectiveQuoteAmount] = $this->evaluateSellQuote($order, $baseAmount);
+        $evaluation = $this->evaluateSellQuote($order, $baseAmount);
+        $grossQuoteSpend = $evaluation['grossQuote'];
+        $fees = $evaluation['fees'];
+        $effectiveQuoteAmount = $evaluation['effectiveQuote'];
+        $netBaseAmount = $evaluation['netBase'];
         $effectiveQuoteAmount = $effectiveQuoteAmount->withScale(max($effectiveQuoteAmount->scale(), $originalTarget->scale()));
         $grossQuoteSpend = $grossQuoteSpend->withScale(max($grossQuoteSpend->scale(), $originalTarget->scale()));
+        $netBaseAmount = $netBaseAmount->withScale(max(
+            $netBaseAmount->scale(),
+            $baseAmount->scale(),
+            $bounds->min()->scale(),
+        ));
 
         return [
             $grossQuoteSpend,
-            $baseAmount,
+            $netBaseAmount,
             $fees,
         ];
     }
@@ -604,7 +615,12 @@ final class PathFinderService
     }
 
     /**
-     * @return array{0: Money, 1: FeeBreakdown, 2: Money}
+     * @return array{
+     *     grossQuote: Money,
+     *     fees: FeeBreakdown,
+     *     effectiveQuote: Money,
+     *     netBase: Money,
+     * }
      */
     private function evaluateSellQuote(Order $order, Money $baseAmount): array
     {
@@ -619,7 +635,20 @@ final class PathFinderService
             $grossQuote = $rawQuote->add($quoteFee);
         }
 
-        return [$grossQuote, $fees, $effectiveQuote];
+        $netBase = $baseAmount;
+        if (OrderSide::SELL === $order->side()) {
+            $baseFee = $fees->baseFee();
+            if (null !== $baseFee && !$baseFee->isZero()) {
+                $netBase = $baseAmount->subtract($baseFee);
+            }
+        }
+
+        return [
+            'grossQuote' => $grossQuote,
+            'fees' => $fees,
+            'effectiveQuote' => $effectiveQuote,
+            'netBase' => $netBase,
+        ];
     }
 
     private function calculateResidualTolerance(Money $desired, Money $actual): float
