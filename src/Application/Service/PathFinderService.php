@@ -168,10 +168,18 @@ final class PathFinderService
             return [$bounds->min(), $bounds->max()];
         }
 
-        $minQuote = $order->calculateEffectiveQuoteAmount($bounds->min());
-        $maxQuote = $order->calculateEffectiveQuoteAmount($bounds->max());
+        $minEvaluation = $this->evaluateSellQuote($order, $bounds->min());
+        $maxEvaluation = $this->evaluateSellQuote($order, $bounds->max());
 
-        return [$minQuote, $maxQuote];
+        $minGross = $minEvaluation['grossQuote'];
+        $maxGross = $maxEvaluation['grossQuote'];
+
+        $scale = max($minGross->scale(), $maxGross->scale());
+
+        return [
+            $minGross->withScale($scale),
+            $maxGross->withScale($scale),
+        ];
     }
 
     private function determineSpendCurrency(Order $order): string
@@ -195,6 +203,68 @@ final class PathFinderService
         $order = $edge['order'];
 
         [$orderMin, $orderMax] = $this->determineOrderSpendBounds($order);
+
+        if (OrderSide::SELL === $order->side()) {
+            $bounds = $order->bounds();
+            $minEvaluation = $this->evaluateSellQuote($order, $bounds->min());
+            $maxEvaluation = $this->evaluateSellQuote($order, $bounds->max());
+
+            $orderEffectiveMin = $minEvaluation['effectiveQuote'];
+            $orderEffectiveMax = $maxEvaluation['effectiveQuote'];
+
+            $scale = max(
+                $desired->scale(),
+                $configMin->scale(),
+                $configMax->scale(),
+                $orderEffectiveMin->scale(),
+                $orderEffectiveMax->scale(),
+            );
+
+            $desired = $desired->withScale($scale);
+            $configMin = $configMin->withScale($scale);
+            $configMax = $configMax->withScale($scale);
+            $orderEffectiveMin = $orderEffectiveMin->withScale($scale);
+            $orderEffectiveMax = $orderEffectiveMax->withScale($scale);
+
+            $lowerBound = $orderEffectiveMin->greaterThan($configMin) ? $orderEffectiveMin : $configMin;
+            $upperBound = $orderEffectiveMax->lessThan($configMax) ? $orderEffectiveMax : $configMax;
+
+            if ($lowerBound->greaterThan($upperBound)) {
+                return null;
+            }
+
+            if ($desired->lessThan($lowerBound)) {
+                $candidate = $lowerBound;
+            } elseif ($desired->greaterThan($upperBound)) {
+                $candidate = $upperBound;
+            } else {
+                $candidate = $desired;
+            }
+
+            $resolved = $this->resolveSellLegAmounts($order, $candidate);
+            if (null === $resolved) {
+                return null;
+            }
+
+            [$grossSpent] = $resolved;
+            $grossScale = max(
+                $grossSpent->scale(),
+                $configMin->scale(),
+                $configMax->scale(),
+                $orderMin->scale(),
+                $orderMax->scale(),
+            );
+
+            $grossSpent = $grossSpent->withScale($grossScale);
+            $configMin = $configMin->withScale($grossScale);
+            $configMax = $configMax->withScale($grossScale);
+
+            if ($grossSpent->lessThan($configMin) || $grossSpent->greaterThan($configMax)) {
+                return null;
+            }
+
+            return $candidate;
+        }
 
         $scale = max(
             $desired->scale(),
@@ -277,16 +347,8 @@ final class PathFinderService
                 $grossSpent = $grossSpent->add($spent);
             }
 
-            $toleranceContribution = $spent;
-            if (OrderSide::SELL === $orderSide) {
-                $quoteFee = $fees->quoteFee();
-                if (null !== $quoteFee && !$quoteFee->isZero()) {
-                    $toleranceContribution = $spent->subtract($quoteFee);
-                }
-            }
-
-            if ($toleranceContribution->currency() === $toleranceSpent->currency()) {
-                $toleranceSpent = $toleranceSpent->add($toleranceContribution);
+            if ($spent->currency() === $toleranceSpent->currency()) {
+                $toleranceSpent = $toleranceSpent->add($spent);
             }
 
             $legs[] = new PathLeg($from, $to, $spent, $received, $legFees);
