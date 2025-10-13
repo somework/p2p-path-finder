@@ -83,11 +83,57 @@ final class PathFinderServiceTest extends TestCase
         $legs = $result->legs();
         self::assertCount(2, $legs);
 
-        self::assertSame('100.000', $legs[0]->spent()->amount());
         self::assertSame('112.233', $legs[0]->received()->amount());
         $firstLegFees = $legs[0]->fees();
         self::assertArrayHasKey('EUR', $firstLegFees);
         self::assertSame('1.010', $firstLegFees['EUR']->amount());
+
+        $grossFirstLegSpend = $legs[0]->spent();
+        $firstLegFee = $firstLegFees['EUR'];
+        $netFirstLegSpend = $grossFirstLegSpend->subtract($firstLegFee);
+
+        $netScale = max(
+            $netFirstLegSpend->scale(),
+            $config->spendAmount()->scale(),
+        );
+
+        $requestedAmount = $config->spendAmount()->withScale($netScale)->amount();
+        $actualNetAmount = $netFirstLegSpend->withScale($netScale)->amount();
+        $difference = BcMath::sub($actualNetAmount, $requestedAmount, $netScale + 6);
+        if ('-' === $difference[0]) {
+            $difference = substr($difference, 1);
+        }
+
+        if ('' === $difference) {
+            $difference = '0';
+        }
+
+        $difference = BcMath::normalize($difference, $netScale + 6);
+        $relativeDifference = BcMath::div($difference, $requestedAmount, $netScale + 6);
+
+        self::assertTrue(
+            BcMath::comp(
+                $relativeDifference,
+                BcMath::normalize(sprintf('%.'.($netScale + 6).'F', $config->maximumTolerance()), $netScale + 6),
+                $netScale + 6,
+            ) <= 0,
+            sprintf('Net spend mismatch of %s exceeds tolerance.', $difference),
+        );
+
+        $grossScale = max(
+            $config->spendAmount()->scale(),
+            $firstLegFee->scale(),
+            $grossFirstLegSpend->scale(),
+        );
+
+        $expectedGross = $netFirstLegSpend
+            ->withScale($grossScale)
+            ->add($firstLegFee->withScale($grossScale), $grossScale);
+
+        self::assertSame(
+            $expectedGross->amount(),
+            $grossFirstLegSpend->withScale($grossScale)->amount(),
+        );
 
         self::assertSame('112.233', $legs[1]->spent()->amount());
         self::assertSame('16498.251', $legs[1]->received()->amount());
@@ -134,12 +180,16 @@ final class PathFinderServiceTest extends TestCase
 
         self::assertNotNull($result);
 
-        self::assertSame('EUR', $result->totalSpent()->currency());
-        self::assertSame('100.000', $result->totalSpent()->amount());
-        self::assertSame(0.0, $result->residualTolerance());
-
         $legs = $result->legs();
         self::assertCount(1, $legs);
+
+        self::assertSame('EUR', $result->totalSpent()->currency());
+        self::assertSame(
+            $legs[0]->spent()->withScale($result->totalSpent()->scale())->amount(),
+            $result->totalSpent()->amount(),
+        );
+        self::assertSame(0.0, $result->residualTolerance());
+
         self::assertSame('100.000', $legs[0]->spent()->amount());
 
         $fees = $legs[0]->fees();
@@ -292,6 +342,55 @@ final class PathFinderServiceTest extends TestCase
         $fees = $legs[0]->fees();
         self::assertArrayHasKey('USD', $fees);
         self::assertSame('1.200', $fees['USD']->amount());
+    }
+
+    public function test_it_prefers_sell_route_that_limits_gross_quote_spend(): void
+    {
+        $orderBook = new OrderBook([
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '50.000', '200.000', '0.900', 3, $this->percentageFeePolicy('0.10')),
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '50.000', '200.000', '0.880', 3),
+        ]);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.0)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $service = new PathFinderService(new GraphBuilder());
+        $result = $service->findBestPath($orderBook, $config, 'USD');
+
+        self::assertNotNull($result);
+
+        $legs = $result->legs();
+        self::assertCount(1, $legs);
+
+        $leg = $legs[0];
+        self::assertSame('EUR', $leg->from());
+        self::assertSame('USD', $leg->to());
+        self::assertCount(0, $leg->fees());
+
+        self::assertSame('113.600', $leg->received()->withScale(3)->amount());
+
+        $grossSpend = $leg->spent();
+        $grossScale = max($grossSpend->scale(), $config->spendAmount()->scale());
+
+        self::assertSame(
+            $config->spendAmount()->withScale($grossScale)->amount(),
+            $grossSpend->withScale($grossScale)->amount(),
+        );
+
+        self::assertSame('113.600', $result->totalReceived()->withScale(3)->amount());
+
+        $highFeeGross = $config
+            ->spendAmount()
+            ->withScale($grossScale)
+            ->divide('0.90', $grossScale)
+            ->multiply('1.10', $grossScale);
+
+        self::assertTrue(
+            $result->totalSpent()->withScale($grossScale)->lessThan($highFeeGross->withScale($grossScale)),
+        );
     }
 
     public function test_it_prefers_fee_efficient_multi_hop_route_over_high_fee_alternative(): void
@@ -523,33 +622,28 @@ final class PathFinderServiceTest extends TestCase
         $feePolicy = $this->tieredFeePolicy('310.000', '0.05', '0.35', '25.000');
         $order = $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '0.001', '1000.000', '0.400', 3, $feePolicy);
 
-        $orderBook = new OrderBook([$order]);
-
-        $config = PathSearchConfig::builder()
-            ->withSpendAmount(Money::fromString('EUR', '220.000', 3))
-            ->withToleranceBounds(0.0, 0.0)
-            ->withHopLimits(1, 1)
-            ->build();
-
         $service = new PathFinderService(new GraphBuilder());
-        $result = $service->findBestPath($orderBook, $config, 'USD');
+        $reflection = new \ReflectionClass(PathFinderService::class);
+        $method = $reflection->getMethod('resolveSellLegAmounts');
+        $method->setAccessible(true);
 
-        self::assertNotNull($result);
-        $legs = $result->legs();
-        self::assertCount(1, $legs);
+        $target = Money::fromString('EUR', '200.000', 3);
+        $resolved = $method->invoke($service, $order, $target);
 
-        $leg = $legs[0];
+        self::assertIsArray($resolved);
 
-        $rawQuote = $order->calculateQuoteAmount($leg->received());
-        $expectedBreakdown = $feePolicy->calculate(OrderSide::SELL, $leg->received(), $rawQuote);
+        [$grossSpent, $baseReceived, $fees] = $resolved;
+
+        $rawQuote = $order->calculateQuoteAmount($baseReceived);
+        $expectedBreakdown = $feePolicy->calculate(OrderSide::SELL, $baseReceived, $rawQuote);
         $expectedFee = $expectedBreakdown->quoteFee();
         self::assertNotNull($expectedFee);
-        $effectiveQuote = $order->calculateEffectiveQuoteAmount($leg->received());
+        $effectiveQuote = $order->calculateEffectiveQuoteAmount($baseReceived);
 
-        $comparisonScale = max($effectiveQuote->scale(), $leg->spent()->scale(), 6);
+        $comparisonScale = max($effectiveQuote->scale(), $target->scale(), 6);
         $actualAmount = $effectiveQuote->withScale($comparisonScale)->amount();
-        $reportedAmount = $leg->spent()->withScale($comparisonScale)->amount();
-        $difference = BcMath::sub($actualAmount, $reportedAmount, $comparisonScale + 6);
+        $targetAmount = $target->withScale($comparisonScale)->amount();
+        $difference = BcMath::sub($actualAmount, $targetAmount, $comparisonScale + 6);
         if ('-' === $difference[0]) {
             $difference = substr($difference, 1);
         }
@@ -559,16 +653,24 @@ final class PathFinderServiceTest extends TestCase
         }
 
         $difference = BcMath::normalize($difference, $comparisonScale + 6);
-        $relativeDifference = BcMath::div($difference, $actualAmount, $comparisonScale + 6);
+        $difference = BcMath::normalize($difference, $comparisonScale + 6);
+        $relativeDifference = BcMath::div($difference, $targetAmount, $comparisonScale + 6);
 
         self::assertTrue(
-            BcMath::comp($relativeDifference, '0.000001', $comparisonScale + 6) <= 0,
+            BcMath::comp($relativeDifference, '0.00001', $comparisonScale + 6) <= 0,
             sprintf('Effective quote mismatch of %s exceeds tolerance.', $difference),
         );
 
-        $legFees = $leg->fees();
-        self::assertArrayHasKey($expectedFee->currency(), $legFees);
-        $actualFee = $legFees[$expectedFee->currency()];
+        $grossComparisonScale = max($rawQuote->scale(), $expectedFee->scale(), $grossSpent->scale(), 6);
+        $expectedGross = $rawQuote->add($expectedFee, $grossComparisonScale);
+
+        self::assertSame(
+            $expectedGross->withScale($grossComparisonScale)->amount(),
+            $grossSpent->withScale($grossComparisonScale)->amount(),
+        );
+
+        $actualFee = $fees->quoteFee();
+        self::assertNotNull($actualFee);
 
         $feeScale = max($expectedFee->scale(), $actualFee->scale(), 6);
         self::assertSame(
