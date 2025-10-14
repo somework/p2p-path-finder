@@ -364,6 +364,42 @@ final class PathFinderTest extends TestCase
         self::assertSame($expectedProduct, $result['edges'][0]['conversionRate']);
     }
 
+    /**
+     * Demonstrates how a single-leg buy path with simultaneous base surcharges and quote deductions alters the conversion rate used for tolerance math.
+     */
+    public function test_it_accounts_for_combined_base_and_quote_fees_when_scoring_buy_edges(): void
+    {
+        $order = OrderFactory::createOrder(
+            OrderSide::BUY,
+            'EUR',
+            'USD',
+            '10.000',
+            '10.000',
+            '1.200',
+            amountScale: 3,
+            rateScale: 3,
+            feePolicy: self::mixedPercentageFeePolicy('0.02', '0.05'),
+        );
+
+        $graph = (new GraphBuilder())->build([$order]);
+
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.10);
+        $result = $finder->findBestPath($graph, 'EUR', 'USD');
+
+        self::assertNotNull($result);
+        self::assertSame(1, $result['hops']);
+        self::assertCount(1, $result['edges']);
+        self::assertSame('EUR', $result['edges'][0]['from']);
+        self::assertSame('USD', $result['edges'][0]['to']);
+
+        $expectedProduct = BcMath::div('11.400', '10.200', self::SCALE);
+        $expectedCost = BcMath::div('1', $expectedProduct, self::SCALE);
+
+        self::assertSame($expectedProduct, $result['product']);
+        self::assertSame($expectedCost, $result['cost']);
+        self::assertSame($expectedProduct, $result['edges'][0]['conversionRate']);
+    }
+
     public function test_it_returns_zero_hop_path_when_source_equals_target(): void
     {
         $orders = self::buildComprehensiveOrderBook();
@@ -706,6 +742,25 @@ final class PathFinderTest extends TestCase
                 $fee = $baseAmount->multiply($this->percentage, $baseAmount->scale());
 
                 return FeeBreakdown::forBase($fee);
+            }
+        };
+    }
+
+    private static function mixedPercentageFeePolicy(string $basePercentage, string $quotePercentage): FeePolicy
+    {
+        return new class($basePercentage, $quotePercentage) implements FeePolicy {
+            public function __construct(
+                private readonly string $basePercentage,
+                private readonly string $quotePercentage,
+            ) {
+            }
+
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                $baseFee = $baseAmount->multiply($this->basePercentage, $baseAmount->scale());
+                $quoteFee = $quoteAmount->multiply($this->quotePercentage, $quoteAmount->scale());
+
+                return FeeBreakdown::of($baseFee, $quoteFee);
             }
         };
     }
