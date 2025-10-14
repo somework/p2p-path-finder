@@ -289,6 +289,48 @@ final class GraphBuilderTest extends TestCase
         self::assertTrue($optional['grossBase']['max']->equals(Money::fromString('BTC', '2.040', 3)));
     }
 
+    /**
+     * Mixed-fee policies should increase gross base spend while simultaneously reducing net quote receipts so path scoring can reflect dual-fee flows.
+     */
+    public function test_build_applies_combined_base_and_quote_fees_to_buy_orders(): void
+    {
+        $order = $this->createOrder(
+            OrderSide::BUY,
+            'BTC',
+            'USD',
+            '1.000',
+            '3.000',
+            '100.000',
+            $this->mixedPercentageFeePolicy('0.02', '0.05'),
+        );
+
+        $graph = (new GraphBuilder())->build([$order]);
+
+        $edges = $graph['BTC']['edges'];
+        self::assertCount(1, $edges);
+
+        $edge = $edges[0];
+
+        self::assertTrue($edge['quoteCapacity']['min']->equals(Money::fromString('USD', '95.000', 3)));
+        self::assertTrue($edge['quoteCapacity']['max']->equals(Money::fromString('USD', '285.000', 3)));
+
+        self::assertTrue($edge['grossBaseCapacity']['min']->equals(Money::fromString('BTC', '1.020', 3)));
+        self::assertTrue($edge['grossBaseCapacity']['max']->equals(Money::fromString('BTC', '3.060', 3)));
+
+        $segments = $edge['segments'];
+        self::assertCount(2, $segments);
+
+        $mandatory = $segments[0];
+        self::assertTrue($mandatory['isMandatory']);
+        self::assertTrue($mandatory['quote']['max']->equals(Money::fromString('USD', '95.000', 3)));
+        self::assertTrue($mandatory['grossBase']['max']->equals(Money::fromString('BTC', '1.020', 3)));
+
+        $optional = $segments[1];
+        self::assertFalse($optional['isMandatory']);
+        self::assertTrue($optional['quote']['max']->equals(Money::fromString('USD', '190.000', 3)));
+        self::assertTrue($optional['grossBase']['max']->equals(Money::fromString('BTC', '2.040', 3)));
+    }
+
     public function test_build_encodes_fully_flexible_orders_as_single_segment(): void
     {
         $order = $this->createOrder(OrderSide::BUY, 'ETH', 'USN', '0.000', '5.000', '2000');
@@ -410,6 +452,25 @@ final class GraphBuilderTest extends TestCase
                 $fee = $baseAmount->multiply($this->percentage, $baseAmount->scale());
 
                 return FeeBreakdown::forBase($fee);
+            }
+        };
+    }
+
+    private function mixedPercentageFeePolicy(string $basePercentage, string $quotePercentage): FeePolicy
+    {
+        return new class($basePercentage, $quotePercentage) implements FeePolicy {
+            public function __construct(
+                private readonly string $basePercentage,
+                private readonly string $quotePercentage,
+            ) {
+            }
+
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                $baseFee = $baseAmount->multiply($this->basePercentage, $baseAmount->scale());
+                $quoteFee = $quoteAmount->multiply($this->quotePercentage, $quoteAmount->scale());
+
+                return FeeBreakdown::of($baseFee, $quoteFee);
             }
         };
     }

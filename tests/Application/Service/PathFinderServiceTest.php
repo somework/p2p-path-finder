@@ -228,6 +228,62 @@ final class PathFinderServiceTest extends TestCase
         self::assertSame('2.000', $feeBreakdown['EUR']->amount());
     }
 
+    /**
+     * A single buy leg charging both base and quote fees should report the increased gross spend and reduced proceeds while surfacing both fee currencies.
+     */
+    public function test_it_materializes_buy_leg_with_combined_base_and_quote_fees(): void
+    {
+        $orderBook = new OrderBook([
+            $this->createOrder(
+                OrderSide::BUY,
+                'EUR',
+                'USD',
+                '10.000',
+                '200.000',
+                '1.200',
+                3,
+                $this->mixedPercentageFeePolicy('0.02', '0.05'),
+            ),
+        ]);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.05)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $service = new PathFinderService(new GraphBuilder());
+        $result = $service->findBestPath($orderBook, $config, 'USD');
+
+        self::assertNotNull($result);
+        self::assertSame('EUR', $result->totalSpent()->currency());
+        self::assertSame('102.000', $result->totalSpent()->amount());
+        self::assertSame('USD', $result->totalReceived()->currency());
+        self::assertSame('114.000', $result->totalReceived()->amount());
+        self::assertEqualsWithDelta(0.02, $result->residualTolerance(), 0.0000001);
+
+        $legs = $result->legs();
+        self::assertCount(1, $legs);
+
+        $leg = $legs[0];
+        self::assertSame('EUR', $leg->from());
+        self::assertSame('USD', $leg->to());
+        self::assertSame('102.000', $leg->spent()->amount());
+        self::assertSame('114.000', $leg->received()->amount());
+
+        $fees = $leg->fees();
+        self::assertArrayHasKey('EUR', $fees);
+        self::assertArrayHasKey('USD', $fees);
+        self::assertSame('2.000', $fees['EUR']->amount());
+        self::assertSame('6.000', $fees['USD']->amount());
+
+        $feeBreakdown = $result->feeBreakdown();
+        self::assertArrayHasKey('EUR', $feeBreakdown);
+        self::assertArrayHasKey('USD', $feeBreakdown);
+        self::assertSame('2.000', $feeBreakdown['EUR']->amount());
+        self::assertSame('6.000', $feeBreakdown['USD']->amount());
+    }
+
     public function test_it_materializes_chained_buy_legs_with_fees_using_net_quotes(): void
     {
         $orderBook = new OrderBook([
@@ -969,6 +1025,25 @@ final class PathFinderServiceTest extends TestCase
                 $fee = $quoteAmount->multiply($this->percentage, $quoteAmount->scale());
 
                 return FeeBreakdown::forQuote($fee);
+            }
+        };
+    }
+
+    private function mixedPercentageFeePolicy(string $basePercentage, string $quotePercentage): FeePolicy
+    {
+        return new class($basePercentage, $quotePercentage) implements FeePolicy {
+            public function __construct(
+                private readonly string $basePercentage,
+                private readonly string $quotePercentage,
+            ) {
+            }
+
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                $baseFee = $baseAmount->multiply($this->basePercentage, $baseAmount->scale());
+                $quoteFee = $quoteAmount->multiply($this->quotePercentage, $quoteAmount->scale());
+
+                return FeeBreakdown::of($baseFee, $quoteFee);
             }
         };
     }
