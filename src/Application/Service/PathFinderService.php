@@ -11,6 +11,7 @@ use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
+use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
@@ -34,8 +35,11 @@ final class PathFinderService
     private const BUY_ADJUSTMENT_MAX_ITERATIONS = 12;
     private const RESIDUAL_TOLERANCE_EPSILON = 0.000001;
 
-    public function __construct(private readonly GraphBuilder $graphBuilder)
+    private readonly OrderFillEvaluator $fillEvaluator;
+
+    public function __construct(private readonly GraphBuilder $graphBuilder, ?OrderFillEvaluator $fillEvaluator = null)
     {
+        $this->fillEvaluator = $fillEvaluator ?? new OrderFillEvaluator();
     }
 
     /**
@@ -87,15 +91,15 @@ final class PathFinderService
                     return false;
                 }
 
-                $initialSpend = $this->determineInitialSpendAmount($config, $firstEdge);
-                if (null === $initialSpend) {
+                $initialSeed = $this->determineInitialSpendAmount($config, $firstEdge);
+                if (null === $initialSeed) {
                     return false;
                 }
 
                 $result = $this->materializePath(
                     $candidate['edges'],
                     $config->spendAmount(),
-                    $initialSpend,
+                    $initialSeed,
                     $targetCurrency,
                     $config,
                 );
@@ -165,7 +169,18 @@ final class PathFinderService
         $bounds = $order->bounds();
 
         if (OrderSide::BUY === $order->side()) {
-            return [$bounds->min(), $bounds->max()];
+            $minFill = $this->fillEvaluator->evaluate($order, $bounds->min());
+            $maxFill = $this->fillEvaluator->evaluate($order, $bounds->max());
+
+            $minGross = $minFill['grossBase'];
+            $maxGross = $maxFill['grossBase'];
+
+            $scale = max($minGross->scale(), $maxGross->scale());
+
+            return [
+                $minGross->withScale($scale),
+                $maxGross->withScale($scale),
+            ];
         }
 
         $minEvaluation = $this->evaluateSellQuote($order, $bounds->min());
@@ -194,15 +209,17 @@ final class PathFinderService
 
     /**
      * @param array{from: string, to: string, order: Order, orderSide: OrderSide} $edge
+     *
+     * @return array{net: Money, gross: Money, grossCeiling: Money}|null
      */
-    private function determineInitialSpendAmount(PathSearchConfig $config, array $edge): ?Money
+    private function determineInitialSpendAmount(PathSearchConfig $config, array $edge): ?array
     {
         $desired = $config->spendAmount();
         $configMin = $config->minimumSpendAmount();
         $configMax = $config->maximumSpendAmount();
         $order = $edge['order'];
 
-        [$orderMin, $orderMax] = $this->determineOrderSpendBounds($order);
+        [$orderMinGross, $orderMaxGross] = $this->determineOrderSpendBounds($order);
 
         if (OrderSide::SELL === $order->side()) {
             $bounds = $order->bounds();
@@ -251,11 +268,13 @@ final class PathFinderService
                 $grossSpent->scale(),
                 $configMin->scale(),
                 $configMax->scale(),
-                $orderMin->scale(),
-                $orderMax->scale(),
+                $orderMinGross->scale(),
+                $orderMaxGross->scale(),
             );
 
             $grossSpent = $grossSpent->withScale($grossScale);
+            $minGross = $orderMinGross->withScale($grossScale);
+            $maxGross = $orderMaxGross->withScale($grossScale);
             $configMin = $configMin->withScale($grossScale);
             $configMax = $configMax->withScale($grossScale);
 
@@ -263,53 +282,106 @@ final class PathFinderService
                 return null;
             }
 
-            return $candidate;
+            if ($grossSpent->lessThan($minGross) || $grossSpent->greaterThan($maxGross)) {
+                return null;
+            }
+
+            return [
+                'net' => $candidate,
+                'gross' => $grossSpent,
+                'grossCeiling' => $grossSpent,
+            ];
+        }
+
+        $bounds = $order->bounds();
+        $minNet = $bounds->min();
+        $maxNet = $bounds->max();
+
+        $grossScale = max(
+            $orderMinGross->scale(),
+            $orderMaxGross->scale(),
+            $configMin->scale(),
+            $configMax->scale(),
+        );
+
+        $minGross = $orderMinGross->withScale($grossScale);
+        $maxGross = $orderMaxGross->withScale($grossScale);
+        $configMinGross = $configMin->withScale($grossScale);
+        $configMaxGross = $configMax->withScale($grossScale);
+
+        $grossLower = $minGross->greaterThan($configMinGross) ? $minGross : $configMinGross;
+        $grossUpper = $maxGross->lessThan($configMaxGross) ? $maxGross : $configMaxGross;
+
+        if ($grossLower->greaterThan($grossUpper)) {
+            return null;
         }
 
         $scale = max(
             $desired->scale(),
             $configMin->scale(),
             $configMax->scale(),
-            $orderMin->scale(),
-            $orderMax->scale(),
+            $minNet->scale(),
+            $maxNet->scale(),
         );
 
-        $desired = $desired->withScale($scale);
-        $orderMin = $orderMin->withScale($scale);
-        $orderMax = $orderMax->withScale($scale);
-        $configMin = $configMin->withScale($scale);
-        $configMax = $configMax->withScale($scale);
+        $desiredNet = $desired->withScale($scale);
+        $minNet = $minNet->withScale($scale);
+        $maxNet = $maxNet->withScale($scale);
 
-        $lowerBound = $orderMin->greaterThan($configMin) ? $orderMin : $configMin;
-        $upperBound = $orderMax->lessThan($configMax) ? $orderMax : $configMax;
+        if ($desiredNet->lessThan($minNet)) {
+            $desiredNet = $minNet;
+        } elseif ($desiredNet->greaterThan($maxNet)) {
+            $desiredNet = $maxNet;
+        }
 
-        if ($lowerBound->greaterThan($upperBound)) {
+        $desiredFill = $this->fillEvaluator->evaluate($order, $desiredNet);
+        $desiredGross = $desiredFill['grossBase']->withScale($grossScale);
+        $targetGross = $desiredGross->greaterThan($grossUpper) ? $grossUpper : $desiredGross;
+
+        $resolved = $this->resolveBuyFill($order, $desiredNet, $targetGross, $grossUpper);
+        if (null === $resolved) {
             return null;
         }
 
-        if ($desired->lessThan($lowerBound)) {
-            return $lowerBound;
+        $gross = $resolved['gross']->withScale($grossScale);
+        $net = $resolved['net']->withScale($scale);
+
+        if ($gross->lessThan($grossLower)) {
+            return null;
         }
 
-        if ($desired->greaterThan($upperBound)) {
-            return $upperBound;
-        }
+        $grossCeiling = $grossUpper->withScale(max($grossUpper->scale(), $gross->scale()));
 
-        return $desired;
+        return [
+            'net' => $net,
+            'gross' => $gross,
+            'grossCeiling' => $grossCeiling,
+        ];
     }
 
     /**
      * @param list<array{from: string, to: string, order: Order, orderSide: OrderSide}> $edges
+     * @param array{net: Money, gross: Money, grossCeiling: Money}                      $initialSeed
      */
-    private function materializePath(array $edges, Money $requestedSpend, Money $actualSpend, string $targetCurrency, PathSearchConfig $config): ?PathResult
+    private function materializePath(array $edges, Money $requestedSpend, array $initialSeed, string $targetCurrency, PathSearchConfig $config): ?PathResult
     {
         $legs = [];
-        $current = $actualSpend;
+        $current = $initialSeed['net'];
         $currentCurrency = $current->currency();
         $feeBreakdown = [];
-        $grossSpentScale = max($requestedSpend->scale(), $actualSpend->scale());
-        $grossSpent = Money::zero($actualSpend->currency(), $grossSpentScale);
-        $toleranceSpent = Money::zero($actualSpend->currency(), $grossSpentScale);
+
+        $initialGrossSeed = $initialSeed['gross'];
+        $initialGrossCeiling = $initialSeed['grossCeiling'];
+
+        $budgetScale = max($initialGrossSeed->scale(), $initialGrossCeiling->scale());
+        $initialGrossSeed = $initialGrossSeed->withScale($budgetScale);
+        $remainingGrossBudget = $initialGrossCeiling->withScale($budgetScale);
+
+        $grossSpentScale = max($requestedSpend->scale(), $budgetScale);
+        $grossSpent = Money::zero($initialGrossSeed->currency(), $grossSpentScale);
+        $toleranceSpent = Money::zero($initialGrossSeed->currency(), $grossSpentScale);
+
+        $applyTolerance = true;
 
         foreach ($edges as $edge) {
             $order = $edge['order'];
@@ -322,33 +394,55 @@ final class PathFinderService
             }
 
             if (OrderSide::BUY === $orderSide) {
-                $resolved = $this->resolveBuyLegAmounts($order, $current);
+                $grossSeedForLeg = $applyTolerance ? $initialGrossSeed : $current;
+                $grossCeilingForLeg = $applyTolerance ? $remainingGrossBudget : $grossSeedForLeg;
+
+                $resolved = $this->resolveBuyLegAmounts($order, $current, $grossSeedForLeg, $grossCeilingForLeg);
 
                 if (null === $resolved) {
                     return null;
                 }
 
                 [$spent, $received, $fees] = $resolved;
+
+                if ($applyTolerance && $spent->currency() === $remainingGrossBudget->currency()) {
+                    $remainingGrossBudget = $this->reduceBudget($remainingGrossBudget, $spent);
+                }
+
+                $applyTolerance = false;
             } else {
                 $targetEffectiveQuote = $current->withScale(max($current->scale(), $order->bounds()->min()->scale()));
-                $resolved = $this->resolveSellLegAmounts($order, $targetEffectiveQuote, $current);
+                $availableBudget = $current;
+
+                if ($applyTolerance && $current->currency() === $remainingGrossBudget->currency()) {
+                    $budgetScale = max($current->scale(), $remainingGrossBudget->scale());
+                    $availableBudget = $remainingGrossBudget->withScale($budgetScale);
+                }
+
+                $resolved = $this->resolveSellLegAmounts($order, $targetEffectiveQuote, $availableBudget);
 
                 if (null === $resolved) {
                     return null;
                 }
 
                 [$spent, $received, $fees] = $resolved;
+
+                if ($applyTolerance && $spent->currency() === $remainingGrossBudget->currency()) {
+                    $remainingGrossBudget = $this->reduceBudget($remainingGrossBudget, $spent);
+                }
+
+                $applyTolerance = false;
             }
 
             $legFees = $this->convertFeesToMap($fees);
             $this->accumulateFeeBreakdown($feeBreakdown, $legFees);
 
             if ($spent->currency() === $grossSpent->currency()) {
-                $grossSpent = $grossSpent->add($spent);
+                $grossSpent = $grossSpent->add($spent, $grossSpentScale);
             }
 
             if ($spent->currency() === $toleranceSpent->currency()) {
-                $toleranceSpent = $toleranceSpent->add($spent);
+                $toleranceSpent = $toleranceSpent->add($spent, $grossSpentScale);
             }
 
             $legs[] = new PathLeg($from, $to, $spent, $received, $legFees);
@@ -451,74 +545,108 @@ final class PathFinderService
         return $normalized;
     }
 
+    private function reduceBudget(Money $budget, Money $spent): Money
+    {
+        if ($budget->currency() !== $spent->currency() || $spent->isZero()) {
+            return $budget;
+        }
+
+        $scale = max($budget->scale(), $spent->scale());
+        $remaining = $budget->subtract($spent, $scale);
+        $zero = Money::zero($budget->currency(), $remaining->scale());
+
+        if ($remaining->lessThan($zero)) {
+            return $zero;
+        }
+
+        return $remaining;
+    }
+
     /**
      * @return array{0: Money, 1: Money, 2: FeeBreakdown}|null
      */
-    private function resolveBuyLegAmounts(Order $order, Money $available): ?array
+    private function resolveBuyLegAmounts(Order $order, Money $netSeed, Money $grossSeed, Money $grossCeiling): ?array
+    {
+        $resolved = $this->resolveBuyFill($order, $netSeed, $grossSeed, $grossCeiling);
+
+        if (null === $resolved) {
+            return null;
+        }
+
+        return [
+            $resolved['gross'],
+            $resolved['quote'],
+            $resolved['fees'],
+        ];
+    }
+
+    /**
+     * @return array{gross: Money, quote: Money, fees: FeeBreakdown, net: Money}|null
+     */
+    private function resolveBuyFill(Order $order, Money $netSeed, Money $grossSeed, Money $grossCeiling): ?array
     {
         $bounds = $order->bounds();
-        $boundsScale = $bounds->min()->scale();
-        $available = $available->withScale(max($available->scale(), $boundsScale));
+        $minNet = $bounds->min();
+        $maxNet = $bounds->max();
+        $boundsScale = max($minNet->scale(), $maxNet->scale());
 
-        $minimumNet = $bounds->min();
-        if (!$minimumNet->isZero()) {
-            $rawMinimumQuote = $order->calculateQuoteAmount($minimumNet);
-            $minimumFees = $this->resolveFeeBreakdown($order, OrderSide::BUY, $minimumNet, $rawMinimumQuote);
-            $minimumGross = $order->calculateGrossBaseSpend($minimumNet, $minimumFees);
+        $netCandidate = $bounds->clamp($netSeed->withScale(max($netSeed->scale(), $boundsScale)));
+        $grossScale = max($grossSeed->scale(), $grossCeiling->scale(), $boundsScale);
+        $grossSeed = $grossSeed->withScale($grossScale);
+        $grossCeiling = $grossCeiling->withScale(max($grossCeiling->scale(), $grossSeed->scale()));
 
-            $comparisonScale = max($minimumGross->scale(), $available->scale());
-            $minimumGrossComparable = $minimumGross->withScale($comparisonScale);
-            $availableComparable = $available->withScale($comparisonScale);
+        if (!$minNet->isZero()) {
+            $minFill = $this->fillEvaluator->evaluate($order, $minNet);
+            $minGross = $minFill['grossBase']->withScale(max($minFill['grossBase']->scale(), $grossCeiling->scale()));
+            $budgetComparable = $grossCeiling->withScale($minGross->scale());
 
-            if ($minimumGrossComparable->greaterThan($availableComparable)) {
+            if ($minGross->greaterThan($budgetComparable)) {
                 return null;
             }
         }
 
-        $netBase = $bounds->clamp($available);
-
         for ($attempt = 0; $attempt < self::BUY_ADJUSTMENT_MAX_ITERATIONS; ++$attempt) {
-            $netBase = $netBase->withScale($boundsScale);
-            $rawQuote = $order->calculateQuoteAmount($netBase);
-            $fees = $this->resolveFeeBreakdown($order, OrderSide::BUY, $netBase, $rawQuote);
-            $grossBase = $order->calculateGrossBaseSpend($netBase, $fees);
-
-            $comparisonScale = max($grossBase->scale(), $available->scale());
+            $netCandidate = $netCandidate->withScale($boundsScale);
+            $fill = $this->fillEvaluator->evaluate($order, $netCandidate);
+            $grossBase = $fill['grossBase'];
+            $comparisonScale = max($grossBase->scale(), $grossCeiling->scale());
             $grossComparable = $grossBase->withScale($comparisonScale);
-            $availableComparable = $available->withScale($comparisonScale);
+            $ceilingComparable = $grossCeiling->withScale($comparisonScale);
 
-            if (!$grossComparable->greaterThan($availableComparable)) {
-                $received = $rawQuote;
-                $quoteFee = $fees->quoteFee();
-                if (null !== $quoteFee && !$quoteFee->isZero()) {
-                    $received = $rawQuote->subtract($quoteFee);
-                }
+            if (!$grossComparable->greaterThan($ceilingComparable)) {
+                $grossResult = $grossBase->withScale(max($grossBase->scale(), $grossSeed->scale(), $grossCeiling->scale()));
+                $quote = $fill['quote'];
 
-                return [$grossBase, $received, $fees];
+                return [
+                    'gross' => $grossResult,
+                    'quote' => $quote,
+                    'fees' => $fill['fees'],
+                    'net' => $netCandidate->withScale($boundsScale),
+                ];
             }
 
             $ratioScale = max($comparisonScale, 12);
-            $availableAmount = $available->withScale($ratioScale)->amount();
-            $grossAmount = $grossBase->withScale($ratioScale)->amount();
+            $ceilingAmount = $ceilingComparable->withScale($ratioScale)->amount();
+            $grossAmount = $grossComparable->withScale($ratioScale)->amount();
 
             if (0 === BcMath::comp($grossAmount, '0', $ratioScale)) {
                 return null;
             }
 
-            $ratio = BcMath::div($availableAmount, $grossAmount, $ratioScale + 4);
+            $ratio = BcMath::div($ceilingAmount, $grossAmount, $ratioScale + 4);
 
             if (0 === BcMath::comp($ratio, '0', $ratioScale + 4)) {
                 return null;
             }
 
-            $nextNet = $netBase->multiply($ratio, max($netBase->scale(), $ratioScale));
+            $nextNet = $netCandidate->multiply($ratio, max($netCandidate->scale(), $ratioScale));
             $nextNet = $bounds->clamp($nextNet);
 
-            if ($nextNet->equals($netBase)) {
+            if ($nextNet->equals($netCandidate)) {
                 return null;
             }
 
-            $netBase = $nextNet;
+            $netCandidate = $nextNet;
         }
 
         return null;
