@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\Service;
 
+use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
@@ -61,6 +62,41 @@ final class PathFinderServiceTest extends TestCase
         self::assertSame('JPY', $legs[1]->to());
         self::assertSame('111.100', $legs[1]->spent()->amount());
         self::assertSame('16665.000', $legs[1]->received()->amount());
+    }
+
+    public function test_it_requires_non_empty_target_asset(): void
+    {
+        $orderBook = new OrderBook([]);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '1.00', 2))
+            ->withToleranceBounds(0.0, 0.0)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $service = new PathFinderService(new GraphBuilder());
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Target asset cannot be empty.');
+
+        $service->findBestPath($orderBook, $config, '');
+    }
+
+    public function test_it_returns_null_when_target_node_is_missing(): void
+    {
+        $orderBook = new OrderBook([
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '200.000', '0.900', 3),
+        ]);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '50.00', 2))
+            ->withToleranceBounds(0.0, 0.0)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $service = new PathFinderService(new GraphBuilder());
+
+        self::assertNull($service->findBestPath($orderBook, $config, 'JPY'));
     }
 
     public function test_it_materializes_leg_fees_and_breakdown(): void
