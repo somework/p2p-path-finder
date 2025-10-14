@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
+use SomeWork\P2PPathFinder\Application\Service\LegMaterializer;
 use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
@@ -851,13 +852,9 @@ final class PathFinderServiceTest extends TestCase
         $feePolicy = $this->tieredFeePolicy('310.000', '0.05', '0.35', '25.000');
         $order = $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '0.001', '1000.000', '0.400', 3, $feePolicy);
 
-        $service = new PathFinderService(new GraphBuilder());
-        $reflection = new \ReflectionClass(PathFinderService::class);
-        $method = $reflection->getMethod('resolveSellLegAmounts');
-        $method->setAccessible(true);
-
         $target = Money::fromString('EUR', '200.000', 3);
-        $resolved = $method->invoke($service, $order, $target);
+        $materializer = new LegMaterializer();
+        $resolved = $materializer->resolveSellLegAmounts($order, $target);
 
         self::assertIsArray($resolved);
 
