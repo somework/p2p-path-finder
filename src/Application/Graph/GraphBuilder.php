@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Graph;
 
-use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
+use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
@@ -17,6 +17,13 @@ use function array_key_exists;
  */
 final class GraphBuilder
 {
+    private OrderFillEvaluator $fillEvaluator;
+
+    public function __construct(?OrderFillEvaluator $fillEvaluator = null)
+    {
+        $this->fillEvaluator = $fillEvaluator ?? new OrderFillEvaluator();
+    }
+
     /**
      * @param iterable<Order> $orders
      *
@@ -83,8 +90,8 @@ final class GraphBuilder
         $minBase = $bounds->min();
         $maxBase = $bounds->max();
 
-        $minFill = $this->evaluateFill($order, $minBase);
-        $maxFill = $this->evaluateFill($order, $maxBase);
+        $minFill = $this->fillEvaluator->evaluate($order, $minBase);
+        $maxFill = $this->fillEvaluator->evaluate($order, $maxBase);
 
         return [
             'from' => $fromCurrency,
@@ -195,62 +202,10 @@ final class GraphBuilder
     }
 
     /**
-     * @return array{
-     *     quote: Money,
-     *     grossBase: Money,
-     *     netBase: Money,
-     * }
+     * @codeCoverageIgnore
      */
-    private function evaluateFill(Order $order, Money $baseAmount): array
+    public function fillEvaluator(): OrderFillEvaluator
     {
-        $rawQuote = $order->calculateQuoteAmount($baseAmount);
-        $fees = $this->resolveFeeBreakdown($order, $baseAmount, $rawQuote);
-
-        $grossBase = $order->calculateGrossBaseSpend($baseAmount, $fees);
-
-        $netBase = $baseAmount;
-        if (OrderSide::SELL === $order->side()) {
-            $baseFee = $fees->baseFee();
-            if (null !== $baseFee && !$baseFee->isZero()) {
-                $netBase = $baseAmount->subtract($baseFee);
-            }
-        }
-
-        $quoteFee = $fees->quoteFee();
-        if (null === $quoteFee || $quoteFee->isZero()) {
-            return [
-                'quote' => $rawQuote,
-                'grossBase' => $grossBase,
-                'netBase' => $netBase,
-            ];
-        }
-
-        if (OrderSide::SELL === $order->side()) {
-            $grossQuote = $rawQuote->add($quoteFee);
-
-            return [
-                'quote' => $grossQuote,
-                'grossBase' => $grossBase,
-                'netBase' => $netBase,
-            ];
-        }
-
-        $netQuote = $rawQuote->subtract($quoteFee);
-
-        return [
-            'quote' => $netQuote,
-            'grossBase' => $grossBase,
-            'netBase' => $netBase,
-        ];
-    }
-
-    private function resolveFeeBreakdown(Order $order, Money $baseAmount, Money $rawQuote): FeeBreakdown
-    {
-        $feePolicy = $order->feePolicy();
-        if (null === $feePolicy) {
-            return FeeBreakdown::none();
-        }
-
-        return $feePolicy->calculate($order->side(), $baseAmount, $rawQuote);
+        return $this->fillEvaluator;
     }
 }
