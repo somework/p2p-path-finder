@@ -30,4 +30,29 @@ final class FeePolicyFactory
             }
         };
     }
+
+    /**
+     * @param numeric-string $baseRatio
+     * @param numeric-string $quoteRatio
+     */
+    public static function baseAndQuoteSurcharge(string $baseRatio, string $quoteRatio, int $scale = 6): FeePolicy
+    {
+        return new class($baseRatio, $quoteRatio, $scale) implements FeePolicy {
+            public function __construct(
+                private readonly string $baseRatio,
+                private readonly string $quoteRatio,
+                private readonly int $scale
+            ) {
+            }
+
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                $feeScale = max($this->scale, $baseAmount->scale(), $quoteAmount->scale());
+                $baseFee = $baseAmount->multiply($this->baseRatio, $feeScale)->withScale($baseAmount->scale());
+                $quoteFee = $quoteAmount->multiply($this->quoteRatio, $feeScale)->withScale($quoteAmount->scale());
+
+                return FeeBreakdown::of($baseFee, $quoteFee);
+            }
+        };
+    }
 }
