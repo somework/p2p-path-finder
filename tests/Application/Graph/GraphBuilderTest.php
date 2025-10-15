@@ -17,19 +17,9 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 
 final class GraphBuilderTest extends TestCase
 {
-    public function test_build_creates_currency_nodes_and_directional_edges_for_multiple_orders(): void
+    public function test_build_creates_expected_currency_nodes(): void
     {
-        $primaryBuyOrder = $this->createOrder(OrderSide::BUY, 'BTC', 'USD', '0.100', '1.000', '30000');
-        $secondaryBuyOrder = $this->createOrder(OrderSide::BUY, 'BTC', 'EUR', '0.200', '0.800', '28000');
-        $primarySellOrder = $this->createOrder(OrderSide::SELL, 'ETH', 'USD', '0.500', '2.000', '1500');
-        $secondarySellOrder = $this->createOrder(OrderSide::SELL, 'LTC', 'USD', '1.000', '4.000', '90');
-
-        $graph = (new GraphBuilder())->build([
-            $primaryBuyOrder,
-            $secondaryBuyOrder,
-            $primarySellOrder,
-            $secondarySellOrder,
-        ]);
+        [$graph] = $this->buildGraphFromSampleOrders();
 
         self::assertCount(5, $graph);
         self::assertEqualsCanonicalizing([
@@ -40,95 +30,53 @@ final class GraphBuilderTest extends TestCase
             'LTC',
         ], array_keys($graph));
 
-        $btcEdges = $graph['BTC']['edges'];
-        self::assertCount(2, $btcEdges);
-
-        $primaryBtcEdge = $btcEdges[0];
-        self::assertSame('BTC', $primaryBtcEdge['from']);
-        self::assertSame('USD', $primaryBtcEdge['to']);
-        self::assertSame(OrderSide::BUY, $primaryBtcEdge['orderSide']);
-        self::assertSame($primaryBuyOrder, $primaryBtcEdge['order']);
-        self::assertTrue($primaryBtcEdge['baseCapacity']['min']->equals(Money::fromString('BTC', '0.100', 3)));
-        self::assertTrue($primaryBtcEdge['baseCapacity']['max']->equals(Money::fromString('BTC', '1.000', 3)));
-        self::assertTrue($primaryBtcEdge['quoteCapacity']['min']->equals(Money::fromString('USD', '3000.000', 3)));
-        self::assertTrue($primaryBtcEdge['quoteCapacity']['max']->equals(Money::fromString('USD', '30000.000', 3)));
-        self::assertTrue($primaryBtcEdge['grossBaseCapacity']['min']->equals($primaryBtcEdge['baseCapacity']['min']));
-        self::assertTrue($primaryBtcEdge['grossBaseCapacity']['max']->equals($primaryBtcEdge['baseCapacity']['max']));
-
-        self::assertCount(2, $primaryBtcEdge['segments']);
-        self::assertTrue($primaryBtcEdge['segments'][0]['isMandatory']);
-        self::assertTrue($primaryBtcEdge['segments'][0]['base']['max']->equals(Money::fromString('BTC', '0.100', 3)));
-        self::assertTrue($primaryBtcEdge['segments'][0]['quote']['max']->equals(Money::fromString('USD', '3000.000', 3)));
-        self::assertTrue($primaryBtcEdge['segments'][0]['grossBase']['max']->equals(Money::fromString('BTC', '0.100', 3)));
-        self::assertFalse($primaryBtcEdge['segments'][1]['isMandatory']);
-        self::assertTrue($primaryBtcEdge['segments'][1]['base']['max']->equals(Money::fromString('BTC', '0.900', 3)));
-        self::assertTrue($primaryBtcEdge['segments'][1]['quote']['max']->equals(Money::fromString('USD', '27000.000', 3)));
-        self::assertTrue($primaryBtcEdge['segments'][1]['grossBase']['max']->equals(Money::fromString('BTC', '0.900', 3)));
-
-        $secondaryBtcEdge = $btcEdges[1];
-        self::assertSame('BTC', $secondaryBtcEdge['from']);
-        self::assertSame('EUR', $secondaryBtcEdge['to']);
-        self::assertSame(OrderSide::BUY, $secondaryBtcEdge['orderSide']);
-        self::assertSame($secondaryBuyOrder, $secondaryBtcEdge['order']);
-        self::assertTrue($secondaryBtcEdge['baseCapacity']['min']->equals(Money::fromString('BTC', '0.200', 3)));
-        self::assertTrue($secondaryBtcEdge['baseCapacity']['max']->equals(Money::fromString('BTC', '0.800', 3)));
-        self::assertTrue($secondaryBtcEdge['quoteCapacity']['min']->equals(Money::fromString('EUR', '5600.000', 3)));
-        self::assertTrue($secondaryBtcEdge['quoteCapacity']['max']->equals(Money::fromString('EUR', '22400.000', 3)));
-        self::assertTrue($secondaryBtcEdge['grossBaseCapacity']['min']->equals($secondaryBtcEdge['baseCapacity']['min']));
-        self::assertTrue($secondaryBtcEdge['grossBaseCapacity']['max']->equals($secondaryBtcEdge['baseCapacity']['max']));
-
-        self::assertCount(2, $secondaryBtcEdge['segments']);
-        self::assertTrue($secondaryBtcEdge['segments'][0]['isMandatory']);
-        self::assertTrue($secondaryBtcEdge['segments'][0]['base']['max']->equals(Money::fromString('BTC', '0.200', 3)));
-        self::assertTrue($secondaryBtcEdge['segments'][0]['quote']['max']->equals(Money::fromString('EUR', '5600.000', 3)));
-        self::assertTrue($secondaryBtcEdge['segments'][0]['grossBase']['max']->equals(Money::fromString('BTC', '0.200', 3)));
-        self::assertFalse($secondaryBtcEdge['segments'][1]['isMandatory']);
-        self::assertTrue($secondaryBtcEdge['segments'][1]['base']['max']->equals(Money::fromString('BTC', '0.600', 3)));
-        self::assertTrue($secondaryBtcEdge['segments'][1]['quote']['max']->equals(Money::fromString('EUR', '16800.000', 3)));
-        self::assertTrue($secondaryBtcEdge['segments'][1]['grossBase']['max']->equals(Money::fromString('BTC', '0.600', 3)));
-
-        $usdEdges = $graph['USD']['edges'];
-        self::assertCount(2, $usdEdges);
-
-        $primaryUsdEdge = $usdEdges[0];
-        self::assertSame('USD', $primaryUsdEdge['from']);
-        self::assertSame('ETH', $primaryUsdEdge['to']);
-        self::assertSame(OrderSide::SELL, $primaryUsdEdge['orderSide']);
-        self::assertSame($primarySellOrder, $primaryUsdEdge['order']);
-        self::assertTrue($primaryUsdEdge['baseCapacity']['min']->equals(Money::fromString('ETH', '0.500', 3)));
-        self::assertTrue($primaryUsdEdge['baseCapacity']['max']->equals(Money::fromString('ETH', '2.000', 3)));
-        self::assertTrue($primaryUsdEdge['quoteCapacity']['min']->equals(Money::fromString('USD', '750.000', 3)));
-        self::assertTrue($primaryUsdEdge['quoteCapacity']['max']->equals(Money::fromString('USD', '3000.000', 3)));
-
-        self::assertCount(2, $primaryUsdEdge['segments']);
-        self::assertTrue($primaryUsdEdge['segments'][0]['isMandatory']);
-        self::assertTrue($primaryUsdEdge['segments'][0]['base']['max']->equals(Money::fromString('ETH', '0.500', 3)));
-        self::assertTrue($primaryUsdEdge['segments'][0]['quote']['max']->equals(Money::fromString('USD', '750.000', 3)));
-        self::assertFalse($primaryUsdEdge['segments'][1]['isMandatory']);
-        self::assertTrue($primaryUsdEdge['segments'][1]['base']['max']->equals(Money::fromString('ETH', '1.500', 3)));
-        self::assertTrue($primaryUsdEdge['segments'][1]['quote']['max']->equals(Money::fromString('USD', '2250.000', 3)));
-
-        $secondaryUsdEdge = $usdEdges[1];
-        self::assertSame('USD', $secondaryUsdEdge['from']);
-        self::assertSame('LTC', $secondaryUsdEdge['to']);
-        self::assertSame(OrderSide::SELL, $secondaryUsdEdge['orderSide']);
-        self::assertSame($secondarySellOrder, $secondaryUsdEdge['order']);
-        self::assertTrue($secondaryUsdEdge['baseCapacity']['min']->equals(Money::fromString('LTC', '1.000', 3)));
-        self::assertTrue($secondaryUsdEdge['baseCapacity']['max']->equals(Money::fromString('LTC', '4.000', 3)));
-        self::assertTrue($secondaryUsdEdge['quoteCapacity']['min']->equals(Money::fromString('USD', '90.000', 3)));
-        self::assertTrue($secondaryUsdEdge['quoteCapacity']['max']->equals(Money::fromString('USD', '360.000', 3)));
-
-        self::assertCount(2, $secondaryUsdEdge['segments']);
-        self::assertTrue($secondaryUsdEdge['segments'][0]['isMandatory']);
-        self::assertTrue($secondaryUsdEdge['segments'][0]['base']['max']->equals(Money::fromString('LTC', '1.000', 3)));
-        self::assertTrue($secondaryUsdEdge['segments'][0]['quote']['max']->equals(Money::fromString('USD', '90.000', 3)));
-        self::assertFalse($secondaryUsdEdge['segments'][1]['isMandatory']);
-        self::assertTrue($secondaryUsdEdge['segments'][1]['base']['max']->equals(Money::fromString('LTC', '3.000', 3)));
-        self::assertTrue($secondaryUsdEdge['segments'][1]['quote']['max']->equals(Money::fromString('USD', '270.000', 3)));
-
+        self::assertCount(2, $graph['BTC']['edges']);
+        self::assertCount(2, $graph['USD']['edges']);
         self::assertCount(0, $graph['EUR']['edges']);
         self::assertCount(0, $graph['ETH']['edges']);
         self::assertCount(0, $graph['LTC']['edges']);
+    }
+
+    public function test_build_creates_buy_edges_for_each_order(): void
+    {
+        [$graph, $orders] = $this->buildGraphFromSampleOrders();
+
+        $edges = $graph['BTC']['edges'];
+        self::assertCount(2, $edges);
+
+        $primaryEdge = $edges[0];
+        $this->assertEdgeBasics($primaryEdge, 'BTC', 'USD', OrderSide::BUY, $orders['primaryBuyOrder']);
+        $this->assertEdgeCapacities($primaryEdge, 'BTC', '0.100', '1.000', 'USD', '3000.000', '30000.000');
+        $this->assertGrossBaseEqualsBase($primaryEdge);
+        $this->assertSegment($primaryEdge['segments'][0], true, 'BTC', '0.100', 'USD', '3000.000', true);
+        $this->assertSegment($primaryEdge['segments'][1], false, 'BTC', '0.900', 'USD', '27000.000', true);
+
+        $secondaryEdge = $edges[1];
+        $this->assertEdgeBasics($secondaryEdge, 'BTC', 'EUR', OrderSide::BUY, $orders['secondaryBuyOrder']);
+        $this->assertEdgeCapacities($secondaryEdge, 'BTC', '0.200', '0.800', 'EUR', '5600.000', '22400.000');
+        $this->assertGrossBaseEqualsBase($secondaryEdge);
+        $this->assertSegment($secondaryEdge['segments'][0], true, 'BTC', '0.200', 'EUR', '5600.000', true);
+        $this->assertSegment($secondaryEdge['segments'][1], false, 'BTC', '0.600', 'EUR', '16800.000', true);
+    }
+
+    public function test_build_creates_sell_edges_for_each_order(): void
+    {
+        [$graph, $orders] = $this->buildGraphFromSampleOrders();
+
+        $edges = $graph['USD']['edges'];
+        self::assertCount(2, $edges);
+
+        $primaryEdge = $edges[0];
+        $this->assertEdgeBasics($primaryEdge, 'USD', 'ETH', OrderSide::SELL, $orders['primarySellOrder']);
+        $this->assertEdgeCapacities($primaryEdge, 'ETH', '0.500', '2.000', 'USD', '750.000', '3000.000');
+        $this->assertSegment($primaryEdge['segments'][0], true, 'ETH', '0.500', 'USD', '750.000');
+        $this->assertSegment($primaryEdge['segments'][1], false, 'ETH', '1.500', 'USD', '2250.000');
+
+        $secondaryEdge = $edges[1];
+        $this->assertEdgeBasics($secondaryEdge, 'USD', 'LTC', OrderSide::SELL, $orders['secondarySellOrder']);
+        $this->assertEdgeCapacities($secondaryEdge, 'LTC', '1.000', '4.000', 'USD', '90.000', '360.000');
+        $this->assertSegment($secondaryEdge['segments'][0], true, 'LTC', '1.000', 'USD', '90.000');
+        $this->assertSegment($secondaryEdge['segments'][1], false, 'LTC', '3.000', 'USD', '270.000');
     }
 
     public function test_build_uses_net_quote_capacity_for_buy_orders_with_fee(): void
@@ -399,6 +347,98 @@ final class GraphBuilderTest extends TestCase
         self::assertTrue($segment['base']['max']->equals(Money::fromString('ETH', '0.000', 3)));
         self::assertTrue($segment['quote']['min']->equals(Money::fromString('USD', '0.000', 3)));
         self::assertTrue($segment['quote']['max']->equals(Money::fromString('USD', '0.000', 3)));
+    }
+
+    /**
+     * @return array{0: array<string, mixed>, 1: array{primaryBuyOrder: Order, secondaryBuyOrder: Order, primarySellOrder: Order, secondarySellOrder: Order}}
+     */
+    private function buildGraphFromSampleOrders(): array
+    {
+        $orders = [
+            'primaryBuyOrder' => $this->createOrder(OrderSide::BUY, 'BTC', 'USD', '0.100', '1.000', '30000'),
+            'secondaryBuyOrder' => $this->createOrder(OrderSide::BUY, 'BTC', 'EUR', '0.200', '0.800', '28000'),
+            'primarySellOrder' => $this->createOrder(OrderSide::SELL, 'ETH', 'USD', '0.500', '2.000', '1500'),
+            'secondarySellOrder' => $this->createOrder(OrderSide::SELL, 'LTC', 'USD', '1.000', '4.000', '90'),
+        ];
+
+        $graph = (new GraphBuilder())->build([
+            $orders['primaryBuyOrder'],
+            $orders['secondaryBuyOrder'],
+            $orders['primarySellOrder'],
+            $orders['secondarySellOrder'],
+        ]);
+
+        return [$graph, $orders];
+    }
+
+    /**
+     * @param array<string, mixed> $edge
+     */
+    private function assertEdgeBasics(array $edge, string $from, string $to, OrderSide $side, Order $order): void
+    {
+        self::assertSame($from, $edge['from']);
+        self::assertSame($to, $edge['to']);
+        self::assertSame($side, $edge['orderSide']);
+        self::assertSame($order, $edge['order']);
+    }
+
+    /**
+     * @param array<string, mixed> $edge
+     */
+    private function assertEdgeCapacities(
+        array $edge,
+        string $baseCurrency,
+        string $baseMin,
+        string $baseMax,
+        string $quoteCurrency,
+        string $quoteMin,
+        string $quoteMax,
+    ): void {
+        $this->assertMoneyEquals($edge['baseCapacity']['min'], $baseCurrency, $baseMin);
+        $this->assertMoneyEquals($edge['baseCapacity']['max'], $baseCurrency, $baseMax);
+        $this->assertMoneyEquals($edge['quoteCapacity']['min'], $quoteCurrency, $quoteMin);
+        $this->assertMoneyEquals($edge['quoteCapacity']['max'], $quoteCurrency, $quoteMax);
+    }
+
+    /**
+     * @param array<string, mixed> $edge
+     */
+    private function assertGrossBaseEqualsBase(array $edge): void
+    {
+        self::assertTrue($edge['grossBaseCapacity']['min']->equals($edge['baseCapacity']['min']));
+        self::assertTrue($edge['grossBaseCapacity']['max']->equals($edge['baseCapacity']['max']));
+    }
+
+    /**
+     * @param array<string, mixed> $segment
+     */
+    private function assertSegment(
+        array $segment,
+        bool $expectedMandatory,
+        string $baseCurrency,
+        string $baseMax,
+        string $quoteCurrency,
+        string $quoteMax,
+        bool $assertGrossBase = false,
+    ): void {
+        self::assertSame($expectedMandatory, $segment['isMandatory']);
+        $this->assertMoneyEquals($segment['base']['max'], $baseCurrency, $baseMax);
+        $this->assertMoneyEquals($segment['quote']['max'], $quoteCurrency, $quoteMax);
+
+        if ($assertGrossBase) {
+            self::assertArrayHasKey('grossBase', $segment);
+            $this->assertMoneyEquals($segment['grossBase']['max'], $baseCurrency, $baseMax);
+        }
+    }
+
+    private function assertMoneyEquals(Money $actual, string $currency, string $amount): void
+    {
+        self::assertTrue($actual->equals($this->money($currency, $amount)));
+    }
+
+    private function money(string $currency, string $amount): Money
+    {
+        return Money::fromString($currency, $amount, 3);
     }
 
     /**
