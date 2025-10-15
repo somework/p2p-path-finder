@@ -9,13 +9,62 @@ use LogicException;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
+use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
+use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
+use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
 final class OrderTest extends TestCase
 {
+    public function test_constructor_rejects_order_bounds_currency_mismatch(): void
+    {
+        $assetPair = AssetPair::fromString('BTC', 'USD');
+        $bounds = OrderBounds::from(
+            Money::fromString('ETH', '0.100', 3),
+            Money::fromString('ETH', '1.000', 3),
+        );
+        $rate = ExchangeRate::fromString('BTC', 'USD', '30000', 3);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Order bounds must be expressed in the base asset.');
+
+        new Order(OrderSide::BUY, $assetPair, $bounds, $rate);
+    }
+
+    public function test_constructor_rejects_effective_rate_base_currency_mismatch(): void
+    {
+        $assetPair = AssetPair::fromString('BTC', 'USD');
+        $bounds = OrderBounds::from(
+            Money::fromString('BTC', '0.100', 3),
+            Money::fromString('BTC', '1.000', 3),
+        );
+        $rate = ExchangeRate::fromString('ETH', 'USD', '30000', 3);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Effective rate base currency must match asset pair base.');
+
+        new Order(OrderSide::BUY, $assetPair, $bounds, $rate);
+    }
+
+    public function test_constructor_rejects_effective_rate_quote_currency_mismatch(): void
+    {
+        $assetPair = AssetPair::fromString('BTC', 'USD');
+        $bounds = OrderBounds::from(
+            Money::fromString('BTC', '0.100', 3),
+            Money::fromString('BTC', '1.000', 3),
+        );
+        $rate = ExchangeRate::fromString('BTC', 'EUR', '30000', 3);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Effective rate quote currency must match asset pair quote.');
+
+        new Order(OrderSide::BUY, $assetPair, $bounds, $rate);
+    }
+
     /**
      * @param non-empty-string $baseCurrency
      * @param non-empty-string $partialFillCurrency
