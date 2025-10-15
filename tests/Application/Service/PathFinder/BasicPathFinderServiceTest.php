@@ -6,18 +6,18 @@ namespace SomeWork\P2PPathFinder\Tests\Application\Service\PathFinder;
 
 use InvalidArgumentException;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 {
+    /**
+     * @testdox Finds best EUR→JPY route by bridging through USD when multiple hops are needed
+     */
     public function test_it_builds_multi_hop_path_and_aggregates_amounts(): void
     {
-        $orderBook = $this->orderBook(
-            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '200.000', '0.900', 3),
-            $this->createOrder(OrderSide::BUY, 'USD', 'JPY', '50.000', '200.000', '150.000', 3),
-            $this->createOrder(OrderSide::SELL, 'JPY', 'EUR', '10.000', '20000.000', '0.007500', 6),
-        );
+        $orderBook = $this->scenarioEuroToUsdToJpyBridge();
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
@@ -48,6 +48,9 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('16665.000', $legs[1]->received()->amount());
     }
 
+    /**
+     * @testdox Validates target asset must be provided before evaluating any routes
+     */
     public function test_it_requires_non_empty_target_asset(): void
     {
         $orderBook = $this->orderBook();
@@ -64,6 +67,9 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         $this->makeService()->findBestPath($orderBook, $config, '');
     }
 
+    /**
+     * @testdox Returns no result when the target market node is not present in the graph
+     */
     public function test_it_returns_null_when_target_node_is_missing(): void
     {
         $orderBook = $this->orderBook(
@@ -79,20 +85,12 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertNull($this->makeService()->findBestPath($orderBook, $config, 'JPY'));
     }
 
+    /**
+     * @testdox Chooses GBP bridge when the notional best scoring USD route lacks available capacity
+     */
     public function test_it_skips_highest_scoring_path_when_complex_book_lacks_capacity(): void
     {
-        $orderBook = $this->orderBook(
-            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '80.000', '0.600', 3),
-            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '5.000', '500.000', '0.800', 3),
-            $this->createOrder(OrderSide::SELL, 'CHF', 'EUR', '5.000', '400.000', '0.920', 3),
-            $this->createOrder(OrderSide::SELL, 'AUD', 'EUR', '5.000', '400.000', '0.700', 3),
-            $this->createOrder(OrderSide::SELL, 'CAD', 'EUR', '5.000', '400.000', '0.750', 3),
-            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '5.000', '500.000', '1.200', 3),
-            $this->createOrder(OrderSide::BUY, 'CHF', 'USD', '5.000', '500.000', '1.050', 3),
-            $this->createOrder(OrderSide::BUY, 'AUD', 'USD', '5.000', '500.000', '0.650', 3),
-            $this->createOrder(OrderSide::BUY, 'CAD', 'USD', '5.000', '500.000', '0.730', 3),
-            $this->createOrder(OrderSide::BUY, 'EUR', 'CHF', '5.000', '500.000', '1.100', 3),
-        );
+        $orderBook = $this->scenarioCapacityConstrainedUsdRoutes();
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
@@ -121,20 +119,12 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('150.000', $legs[1]->received()->amount());
     }
 
+    /**
+     * @testdox Picks the most competitive GBP legs when multiple identical pairs quote different rates
+     */
     public function test_it_prefers_best_rates_when_multiple_identical_pairs_exist(): void
     {
-        $orderBook = $this->orderBook(
-            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '5.000', '80.000', '0.680', 3),
-            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '5.000', '500.000', '0.760', 3),
-            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '5.000', '500.000', '0.780', 3),
-            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '5.000', '500.000', '0.710', 3),
-            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '5.000', '500.000', '0.700', 3),
-            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '5.000', '80.000', '1.350', 3),
-            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '5.000', '500.000', '1.220', 3),
-            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '5.000', '500.000', '1.200', 3),
-            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '5.000', '500.000', '1.180', 3),
-            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '5.000', '500.000', '1.250', 3),
-        );
+        $orderBook = $this->scenarioCompetingGbpQuotes();
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
@@ -162,5 +152,46 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('USD', $legs[1]->to());
         self::assertSame('142.900', $legs[1]->spent()->amount());
         self::assertSame('178.625', $legs[1]->received()->amount());
+    }
+
+    private function scenarioEuroToUsdToJpyBridge(): OrderBook
+    {
+        return $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '200.000', '0.900', 3),
+            $this->createOrder(OrderSide::BUY, 'USD', 'JPY', '50.000', '200.000', '150.000', 3),
+            $this->createOrder(OrderSide::SELL, 'JPY', 'EUR', '10.000', '20000.000', '0.007500', 6),
+        );
+    }
+
+    private function scenarioCapacityConstrainedUsdRoutes(): OrderBook
+    {
+        return $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '80.000', '0.600', 3),
+            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '5.000', '500.000', '0.800', 3),
+            $this->createOrder(OrderSide::SELL, 'CHF', 'EUR', '5.000', '400.000', '0.920', 3),
+            $this->createOrder(OrderSide::SELL, 'AUD', 'EUR', '5.000', '400.000', '0.700', 3),
+            $this->createOrder(OrderSide::SELL, 'CAD', 'EUR', '5.000', '400.000', '0.750', 3),
+            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '5.000', '500.000', '1.200', 3),
+            $this->createOrder(OrderSide::BUY, 'CHF', 'USD', '5.000', '500.000', '1.050', 3),
+            $this->createOrder(OrderSide::BUY, 'AUD', 'USD', '5.000', '500.000', '0.650', 3),
+            $this->createOrder(OrderSide::BUY, 'CAD', 'USD', '5.000', '500.000', '0.730', 3),
+            $this->createOrder(OrderSide::BUY, 'EUR', 'CHF', '5.000', '500.000', '1.100', 3),
+        );
+    }
+
+    private function scenarioCompetingGbpQuotes(): OrderBook
+    {
+        return $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '5.000', '80.000', '0.680', 3),
+            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '5.000', '500.000', '0.760', 3),
+            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '5.000', '500.000', '0.780', 3),
+            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '5.000', '500.000', '0.710', 3),
+            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '5.000', '500.000', '0.700', 3),
+            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '5.000', '80.000', '1.350', 3),
+            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '5.000', '500.000', '1.220', 3),
+            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '5.000', '500.000', '1.200', 3),
+            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '5.000', '500.000', '1.180', 3),
+            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '5.000', '500.000', '1.250', 3),
+        );
     }
 }
