@@ -300,6 +300,75 @@ final class PathFinderTest extends TestCase
         ];
     }
 
+    /**
+     * @dataProvider provideSpendConstraintsMissingBounds
+     */
+    public function test_it_throws_when_one_of_the_spend_bounds_is_missing(array $constraints): void
+    {
+        $order = OrderFactory::buy('EUR', 'USD', '1.000', '1.000', '1.100', 3, 3);
+        $graph = (new GraphBuilder())->build([$order]);
+
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Spend constraints must include both minimum and maximum bounds.');
+
+        $finder->findBestPath($graph, 'EUR', 'USD', $constraints);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function provideSpendConstraintsMissingBounds(): iterable
+    {
+        $minimum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
+        $maximum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
+
+        yield 'missing_minimum' => [
+            [
+                'max' => $maximum,
+            ],
+        ];
+
+        yield 'missing_maximum' => [
+            [
+                'min' => $minimum,
+            ],
+        ];
+    }
+
+    public function test_it_accepts_spend_constraints_with_both_bounds(): void
+    {
+        $order = OrderFactory::buy('EUR', 'USD', '1.000', '1.000', '1.100', 3, 3);
+        $graph = (new GraphBuilder())->build([$order]);
+
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+
+        $minimum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
+        $maximum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
+
+        $result = $finder->findBestPath(
+            $graph,
+            'EUR',
+            'USD',
+            [
+                'min' => $minimum,
+                'max' => $maximum,
+            ],
+        );
+
+        self::assertNotNull($result);
+        self::assertSame(1, $result['hops']);
+        self::assertCount(1, $result['edges']);
+        self::assertSame('EUR', $result['edges'][0]['from']);
+        self::assertSame('USD', $result['edges'][0]['to']);
+
+        self::assertNotNull($result['amountRange']);
+        self::assertSame('USD', $result['amountRange']['min']->currency());
+        self::assertSame($result['amountRange']['min']->currency(), $result['amountRange']['max']->currency());
+        self::assertSame($result['amountRange']['min']->amount(), $result['amountRange']['max']->amount());
+    }
+
     public function test_it_supports_spend_constraints_without_desired_amount(): void
     {
         $order = OrderFactory::buy('EUR', 'USD', '1.000', '1.000', '1.100', 3, 3);
