@@ -40,4 +40,32 @@ final class ExchangeRateTest extends TestCase
         self::assertSame('USD', $inverted->quoteCurrency());
         self::assertSame('0.007', $inverted->rate());
     }
+
+    public function test_from_string_rejects_identical_currencies(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        ExchangeRate::fromString('USD', 'USD', '1.0000', 4);
+    }
+
+    /**
+     * @param non-empty-string $rate
+     *
+     * @dataProvider invalidRateProvider
+     */
+    public function test_from_string_rejects_non_positive_rates(string $rate): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        ExchangeRate::fromString('USD', 'EUR', $rate, 4);
+    }
+
+    /**
+     * @return iterable<array{string}>
+     */
+    public function invalidRateProvider(): iterable
+    {
+        yield 'zero rate' => ['0'];
+        yield 'negative rate' => ['-1.25'];
+    }
 }
