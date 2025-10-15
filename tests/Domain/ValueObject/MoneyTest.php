@@ -19,6 +19,55 @@ final class MoneyTest extends TestCase
         self::assertSame(4, $money->scale());
     }
 
+    public function test_from_string_rejects_empty_currency(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        Money::fromString('', '1.00');
+    }
+
+    /**
+     * @dataProvider provideMalformedCurrencies
+     */
+    public function test_from_string_rejects_malformed_currency(string $currency): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        Money::fromString($currency, '1.00');
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public function provideMalformedCurrencies(): iterable
+    {
+        yield 'too short' => ['US'];
+        yield 'too long' => ['USDA'];
+        yield 'contains digits' => ['U5D'];
+        yield 'contains symbols' => ['U$D'];
+        yield 'contains whitespace' => ['U D'];
+    }
+
+    /**
+     * @dataProvider provideValidCurrencies
+     */
+    public function test_from_string_accepts_three_letter_currency(string $currency): void
+    {
+        $money = Money::fromString($currency, '5.00', 2);
+
+        self::assertSame(strtoupper($currency), $money->currency());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public function provideValidCurrencies(): iterable
+    {
+        yield 'lowercase' => ['usd'];
+        yield 'uppercase' => ['JPY'];
+        yield 'mixed case' => ['eUr'];
+    }
+
     public function test_add_and_subtract_respect_scale(): void
     {
         $a = Money::fromString('EUR', '10.5', 2);
