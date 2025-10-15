@@ -14,8 +14,10 @@ use SplPriorityQueue;
 
 use function array_key_exists;
 use function array_values;
+use function is_string;
 use function rtrim;
 use function sprintf;
+use function str_repeat;
 use function strtoupper;
 
 /**
@@ -50,24 +52,21 @@ final class PathFinder
     private readonly bool $hasTolerance;
 
     /**
-     * @param int   $maxHops   maximum number of edges a path may contain
-     * @param float $tolerance value in the [0, 1) range representing the acceptable degradation of the best product
+     * @param int          $maxHops   maximum number of edges a path may contain
+     * @param float|string $tolerance value in the [0, 1) range representing the acceptable degradation of the best product
      */
     public function __construct(
         private readonly int $maxHops = 4,
-        float $tolerance = 0.0,
+        float|string $tolerance = 0.0,
     ) {
         if ($maxHops < 1) {
             throw new InvalidArgumentException('Maximum hops must be at least one.');
         }
 
-        if ($tolerance < 0.0 || $tolerance >= 1.0) {
-            throw new InvalidArgumentException('Tolerance must be in the [0, 1) range.');
-        }
-
         $this->unitValue = BcMath::normalize('1', self::SCALE);
-        $this->toleranceAmplifier = $this->calculateToleranceAmplifier($tolerance);
-        $this->hasTolerance = 0.0 < $tolerance;
+        $normalizedTolerance = $this->normalizeTolerance($tolerance);
+        $this->toleranceAmplifier = $this->calculateToleranceAmplifier($normalizedTolerance);
+        $this->hasTolerance = 1 === BcMath::comp($normalizedTolerance, '0', self::SCALE);
     }
 
     /**
@@ -587,19 +586,45 @@ final class PathFinder
         return BcMath::div($quoteMax, $baseMax, self::SCALE);
     }
 
-    private function calculateToleranceAmplifier(float $tolerance): string
+    private function normalizeTolerance(float|string $tolerance): string
     {
-        if (0.0 === $tolerance) {
+        if (is_string($tolerance)) {
+            if (!BcMath::isNumeric($tolerance)) {
+                throw new InvalidArgumentException('Tolerance must be numeric.');
+            }
+
+            if (-1 === BcMath::comp($tolerance, '0', self::SCALE)) {
+                throw new InvalidArgumentException('Tolerance must be non-negative.');
+            }
+
+            if (BcMath::comp($tolerance, '1', self::SCALE) >= 0) {
+                throw new InvalidArgumentException('Tolerance must be less than one.');
+            }
+
+            $normalized = BcMath::normalize($tolerance, self::SCALE);
+        } else {
+            if ($tolerance < 0.0 || $tolerance >= 1.0) {
+                throw new InvalidArgumentException('Tolerance must be in the [0, 1) range.');
+            }
+
+            $normalized = BcMath::normalize($this->formatFloat($tolerance), self::SCALE);
+        }
+
+        $upperBound = '0.'.str_repeat('9', self::SCALE);
+        if (1 === BcMath::comp($normalized, $upperBound, self::SCALE)) {
+            return $upperBound;
+        }
+
+        return $normalized;
+    }
+
+    private function calculateToleranceAmplifier(string $tolerance): string
+    {
+        if (0 === BcMath::comp($tolerance, '0', self::SCALE)) {
             return BcMath::normalize('1', self::SCALE);
         }
 
-        $upperBound = 1 - 10 ** (-self::SCALE);
-        if ($tolerance > $upperBound) {
-            $tolerance = $upperBound;
-        }
-
-        $toleranceString = $this->formatFloat($tolerance);
-        $normalizedTolerance = BcMath::normalize($toleranceString, self::SCALE);
+        $normalizedTolerance = BcMath::normalize($tolerance, self::SCALE);
         $complement = BcMath::sub('1', $normalizedTolerance, self::SCALE);
 
         return BcMath::div('1', $complement, self::SCALE);
