@@ -11,6 +11,42 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 final class PathSearchConfigTest extends TestCase
 {
+    public function test_build_requires_spend_amount(): void
+    {
+        $builder = PathSearchConfig::builder()
+            ->withToleranceBounds(0.10, 0.20)
+            ->withHopLimits(1, 3);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Spend amount must be provided.');
+
+        $builder->build();
+    }
+
+    public function test_build_requires_tolerance_bounds(): void
+    {
+        $builder = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withHopLimits(1, 3);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Tolerance bounds must be configured.');
+
+        $builder->build();
+    }
+
+    public function test_build_requires_hop_limits(): void
+    {
+        $builder = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.10, 0.20);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Hop limits must be configured.');
+
+        $builder->build();
+    }
+
     /**
      * @dataProvider provideInvalidToleranceBounds
      */
