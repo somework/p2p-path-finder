@@ -164,6 +164,96 @@ final class LegMaterializerTest extends TestCase
         self::assertSame('2.823', $secondFees['EUR']->amount());
     }
 
+    public function test_it_rejects_non_contiguous_edge_sequences(): void
+    {
+        $orders = [
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '200.000', '0.900', 3),
+            $this->createOrder(OrderSide::BUY, 'USD', 'JPY', '50.000', '200.000', '150.000', 3),
+        ];
+
+        $graph = (new GraphBuilder())->build($orders);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.25)
+            ->withHopLimits(1, 3)
+            ->build();
+
+        $materializer = new LegMaterializer();
+        $analyzer = new OrderSpendAnalyzer(null, $materializer);
+
+        $initialSeed = $analyzer->determineInitialSpendAmount($config, $graph['EUR']['edges'][0]);
+        self::assertNotNull($initialSeed);
+
+        $misorderedEdges = [
+            $graph['USD']['edges'][0],
+            $graph['EUR']['edges'][0],
+        ];
+
+        self::assertNull(
+            $materializer->materialize($misorderedEdges, $config->spendAmount(), $initialSeed, 'JPY')
+        );
+    }
+
+    public function test_it_rejects_when_final_currency_does_not_match_target(): void
+    {
+        $orders = [
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '200.000', '0.900', 3),
+            $this->createOrder(OrderSide::BUY, 'USD', 'JPY', '50.000', '200.000', '150.000', 3),
+        ];
+
+        $graph = (new GraphBuilder())->build($orders);
+        $edges = [
+            $graph['EUR']['edges'][0],
+            $graph['USD']['edges'][0],
+        ];
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.25)
+            ->withHopLimits(1, 3)
+            ->build();
+
+        $materializer = new LegMaterializer();
+        $analyzer = new OrderSpendAnalyzer(null, $materializer);
+
+        $initialSeed = $analyzer->determineInitialSpendAmount($config, $edges[0]);
+        self::assertNotNull($initialSeed);
+
+        self::assertNull(
+            $materializer->materialize($edges, $config->spendAmount(), $initialSeed, 'USD')
+        );
+    }
+
+    public function test_resolve_buy_fill_rejects_when_minimum_spend_exceeds_ceiling(): void
+    {
+        $order = OrderFactory::buy('AAA', 'USD', '5.000', '10.000', '2.000', 3, 3);
+        $materializer = new LegMaterializer();
+
+        $netSeed = Money::fromString('AAA', '5.000', 3);
+        $grossSeed = Money::fromString('AAA', '5.000', 3);
+        $insufficientCeiling = Money::fromString('AAA', '4.999', 3);
+
+        self::assertNull(
+            $materializer->resolveBuyFill($order, $netSeed, $grossSeed, $insufficientCeiling)
+        );
+    }
+
+    public function test_resolve_buy_fill_rejects_when_budget_ratio_collapses(): void
+    {
+        $order = OrderFactory::buy('AAA', 'USD', '0.000', '10.000', '2.000', 3, 3);
+        $materializer = new LegMaterializer();
+
+        $netSeed = Money::fromString('AAA', '5.000', 3);
+        $grossSeed = Money::fromString('AAA', '5.000', 3);
+        $zeroCeiling = Money::fromString('AAA', '0.000', 3);
+
+        self::assertNull(
+            $materializer->resolveBuyFill($order, $netSeed, $grossSeed, $zeroCeiling),
+            'Expected the adjustment ratio to collapse to zero, causing a null result.'
+        );
+    }
+
     private function createOrder(OrderSide $side, string $base, string $quote, string $min, string $max, string $rate, int $rateScale): Order
     {
         $assetPair = AssetPair::fromString($base, $quote);
