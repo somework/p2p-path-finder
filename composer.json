@@ -13,6 +13,8 @@
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.58",
+        "infection/infection": "^0.31",
+        "phpbench/phpbench": "^1.4",
         "phpstan/phpstan": "^1.10",
         "phpunit/phpunit": "^10.5"
     },
@@ -23,7 +25,8 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "SomeWork\\P2PPathFinder\\Tests\\": "tests/"
+            "SomeWork\\P2PPathFinder\\Tests\\": "tests/",
+            "SomeWork\\P2PPathFinder\\Benchmarks\\": "benchmarks/"
         }
     },
     "scripts": {
@@ -39,6 +42,9 @@
         "sort-packages": true,
         "platform": {
             "ext-bcmath": "0"
+        },
+        "allow-plugins": {
+            "infection/extension-installer": true
         }
     }
 }
