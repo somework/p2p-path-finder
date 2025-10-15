@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\Result;
 
+use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
@@ -72,5 +73,108 @@ final class PathResultTest extends TestCase
             ],
             $result->jsonSerialize(),
         );
+    }
+
+    public function test_residual_tolerance_cannot_be_negative(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Residual tolerance must be a value between 0 and 1 inclusive.');
+
+        new PathResult(
+            Money::fromString('USD', '10', 2),
+            Money::fromString('EUR', '9', 2),
+            -0.01,
+        );
+    }
+
+    public function test_residual_tolerance_cannot_exceed_one(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Residual tolerance must be a value between 0 and 1 inclusive.');
+
+        new PathResult(
+            Money::fromString('USD', '10', 2),
+            Money::fromString('EUR', '9', 2),
+            1.01,
+        );
+    }
+
+    public function test_path_legs_must_be_a_list(): void
+    {
+        $leg = new PathLeg(
+            'usd',
+            'btc',
+            Money::fromString('USD', '10', 2),
+            Money::fromString('BTC', '0.001', 6),
+            [],
+        );
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Path legs must be provided as a list.');
+
+        new PathResult(
+            Money::fromString('USD', '10', 2),
+            Money::fromString('BTC', '0.001', 6),
+            0.1,
+            ['first' => $leg],
+        );
+    }
+
+    public function test_fee_breakdown_merges_duplicate_currencies(): void
+    {
+        $leg = new PathLeg(
+            'usd',
+            'btc',
+            Money::fromString('USD', '10', 2),
+            Money::fromString('BTC', '0.001', 6),
+            [],
+        );
+
+        $result = new PathResult(
+            Money::fromString('USD', '10', 2),
+            Money::fromString('BTC', '0.001', 6),
+            0.1,
+            [$leg],
+            [
+                Money::fromString('USD', '0.30', 2),
+                Money::fromString('USD', '0.200', 3),
+                Money::fromString('EUR', '1', 2),
+            ],
+        );
+
+        $fees = $result->feeBreakdown();
+
+        $this->assertCount(2, $fees);
+        $this->assertSame('0.500', $fees['USD']->amount());
+        $this->assertSame(3, $fees['USD']->scale());
+        $this->assertSame('1.00', $fees['EUR']->amount());
+        $this->assertSame(2, $fees['EUR']->scale());
+
+        $this->assertSame([
+            'feeBreakdown' => [
+                'EUR' => ['currency' => 'EUR', 'amount' => '1.00', 'scale' => 2],
+                'USD' => ['currency' => 'USD', 'amount' => '0.500', 'scale' => 3],
+            ],
+        ], array_intersect_key($result->jsonSerialize(), ['feeBreakdown' => true]));
+    }
+
+    public function test_empty_legs_and_fees_are_preserved(): void
+    {
+        $result = new PathResult(
+            Money::fromString('USD', '0', 2),
+            Money::fromString('EUR', '0', 2),
+            0.0,
+        );
+
+        $this->assertSame([], $result->legs());
+        $this->assertSame([], $result->feeBreakdown());
+
+        $this->assertSame([
+            'totalSpent' => ['currency' => 'USD', 'amount' => '0.00', 'scale' => 2],
+            'totalReceived' => ['currency' => 'EUR', 'amount' => '0.00', 'scale' => 2],
+            'residualTolerance' => 0.0,
+            'feeBreakdown' => [],
+            'legs' => [],
+        ], $result->jsonSerialize());
     }
 }
