@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\Result;
 
+use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
@@ -31,6 +32,51 @@ final class PathLegTest extends TestCase
                 ],
             ],
             $leg->jsonSerialize(),
+        );
+    }
+
+    public function test_fee_normalization_merges_duplicates_and_discards_zero_values(): void
+    {
+        $leg = new PathLeg(
+            'btc',
+            'eth',
+            Money::fromString('BTC', '0.10', 8),
+            Money::fromString('ETH', '1.50', 8),
+            [
+                Money::fromString('USD', '1', 2),
+                Money::fromString('USD', '0.5', 2),
+                Money::fromString('EUR', '0', 2),
+            ],
+        );
+
+        $this->assertSame(['USD'], array_keys($leg->fees()));
+        $this->assertSame('1.50', $leg->fees()['USD']->amount());
+    }
+
+    public function test_empty_asset_symbol_throws_exception(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Path leg from asset cannot be empty.');
+
+        new PathLeg(
+            '',
+            'usd',
+            Money::fromString('USD', '1', 2),
+            Money::fromString('USD', '1', 2),
+        );
+    }
+
+    public function test_non_money_fee_entries_throw_exception(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Path leg fees must be instances of Money.');
+
+        new PathLeg(
+            'usd',
+            'eur',
+            Money::fromString('USD', '1', 2),
+            Money::fromString('EUR', '1', 2),
+            ['not-a-money'],
         );
     }
 }
