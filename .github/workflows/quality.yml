@@ -1,0 +1,74 @@
+name: Quality
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+jobs:
+  phpstan:
+    name: PHPStan (max)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: bcmath
+          ini-values: memory_limit=-1
+      - uses: ramsey/composer-install@v3
+        with:
+          composer-options: --prefer-dist --no-interaction --no-progress
+      - name: Run PHPStan at max level
+        run: vendor/bin/phpstan analyse --configuration=phpstan.neon.dist --level=max
+
+  php-cs-fixer:
+    name: PHP-CS-Fixer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: bcmath
+          ini-values: memory_limit=-1
+      - uses: ramsey/composer-install@v3
+        with:
+          composer-options: --prefer-dist --no-interaction --no-progress
+      - name: Run php-cs-fixer dry-run
+        run: vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php --dry-run --diff
+
+  infection:
+    name: Infection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: xdebug
+          extensions: bcmath
+          ini-values: memory_limit=-1
+      - uses: ramsey/composer-install@v3
+        with:
+          composer-options: --prefer-dist --no-interaction --no-progress
+      - name: Run Infection smoke test
+        run: vendor/bin/infection --threads=4 --min-msi=0 --min-covered-msi=0 --log-verbosity=none
+        env:
+          XDEBUG_MODE: coverage
+
+  phpbench:
+    name: PhpBench
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: bcmath
+          ini-values: memory_limit=-1
+      - uses: ramsey/composer-install@v3
+        with:
+          composer-options: --prefer-dist --no-interaction --no-progress
+      - name: Run PhpBench smoke suite
+        run: vendor/bin/phpbench run --config=phpbench.json.dist --progress=none --report=aggregate --iterations=1 --revs=1
