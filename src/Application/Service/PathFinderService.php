@@ -162,7 +162,7 @@ final class PathFinderService
     }
 
     /**
-     * @deprecated Use {@see PathFinderService::findBestPaths()} instead.
+     * @deprecated use {@see PathFinderService::findBestPaths()} instead
      */
     public function findBestPath(OrderBook $orderBook, PathSearchConfig $config, string $targetAsset): ?PathResult
     {
