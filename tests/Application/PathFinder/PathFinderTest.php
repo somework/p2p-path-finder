@@ -439,6 +439,52 @@ final class PathFinderTest extends TestCase
         self::assertSame($result['amountRange']['min']->amount(), $result['desiredAmount']->amount());
     }
 
+    public function test_it_preserves_parallel_states_with_distinct_ranges(): void
+    {
+        $limitedCapacity = OrderFactory::sell('MID', 'SRC', '10.000', '15.000', '1.000', 3, 3);
+        $sufficientCapacity = OrderFactory::sell('MID', 'SRC', '10.000', '20.000', '1.000', 3, 3);
+        $finalLeg = OrderFactory::sell('DST', 'MID', '18.000', '25.000', '1.000', 3, 3);
+
+        $graph = (new GraphBuilder())->build([
+            $limitedCapacity,
+            $sufficientCapacity,
+            $finalLeg,
+        ]);
+
+        $finder = new PathFinder(maxHops: 2, tolerance: 0.0);
+
+        $minSpend = CurrencyScenarioFactory::money('SRC', '10.000', 3);
+        $maxSpend = CurrencyScenarioFactory::money('SRC', '20.000', 3);
+
+        $result = $finder->findBestPath(
+            $graph,
+            'SRC',
+            'DST',
+            [
+                'min' => $minSpend,
+                'max' => $maxSpend,
+            ],
+        );
+
+        self::assertNotNull($result);
+        self::assertSame(2, $result['hops']);
+        self::assertCount(2, $result['edges']);
+
+        self::assertSame('SRC', $result['edges'][0]['from']);
+        self::assertSame('MID', $result['edges'][0]['to']);
+        self::assertSame($sufficientCapacity, $result['edges'][0]['order']);
+
+        self::assertSame('MID', $result['edges'][1]['from']);
+        self::assertSame('DST', $result['edges'][1]['to']);
+        self::assertSame($finalLeg, $result['edges'][1]['order']);
+
+        self::assertNotNull($result['amountRange']);
+        self::assertSame('DST', $result['amountRange']['min']->currency());
+        self::assertSame('DST', $result['amountRange']['max']->currency());
+        self::assertSame('18.000000000000000000', $result['amountRange']['min']->amount());
+        self::assertSame('20.000000000000000000', $result['amountRange']['max']->amount());
+    }
+
     /**
      * @dataProvider provideSpendBelowMandatoryMinimum
      */

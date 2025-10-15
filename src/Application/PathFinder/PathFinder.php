@@ -133,9 +133,15 @@ final class PathFinder
         ], ['cost' => $this->unitValue, 'order' => $insertionOrder++]);
 
         /**
-         * @var array<string, list<array{cost: string, hops: int}>> $bestPerNode
+         * @var array<string, list<array{cost: string, hops: int, signature: string}>> $bestPerNode
          */
-        $bestPerNode = [$source => [['cost' => $this->unitValue, 'hops' => 0]]];
+        $bestPerNode = [
+            $source => [[
+                'cost' => $this->unitValue,
+                'hops' => 0,
+                'signature' => $this->stateSignature($range, $desiredSpend),
+            ]],
+        ];
 
         $bestTargetState = null;
         $bestTargetCost = null;
@@ -227,7 +233,7 @@ final class PathFinder
                 $nextProduct = BcMath::mul($state['product'], $conversionRate, self::SCALE);
                 $nextHops = $state['hops'] + 1;
 
-                if ($this->isDominated($bestPerNode[$nextNode] ?? [], $nextCost, $nextHops)) {
+                if ($this->isDominated($bestPerNode[$nextNode] ?? [], $nextCost, $nextHops, $nextRange, $nextDesired)) {
                     continue;
                 }
 
@@ -260,7 +266,7 @@ final class PathFinder
                     'desiredAmount' => $nextDesired,
                 ];
 
-                $this->recordState($bestPerNode, $nextNode, $nextCost, $nextHops);
+                $this->recordState($bestPerNode, $nextNode, $nextCost, $nextHops, $nextRange, $nextDesired);
 
                 $queue->insert($nextState, ['cost' => $nextCost, 'order' => $insertionOrder++]);
             }
@@ -278,11 +284,18 @@ final class PathFinder
     }
 
     /**
-     * @param list<array{cost: string, hops: int}> $existing
+     * @param list<array{cost: string, hops: int, signature: string}> $existing
+     * @param array{min: Money, max: Money}|null                      $range
      */
-    private function isDominated(array $existing, string $cost, int $hops): bool
+    private function isDominated(array $existing, string $cost, int $hops, ?array $range, ?Money $desired): bool
     {
+        $signature = $this->stateSignature($range, $desired);
+
         foreach ($existing as $state) {
+            if ($state['signature'] !== $signature) {
+                continue;
+            }
+
             if (
                 BcMath::comp($state['cost'], $cost, self::SCALE) <= 0
                 && $state['hops'] <= $hops
@@ -295,13 +308,19 @@ final class PathFinder
     }
 
     /**
-     * @param array<string, list<array{cost: string, hops: int}>> $registry
+     * @param array<string, list<array{cost: string, hops: int, signature: string}>> $registry
+     * @param array{min: Money, max: Money}|null                                     $range
      */
-    private function recordState(array &$registry, string $node, string $cost, int $hops): void
+    private function recordState(array &$registry, string $node, string $cost, int $hops, ?array $range, ?Money $desired): void
     {
+        $signature = $this->stateSignature($range, $desired);
         $existing = $registry[$node] ?? [];
 
         foreach ($existing as $index => $state) {
+            if ($state['signature'] !== $signature) {
+                continue;
+            }
+
             if (
                 BcMath::comp($cost, $state['cost'], self::SCALE) <= 0
                 && $hops <= $state['hops']
@@ -310,8 +329,48 @@ final class PathFinder
             }
         }
 
-        $existing[] = ['cost' => $cost, 'hops' => $hops];
+        $existing[] = ['cost' => $cost, 'hops' => $hops, 'signature' => $signature];
         $registry[$node] = array_values($existing);
+    }
+
+    /**
+     * @param array{min: Money, max: Money}|null $range
+     */
+    private function stateSignature(?array $range, ?Money $desired): string
+    {
+        if (null === $range) {
+            return 'range:null|desired:'.$this->moneySignature($desired);
+        }
+
+        $scale = max($range['min']->scale(), $range['max']->scale());
+        if ($desired instanceof Money) {
+            $scale = max($scale, $desired->scale());
+        }
+
+        $minimum = $range['min']->withScale($scale);
+        $maximum = $range['max']->withScale($scale);
+
+        $rangeSignature = sprintf(
+            '%s:%s:%s:%d',
+            $minimum->currency(),
+            $minimum->amount(),
+            $maximum->amount(),
+            $scale,
+        );
+
+        return 'range:'.$rangeSignature.'|desired:'.$this->moneySignature($desired, $scale);
+    }
+
+    private function moneySignature(?Money $amount, ?int $scale = null): string
+    {
+        if (null === $amount) {
+            return 'null';
+        }
+
+        $scale ??= $amount->scale();
+        $normalized = $amount->withScale($scale);
+
+        return sprintf('%s:%s:%d', $normalized->currency(), $normalized->amount(), $scale);
     }
 
     /**
