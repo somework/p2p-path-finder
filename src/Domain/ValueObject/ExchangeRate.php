@@ -11,6 +11,11 @@ use InvalidArgumentException;
  */
 final class ExchangeRate
 {
+    /**
+     * @param non-empty-string $baseCurrency
+     * @param non-empty-string $quoteCurrency
+     * @param numeric-string   $rate
+     */
     private function __construct(
         private readonly string $baseCurrency,
         private readonly string $quoteCurrency,
@@ -21,6 +26,10 @@ final class ExchangeRate
 
     /**
      * Builds an exchange rate for the provided currency pair and numeric rate.
+     *
+     * @param non-empty-string $baseCurrency
+     * @param non-empty-string $quoteCurrency
+     * @param numeric-string   $rate
      */
     public static function fromString(string $baseCurrency, string $quoteCurrency, string $rate, int $scale = 8): self
     {
@@ -69,6 +78,9 @@ final class ExchangeRate
     /**
      * Returns the base currency symbol used by the rate.
      */
+    /**
+     * @return non-empty-string
+     */
     public function baseCurrency(): string
     {
         return $this->baseCurrency;
@@ -77,6 +89,9 @@ final class ExchangeRate
     /**
      * Returns the quote currency symbol used by the rate.
      */
+    /**
+     * @return non-empty-string
+     */
     public function quoteCurrency(): string
     {
         return $this->quoteCurrency;
@@ -84,6 +99,9 @@ final class ExchangeRate
 
     /**
      * Returns the normalized numeric representation of the rate.
+     */
+    /**
+     * @return numeric-string
      */
     public function rate(): string
     {

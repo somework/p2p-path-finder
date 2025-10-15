@@ -15,6 +15,27 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 
+/**
+ * @psalm-type GraphSegment = array{
+ *     isMandatory: bool,
+ *     base: array{min: Money, max: Money},
+ *     quote: array{min: Money, max: Money},
+ *     grossBase: array{min: Money, max: Money},
+ * }
+ * @psalm-type GraphEdge = array{
+ *     from: string,
+ *     to: string,
+ *     orderSide: OrderSide,
+ *     order: Order,
+ *     rate: ExchangeRate,
+ *     baseCapacity: array{min: Money, max: Money},
+ *     quoteCapacity: array{min: Money, max: Money},
+ *     grossBaseCapacity: array{min: Money, max: Money},
+ *     segments: list<GraphSegment>,
+ * }
+ * @psalm-type GraphNode = array{currency: string, edges: list<GraphEdge>}
+ * @psalm-type Graph = array<string, GraphNode>
+ */
 final class GraphBuilderTest extends TestCase
 {
     public function test_build_creates_expected_currency_nodes(): void
@@ -41,6 +62,8 @@ final class GraphBuilderTest extends TestCase
     {
         [$graph, $orders] = $this->buildGraphFromSampleOrders();
 
+        /** @var list<GraphEdge> $edges */
+        /** @var list<GraphEdge> $edges */
         $edges = $graph['BTC']['edges'];
         self::assertCount(2, $edges);
 
@@ -63,6 +86,7 @@ final class GraphBuilderTest extends TestCase
     {
         [$graph, $orders] = $this->buildGraphFromSampleOrders();
 
+        /** @var list<GraphEdge> $edges */
         $edges = $graph['USD']['edges'];
         self::assertCount(2, $edges);
 
@@ -135,6 +159,7 @@ final class GraphBuilderTest extends TestCase
 
         $graph = (new GraphBuilder())->build([$order]);
 
+        /** @var list<GraphEdge> $edges */
         $edges = $graph['EUR']['edges'];
         self::assertCount(1, $edges);
 
@@ -174,6 +199,7 @@ final class GraphBuilderTest extends TestCase
 
         $graph = (new GraphBuilder())->build([$order]);
 
+        /** @var list<GraphEdge> $edges */
         $edges = $graph['USD']['edges'];
         self::assertCount(1, $edges);
 
@@ -214,6 +240,7 @@ final class GraphBuilderTest extends TestCase
 
         $graph = (new GraphBuilder())->build([$order]);
 
+        /** @var list<GraphEdge> $edges */
         $edges = $graph['BTC']['edges'];
         self::assertCount(1, $edges);
 
@@ -254,6 +281,7 @@ final class GraphBuilderTest extends TestCase
 
         $graph = (new GraphBuilder())->build([$order]);
 
+        /** @var list<GraphEdge> $edges */
         $edges = $graph['BTC']['edges'];
         self::assertCount(1, $edges);
 
@@ -285,6 +313,7 @@ final class GraphBuilderTest extends TestCase
 
         $graph = (new GraphBuilder())->build([$order]);
 
+        /** @var list<GraphEdge> $edges */
         $edges = $graph['ETH']['edges'];
         self::assertCount(1, $edges);
 
@@ -350,7 +379,7 @@ final class GraphBuilderTest extends TestCase
     }
 
     /**
-     * @return array{0: array<string, mixed>, 1: array{primaryBuyOrder: Order, secondaryBuyOrder: Order, primarySellOrder: Order, secondarySellOrder: Order}}
+     * @return array{0: Graph, 1: array{primaryBuyOrder: Order, secondaryBuyOrder: Order, primarySellOrder: Order, secondarySellOrder: Order}}
      */
     private function buildGraphFromSampleOrders(): array
     {
@@ -361,6 +390,7 @@ final class GraphBuilderTest extends TestCase
             'secondarySellOrder' => $this->createOrder(OrderSide::SELL, 'LTC', 'USD', '1.000', '4.000', '90'),
         ];
 
+        /** @var Graph $graph */
         $graph = (new GraphBuilder())->build([
             $orders['primaryBuyOrder'],
             $orders['secondaryBuyOrder'],
@@ -372,7 +402,7 @@ final class GraphBuilderTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $edge
+     * @param GraphEdge $edge
      */
     private function assertEdgeBasics(array $edge, string $from, string $to, OrderSide $side, Order $order): void
     {
@@ -383,7 +413,7 @@ final class GraphBuilderTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $edge
+     * @param GraphEdge $edge
      */
     private function assertEdgeCapacities(
         array $edge,
@@ -401,7 +431,7 @@ final class GraphBuilderTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $edge
+     * @param GraphEdge $edge
      */
     private function assertGrossBaseEqualsBase(array $edge): void
     {
@@ -410,7 +440,7 @@ final class GraphBuilderTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $segment
+     * @param GraphSegment $segment
      */
     private function assertSegment(
         array $segment,

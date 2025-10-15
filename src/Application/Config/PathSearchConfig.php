@@ -172,9 +172,14 @@ final class PathSearchConfig
         return $adjusted->withScale($this->spendAmount->scale());
     }
 
+    /**
+     * @return numeric-string
+     */
     private static function floatToString(float $value, int $scale): string
     {
-        $normalized = BcMath::normalize(sprintf('%.'.($scale + 2).'F', $value), $scale);
+        $formatted = sprintf('%.'.($scale + 2).'F', $value);
+        BcMath::ensureNumeric($formatted);
+        $normalized = BcMath::normalize($formatted, $scale);
 
         if ('-0' === $normalized) {
             return '0';

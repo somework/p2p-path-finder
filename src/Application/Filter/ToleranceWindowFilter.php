@@ -14,10 +14,16 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
  */
 final class ToleranceWindowFilter implements OrderFilterInterface
 {
+    /** @var numeric-string */
     private readonly string $lowerBound;
+
+    /** @var numeric-string */
     private readonly string $upperBound;
     private readonly int $scale;
 
+    /**
+     * @param numeric-string $tolerance
+     */
     public function __construct(private readonly ExchangeRate $referenceRate, string $tolerance)
     {
         BcMath::ensureNumeric($tolerance);

@@ -58,6 +58,11 @@ final class ToleranceEvaluator
             $diff = substr($diff, 1);
         }
 
+        if ('' === $diff) {
+            $diff = '0';
+        }
+
+        BcMath::ensureNumeric($diff);
         $ratio = BcMath::div($diff, $desiredAmount, $scale + 4);
 
         return (float) $ratio;

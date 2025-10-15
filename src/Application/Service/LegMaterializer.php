@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Service;
 
+use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
@@ -18,6 +19,9 @@ use function substr;
 
 /**
  * Resolves concrete path legs from abstract graph edges.
+ *
+ * @psalm-import-type GraphEdge from PathFinder
+ * @psalm-import-type PathEdge from PathFinder
  */
 final class LegMaterializer
 {
@@ -36,8 +40,8 @@ final class LegMaterializer
     }
 
     /**
-     * @param list<array{from: string, to: string, order: Order, orderSide: OrderSide}> $edges
-     * @param array{net: Money, gross: Money, grossCeiling: Money}                      $initialSeed
+     * @param list<GraphEdge>|list<PathEdge>                       $edges
+     * @param array{net: Money, gross: Money, grossCeiling: Money} $initialSeed
      *
      * @return array{
      *     totalSpent: Money,
@@ -197,7 +201,6 @@ final class LegMaterializer
 
         for ($attempt = 0; $attempt < self::SELL_RESOLUTION_MAX_ITERATIONS; ++$attempt) {
             $evaluation = $this->evaluateSellQuote($order, $baseAmount);
-            $fees = $evaluation['fees'];
             $effectiveQuoteAmount = $evaluation['effectiveQuote'];
             $grossQuoteAmount = $evaluation['grossQuote'];
 
@@ -211,28 +214,24 @@ final class LegMaterializer
                 $grossComparable = $grossQuoteAmount->withScale($grossComparisonScale);
                 $availableComparable = $availableQuoteBudget->withScale($grossComparisonScale);
 
-                if ($grossComparable->greaterThan($availableComparable)) {
-                    if ($this->isWithinSellResolutionTolerance($availableComparable, $grossComparable)) {
-                        $grossComparable = $availableComparable;
-                    } else {
-                        $ratio = $this->calculateSellAdjustmentRatio($availableComparable, $grossComparable, $grossComparisonScale);
-                        if (null === $ratio) {
-                            return null;
-                        }
-
-                        $previousBase = $baseAmount;
-                        $baseAmount = $baseAmount->multiply($ratio, max($baseAmount->scale(), $grossComparisonScale));
-                        $baseAmount = $this->alignBaseScale($bounds->min()->scale(), $bounds->max()->scale(), $baseAmount);
-
-                        if ($baseAmount->equals($previousBase)) {
-                            return null;
-                        }
-
-                        $currentTarget = $effectiveQuoteAmount->multiply($ratio, max($effectiveQuoteAmount->scale(), $grossComparisonScale));
-                        $currentTarget = $currentTarget->withScale(max($currentTarget->scale(), $scale, $grossComparisonScale));
-
-                        continue;
+                if ($grossComparable->greaterThan($availableComparable) && !$this->isWithinSellResolutionTolerance($availableComparable, $grossComparable)) {
+                    $ratio = $this->calculateSellAdjustmentRatio($availableComparable, $grossComparable, $grossComparisonScale);
+                    if (null === $ratio) {
+                        return null;
                     }
+
+                    $previousBase = $baseAmount;
+                    $baseAmount = $baseAmount->multiply($ratio, max($baseAmount->scale(), $grossComparisonScale));
+                    $baseAmount = $this->alignBaseScale($bounds->min()->scale(), $bounds->max()->scale(), $baseAmount);
+
+                    if ($baseAmount->equals($previousBase)) {
+                        return null;
+                    }
+
+                    $currentTarget = $effectiveQuoteAmount->multiply($ratio, max($effectiveQuoteAmount->scale(), $grossComparisonScale));
+                    $currentTarget = $currentTarget->withScale(max($currentTarget->scale(), $scale, $grossComparisonScale));
+
+                    continue;
                 }
             }
 
@@ -246,7 +245,6 @@ final class LegMaterializer
             $targetComparable = $currentTarget->withScale($comparisonScale);
 
             if ($this->isWithinSellResolutionTolerance($targetComparable, $effectiveComparable)) {
-                $currentTarget = $targetComparable;
                 $converged = true;
 
                 break;
@@ -273,7 +271,6 @@ final class LegMaterializer
         $evaluation = $this->evaluateSellQuote($order, $baseAmount);
         $grossQuoteSpend = $evaluation['grossQuote'];
         $fees = $evaluation['fees'];
-        $effectiveQuoteAmount = $evaluation['effectiveQuote'];
         $netBaseAmount = $evaluation['netBase'];
 
         if (null !== $availableQuoteBudget) {
@@ -286,19 +283,11 @@ final class LegMaterializer
             $grossComparable = $grossQuoteSpend->withScale($grossComparisonScale);
             $availableComparable = $availableQuoteBudget->withScale($grossComparisonScale);
 
-            if ($grossComparable->greaterThan($availableComparable)) {
-                if ($this->isWithinSellResolutionTolerance($availableComparable, $grossComparable)) {
-                    $grossComparable = $availableComparable;
-                } else {
-                    return null;
-                }
+            if ($grossComparable->greaterThan($availableComparable) && !$this->isWithinSellResolutionTolerance($availableComparable, $grossComparable)) {
+                return null;
             }
         }
 
-        $effectiveQuoteAmount = $effectiveQuoteAmount->withScale(max(
-            $effectiveQuoteAmount->scale(),
-            $originalTarget->scale(),
-        ));
         $grossQuoteSpend = $grossQuoteSpend->withScale(max(
             $grossQuoteSpend->scale(),
             $originalTarget->scale(),
@@ -543,11 +532,15 @@ final class LegMaterializer
             $difference = '0';
         }
 
+        BcMath::ensureNumeric($difference);
         $relative = BcMath::div($difference, $targetAmount, $comparisonScale + self::SELL_RESOLUTION_RATIO_EXTRA_SCALE);
 
         return BcMath::comp($relative, self::SELL_RESOLUTION_RELATIVE_TOLERANCE, self::SELL_RESOLUTION_TOLERANCE_SCALE) <= 0;
     }
 
+    /**
+     * @return numeric-string|null
+     */
     private function calculateSellAdjustmentRatio(Money $target, Money $actual, int $scale): ?string
     {
         $targetAmount = $target->withScale($scale)->amount();

@@ -123,6 +123,7 @@ final class PathLeg implements JsonSerializable
      */
     private function normalizeFees(array $fees): array
     {
+        /** @var array<string, Money> $normalized */
         $normalized = [];
 
         foreach ($fees as $fee) {

@@ -85,10 +85,25 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
      * @testdox Rejects candidate paths when tolerance rules from the provider scenarios are violated
      *
      * @dataProvider toleranceRejectionProvider
+     *
+     * @param list<array{
+     *     side: OrderSide,
+     *     base: non-empty-string,
+     *     quote: non-empty-string,
+     *     min: numeric-string,
+     *     max: numeric-string,
+     *     rate: numeric-string,
+     *     scale: positive-int,
+     *     feePolicy?: array{type: string, value: numeric-string}|null,
+     * }> $orders
+     * @param array{currency: non-empty-string, amount: numeric-string, scale: int} $spend
+     * @param array{0: float, 1: float}                                             $tolerance
+     * @param array{0: int, 1: int}                                                 $hopLimits
+     * @param non-empty-string                                                      $target
      */
     public function test_it_rejects_paths_outside_tolerance_window(array $orders, array $spend, array $tolerance, array $hopLimits, string $target): void
     {
-        $orderBook = $this->orderBook(...array_map(fn (array $order): Order => $this->createOrder(
+        $orderList = array_map(fn (array $order): Order => $this->createOrder(
             $order['side'],
             $order['base'],
             $order['quote'],
@@ -97,7 +112,9 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
             $order['rate'],
             $order['scale'],
             $this->resolveFeePolicy($order['feePolicy'] ?? null),
-        ), $orders));
+        ), $orders);
+
+        $orderBook = $this->orderBook(...$orderList);
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString($spend['currency'], $spend['amount'], $spend['scale']))
@@ -108,6 +125,24 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, $target));
     }
 
+    /**
+     * @return iterable<array{
+     *     0: list<array{
+     *         side: OrderSide,
+     *         base: non-empty-string,
+     *         quote: non-empty-string,
+     *         min: numeric-string,
+     *         max: numeric-string,
+     *         rate: numeric-string,
+     *         scale: positive-int,
+     *         feePolicy?: array{type: string, value: numeric-string}|null,
+     *     }>,
+     *     1: array{currency: non-empty-string, amount: numeric-string, scale: int},
+     *     2: array{0: float, 1: float},
+     *     3: array{0: int, 1: int},
+     *     4: non-empty-string,
+     * }>
+     */
     public static function toleranceRejectionProvider(): iterable
     {
         yield 'insufficient tolerance for chained sell' => [
@@ -251,6 +286,9 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
         self::assertEqualsWithDelta(2 / 22, $result->residualTolerance(), 1e-9);
     }
 
+    /**
+     * @param array{type: string, value: numeric-string}|null $definition
+     */
     private function resolveFeePolicy(?array $definition): ?FeePolicy
     {
         if (null === $definition) {

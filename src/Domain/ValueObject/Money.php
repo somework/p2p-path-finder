@@ -17,6 +17,9 @@ use function sprintf;
  */
 final class Money
 {
+    /**
+     * @param numeric-string $amount
+     */
     private function __construct(
         private readonly string $currency,
         private readonly string $amount,
@@ -27,9 +30,9 @@ final class Money
     /**
      * Creates a new money instance from raw string components.
      *
-     * @param string $currency three-letter ISO-like currency symbol
-     * @param string $amount   numeric string compatible with BCMath functions
-     * @param int    $scale    number of decimal digits to retain after normalization
+     * @param string         $currency three-letter ISO-like currency symbol
+     * @param numeric-string $amount   numeric string compatible with BCMath functions
+     * @param int            $scale    number of decimal digits to retain after normalization
      */
     public static function fromString(string $currency, string $amount, int $scale = 2): self
     {
@@ -73,6 +76,9 @@ final class Money
 
     /**
      * Returns the normalized numeric string representation of the amount.
+     */
+    /**
+     * @return numeric-string
      */
     public function amount(): string
     {
@@ -122,8 +128,8 @@ final class Money
     /**
      * Multiplies the amount by a scalar numeric multiplier.
      *
-     * @param string   $multiplier numeric multiplier compatible with BCMath
-     * @param int|null $scale      optional explicit scale override
+     * @param numeric-string $multiplier numeric multiplier compatible with BCMath
+     * @param int|null       $scale      optional explicit scale override
      */
     public function multiply(string $multiplier, ?int $scale = null): self
     {
@@ -138,11 +144,12 @@ final class Money
     /**
      * Divides the amount by a scalar numeric divisor.
      *
-     * @param string   $divisor numeric divisor compatible with BCMath
-     * @param int|null $scale   optional explicit scale override
+     * @param numeric-string $divisor numeric divisor compatible with BCMath
+     * @param int|null       $scale   optional explicit scale override
      */
     public function divide(string $divisor, ?int $scale = null): self
     {
+        BcMath::ensureNumeric($divisor);
         $scale ??= $this->scale;
         $result = BcMath::div($this->amount, $divisor, $scale);
 
@@ -197,6 +204,11 @@ final class Money
         return 0 === BcMath::comp($this->amount, '0', $this->scale);
     }
 
+    /**
+     * @phpstan-assert non-empty-string $currency
+     *
+     * @psalm-assert non-empty-string $currency
+     */
     private static function assertCurrency(string $currency): void
     {
         if ('' === $currency) {

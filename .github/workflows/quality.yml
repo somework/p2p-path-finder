@@ -26,6 +26,23 @@ jobs:
       - name: Run PHPStan at max level
         run: vendor/bin/phpstan analyse --configuration=phpstan.neon.dist --level=max
 
+  psalm:
+    name: Psalm (strict)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: bcmath
+          ini-values: memory_limit=-1
+      - uses: ramsey/composer-install@v3
+        with:
+          composer-options: --prefer-dist --no-interaction --no-progress
+          custom-cache-suffix: ${{ hashFiles('composer.json') }}
+      - name: Run Psalm in strict mode
+        run: composer psalm
+
   php-cs-fixer:
     name: PHP-CS-Fixer
     runs-on: ubuntu-latest
@@ -58,10 +75,8 @@ jobs:
         with:
           composer-options: --prefer-dist --no-interaction --no-progress
           custom-cache-suffix: ${{ hashFiles('composer.json') }}
-      - name: Run Infection smoke test
-        run: vendor/bin/infection --threads=4 --min-msi=0 --min-covered-msi=0 --log-verbosity=none
-        env:
-          XDEBUG_MODE: coverage
+      - name: Run Infection with coverage thresholds
+        run: composer infection -- --log-verbosity=none
 
   phpbench:
     name: PhpBench

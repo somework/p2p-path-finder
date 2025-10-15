@@ -39,6 +39,10 @@ final class BcMath
     /**
      * Asserts that all provided string values represent numeric quantities.
      *
+     * @param string ...$values
+     * @phpstan-assert numeric-string $values
+     * @psalm-assert numeric-string $values
+     *
      * @throws InvalidArgumentException when at least one value is not numeric
      */
     public static function ensureNumeric(string ...$values): void
@@ -64,6 +68,10 @@ final class BcMath
 
     /**
      * Normalizes a numeric string to the provided scale using bankers rounding.
+     *
+     * @param numeric-string $value
+     *
+     * @return numeric-string
      */
     public static function normalize(string $value, int $scale): string
     {
@@ -76,6 +84,11 @@ final class BcMath
 
     /**
      * Adds two numeric strings while maintaining deterministic scale handling.
+     *
+     * @param numeric-string $left
+     * @param numeric-string $right
+     *
+     * @return numeric-string
      */
     public static function add(string $left, string $right, int $scale): string
     {
@@ -92,6 +105,11 @@ final class BcMath
 
     /**
      * Subtracts the right operand from the left operand while preserving scale.
+     *
+     * @param numeric-string $left
+     * @param numeric-string $right
+     *
+     * @return numeric-string
      */
     public static function sub(string $left, string $right, int $scale): string
     {
@@ -108,6 +126,11 @@ final class BcMath
 
     /**
      * Multiplies two numeric strings with deterministic rounding behaviour.
+     *
+     * @param numeric-string $left
+     * @param numeric-string $right
+     *
+     * @return numeric-string
      */
     public static function mul(string $left, string $right, int $scale): string
     {
@@ -124,6 +147,11 @@ final class BcMath
 
     /**
      * Divides the left operand by the right operand while guarding against division by zero.
+     *
+     * @param numeric-string $left
+     * @param numeric-string $right
+     *
+     * @return numeric-string
      */
     public static function div(string $left, string $right, int $scale): string
     {
@@ -141,6 +169,9 @@ final class BcMath
 
     /**
      * Compares two numeric strings at the requested precision level.
+     *
+     * @param numeric-string $left
+     * @param numeric-string $right
      */
     public static function comp(string $left, string $right, int $scale): int
     {
@@ -155,6 +186,10 @@ final class BcMath
 
     /**
      * Rounds a numeric string to the provided scale using half-up semantics.
+     *
+     * @param numeric-string $value
+     *
+     * @return numeric-string
      */
     public static function round(string $value, int $scale): string
     {
@@ -181,6 +216,9 @@ final class BcMath
 
     /**
      * Determines the scale required to safely compare the provided operands.
+     *
+     * @param numeric-string $first
+     * @param numeric-string $second
      */
     public static function scaleForComparison(string $first, string $second, int $fallbackScale = self::DEFAULT_SCALE): int
     {

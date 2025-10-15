@@ -54,6 +54,9 @@ abstract class PathFinderServiceTestCase extends TestCase
         return new OrderBook($orders);
     }
 
+    /**
+     * @param list<Order> $orders
+     */
     protected function orderBookFromArray(array $orders): OrderBook
     {
         return new OrderBook($orders);

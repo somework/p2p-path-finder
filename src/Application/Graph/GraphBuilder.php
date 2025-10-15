@@ -15,6 +15,9 @@ use function array_key_exists;
 /**
  * Converts a collection of domain orders into a weighted directed graph representation.
  *
+ * @psalm-import-type Graph from PathFinder
+ * @psalm-import-type GraphEdge from PathFinder
+ *
  * @phpstan-import-type Graph from PathFinder
  * @phpstan-import-type GraphEdge from PathFinder
  */
@@ -31,10 +34,12 @@ final class GraphBuilder
      * @param iterable<Order> $orders
      *
      * @return Graph
+     *
+     * @psalm-return Graph
      */
     public function build(iterable $orders): array
     {
-        /** @var Graph $graph */
+        /** @psalm-var Graph $graph */
         $graph = [];
 
         foreach ($orders as $order) {
@@ -56,6 +61,8 @@ final class GraphBuilder
 
     /**
      * @param Graph $graph
+     *
+     * @psalm-param Graph $graph
      */
     private function initializeNode(array &$graph, string $currency): void
     {
@@ -63,7 +70,7 @@ final class GraphBuilder
             return;
         }
 
-        /** @var list<GraphEdge> $edges */
+        /** @psalm-var list<GraphEdge> $edges */
         $edges = [];
 
         $graph[$currency] = [

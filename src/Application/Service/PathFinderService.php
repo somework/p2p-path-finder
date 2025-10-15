@@ -80,6 +80,7 @@ final class PathFinderService
             $config->pathFinderMaxVisitedStates(),
         );
 
+        /** @var list<array{cost: numeric-string, order: int, result: PathResult}> $materializedResults */
         $materializedResults = [];
         $resultOrder = 0;
         $pathFinder->findBestPaths(
@@ -91,7 +92,11 @@ final class PathFinderService
                 'max' => $config->maximumSpendAmount(),
                 'desired' => $requestedSpend,
             ],
-            /** @param Candidate $candidate */
+            /**
+             * @phpstan-param Candidate $candidate
+             *
+             * @psalm-param Candidate $candidate
+             */
             function (array $candidate) use (&$materializedResults, &$resultOrder, $config, $sourceCurrency, $targetCurrency, $requestedSpend) {
                 if ($candidate['hops'] < $config->minimumHops() || $candidate['hops'] > $config->maximumHops()) {
                     return false;
@@ -154,8 +159,22 @@ final class PathFinderService
 
         usort(
             $materializedResults,
+            /**
+             * @phpstan-param array{cost: numeric-string, order: int, result: PathResult} $left
+             * @phpstan-param array{cost: numeric-string, order: int, result: PathResult} $right
+             *
+             * @psalm-param array{cost: numeric-string, order: int, result: PathResult} $left
+             * @psalm-param array{cost: numeric-string, order: int, result: PathResult} $right
+             */
             static function (array $left, array $right): int {
-                $comparison = BcMath::comp($left['cost'], $right['cost'], self::COST_SCALE);
+                $leftCost = $left['cost'];
+                /** @var numeric-string $leftCost */
+                $leftCost = $leftCost;
+                $rightCost = $right['cost'];
+                /** @var numeric-string $rightCost */
+                $rightCost = $rightCost;
+
+                $comparison = BcMath::comp($leftCost, $rightCost, self::COST_SCALE);
                 if (0 !== $comparison) {
                     return $comparison;
                 }

@@ -64,8 +64,9 @@ final class BcMathTest extends TestCase
 
     public function test_ensure_numeric_accepts_multiple_valid_inputs(): void
     {
+        self::expectNotToPerformAssertions();
+
         BcMath::ensureNumeric('0', '-10.5', '123456', '0.000001');
-        $this->addToAssertionCount(1);
     }
 
     public function test_ensure_numeric_throws_for_invalid_values(): void
