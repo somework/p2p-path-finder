@@ -18,6 +18,8 @@ use function usort;
 
 /**
  * High level facade orchestrating order filtering, graph building and path search.
+ *
+ * @phpstan-import-type Candidate from PathFinder
  */
 final class PathFinderService
 {
@@ -70,7 +72,13 @@ final class PathFinderService
             return [];
         }
 
-        $pathFinder = new PathFinder($config->maximumHops(), $config->pathFinderTolerance(), $config->resultLimit());
+        $pathFinder = new PathFinder(
+            $config->maximumHops(),
+            $config->pathFinderTolerance(),
+            $config->resultLimit(),
+            $config->pathFinderMaxExpansions(),
+            $config->pathFinderMaxVisitedStates(),
+        );
 
         $materializedResults = [];
         $resultOrder = 0;
@@ -83,6 +91,7 @@ final class PathFinderService
                 'max' => $config->maximumSpendAmount(),
                 'desired' => $requestedSpend,
             ],
+            /** @param Candidate $candidate */
             function (array $candidate) use (&$materializedResults, &$resultOrder, $config, $sourceCurrency, $targetCurrency, $requestedSpend) {
                 if ($candidate['hops'] < $config->minimumHops() || $candidate['hops'] > $config->maximumHops()) {
                     return false;

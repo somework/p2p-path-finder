@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Application\Config;
 
 use InvalidArgumentException;
+use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 use function is_float;
@@ -26,6 +27,10 @@ final class PathSearchConfigBuilder
     private ?int $maximumHops = null;
 
     private int $resultLimit = 1;
+
+    private ?int $maxVisitedStates = null;
+
+    private ?int $maxExpansions = null;
 
     /**
      * Sets the amount of the source asset that will be spent during path search.
@@ -90,6 +95,25 @@ final class PathSearchConfigBuilder
     }
 
     /**
+     * Configures limits that guard search explosion in dense graphs.
+     */
+    public function withSearchGuards(int $maxVisitedStates, int $maxExpansions): self
+    {
+        if ($maxVisitedStates < 1) {
+            throw new InvalidArgumentException('Maximum visited states must be at least one.');
+        }
+
+        if ($maxExpansions < 1) {
+            throw new InvalidArgumentException('Maximum expansions must be at least one.');
+        }
+
+        $this->maxVisitedStates = $maxVisitedStates;
+        $this->maxExpansions = $maxExpansions;
+
+        return $this;
+    }
+
+    /**
      * Builds a validated {@see PathSearchConfig} instance.
      */
     public function build(): PathSearchConfig
@@ -106,6 +130,9 @@ final class PathSearchConfigBuilder
             throw new InvalidArgumentException('Hop limits must be configured.');
         }
 
+        $maxVisitedStates = $this->maxVisitedStates ?? PathFinder::DEFAULT_MAX_VISITED_STATES;
+        $maxExpansions = $this->maxExpansions ?? PathFinder::DEFAULT_MAX_EXPANSIONS;
+
         return new PathSearchConfig(
             $this->spendAmount,
             $this->minimumTolerance,
@@ -113,6 +140,8 @@ final class PathSearchConfigBuilder
             $this->minimumHops,
             $this->maximumHops,
             $this->resultLimit,
+            $maxExpansions,
+            $maxVisitedStates,
         );
     }
 }

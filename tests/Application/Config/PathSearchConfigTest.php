@@ -7,6 +7,7 @@ namespace SomeWork\P2PPathFinder\Tests\Application\Config;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 final class PathSearchConfigTest extends TestCase
@@ -109,6 +110,8 @@ final class PathSearchConfigTest extends TestCase
         self::assertSame($expectedMinimum, $config->minimumSpendAmount()->amount());
         self::assertSame($spendAmount->currency(), $config->maximumSpendAmount()->currency());
         self::assertSame($expectedMaximum, $config->maximumSpendAmount()->amount());
+        self::assertSame(PathFinder::DEFAULT_MAX_EXPANSIONS, $config->pathFinderMaxExpansions());
+        self::assertSame(PathFinder::DEFAULT_MAX_VISITED_STATES, $config->pathFinderMaxVisitedStates());
     }
 
     /**
@@ -158,5 +161,43 @@ final class PathSearchConfigTest extends TestCase
         yield 'uses upper tolerance when it is greater' => [0.10, 0.25, 0.25];
         yield 'uses minimum tolerance when it dominates upper bound' => [0.30, 0.20, 0.30];
         yield 'clamps result to hard upper limit' => [0.50, 0.9999995, 0.999999];
+    }
+
+    public function test_builder_allows_configuring_search_guards(): void
+    {
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '50.00', 2))
+            ->withToleranceBounds(0.0, 0.1)
+            ->withHopLimits(1, 2)
+            ->withSearchGuards(42, 256)
+            ->build();
+
+        self::assertSame(256, $config->pathFinderMaxExpansions());
+        self::assertSame(42, $config->pathFinderMaxVisitedStates());
+    }
+
+    /**
+     * @dataProvider provideInvalidSearchGuards
+     */
+    public function test_builder_rejects_invalid_search_guards(int $maxVisited, int $maxExpansions, string $message): void
+    {
+        $builder = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '50.00', 2))
+            ->withToleranceBounds(0.0, 0.1)
+            ->withHopLimits(1, 2);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage($message);
+
+        $builder->withSearchGuards($maxVisited, $maxExpansions);
+    }
+
+    /**
+     * @return iterable<string, array{int, int, string}>
+     */
+    public static function provideInvalidSearchGuards(): iterable
+    {
+        yield 'visited below one' => [0, 10, 'Maximum visited states must be at least one.'];
+        yield 'expansions below one' => [10, 0, 'Maximum expansions must be at least one.'];
     }
 }

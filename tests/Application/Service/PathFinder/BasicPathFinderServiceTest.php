@@ -199,6 +199,29 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('USD', $secondLegs[1]->to());
     }
 
+    public function test_it_honors_path_finder_guard_configuration(): void
+    {
+        $orderBook = $this->scenarioEuroToUsdToJpyBridge();
+
+        $guardedConfig = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.25)
+            ->withHopLimits(1, 3)
+            ->withSearchGuards(1, 1)
+            ->build();
+
+        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $guardedConfig, 'JPY'));
+
+        $relaxedConfig = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.25)
+            ->withHopLimits(1, 3)
+            ->withSearchGuards(1000, 1000)
+            ->build();
+
+        self::assertNotSame([], $this->makeService()->findBestPaths($orderBook, $relaxedConfig, 'JPY'));
+    }
+
     private function scenarioEuroToUsdToJpyBridge(): OrderBook
     {
         return $this->orderBook(
