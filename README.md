@@ -21,6 +21,12 @@ The codebase is intentionally split into two layers:
   * `PathFinderService`, a façade that applies filters, builds the search graph and returns
     `PathResult` aggregates complete with `PathLeg` breakdowns.
 
+The path finder accepts tolerance values as either PHP floats or decimal strings. Supplying
+string tolerances (for example `'0.9999999999999999'`) preserves the full precision of the
+input without depending on floating-point formatting. Internally all tolerances are
+normalised to 18 decimal places before calculating the amplifier used by the search
+heuristic.
+
 The separation allows you to extend or replace either layer (e.g. load orders from an API
 or swap in a different search algorithm) without leaking implementation details.
 

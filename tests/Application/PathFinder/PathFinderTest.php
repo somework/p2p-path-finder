@@ -6,6 +6,7 @@ namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use ReflectionProperty;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
@@ -43,7 +44,7 @@ final class PathFinderTest extends TestCase
     /**
      * @dataProvider provideInvalidTolerances
      */
-    public function test_it_requires_tolerance_within_expected_range(float $invalidTolerance): void
+    public function test_it_requires_tolerance_within_expected_range(float|string $invalidTolerance): void
     {
         $this->expectException(InvalidArgumentException::class);
 
@@ -51,12 +52,46 @@ final class PathFinderTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{float}>
+     * @return iterable<string, array{float|string}>
      */
     public static function provideInvalidTolerances(): iterable
     {
         yield 'negative' => [-0.001];
         yield 'greater_than_or_equal_to_one' => [1.0];
+        yield 'string_out_of_range' => ['1.0000000000000001'];
+    }
+
+    /**
+     * @dataProvider provideHighPrecisionTolerances
+     */
+    public function test_it_accepts_high_precision_string_tolerance(string $tolerance, string $expectedAmplifier): void
+    {
+        $finder = new PathFinder(maxHops: 1, tolerance: $tolerance);
+
+        $property = new ReflectionProperty(PathFinder::class, 'toleranceAmplifier');
+        $property->setAccessible(true);
+
+        self::assertSame($expectedAmplifier, $property->getValue($finder));
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function provideHighPrecisionTolerances(): iterable
+    {
+        $normalized = BcMath::normalize('0.9999999999999999', self::SCALE);
+        $complement = BcMath::sub('1', $normalized, self::SCALE);
+        yield 'sixteen_nines' => [
+            '0.9999999999999999',
+            BcMath::div('1', $complement, self::SCALE),
+        ];
+
+        $tiny = BcMath::normalize('0.0000000000000001', self::SCALE);
+        $tinyComplement = BcMath::sub('1', $tiny, self::SCALE);
+        yield 'tiny_fraction' => [
+            '0.0000000000000001',
+            BcMath::div('1', $tinyComplement, self::SCALE),
+        ];
     }
 
     /**
