@@ -41,6 +41,56 @@ final class MoneyTest extends TestCase
         self::assertSame('13.88', $result->amount());
     }
 
+    public function test_divide_rounds_result_and_honours_custom_scale(): void
+    {
+        $money = Money::fromString('USD', '100.00', 2);
+
+        $result = $money->divide('3', 4);
+
+        self::assertSame('33.3333', $result->amount());
+        self::assertSame(4, $result->scale());
+        self::assertSame(0, $result->compare(Money::fromString('USD', '33.3333', 4), 4));
+    }
+
+    /**
+     * @dataProvider provideInvalidDivisors
+     */
+    public function test_divide_rejects_invalid_divisors(string $divisor): void
+    {
+        $money = Money::fromString('USD', '10.00', 2);
+
+        $this->expectException(InvalidArgumentException::class);
+
+        $money->divide($divisor);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public function provideInvalidDivisors(): iterable
+    {
+        yield 'non-numeric' => ['foo'];
+        yield 'zero' => ['0'];
+    }
+
+    public function test_is_zero_respects_scale(): void
+    {
+        $zero = Money::fromString('JPY', '0.000', 3);
+        $alsoZero = Money::fromString('JPY', '0', 0);
+        $nonZero = Money::fromString('JPY', '0.001', 3);
+
+        self::assertTrue($zero->isZero());
+        self::assertTrue($alsoZero->isZero());
+        self::assertFalse($nonZero->isZero());
+    }
+
+    public function test_with_scale_returns_same_instance_when_unchanged(): void
+    {
+        $money = Money::fromString('AUD', '42.42', 2);
+
+        self::assertSame($money, $money->withScale(2));
+    }
+
     public function test_compare_detects_order(): void
     {
         $low = Money::fromString('CHF', '99.999', 3);
