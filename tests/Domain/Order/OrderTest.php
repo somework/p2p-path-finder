@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Domain\Order;
 
 use InvalidArgumentException;
+use LogicException;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
@@ -117,6 +118,30 @@ final class OrderTest extends TestCase
         self::assertTrue($effectiveQuote->lessThan($rawQuote));
     }
 
+    public function test_calculate_gross_base_spend_uses_precomputed_fee_breakdown(): void
+    {
+        $order = OrderFactory::buy(feePolicy: $this->failOnCalculatePolicy());
+
+        $baseAmount = CurrencyScenarioFactory::money('BTC', '0.500', 3);
+        $precomputedFee = CurrencyScenarioFactory::money('BTC', '0.010', 3);
+
+        $grossBase = $order->calculateGrossBaseSpend($baseAmount, FeeBreakdown::forBase($precomputedFee));
+
+        self::assertTrue($grossBase->equals(CurrencyScenarioFactory::money('BTC', '0.510', 3)));
+    }
+
+    public function test_calculate_gross_base_spend_with_precomputed_quote_fee_leaves_base_unchanged(): void
+    {
+        $order = OrderFactory::buy(feePolicy: $this->failOnCalculatePolicy());
+
+        $baseAmount = CurrencyScenarioFactory::money('BTC', '0.500', 3);
+        $quoteFee = CurrencyScenarioFactory::money('USD', '1.000', 3);
+
+        $grossBase = $order->calculateGrossBaseSpend($baseAmount, FeeBreakdown::forQuote($quoteFee));
+
+        self::assertTrue($grossBase->equals($baseAmount));
+    }
+
     public function test_calculate_effective_quote_amount_subtracts_fee_for_sell_order(): void
     {
         $order = OrderFactory::sell(feePolicy: $this->percentageFeePolicy('0.10'));
@@ -188,6 +213,16 @@ final class OrderTest extends TestCase
                 $fee = Money::fromString($baseAmount->currency(), $this->flatFee, $baseAmount->scale());
 
                 return FeeBreakdown::forBase($fee);
+            }
+        };
+    }
+
+    private function failOnCalculatePolicy(): FeePolicy
+    {
+        return new class implements FeePolicy {
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                throw new LogicException('Precomputed fees should prevent FeePolicy::calculate invocation.');
             }
         };
     }
