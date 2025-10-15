@@ -229,4 +229,55 @@ final class OrderSpendAnalyzerTest extends TestCase
             $sellAtBounds,
         ], $filtered);
     }
+
+    public function test_it_preserves_orders_with_foreign_spend_currency(): void
+    {
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+            ->withToleranceBounds(0.1, 0.2)
+            ->withHopLimits(1, 3)
+            ->build();
+
+        $foreignSpendBuy = OrderFactory::buy(
+            base: 'EUR',
+            quote: 'GBP',
+            minAmount: '500.00',
+            maxAmount: '600.00',
+            rate: '0.8500',
+            amountScale: 2,
+            rateScale: 4,
+        );
+        $withinBoundsBuy = OrderFactory::buy(
+            base: 'USD',
+            quote: 'EUR',
+            minAmount: '95.00',
+            maxAmount: '115.00',
+            rate: '0.9000',
+            amountScale: 2,
+            rateScale: 4,
+        );
+        $tooHighBuy = OrderFactory::buy(
+            base: 'USD',
+            quote: 'EUR',
+            minAmount: '130.00',
+            maxAmount: '150.00',
+            rate: '0.9000',
+            amountScale: 2,
+            rateScale: 4,
+        );
+
+        $orderBook = new OrderBook([
+            $foreignSpendBuy,
+            $withinBoundsBuy,
+            $tooHighBuy,
+        ]);
+
+        $analyzer = new OrderSpendAnalyzer();
+        $filtered = $analyzer->filterOrders($orderBook, $config);
+
+        self::assertSame([
+            $foreignSpendBuy,
+            $withinBoundsBuy,
+        ], $filtered);
+    }
 }
