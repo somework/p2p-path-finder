@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Graph;
 
+use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 use function array_key_exists;
 
 /**
  * Converts a collection of domain orders into a weighted directed graph representation.
+ *
+ * @phpstan-import-type Graph from PathFinder
+ * @phpstan-import-type GraphEdge from PathFinder
  */
 final class GraphBuilder
 {
@@ -27,10 +30,11 @@ final class GraphBuilder
     /**
      * @param iterable<Order> $orders
      *
-     * @return array<string, array{currency: string, edges: list<array<string, mixed>>}>
+     * @return Graph
      */
     public function build(iterable $orders): array
     {
+        /** @var Graph $graph */
         $graph = [];
 
         foreach ($orders as $order) {
@@ -51,7 +55,7 @@ final class GraphBuilder
     }
 
     /**
-     * @param array<string, array{currency: string, edges: list<array<string, mixed>>}> $graph
+     * @param Graph $graph
      */
     private function initializeNode(array &$graph, string $currency): void
     {
@@ -59,29 +63,17 @@ final class GraphBuilder
             return;
         }
 
+        /** @var list<GraphEdge> $edges */
+        $edges = [];
+
         $graph[$currency] = [
             'currency' => $currency,
-            'edges' => [],
+            'edges' => $edges,
         ];
     }
 
     /**
-     * @return array{
-     *     from: string,
-     *     to: string,
-     *     orderSide: OrderSide,
-     *     order: Order,
-     *     rate: ExchangeRate,
-     *     baseCapacity: array{min: Money, max: Money},
-     *     quoteCapacity: array{min: Money, max: Money},
-     *     grossBaseCapacity: array{min: Money, max: Money},
-     *     segments: list<array{
-     *         isMandatory: bool,
-     *         base: array{min: Money, max: Money},
-     *         quote: array{min: Money, max: Money},
-     *         grossBase: array{min: Money, max: Money},
-     *     }>,
-     * }
+     * @return GraphEdge
      */
     private function createEdge(Order $order, string $fromCurrency, string $toCurrency): array
     {
