@@ -1,0 +1,265 @@
+<?php
+
+declare(strict_types=1);
+
+namespace SomeWork\P2PPathFinder\Tests\Application\Service\PathFinder;
+
+use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
+use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
+use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+
+final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
+{
+    public function test_it_handles_buy_base_fee_within_tolerance_window(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(
+                OrderSide::BUY,
+                'EUR',
+                'USD',
+                '10.000',
+                '500.000',
+                '1.200',
+                3,
+                $this->basePercentageFeePolicy('0.02'),
+            ),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.05)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $result = $this->makeService()->findBestPath($orderBook, $config, 'USD');
+
+        self::assertNotNull($result);
+
+        $totalSpent = $result->totalSpent()->withScale(3);
+        self::assertSame('EUR', $totalSpent->currency());
+        self::assertSame('102.000', $totalSpent->amount());
+
+        self::assertGreaterThan(0.0, $result->residualTolerance());
+        self::assertLessThanOrEqual($config->maximumTolerance(), $result->residualTolerance());
+
+        $legs = $result->legs();
+        self::assertCount(1, $legs);
+        $leg = $legs[0];
+        self::assertSame('EUR', $leg->from());
+        self::assertSame('USD', $leg->to());
+        self::assertSame('102.000', $leg->spent()->withScale(3)->amount());
+    }
+
+    public function test_it_caps_buy_gross_spend_at_tolerance_upper_bound(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(
+                OrderSide::BUY,
+                'EUR',
+                'USD',
+                '10.000',
+                '500.000',
+                '1.200',
+                3,
+                $this->basePercentageFeePolicy('0.05'),
+            ),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.02)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $result = $this->makeService()->findBestPath($orderBook, $config, 'USD');
+
+        self::assertNotNull($result);
+
+        $legs = $result->legs();
+        self::assertCount(1, $legs);
+        $leg = $legs[0];
+
+        $maximumSpend = $config->maximumSpendAmount()->withScale(3);
+        self::assertSame($maximumSpend->amount(), $leg->spent()->withScale(3)->amount());
+
+        self::assertSame('116.572', $leg->received()->withScale(3)->amount());
+
+        $legFees = $leg->fees();
+        self::assertArrayHasKey('EUR', $legFees);
+        self::assertSame('4.857', $legFees['EUR']->withScale(3)->amount());
+
+        self::assertSame($maximumSpend->amount(), $result->totalSpent()->withScale(3)->amount());
+        self::assertEqualsWithDelta($config->maximumTolerance(), $result->residualTolerance(), 0.0000001);
+    }
+
+    /**
+     * @dataProvider toleranceRejectionProvider
+     */
+    public function test_it_rejects_paths_outside_tolerance_window(array $orders, array $spend, array $tolerance, array $hopLimits, string $target): void
+    {
+        $orderBook = $this->orderBook(...array_map(fn (array $order): Order => $this->createOrder(
+            $order['side'],
+            $order['base'],
+            $order['quote'],
+            $order['min'],
+            $order['max'],
+            $order['rate'],
+            $order['scale'],
+            $this->resolveFeePolicy($order['feePolicy'] ?? null),
+        ), $orders));
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString($spend['currency'], $spend['amount'], $spend['scale']))
+            ->withToleranceBounds($tolerance[0], $tolerance[1])
+            ->withHopLimits($hopLimits[0], $hopLimits[1])
+            ->build();
+
+        self::assertNull($this->makeService()->findBestPath($orderBook, $config, $target));
+    }
+
+    public static function toleranceRejectionProvider(): iterable
+    {
+        yield 'insufficient tolerance for chained sell' => [
+            [
+                [
+                    'side' => OrderSide::SELL,
+                    'base' => 'USD',
+                    'quote' => 'EUR',
+                    'min' => '10.000',
+                    'max' => '200.000',
+                    'rate' => '0.900',
+                    'scale' => 3,
+                ],
+                [
+                    'side' => OrderSide::SELL,
+                    'base' => 'JPY',
+                    'quote' => 'EUR',
+                    'min' => '10.000',
+                    'max' => '20000.000',
+                    'rate' => '0.007500',
+                    'scale' => 6,
+                ],
+            ],
+            ['currency' => 'EUR', 'amount' => '5.00', 'scale' => 2],
+            [0.0, 0.40],
+            [1, 2],
+            'USD',
+        ];
+
+        yield 'gross spend exceeds tolerance' => [
+            [
+                [
+                    'side' => OrderSide::SELL,
+                    'base' => 'USD',
+                    'quote' => 'EUR',
+                    'min' => '100.000',
+                    'max' => '200.000',
+                    'rate' => '1.000',
+                    'scale' => 3,
+                    'feePolicy' => ['type' => 'percentage', 'value' => '0.10'],
+                ],
+            ],
+            ['currency' => 'EUR', 'amount' => '100.00', 'scale' => 2],
+            [0.0, 0.05],
+            [1, 1],
+            'USD',
+        ];
+    }
+
+    public function test_it_enforces_minimum_hop_requirement(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '200.000', '0.900', 3),
+            $this->createOrder(OrderSide::BUY, 'USD', 'JPY', '50.000', '200.000', '150.000', 3),
+            $this->createOrder(OrderSide::SELL, 'JPY', 'EUR', '10.000', '20000.000', '0.007500', 6),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.25)
+            ->withHopLimits(3, 3)
+            ->build();
+
+        self::assertNull($this->makeService()->findBestPath($orderBook, $config, 'JPY'));
+    }
+
+    public function test_it_handles_under_spend_within_tolerance_bounds(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '5.000', '8.000', '0.900', 3),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '8.00', 2))
+            ->withToleranceBounds(0.25, 0.05)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $result = $this->makeService()->findBestPath($orderBook, $config, 'USD');
+
+        self::assertNotNull($result);
+        self::assertSame('EUR', $result->totalSpent()->currency());
+        self::assertSame('7.200', $result->totalSpent()->amount());
+        self::assertSame('USD', $result->totalReceived()->currency());
+        self::assertSame('7.999', $result->totalReceived()->amount());
+        self::assertEqualsWithDelta(0.1, $result->residualTolerance(), 1e-9);
+    }
+
+    public function test_it_discovers_buy_path_when_order_minimum_exceeds_configured_minimum(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(OrderSide::BUY, 'EUR', 'USD', '50.000', '120.000', '1.200', 3),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '40.00', 2))
+            ->withToleranceBounds(0.5, 0.5)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $result = $this->makeService()->findBestPath($orderBook, $config, 'USD');
+
+        self::assertNotNull($result);
+        self::assertSame('EUR', $result->totalSpent()->currency());
+        self::assertSame('50.000', $result->totalSpent()->amount());
+        self::assertSame('USD', $result->totalReceived()->currency());
+        self::assertSame('60.000', $result->totalReceived()->amount());
+        self::assertEqualsWithDelta(0.25, $result->residualTolerance(), 1e-9);
+    }
+
+    public function test_it_discovers_sell_path_when_order_minimum_exceeds_configured_minimum(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '30.000', '120.000', '0.800', 3),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '22.00', 2))
+            ->withToleranceBounds(0.1, 0.5)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $result = $this->makeService()->findBestPath($orderBook, $config, 'USD');
+
+        self::assertNotNull($result);
+        self::assertSame('EUR', $result->totalSpent()->currency());
+        self::assertSame('24.000', $result->totalSpent()->amount());
+        self::assertSame('USD', $result->totalReceived()->currency());
+        self::assertSame('30.000', $result->totalReceived()->amount());
+        self::assertEqualsWithDelta(2 / 22, $result->residualTolerance(), 1e-9);
+    }
+
+    private function resolveFeePolicy(?array $definition): ?FeePolicy
+    {
+        if (null === $definition) {
+            return null;
+        }
+
+        return match ($definition['type']) {
+            'percentage' => $this->percentageFeePolicy($definition['value']),
+            default => throw new \InvalidArgumentException('Unsupported fee policy type: '.$definition['type']),
+        };
+    }
+}
