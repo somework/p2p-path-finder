@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 
+use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
@@ -218,6 +219,117 @@ final class PathFinderTest extends TestCase
             'IDR',
             BcMath::normalize('15400.000', self::SCALE),
         ];
+    }
+
+    /**
+     * @dataProvider provideMalformedSpendConstraints
+     */
+    public function test_it_requires_spend_constraints_to_include_bounds(array $constraints): void
+    {
+        $orders = self::createRubToUsdSellOrders();
+        $graph = (new GraphBuilder())->build($orders);
+
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+
+        $this->expectException(InvalidArgumentException::class);
+        $finder->findBestPath($graph, 'RUB', 'USD', $constraints);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function provideMalformedSpendConstraints(): iterable
+    {
+        $minimum = CurrencyScenarioFactory::money('RUB', '1.000', 3);
+        $maximum = CurrencyScenarioFactory::money('RUB', '5.000', 3);
+
+        yield 'missing_minimum' => [
+            [
+                'max' => $maximum,
+            ],
+        ];
+
+        yield 'missing_maximum' => [
+            [
+                'min' => $minimum,
+            ],
+        ];
+
+        yield 'desired_without_bounds' => [
+            [
+                'desired' => $minimum,
+            ],
+        ];
+    }
+
+    public function test_it_supports_spend_constraints_without_desired_amount(): void
+    {
+        $order = OrderFactory::buy('EUR', 'USD', '1.000', '1.000', '1.100', 3, 3);
+        $graph = (new GraphBuilder())->build([$order]);
+
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+
+        $minimum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
+        $maximum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
+
+        $result = $finder->findBestPath(
+            $graph,
+            'EUR',
+            'USD',
+            [
+                'min' => $minimum,
+                'max' => $maximum,
+            ],
+        );
+
+        self::assertNotNull($result);
+        self::assertSame(1, $result['hops']);
+        self::assertCount(1, $result['edges']);
+        self::assertSame('EUR', $result['edges'][0]['from']);
+        self::assertSame('USD', $result['edges'][0]['to']);
+
+        self::assertNotNull($result['amountRange']);
+        self::assertSame('USD', $result['amountRange']['min']->currency());
+        self::assertSame($result['amountRange']['min']->currency(), $result['amountRange']['max']->currency());
+        self::assertSame($result['amountRange']['min']->amount(), $result['amountRange']['max']->amount());
+        self::assertNull($result['desiredAmount']);
+    }
+
+    public function test_it_supports_spend_constraints_with_desired_amount(): void
+    {
+        $order = OrderFactory::buy('EUR', 'USD', '1.000', '1.000', '1.100', 3, 3);
+        $graph = (new GraphBuilder())->build([$order]);
+
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+
+        $minimum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
+        $maximum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
+        $desired = CurrencyScenarioFactory::money('EUR', '1.000', 3);
+
+        $result = $finder->findBestPath(
+            $graph,
+            'EUR',
+            'USD',
+            [
+                'min' => $minimum,
+                'max' => $maximum,
+                'desired' => $desired,
+            ],
+        );
+
+        self::assertNotNull($result);
+        self::assertSame(1, $result['hops']);
+        self::assertCount(1, $result['edges']);
+        self::assertSame('EUR', $result['edges'][0]['from']);
+        self::assertSame('USD', $result['edges'][0]['to']);
+
+        self::assertNotNull($result['amountRange']);
+        self::assertSame('USD', $result['amountRange']['min']->currency());
+        self::assertSame($result['amountRange']['min']->currency(), $result['amountRange']['max']->currency());
+        self::assertSame($result['amountRange']['min']->amount(), $result['amountRange']['max']->amount());
+        self::assertNotNull($result['desiredAmount']);
+        self::assertSame($result['amountRange']['min']->currency(), $result['desiredAmount']->currency());
+        self::assertSame($result['amountRange']['min']->amount(), $result['desiredAmount']->amount());
     }
 
     /**
