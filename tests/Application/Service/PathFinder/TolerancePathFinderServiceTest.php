@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Application\Service\PathFinder;
 
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
@@ -12,20 +13,12 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
 {
+    /**
+     * @testdox Accepts EUR→USD buy when base fee stays within configured tolerance window
+     */
     public function test_it_handles_buy_base_fee_within_tolerance_window(): void
     {
-        $orderBook = $this->orderBook(
-            $this->createOrder(
-                OrderSide::BUY,
-                'EUR',
-                'USD',
-                '10.000',
-                '500.000',
-                '1.200',
-                3,
-                $this->basePercentageFeePolicy('0.02'),
-            ),
-        );
+        $orderBook = $this->scenarioEurBuyWithBaseFeeWithinTolerance();
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
@@ -52,20 +45,12 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('102.000', $leg->spent()->withScale(3)->amount());
     }
 
+    /**
+     * @testdox Caps gross spend at tolerance ceiling when base fees threaten to overshoot budget
+     */
     public function test_it_caps_buy_gross_spend_at_tolerance_upper_bound(): void
     {
-        $orderBook = $this->orderBook(
-            $this->createOrder(
-                OrderSide::BUY,
-                'EUR',
-                'USD',
-                '10.000',
-                '500.000',
-                '1.200',
-                3,
-                $this->basePercentageFeePolicy('0.05'),
-            ),
-        );
+        $orderBook = $this->scenarioEurBuyClampedByTolerance();
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
@@ -95,6 +80,8 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
     }
 
     /**
+     * @testdox Rejects candidate paths when tolerance rules from the provider scenarios are violated
+     *
      * @dataProvider toleranceRejectionProvider
      */
     public function test_it_rejects_paths_outside_tolerance_window(array $orders, array $spend, array $tolerance, array $hopLimits, string $target): void
@@ -168,13 +155,12 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
         ];
     }
 
+    /**
+     * @testdox Enforces minimum hop requirement even when an otherwise valid multi-hop bridge exists
+     */
     public function test_it_enforces_minimum_hop_requirement(): void
     {
-        $orderBook = $this->orderBook(
-            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '200.000', '0.900', 3),
-            $this->createOrder(OrderSide::BUY, 'USD', 'JPY', '50.000', '200.000', '150.000', 3),
-            $this->createOrder(OrderSide::SELL, 'JPY', 'EUR', '10.000', '20000.000', '0.007500', 6),
-        );
+        $orderBook = $this->scenarioEuroToUsdToJpyBridge();
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
@@ -185,6 +171,9 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
         self::assertNull($this->makeService()->findBestPath($orderBook, $config, 'JPY'));
     }
 
+    /**
+     * @testdox Allows underspend on USD sell leg when within asymmetric tolerance window
+     */
     public function test_it_handles_under_spend_within_tolerance_bounds(): void
     {
         $orderBook = $this->orderBook(
@@ -207,6 +196,9 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
         self::assertEqualsWithDelta(0.1, $result->residualTolerance(), 1e-9);
     }
 
+    /**
+     * @testdox Finds viable buy path when venue minimum exceeds configured spend but tolerance permits it
+     */
     public function test_it_discovers_buy_path_when_order_minimum_exceeds_configured_minimum(): void
     {
         $orderBook = $this->orderBook(
@@ -229,6 +221,9 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
         self::assertEqualsWithDelta(0.25, $result->residualTolerance(), 1e-9);
     }
 
+    /**
+     * @testdox Unlocks sell path when order minimum is above configuration yet tolerance allows scaling up
+     */
     public function test_it_discovers_sell_path_when_order_minimum_exceeds_configured_minimum(): void
     {
         $orderBook = $this->orderBook(
@@ -261,5 +256,46 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
             'percentage' => $this->percentageFeePolicy($definition['value']),
             default => throw new \InvalidArgumentException('Unsupported fee policy type: '.$definition['type']),
         };
+    }
+
+    private function scenarioEurBuyWithBaseFeeWithinTolerance(): OrderBook
+    {
+        return $this->orderBook(
+            $this->createOrder(
+                OrderSide::BUY,
+                'EUR',
+                'USD',
+                '10.000',
+                '500.000',
+                '1.200',
+                3,
+                $this->basePercentageFeePolicy('0.02'),
+            ),
+        );
+    }
+
+    private function scenarioEurBuyClampedByTolerance(): OrderBook
+    {
+        return $this->orderBook(
+            $this->createOrder(
+                OrderSide::BUY,
+                'EUR',
+                'USD',
+                '10.000',
+                '500.000',
+                '1.200',
+                3,
+                $this->basePercentageFeePolicy('0.05'),
+            ),
+        );
+    }
+
+    private function scenarioEuroToUsdToJpyBridge(): OrderBook
+    {
+        return $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '200.000', '0.900', 3),
+            $this->createOrder(OrderSide::BUY, 'USD', 'JPY', '50.000', '200.000', '150.000', 3),
+            $this->createOrder(OrderSide::SELL, 'JPY', 'EUR', '10.000', '20000.000', '0.007500', 6),
+        );
     }
 }

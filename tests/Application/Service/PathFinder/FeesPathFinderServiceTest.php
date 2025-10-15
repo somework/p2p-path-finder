@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Application\Service\PathFinder;
 
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\Service\LegMaterializer;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
@@ -14,12 +15,12 @@ use function sprintf;
 
 final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
 {
+    /**
+     * @testdox Materializes EUR→JPY bridge with quote fees on each hop and captures fee breakdown
+     */
     public function test_it_materializes_leg_fees_and_breakdown(): void
     {
-        $orderBook = $this->orderBook(
-            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '200.000', '0.900', 3, $this->percentageFeePolicy('0.01')),
-            $this->createOrder(OrderSide::BUY, 'USD', 'JPY', '50.000', '200.000', '150.000', 3, $this->percentageFeePolicy('0.02')),
-        );
+        $orderBook = $this->scenarioEurToJpyBridgeWithLegFees();
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
@@ -66,20 +67,12 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertTrue($result->totalReceived()->lessThan($rawWithoutFee));
     }
 
+    /**
+     * @testdox Applies base-denominated fee to reduce BTC received on a direct USD sell
+     */
     public function test_it_reduces_sell_leg_receipts_by_base_fee(): void
     {
-        $orderBook = $this->orderBook(
-            $this->createOrder(
-                OrderSide::SELL,
-                'BTC',
-                'USD',
-                '1.000',
-                '3.000',
-                '2.000',
-                3,
-                $this->basePercentageFeePolicy('0.10'),
-            ),
-        );
+        $orderBook = $this->scenarioBtcSellWithBaseFee();
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '2.00', 2))
@@ -107,20 +100,12 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('0.100', $fees['BTC']->amount());
     }
 
+    /**
+     * @testdox Includes EUR base fee when determining gross spend for a direct buy leg
+     */
     public function test_it_includes_base_fee_in_total_spent(): void
     {
-        $orderBook = $this->orderBook(
-            $this->createOrder(
-                OrderSide::BUY,
-                'EUR',
-                'USD',
-                '10.000',
-                '200.000',
-                '1.200',
-                3,
-                $this->basePercentageFeePolicy('0.02'),
-            ),
-        );
+        $orderBook = $this->scenarioEurBuyWithBaseFee();
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
@@ -153,20 +138,12 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('2.000', $feeBreakdown['EUR']->amount());
     }
 
+    /**
+     * @testdox Handles combined base and quote fees on a single EUR→USD buy leg
+     */
     public function test_it_materializes_buy_leg_with_combined_base_and_quote_fees(): void
     {
-        $orderBook = $this->orderBook(
-            $this->createOrder(
-                OrderSide::BUY,
-                'EUR',
-                'USD',
-                '10.000',
-                '200.000',
-                '1.200',
-                3,
-                $this->mixedPercentageFeePolicy('0.02', '0.05'),
-            ),
-        );
+        $orderBook = $this->scenarioEurBuyWithMixedFees();
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
@@ -205,12 +182,12 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('6.000', $feeBreakdown['USD']->amount());
     }
 
+    /**
+     * @testdox Chains EUR→USD→JPY buy legs while propagating quote-denominated fees between hops
+     */
     public function test_it_materializes_chained_buy_legs_with_fees_using_net_quotes(): void
     {
-        $orderBook = $this->orderBook(
-            $this->createOrder(OrderSide::BUY, 'EUR', 'USD', '50.000', '200.000', '1.100', 3, $this->percentageFeePolicy('0.05')),
-            $this->createOrder(OrderSide::BUY, 'USD', 'JPY', '50.000', '200.000', '150.000', 3, $this->percentageFeePolicy('0.02')),
-        );
+        $orderBook = $this->scenarioChainedBuyLegsWithFees();
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
@@ -260,30 +237,12 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('313.500', $feeBreakdown['JPY']->amount());
     }
 
+    /**
+     * @testdox Caps gross spend when consecutive buy legs each take base-denominated fees
+     */
     public function test_it_limits_gross_spend_for_buy_legs_with_base_fees(): void
     {
-        $orderBook = $this->orderBook(
-            $this->createOrder(
-                OrderSide::BUY,
-                'EUR',
-                'USD',
-                '20.000',
-                '300.000',
-                '1.250',
-                3,
-                $this->basePercentageFeePolicy('0.10'),
-            ),
-            $this->createOrder(
-                OrderSide::BUY,
-                'USD',
-                'JPY',
-                '20.000',
-                '300.000',
-                '140.000',
-                3,
-                $this->basePercentageFeePolicy('0.05'),
-            ),
-        );
+        $orderBook = $this->scenarioStackedBaseFeeBuys();
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
@@ -318,12 +277,12 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
         );
     }
 
+    /**
+     * @testdox Prefers lower fee EUR→USD direct route even when a rival advertises a better raw rate
+     */
     public function test_it_prefers_fee_efficient_direct_route_over_higher_raw_rate(): void
     {
-        $orderBook = $this->orderBook(
-            $this->createOrder(OrderSide::BUY, 'EUR', 'USD', '50.000', '200.000', '1.250', 3, $this->percentageFeePolicy('0.10')),
-            $this->createOrder(OrderSide::BUY, 'EUR', 'USD', '50.000', '200.000', '1.200', 3, $this->percentageFeePolicy('0.01')),
-        );
+        $orderBook = $this->scenarioHighFeeDirectRoute();
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
@@ -346,12 +305,12 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('1.200', $fees['USD']->amount());
     }
 
+    /**
+     * @testdox Chooses quote-efficient USD sell route when competing leg inflates spend via fees
+     */
     public function test_it_prefers_sell_route_that_limits_gross_quote_spend(): void
     {
-        $orderBook = $this->orderBook(
-            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '50.000', '200.000', '0.900', 3, $this->percentageFeePolicy('0.10')),
-            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '50.000', '200.000', '0.880', 3),
-        );
+        $orderBook = $this->scenarioQuoteEfficientSellRoute();
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
@@ -394,21 +353,12 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
         );
     }
 
+    /**
+     * @testdox Resizes downstream sell leg when quote fee would otherwise overspend received USD
+     */
     public function test_it_resizes_sell_leg_when_quote_fee_would_overdraw_available_budget(): void
     {
-        $firstLegOrder = $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '0.000', '200.000', '1.000', 3);
-        $secondLegOrder = $this->createOrder(
-            OrderSide::SELL,
-            'BTC',
-            'USD',
-            '0.000',
-            '5.000',
-            '100.000',
-            3,
-            $this->percentageFeePolicy('0.10'),
-        );
-
-        $orderBook = $this->orderBook($firstLegOrder, $secondLegOrder);
+        $orderBook = $this->scenarioSellChainRequiringQuoteFeeResizing();
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
@@ -458,21 +408,12 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame($config->spendAmount()->withScale($resultSpent->scale())->amount(), $resultSpent->amount());
     }
 
+    /**
+     * @testdox Rejects sell chain outright when quote fee minimum cannot be funded by upstream liquidity
+     */
     public function test_it_rejects_sell_leg_when_quote_fee_budget_cannot_cover_minimum(): void
     {
-        $firstLegOrder = $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '0.000', '200.000', '1.000', 3);
-        $secondLegOrder = $this->createOrder(
-            OrderSide::SELL,
-            'BTC',
-            'USD',
-            '1.000',
-            '5.000',
-            '100.000',
-            3,
-            $this->percentageFeePolicy('0.10'),
-        );
-
-        $orderBook = $this->orderBook($firstLegOrder, $secondLegOrder);
+        $orderBook = $this->scenarioSellChainBlockedByFeeMinimum();
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
@@ -483,13 +424,12 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertNull($this->makeService()->findBestPath($orderBook, $config, 'BTC'));
     }
 
+    /**
+     * @testdox Picks multi-hop EUR→USD→JPY route when direct high-fee offer erodes payout
+     */
     public function test_it_prefers_fee_efficient_multi_hop_route_over_high_fee_alternative(): void
     {
-        $orderBook = $this->orderBook(
-            $this->createOrder(OrderSide::BUY, 'EUR', 'USD', '50.000', '200.000', '1.250', 3, $this->percentageFeePolicy('0.10')),
-            $this->createOrder(OrderSide::BUY, 'EUR', 'USD', '50.000', '200.000', '1.200', 3, $this->percentageFeePolicy('0.01')),
-            $this->createOrder(OrderSide::BUY, 'USD', 'JPY', '50.000', '200.000', '140.000', 3),
-        );
+        $orderBook = $this->scenarioMultiHopBeatsHighFeeDirect();
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
@@ -541,5 +481,154 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->build();
 
         self::assertNull($this->makeService()->findBestPath($orderBook, $config, 'USD'));
+    }
+
+    private function scenarioEurToJpyBridgeWithLegFees(): OrderBook
+    {
+        return $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '200.000', '0.900', 3, $this->percentageFeePolicy('0.01')),
+            $this->createOrder(OrderSide::BUY, 'USD', 'JPY', '50.000', '200.000', '150.000', 3, $this->percentageFeePolicy('0.02')),
+        );
+    }
+
+    private function scenarioBtcSellWithBaseFee(): OrderBook
+    {
+        return $this->orderBook(
+            $this->createOrder(
+                OrderSide::SELL,
+                'BTC',
+                'USD',
+                '1.000',
+                '3.000',
+                '2.000',
+                3,
+                $this->basePercentageFeePolicy('0.10'),
+            ),
+        );
+    }
+
+    private function scenarioEurBuyWithBaseFee(): OrderBook
+    {
+        return $this->orderBook(
+            $this->createOrder(
+                OrderSide::BUY,
+                'EUR',
+                'USD',
+                '10.000',
+                '200.000',
+                '1.200',
+                3,
+                $this->basePercentageFeePolicy('0.02'),
+            ),
+        );
+    }
+
+    private function scenarioEurBuyWithMixedFees(): OrderBook
+    {
+        return $this->orderBook(
+            $this->createOrder(
+                OrderSide::BUY,
+                'EUR',
+                'USD',
+                '10.000',
+                '200.000',
+                '1.200',
+                3,
+                $this->mixedPercentageFeePolicy('0.02', '0.05'),
+            ),
+        );
+    }
+
+    private function scenarioChainedBuyLegsWithFees(): OrderBook
+    {
+        return $this->orderBook(
+            $this->createOrder(OrderSide::BUY, 'EUR', 'USD', '50.000', '200.000', '1.100', 3, $this->percentageFeePolicy('0.05')),
+            $this->createOrder(OrderSide::BUY, 'USD', 'JPY', '50.000', '200.000', '150.000', 3, $this->percentageFeePolicy('0.02')),
+        );
+    }
+
+    private function scenarioStackedBaseFeeBuys(): OrderBook
+    {
+        return $this->orderBook(
+            $this->createOrder(
+                OrderSide::BUY,
+                'EUR',
+                'USD',
+                '20.000',
+                '300.000',
+                '1.250',
+                3,
+                $this->basePercentageFeePolicy('0.10'),
+            ),
+            $this->createOrder(
+                OrderSide::BUY,
+                'USD',
+                'JPY',
+                '20.000',
+                '300.000',
+                '140.000',
+                3,
+                $this->basePercentageFeePolicy('0.05'),
+            ),
+        );
+    }
+
+    private function scenarioHighFeeDirectRoute(): OrderBook
+    {
+        return $this->orderBook(
+            $this->createOrder(OrderSide::BUY, 'EUR', 'USD', '50.000', '200.000', '1.250', 3, $this->percentageFeePolicy('0.10')),
+            $this->createOrder(OrderSide::BUY, 'EUR', 'USD', '50.000', '200.000', '1.200', 3, $this->percentageFeePolicy('0.01')),
+        );
+    }
+
+    private function scenarioQuoteEfficientSellRoute(): OrderBook
+    {
+        return $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '50.000', '200.000', '0.900', 3, $this->percentageFeePolicy('0.10')),
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '50.000', '200.000', '0.880', 3),
+        );
+    }
+
+    private function scenarioSellChainRequiringQuoteFeeResizing(): OrderBook
+    {
+        $firstLegOrder = $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '0.000', '200.000', '1.000', 3);
+        $secondLegOrder = $this->createOrder(
+            OrderSide::SELL,
+            'BTC',
+            'USD',
+            '0.000',
+            '5.000',
+            '100.000',
+            3,
+            $this->percentageFeePolicy('0.10'),
+        );
+
+        return $this->orderBook($firstLegOrder, $secondLegOrder);
+    }
+
+    private function scenarioSellChainBlockedByFeeMinimum(): OrderBook
+    {
+        $firstLegOrder = $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '0.000', '200.000', '1.000', 3);
+        $secondLegOrder = $this->createOrder(
+            OrderSide::SELL,
+            'BTC',
+            'USD',
+            '1.000',
+            '5.000',
+            '100.000',
+            3,
+            $this->percentageFeePolicy('0.10'),
+        );
+
+        return $this->orderBook($firstLegOrder, $secondLegOrder);
+    }
+
+    private function scenarioMultiHopBeatsHighFeeDirect(): OrderBook
+    {
+        return $this->orderBook(
+            $this->createOrder(OrderSide::BUY, 'EUR', 'USD', '50.000', '200.000', '1.250', 3, $this->percentageFeePolicy('0.10')),
+            $this->createOrder(OrderSide::BUY, 'EUR', 'USD', '50.000', '200.000', '1.200', 3, $this->percentageFeePolicy('0.01')),
+            $this->createOrder(OrderSide::BUY, 'USD', 'JPY', '50.000', '200.000', '140.000', 3),
+        );
     }
 }
