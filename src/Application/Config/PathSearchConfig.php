@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Application\Config;
 
 use InvalidArgumentException;
+use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
@@ -26,6 +27,8 @@ final class PathSearchConfig
         private readonly int $minimumHops,
         private readonly int $maximumHops,
         private readonly int $resultLimit = 1,
+        private readonly int $pathFinderMaxExpansions = PathFinder::DEFAULT_MAX_EXPANSIONS,
+        private readonly int $pathFinderMaxVisitedStates = PathFinder::DEFAULT_MAX_VISITED_STATES,
     ) {
         if ($minimumTolerance < 0.0 || $minimumTolerance >= 1.0) {
             throw new InvalidArgumentException('Minimum tolerance must be in the [0, 1) range.');
@@ -45,6 +48,14 @@ final class PathSearchConfig
 
         if ($resultLimit < 1) {
             throw new InvalidArgumentException('Result limit must be at least one.');
+        }
+
+        if ($pathFinderMaxExpansions < 1) {
+            throw new InvalidArgumentException('Maximum expansions must be at least one.');
+        }
+
+        if ($pathFinderMaxVisitedStates < 1) {
+            throw new InvalidArgumentException('Maximum visited states must be at least one.');
         }
 
         $this->minimumSpendAmount = $this->calculateBoundedSpend(1.0 - $minimumTolerance);
@@ -105,6 +116,22 @@ final class PathSearchConfig
     public function resultLimit(): int
     {
         return $this->resultLimit;
+    }
+
+    /**
+     * Returns the maximum number of state expansions the path finder is allowed to perform.
+     */
+    public function pathFinderMaxExpansions(): int
+    {
+        return $this->pathFinderMaxExpansions;
+    }
+
+    /**
+     * Returns the maximum number of unique state signatures tracked during search.
+     */
+    public function pathFinderMaxVisitedStates(): int
+    {
+        return $this->pathFinderMaxVisitedStates;
     }
 
     /**

@@ -48,6 +48,10 @@ final class PathFinder
 {
     private const SCALE = 18;
 
+    public const DEFAULT_MAX_EXPANSIONS = 250000;
+
+    public const DEFAULT_MAX_VISITED_STATES = 250000;
+
     private readonly string $unitValue;
     private readonly string $toleranceAmplifier;
     private readonly bool $hasTolerance;
@@ -60,6 +64,8 @@ final class PathFinder
         private readonly int $maxHops = 4,
         float|string $tolerance = 0.0,
         private readonly int $topK = 1,
+        private readonly int $maxExpansions = self::DEFAULT_MAX_EXPANSIONS,
+        private readonly int $maxVisitedStates = self::DEFAULT_MAX_VISITED_STATES,
     ) {
         if ($maxHops < 1) {
             throw new InvalidArgumentException('Maximum hops must be at least one.');
@@ -67,6 +73,14 @@ final class PathFinder
 
         if ($this->topK < 1) {
             throw new InvalidArgumentException('Result limit must be at least one.');
+        }
+
+        if ($this->maxExpansions < 1) {
+            throw new InvalidArgumentException('Maximum expansions must be at least one.');
+        }
+
+        if ($this->maxVisitedStates < 1) {
+            throw new InvalidArgumentException('Maximum visited states must be at least one.');
         }
 
         $this->unitValue = BcMath::normalize('1', self::SCALE);
@@ -137,6 +151,7 @@ final class PathFinder
             'path' => [],
             'amountRange' => $range,
             'desiredAmount' => $desiredSpend,
+            'visited' => [$source => true],
         ], ['cost' => $this->unitValue, 'order' => $insertionOrder++]);
 
         /**
@@ -151,10 +166,17 @@ final class PathFinder
         ];
 
         $bestTargetCost = null;
+        $expansions = 0;
+        $visitedStates = 1;
 
         while (!$queue->isEmpty()) {
-            /** @var array{node: string, cost: string, product: string, hops: int, path: list<array<string, mixed>>, amountRange: SpendRange|null, desiredAmount: Money|null} $state */
+            if ($expansions >= $this->maxExpansions) {
+                break;
+            }
+
+            /** @var array{node: string, cost: string, product: string, hops: int, path: list<array<string, mixed>>, amountRange: SpendRange|null, desiredAmount: Money|null, visited: array<string, bool>} $state */
             $state = $queue->extract();
+            ++$expansions;
 
             if ($state['node'] === $target) {
                 if (null === $bestTargetCost || -1 === BcMath::comp($state['cost'], $bestTargetCost, self::SCALE)) {
@@ -191,6 +213,10 @@ final class PathFinder
                     continue;
                 }
 
+                if (isset($state['visited'][$nextNode])) {
+                    continue;
+                }
+
                 $conversionRate = $this->edgeEffectiveConversionRate($edge);
                 if (1 !== BcMath::comp($conversionRate, '0', self::SCALE)) {
                     continue;
@@ -222,7 +248,16 @@ final class PathFinder
                 $nextProduct = BcMath::mul($state['product'], $conversionRate, self::SCALE);
                 $nextHops = $state['hops'] + 1;
 
-                if ($this->isDominated($bestPerNode[$nextNode] ?? [], $nextCost, $nextHops, $nextRange, $nextDesired)) {
+                $signature = $this->stateSignature($nextRange, $nextDesired);
+
+                if ($this->isDominated($bestPerNode[$nextNode] ?? [], $nextCost, $nextHops, $signature)) {
+                    continue;
+                }
+
+                if (
+                    $visitedStates >= $this->maxVisitedStates
+                    && !$this->hasStateWithSignature($bestPerNode[$nextNode] ?? [], $signature)
+                ) {
                     continue;
                 }
 
@@ -245,6 +280,9 @@ final class PathFinder
                     'conversionRate' => $conversionRate,
                 ];
 
+                $nextVisited = $state['visited'];
+                $nextVisited[$nextNode] = true;
+
                 $nextState = [
                     'node' => $nextNode,
                     'cost' => $nextCost,
@@ -253,9 +291,21 @@ final class PathFinder
                     'path' => $nextPath,
                     'amountRange' => $nextRange,
                     'desiredAmount' => $nextDesired,
+                    'visited' => $nextVisited,
                 ];
 
-                $this->recordState($bestPerNode, $nextNode, $nextCost, $nextHops, $nextRange, $nextDesired);
+                $visitedStates = max(
+                    0,
+                    $visitedStates + $this->recordState(
+                        $bestPerNode,
+                        $nextNode,
+                        $nextCost,
+                        $nextHops,
+                        $nextRange,
+                        $nextDesired,
+                        $signature,
+                    ),
+                );
 
                 $queue->insert($nextState, ['cost' => $nextCost, 'order' => $insertionOrder++]);
             }
@@ -270,12 +320,9 @@ final class PathFinder
 
     /**
      * @param list<array{cost: string, hops: int, signature: string}> $existing
-     * @param array{min: Money, max: Money}|null                      $range
      */
-    private function isDominated(array $existing, string $cost, int $hops, ?array $range, ?Money $desired): bool
+    private function isDominated(array $existing, string $cost, int $hops, string $signature): bool
     {
-        $signature = $this->stateSignature($range, $desired);
-
         foreach ($existing as $state) {
             if ($state['signature'] !== $signature) {
                 continue;
@@ -295,11 +342,21 @@ final class PathFinder
     /**
      * @param array<string, list<array{cost: string, hops: int, signature: string}>> $registry
      * @param array{min: Money, max: Money}|null                                     $range
+     *
+     * @return int net change in the number of tracked states
      */
-    private function recordState(array &$registry, string $node, string $cost, int $hops, ?array $range, ?Money $desired): void
-    {
-        $signature = $this->stateSignature($range, $desired);
+    private function recordState(
+        array &$registry,
+        string $node,
+        string $cost,
+        int $hops,
+        ?array $range,
+        ?Money $desired,
+        ?string $signature = null
+    ): int {
+        $signature ??= $this->stateSignature($range, $desired);
         $existing = $registry[$node] ?? [];
+        $removed = 0;
 
         foreach ($existing as $index => $state) {
             if ($state['signature'] !== $signature) {
@@ -311,11 +368,14 @@ final class PathFinder
                 && $hops <= $state['hops']
             ) {
                 unset($existing[$index]);
+                ++$removed;
             }
         }
 
         $existing[] = ['cost' => $cost, 'hops' => $hops, 'signature' => $signature];
         $registry[$node] = array_values($existing);
+
+        return 1 - $removed;
     }
 
     /**
@@ -356,6 +416,20 @@ final class PathFinder
         $normalized = $amount->withScale($scale);
 
         return sprintf('%s:%s:%d', $normalized->currency(), $normalized->amount(), $scale);
+    }
+
+    /**
+     * @param list<array{cost: string, hops: int, signature: string}> $existing
+     */
+    private function hasStateWithSignature(array $existing, string $signature): bool
+    {
+        foreach ($existing as $state) {
+            if ($state['signature'] === $signature) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -18,6 +18,8 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
+use function array_unique;
+
 final class PathFinderTest extends TestCase
 {
     private const SCALE = 18;
@@ -856,6 +858,117 @@ final class PathFinderTest extends TestCase
         ];
     }
 
+    public function test_it_prevents_cycles_by_tracking_assets(): void
+    {
+        $orders = [
+            OrderFactory::sell('MID', 'SRC', '1.000', '1.000', '1.000', 3, 3),
+            OrderFactory::sell('SRC', 'MID', '1.000', '1.000', '1.000', 3, 3),
+            OrderFactory::sell('DST', 'MID', '1.000', '1.000', '1.000', 3, 3),
+        ];
+
+        $graph = (new GraphBuilder())->build($orders);
+
+        $finder = new PathFinder(maxHops: 4, tolerance: 0.0);
+        $results = $finder->findBestPaths($graph, 'SRC', 'DST');
+
+        self::assertNotSame([], $results);
+        $best = $results[0];
+
+        $assetTrail = ['SRC'];
+        foreach ($best['edges'] as $edge) {
+            $assetTrail[] = $edge['to'];
+        }
+
+        self::assertSame($assetTrail, array_unique($assetTrail), 'Paths should not revisit identical assets.');
+    }
+
+    public function test_it_enforces_expansion_guard_on_dense_graph(): void
+    {
+        $orders = self::createDenseLayeredOrders(3, 3);
+        $graph = (new GraphBuilder())->build($orders);
+
+        $guardedFinder = new PathFinder(
+            maxHops: 5,
+            tolerance: 0.0,
+            topK: 1,
+            maxExpansions: 1,
+            maxVisitedStates: 100,
+        );
+
+        self::assertSame([], $guardedFinder->findBestPaths($graph, 'SRC', 'DST'));
+
+        $relaxedFinder = new PathFinder(
+            maxHops: 5,
+            tolerance: 0.0,
+            topK: 1,
+            maxExpansions: 20000,
+            maxVisitedStates: 20000,
+        );
+
+        $results = $relaxedFinder->findBestPaths($graph, 'SRC', 'DST');
+
+        self::assertNotSame([], $results);
+        self::assertGreaterThan(0, $results[0]['hops']);
+    }
+
+    public function test_it_enforces_visited_guard_on_dense_graph(): void
+    {
+        $orders = self::createDenseLayeredOrders(2, 4);
+        $graph = (new GraphBuilder())->build($orders);
+
+        $guardedFinder = new PathFinder(
+            maxHops: 4,
+            tolerance: 0.0,
+            topK: 1,
+            maxExpansions: 100,
+            maxVisitedStates: 1,
+        );
+
+        self::assertSame([], $guardedFinder->findBestPaths($graph, 'SRC', 'DST'));
+
+        $relaxedFinder = new PathFinder(
+            maxHops: 4,
+            tolerance: 0.0,
+            topK: 1,
+            maxExpansions: 10000,
+            maxVisitedStates: 10000,
+        );
+
+        $results = $relaxedFinder->findBestPaths($graph, 'SRC', 'DST');
+
+        self::assertNotSame([], $results);
+    }
+
+    /**
+     * @return list<Order>
+     */
+    private static function createDenseLayeredOrders(int $depth, int $fanout): array
+    {
+        $orders = [];
+        $currentLayer = ['SRC'];
+        $counter = 0;
+
+        for ($layer = 1; $layer <= $depth; ++$layer) {
+            $nextLayer = [];
+
+            foreach ($currentLayer as $index => $asset) {
+                for ($i = 0; $i < $fanout; ++$i) {
+                    $nextAsset = self::syntheticCurrency($counter++);
+                    $orders[] = OrderFactory::sell($nextAsset, $asset, '1.000', '1.000', '1.000', 3, 3);
+                    $nextLayer[] = $nextAsset;
+                }
+            }
+
+            $currentLayer = $nextLayer;
+        }
+
+        foreach ($currentLayer as $asset) {
+            $orders[] = OrderFactory::sell('DST', $asset, '1.000', '1.000', '1.000', 3, 3);
+        }
+
+        return $orders;
+    }
+
     /**
      * @return list<Order>
      */
@@ -1089,5 +1202,16 @@ final class PathFinderTest extends TestCase
     private static function formatAmount(float $amount): string
     {
         return number_format($amount, 3, '.', '');
+    }
+
+    private static function syntheticCurrency(int $index): string
+    {
+        $alphabet = range('A', 'Z');
+
+        $first = intdiv($index, 26 * 26) % 26;
+        $second = intdiv($index, 26) % 26;
+        $third = $index % 26;
+
+        return $alphabet[$first].$alphabet[$second].$alphabet[$third];
     }
 }

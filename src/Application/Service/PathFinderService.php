@@ -70,7 +70,13 @@ final class PathFinderService
             return [];
         }
 
-        $pathFinder = new PathFinder($config->maximumHops(), $config->pathFinderTolerance(), $config->resultLimit());
+        $pathFinder = new PathFinder(
+            $config->maximumHops(),
+            $config->pathFinderTolerance(),
+            $config->resultLimit(),
+            $config->pathFinderMaxExpansions(),
+            $config->pathFinderMaxVisitedStates(),
+        );
 
         $materializedResults = [];
         $resultOrder = 0;
