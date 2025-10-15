@@ -33,6 +33,7 @@ jobs:
         uses: ramsey/composer-install@v3
         with:
           composer-options: --prefer-dist --no-interaction --no-progress
+          custom-cache-suffix: ${{ hashFiles('composer.json') }}
 
       - name: Run PHPUnit with coverage
         run: |

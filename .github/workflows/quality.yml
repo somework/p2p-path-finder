@@ -22,6 +22,7 @@ jobs:
       - uses: ramsey/composer-install@v3
         with:
           composer-options: --prefer-dist --no-interaction --no-progress
+          custom-cache-suffix: ${{ hashFiles('composer.json') }}
       - name: Run PHPStan at max level
         run: vendor/bin/phpstan analyse --configuration=phpstan.neon.dist --level=max
 
@@ -38,6 +39,7 @@ jobs:
       - uses: ramsey/composer-install@v3
         with:
           composer-options: --prefer-dist --no-interaction --no-progress
+          custom-cache-suffix: ${{ hashFiles('composer.json') }}
       - name: Run php-cs-fixer dry-run
         run: vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php --dry-run --diff
 
@@ -55,6 +57,7 @@ jobs:
       - uses: ramsey/composer-install@v3
         with:
           composer-options: --prefer-dist --no-interaction --no-progress
+          custom-cache-suffix: ${{ hashFiles('composer.json') }}
       - name: Run Infection smoke test
         run: vendor/bin/infection --threads=4 --min-msi=0 --min-covered-msi=0 --log-verbosity=none
         env:
@@ -73,5 +76,6 @@ jobs:
       - uses: ramsey/composer-install@v3
         with:
           composer-options: --prefer-dist --no-interaction --no-progress
+          custom-cache-suffix: ${{ hashFiles('composer.json') }}
       - name: Run PhpBench smoke suite
         run: vendor/bin/phpbench run --config=phpbench.json.dist --progress=none --report=aggregate --iterations=1 --revs=1

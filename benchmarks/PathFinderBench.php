@@ -33,22 +33,22 @@ class PathFinderBench
         $orderSet = [];
         $orderSet[] = new Order(
             OrderSide::SELL,
-            AssetPair::fromString('USD', 'USDT'),
+            AssetPair::fromString('USD', 'BTC'),
             OrderBounds::from(
                 Money::fromString('USD', '10.00', 2),
                 Money::fromString('USD', '1000.00', 2),
             ),
-            ExchangeRate::fromString('USD', 'USDT', '1.0000', 4),
+            ExchangeRate::fromString('USD', 'BTC', '1.0000', 4),
         );
 
         $orderSet[] = new Order(
             OrderSide::SELL,
-            AssetPair::fromString('USDT', 'EUR'),
+            AssetPair::fromString('BTC', 'EUR'),
             OrderBounds::from(
-                Money::fromString('USDT', '50.00', 2),
-                Money::fromString('USDT', '5000.00', 2),
+                Money::fromString('BTC', '50.00', 2),
+                Money::fromString('BTC', '5000.00', 2),
             ),
-            ExchangeRate::fromString('USDT', 'EUR', '0.92', 8),
+            ExchangeRate::fromString('BTC', 'EUR', '0.92', 8),
         );
 
         $orderSet[] = new Order(
