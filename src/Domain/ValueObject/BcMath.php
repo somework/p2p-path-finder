@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
 use InvalidArgumentException;
+use RuntimeException;
 
 use function bcadd;
 use function bccomp;
 use function bcdiv;
 use function bcmul;
 use function bcsub;
+use function extension_loaded;
 use function ltrim;
 use function max;
 use function preg_match;
@@ -27,6 +29,8 @@ use function substr;
 final class BcMath
 {
     private const DEFAULT_SCALE = 8;
+
+    private static bool $extensionVerified = false;
 
     private function __construct()
     {
@@ -63,6 +67,7 @@ final class BcMath
      */
     public static function normalize(string $value, int $scale): string
     {
+        self::ensureExtensionAvailable();
         self::ensureScale($scale);
         self::ensureNumeric($value);
 
@@ -74,6 +79,7 @@ final class BcMath
      */
     public static function add(string $left, string $right, int $scale): string
     {
+        self::ensureExtensionAvailable();
         self::ensureScale($scale);
         self::ensureNumeric($left, $right);
 
@@ -89,6 +95,7 @@ final class BcMath
      */
     public static function sub(string $left, string $right, int $scale): string
     {
+        self::ensureExtensionAvailable();
         self::ensureScale($scale);
         self::ensureNumeric($left, $right);
 
@@ -104,6 +111,7 @@ final class BcMath
      */
     public static function mul(string $left, string $right, int $scale): string
     {
+        self::ensureExtensionAvailable();
         self::ensureScale($scale);
         self::ensureNumeric($left, $right);
 
@@ -119,6 +127,7 @@ final class BcMath
      */
     public static function div(string $left, string $right, int $scale): string
     {
+        self::ensureExtensionAvailable();
         self::ensureScale($scale);
         self::ensureNumeric($left, $right);
         self::ensureNonZero($right);
@@ -135,6 +144,7 @@ final class BcMath
      */
     public static function comp(string $left, string $right, int $scale): int
     {
+        self::ensureExtensionAvailable();
         self::ensureScale($scale);
         self::ensureNumeric($left, $right);
 
@@ -148,6 +158,7 @@ final class BcMath
      */
     public static function round(string $value, int $scale): string
     {
+        self::ensureExtensionAvailable();
         self::ensureScale($scale);
         self::ensureNumeric($value);
 
@@ -173,6 +184,8 @@ final class BcMath
      */
     public static function scaleForComparison(string $first, string $second, int $fallbackScale = self::DEFAULT_SCALE): int
     {
+        self::ensureExtensionAvailable();
+
         return self::workingScaleForComparison($first, $second, $fallbackScale);
     }
 
@@ -198,12 +211,26 @@ final class BcMath
 
     private static function ensureNonZero(string $value): void
     {
+        self::ensureExtensionAvailable();
         self::ensureNumeric($value);
         $scale = max(self::scaleOf($value), 1);
 
         if (0 === bccomp($value, '0', $scale)) {
             throw new InvalidArgumentException('Division by zero.');
         }
+    }
+
+    private static function ensureExtensionAvailable(): void
+    {
+        if (self::$extensionVerified) {
+            return;
+        }
+
+        if (!extension_loaded('bcmath')) {
+            throw new RuntimeException('The BCMath extension (ext-bcmath) is required. Install it or require symfony/polyfill-bcmath when the extension cannot be loaded.');
+        }
+
+        self::$extensionVerified = true;
     }
 
     private static function workingScaleForAddition(string $left, string $right, int $scale): int

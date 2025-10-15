@@ -4,6 +4,11 @@ A small toolkit for discovering optimal peer-to-peer conversion paths across a s
 orders. The package focuses on deterministic arithmetic, declarative configuration and
 clear separation between the domain model and application services.
 
+## Requirements
+
+* PHP 8.2 or newer.
+* The [BCMath extension](https://www.php.net/manual/en/book.bc.php) (`ext-bcmath`). When installing the extension is not possible, require [`symfony/polyfill-bcmath`](https://github.com/symfony/polyfill-bcmath) to emulate the necessary functions.
+
 ## Architecture overview
 
 The codebase is intentionally split into two layers:

@@ -8,7 +8,8 @@
         }
     ],
     "require": {
-        "php": "^8.2"
+        "php": "^8.2",
+        "ext-bcmath": "*"
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.58",
@@ -31,7 +32,13 @@
         "phpunit": "vendor/bin/phpunit",
         "phpdoc": "php bin/generate-phpdoc.php"
     },
+    "suggest": {
+        "symfony/polyfill-bcmath": "Provides BCMath functions when the extension cannot be installed."
+    },
     "config": {
-        "sort-packages": true
+        "sort-packages": true,
+        "platform": {
+            "ext-bcmath": "0"
+        }
     }
 }
