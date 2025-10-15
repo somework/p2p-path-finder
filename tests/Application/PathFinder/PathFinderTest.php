@@ -22,6 +22,44 @@ final class PathFinderTest extends TestCase
     private const SCALE = 18;
 
     /**
+     * @dataProvider provideInvalidMaxHops
+     */
+    public function test_it_requires_positive_max_hops(int $invalidMaxHops): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new PathFinder($invalidMaxHops, 0.0);
+    }
+
+    /**
+     * @return iterable<string, array{int}>
+     */
+    public static function provideInvalidMaxHops(): iterable
+    {
+        yield 'zero' => [0];
+        yield 'negative' => [-3];
+    }
+
+    /**
+     * @dataProvider provideInvalidTolerances
+     */
+    public function test_it_requires_tolerance_within_expected_range(float $invalidTolerance): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new PathFinder(1, $invalidTolerance);
+    }
+
+    /**
+     * @return iterable<string, array{float}>
+     */
+    public static function provideInvalidTolerances(): iterable
+    {
+        yield 'negative' => [-0.001];
+        yield 'greater_than_or_equal_to_one' => [1.0];
+    }
+
+    /**
      * @dataProvider provideRubToIdrConstraintScenarios
      *
      * @param list<array{from: string, to: string}> $expectedRoute
