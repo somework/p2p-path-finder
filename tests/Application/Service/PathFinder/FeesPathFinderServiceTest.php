@@ -28,9 +28,10 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 2)
             ->build();
 
-        $result = $this->makeService()->findBestPath($orderBook, $config, 'JPY');
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'JPY');
 
-        self::assertNotNull($result);
+        self::assertNotSame([], $results);
+        $result = $results[0];
 
         $legs = $result->legs();
         self::assertCount(2, $legs);
@@ -80,9 +81,11 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $result = $this->makeService()->findBestPath($orderBook, $config, 'BTC');
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'BTC');
 
-        self::assertNotNull($result);
+        self::assertNotSame([], $results);
+        $result = $results[0];
+
         self::assertSame('BTC', $result->totalReceived()->currency());
         self::assertSame('0.900', $result->totalReceived()->amount());
 
@@ -113,9 +116,10 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $result = $this->makeService()->findBestPath($orderBook, $config, 'USD');
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
 
-        self::assertNotNull($result);
+        self::assertNotSame([], $results);
+        $result = $results[0];
 
         $legs = $result->legs();
         self::assertCount(1, $legs);
@@ -151,9 +155,10 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $result = $this->makeService()->findBestPath($orderBook, $config, 'USD');
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
 
-        self::assertNotNull($result);
+        self::assertNotSame([], $results);
+        $result = $results[0];
         self::assertSame('EUR', $result->totalSpent()->currency());
         self::assertSame('102.000', $result->totalSpent()->amount());
         self::assertSame('USD', $result->totalReceived()->currency());
@@ -195,9 +200,10 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 3)
             ->build();
 
-        $result = $this->makeService()->findBestPath($orderBook, $config, 'JPY');
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'JPY');
 
-        self::assertNotNull($result);
+        self::assertNotSame([], $results);
+        $result = $results[0];
         self::assertSame('EUR', $result->totalSpent()->currency());
         self::assertSame('100.000', $result->totalSpent()->amount());
         self::assertSame('JPY', $result->totalReceived()->currency());
@@ -250,9 +256,10 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 3)
             ->build();
 
-        $result = $this->makeService()->findBestPath($orderBook, $config, 'JPY');
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'JPY');
 
-        self::assertNotNull($result);
+        self::assertNotSame([], $results);
+        $result = $results[0];
 
         $legs = $result->legs();
         self::assertCount(2, $legs);
@@ -290,9 +297,10 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $result = $this->makeService()->findBestPath($orderBook, $config, 'USD');
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
 
-        self::assertNotNull($result);
+        self::assertNotSame([], $results);
+        $result = $results[0];
         self::assertSame('USD', $result->totalReceived()->currency());
         self::assertSame('118.800', $result->totalReceived()->amount());
 
@@ -318,9 +326,10 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $result = $this->makeService()->findBestPath($orderBook, $config, 'USD');
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
 
-        self::assertNotNull($result);
+        self::assertNotSame([], $results);
+        $result = $results[0];
 
         $legs = $result->legs();
         self::assertCount(1, $legs);
@@ -366,9 +375,10 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 2)
             ->build();
 
-        $result = $this->makeService()->findBestPath($orderBook, $config, 'BTC');
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'BTC');
 
-        self::assertNotNull($result);
+        self::assertNotSame([], $results);
+        $result = $results[0];
 
         $legs = $result->legs();
         self::assertCount(2, $legs);
@@ -421,7 +431,7 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 2)
             ->build();
 
-        self::assertNull($this->makeService()->findBestPath($orderBook, $config, 'BTC'));
+        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'BTC'));
     }
 
     /**
@@ -437,9 +447,10 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 2)
             ->build();
 
-        $result = $this->makeService()->findBestPath($orderBook, $config, 'JPY');
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'JPY');
 
-        self::assertNotNull($result);
+        self::assertNotSame([], $results);
+        $result = $results[0];
         self::assertSame('JPY', $result->totalReceived()->currency());
         self::assertSame('16632.000', $result->totalReceived()->amount());
 
@@ -480,7 +491,7 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        self::assertNull($this->makeService()->findBestPath($orderBook, $config, 'USD'));
+        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'USD'));
     }
 
     private function scenarioEurToJpyBridgeWithLegFees(): OrderBook

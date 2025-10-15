@@ -25,6 +25,8 @@ final class PathSearchConfigBuilder
 
     private ?int $maximumHops = null;
 
+    private int $resultLimit = 1;
+
     /**
      * Sets the amount of the source asset that will be spent during path search.
      */
@@ -74,6 +76,20 @@ final class PathSearchConfigBuilder
     }
 
     /**
+     * Limits how many paths should be returned by the search service.
+     */
+    public function withResultLimit(int $limit): self
+    {
+        if ($limit < 1) {
+            throw new InvalidArgumentException('Result limit must be at least one.');
+        }
+
+        $this->resultLimit = $limit;
+
+        return $this;
+    }
+
+    /**
      * Builds a validated {@see PathSearchConfig} instance.
      */
     public function build(): PathSearchConfig
@@ -96,6 +112,7 @@ final class PathSearchConfigBuilder
             $this->maximumTolerance,
             $this->minimumHops,
             $this->maximumHops,
+            $this->resultLimit,
         );
     }
 }

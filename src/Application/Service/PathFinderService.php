@@ -14,6 +14,7 @@ use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 
 use function strtoupper;
+use function usort;
 
 /**
  * High level facade orchestrating order filtering, graph building and path search.
@@ -45,9 +46,11 @@ final class PathFinderService
     }
 
     /**
-     * Searches for the best conversion path from the configured spend asset to the target asset.
+     * Searches for the best conversion paths from the configured spend asset to the target asset.
+     *
+     * @return list<PathResult>
      */
-    public function findBestPath(OrderBook $orderBook, PathSearchConfig $config, string $targetAsset): ?PathResult
+    public function findBestPaths(OrderBook $orderBook, PathSearchConfig $config, string $targetAsset): array
     {
         if ('' === $targetAsset) {
             throw new InvalidArgumentException('Target asset cannot be empty.');
@@ -59,19 +62,19 @@ final class PathFinderService
 
         $orders = $this->orderSpendAnalyzer->filterOrders($orderBook, $config);
         if ([] === $orders) {
-            return null;
+            return [];
         }
 
         $graph = $this->graphBuilder->build($orders);
         if (!isset($graph[$sourceCurrency], $graph[$targetCurrency])) {
-            return null;
+            return [];
         }
 
-        $pathFinder = new PathFinder($config->maximumHops(), $config->pathFinderTolerance());
+        $pathFinder = new PathFinder($config->maximumHops(), $config->pathFinderTolerance(), $config->resultLimit());
 
-        $materializedResult = null;
-        $materializedCost = null;
-        $pathFinder->findBestPath(
+        $materializedResults = [];
+        $resultOrder = 0;
+        $pathFinder->findBestPaths(
             $graph,
             $sourceCurrency,
             $targetCurrency,
@@ -80,7 +83,7 @@ final class PathFinderService
                 'max' => $config->maximumSpendAmount(),
                 'desired' => $requestedSpend,
             ],
-            function (array $candidate) use (&$materializedResult, &$materializedCost, $config, $sourceCurrency, $targetCurrency, $requestedSpend) {
+            function (array $candidate) use (&$materializedResults, &$resultOrder, $config, $sourceCurrency, $targetCurrency, $requestedSpend) {
                 if ($candidate['hops'] < $config->minimumHops() || $candidate['hops'] > $config->maximumHops()) {
                     return false;
                 }
@@ -120,27 +123,51 @@ final class PathFinderService
                     return false;
                 }
 
-                $result = new PathResult(
-                    $materialized['totalSpent'],
-                    $materialized['totalReceived'],
-                    $residual,
-                    $materialized['legs'],
-                    $materialized['feeBreakdown'],
-                );
-
-                if (null === $materializedCost || -1 === BcMath::comp($candidate['cost'], $materializedCost, self::COST_SCALE)) {
-                    $materializedCost = $candidate['cost'];
-                    $materializedResult = $result;
-                }
+                $materializedResults[] = [
+                    'cost' => $candidate['cost'],
+                    'order' => $resultOrder++,
+                    'result' => new PathResult(
+                        $materialized['totalSpent'],
+                        $materialized['totalReceived'],
+                        $residual,
+                        $materialized['legs'],
+                        $materialized['feeBreakdown'],
+                    ),
+                ];
 
                 return true;
             }
         );
 
-        if (null === $materializedResult) {
-            return null;
+        if ([] === $materializedResults) {
+            return [];
         }
 
-        return $materializedResult;
+        usort(
+            $materializedResults,
+            static function (array $left, array $right): int {
+                $comparison = BcMath::comp($left['cost'], $right['cost'], self::COST_SCALE);
+                if (0 !== $comparison) {
+                    return $comparison;
+                }
+
+                return $left['order'] <=> $right['order'];
+            },
+        );
+
+        return array_map(
+            static fn (array $entry): PathResult => $entry['result'],
+            $materializedResults,
+        );
+    }
+
+    /**
+     * @deprecated Use {@see PathFinderService::findBestPaths()} instead.
+     */
+    public function findBestPath(OrderBook $orderBook, PathSearchConfig $config, string $targetAsset): ?PathResult
+    {
+        $results = $this->findBestPaths($orderBook, $config, $targetAsset);
+
+        return $results[0] ?? null;
     }
 }
