@@ -54,6 +54,28 @@ final class PathResultFormatter
     }
 
     /**
+     * @param list<PathResult> $results
+     *
+     * @return list<array{
+     *     totalSpent: array{currency: string, amount: string, scale: int},
+     *     totalReceived: array{currency: string, amount: string, scale: int},
+     *     residualTolerance: float,
+     *     feeBreakdown: array<string, array{currency: string, amount: string, scale: int}>,
+     *     legs: list<array{
+     *         from: string,
+     *         to: string,
+     *         spent: array{currency: string, amount: string, scale: int},
+     *         received: array{currency: string, amount: string, scale: int},
+     *         fees: array<string, array{currency: string, amount: string, scale: int}>,
+     *     }>,
+     * }>
+     */
+    public function formatMachineCollection(array $results): array
+    {
+        return array_map(fn (PathResult $result): array => $this->formatMachine($result), $results);
+    }
+
+    /**
      * Produces a multi-line human readable summary of the conversion path.
      */
     public function formatHuman(PathResult $result): string
@@ -81,6 +103,23 @@ final class PathResultFormatter
         }
 
         return implode(PHP_EOL, $lines);
+    }
+
+    /**
+     * @param list<PathResult> $results
+     */
+    public function formatHumanCollection(array $results): string
+    {
+        if ([] === $results) {
+            return 'No paths available.';
+        }
+
+        $blocks = [];
+        foreach ($results as $index => $result) {
+            $blocks[] = sprintf('Path %d:%s%s', $index + 1, PHP_EOL, $this->formatHuman($result));
+        }
+
+        return implode(PHP_EOL.PHP_EOL, $blocks);
     }
 
     /**

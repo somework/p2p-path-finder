@@ -25,6 +25,7 @@ final class PathSearchConfig
         private readonly float $maximumTolerance,
         private readonly int $minimumHops,
         private readonly int $maximumHops,
+        private readonly int $resultLimit = 1,
     ) {
         if ($minimumTolerance < 0.0 || $minimumTolerance >= 1.0) {
             throw new InvalidArgumentException('Minimum tolerance must be in the [0, 1) range.');
@@ -40,6 +41,10 @@ final class PathSearchConfig
 
         if ($maximumHops < $minimumHops) {
             throw new InvalidArgumentException('Maximum hops must be greater than or equal to minimum hops.');
+        }
+
+        if ($resultLimit < 1) {
+            throw new InvalidArgumentException('Result limit must be at least one.');
         }
 
         $this->minimumSpendAmount = $this->calculateBoundedSpend(1.0 - $minimumTolerance);
@@ -92,6 +97,14 @@ final class PathSearchConfig
     public function maximumHops(): int
     {
         return $this->maximumHops;
+    }
+
+    /**
+     * Returns the maximum number of paths that should be returned by the search.
+     */
+    public function resultLimit(): int
+    {
+        return $this->resultLimit;
     }
 
     /**

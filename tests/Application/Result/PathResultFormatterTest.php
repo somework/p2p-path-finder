@@ -35,12 +35,17 @@ final class PathResultFormatterTest extends TestCase
         $formatter = new PathResultFormatter();
 
         $this->assertSame($result->jsonSerialize(), $formatter->formatMachine($result));
+        $this->assertSame([
+            $result->jsonSerialize(),
+        ], $formatter->formatMachineCollection([$result]));
 
         $expectedHuman = 'Total spent: USD 100.00; total received: EUR 95.00; total fees: USD 1.50; residual tolerance: 2.50%.'.PHP_EOL
             .'Legs:'.PHP_EOL
             .'  1. USD -> EUR | Spent USD 100.00 | Received EUR 95.00 | Fees USD 1.50';
 
         $this->assertSame($expectedHuman, $formatter->formatHuman($result));
+        $this->assertSame('Path 1:'.PHP_EOL.$expectedHuman, $formatter->formatHumanCollection([$result]));
+        $this->assertSame('No paths available.', $formatter->formatHumanCollection([]));
     }
 
     public function test_formatting_without_fees(): void

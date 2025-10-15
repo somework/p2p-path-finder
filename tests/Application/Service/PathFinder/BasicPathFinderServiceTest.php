@@ -25,9 +25,11 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 3)
             ->build();
 
-        $result = $this->makeService()->findBestPath($orderBook, $config, 'JPY');
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'JPY');
 
-        self::assertNotNull($result);
+        self::assertNotSame([], $results);
+        $result = $results[0];
+
         self::assertSame('EUR', $result->totalSpent()->currency());
         self::assertSame('100.000', $result->totalSpent()->amount());
         self::assertSame('JPY', $result->totalReceived()->currency());
@@ -64,7 +66,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Target asset cannot be empty.');
 
-        $this->makeService()->findBestPath($orderBook, $config, '');
+        $this->makeService()->findBestPaths($orderBook, $config, '');
     }
 
     /**
@@ -82,7 +84,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        self::assertNull($this->makeService()->findBestPath($orderBook, $config, 'JPY'));
+        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'JPY'));
     }
 
     /**
@@ -98,9 +100,11 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 3)
             ->build();
 
-        $result = $this->makeService()->findBestPath($orderBook, $config, 'USD');
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
 
-        self::assertNotNull($result);
+        self::assertNotSame([], $results);
+        $result = $results[0];
+
         self::assertSame('EUR', $result->totalSpent()->currency());
         self::assertSame('100.000', $result->totalSpent()->amount());
         self::assertSame('USD', $result->totalReceived()->currency());
@@ -132,9 +136,11 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 3)
             ->build();
 
-        $result = $this->makeService()->findBestPath($orderBook, $config, 'USD');
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
 
-        self::assertNotNull($result);
+        self::assertNotSame([], $results);
+        $result = $results[0];
+
         self::assertSame('EUR', $result->totalSpent()->currency());
         self::assertSame('100.000', $result->totalSpent()->amount());
         self::assertSame('USD', $result->totalReceived()->currency());
@@ -152,6 +158,45 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('USD', $legs[1]->to());
         self::assertSame('142.900', $legs[1]->spent()->amount());
         self::assertSame('178.625', $legs[1]->received()->amount());
+    }
+
+    public function test_it_returns_multiple_paths_ordered_by_cost(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '500.000', '0.900', 3),
+            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '10.000', '500.000', '0.850', 3),
+            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '10.000', '500.000', '0.900', 3),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.05)
+            ->withHopLimits(1, 2)
+            ->withResultLimit(2)
+            ->build();
+
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+
+        self::assertCount(2, $results);
+
+        $first = $results[0];
+        $second = $results[1];
+
+        self::assertSame('USD', $first->totalReceived()->currency());
+        self::assertSame('USD', $second->totalReceived()->currency());
+        self::assertTrue($first->totalReceived()->greaterThan($second->totalReceived()));
+
+        $firstLegs = $first->legs();
+        self::assertCount(1, $firstLegs);
+        self::assertSame('EUR', $firstLegs[0]->from());
+        self::assertSame('USD', $firstLegs[0]->to());
+
+        $secondLegs = $second->legs();
+        self::assertCount(2, $secondLegs);
+        self::assertSame('EUR', $secondLegs[0]->from());
+        self::assertSame('GBP', $secondLegs[0]->to());
+        self::assertSame('GBP', $secondLegs[1]->from());
+        self::assertSame('USD', $secondLegs[1]->to());
     }
 
     private function scenarioEuroToUsdToJpyBridge(): OrderBook

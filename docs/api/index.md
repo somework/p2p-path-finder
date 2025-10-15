@@ -8,7 +8,7 @@ Immutable configuration carrying constraints used by {@see PathFinderService}.
 ### Public methods
 
 ### __construct
-`PathSearchConfig::__construct(SomeWork\P2PPathFinder\Domain\ValueObject\Money $spendAmount, float $minimumTolerance, float $maximumTolerance, int $minimumHops, int $maximumHops)`
+`PathSearchConfig::__construct(SomeWork\P2PPathFinder\Domain\ValueObject\Money $spendAmount, float $minimumTolerance, float $maximumTolerance, int $minimumHops, int $maximumHops, int $resultLimit = 1)`
 
 ### builder
 `PathSearchConfig::builder(): SomeWork\P2PPathFinder\Application\Config\PathSearchConfigBuilder`
@@ -39,6 +39,11 @@ Returns the minimum number of hops allowed in a resulting path.
 `PathSearchConfig::maximumHops(): int`
 
 Returns the maximum number of hops allowed in a resulting path.
+
+### resultLimit
+`PathSearchConfig::resultLimit(): int`
+
+Returns the maximum number of paths that should be returned by the search.
 
 ### minimumSpendAmount
 `PathSearchConfig::minimumSpendAmount(): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
@@ -74,6 +79,11 @@ Configures the acceptable relative deviation from the desired spend amount.
 `PathSearchConfigBuilder::withHopLimits(int $minimumHops, int $maximumHops): self`
 
 Configures the minimum and maximum allowed number of hops in a resulting path.
+
+### withResultLimit
+`PathSearchConfigBuilder::withResultLimit(int $limit): self`
+
+Limits how many paths should be returned by the search service.
 
 ### build
 `PathSearchConfigBuilder::build(): SomeWork\P2PPathFinder\Application\Config\PathSearchConfig`
@@ -166,25 +176,26 @@ Implementation of a tolerance-aware best-path search through the trading graph.
 ### Public methods
 
 ### __construct
-`PathFinder::__construct(int $maxHops = 4, float $tolerance = 0)`
+`PathFinder::__construct(int $maxHops = 4, float $tolerance = 0, int $topK = 1)`
 
-### findBestPath
-`PathFinder::findBestPath(array $graph, string $source, string $target, ?array $spendConstraints = null, ?callable $acceptCandidate = null): ?array`
+### findBestPaths
+`PathFinder::findBestPaths(array $graph, string $source, string $target, ?array $spendConstraints = null, ?callable $acceptCandidate = null): array`
 
-cost: float,
-product: float,
-hops: int,
-edges: list<array{
-from: string,
-to: string,
-order: Order,
-rate: ExchangeRate,
-orderSide: OrderSide,
-conversionRate: float,
-}>,
-amountRange: array{min: Money, max: Money}|null,
-desiredAmount: Money|null,
-}|null
+list<array{
+    cost: float,
+    product: float,
+    hops: int,
+    edges: list<array{
+        from: string,
+        to: string,
+        order: Order,
+        rate: ExchangeRate,
+        orderSide: OrderSide,
+        conversionRate: float,
+    }>,
+    amountRange: array{min: Money, max: Money}|null,
+    desiredAmount: Money|null,
+}>
 
 ## SomeWork\P2PPathFinder\Application\Result\PathLeg
 Describes a single conversion leg in a path finder result.
@@ -295,6 +306,16 @@ fee: array{currency: string, amount: string, scale: int},
 
 Produces a multi-line human readable summary of the conversion path.
 
+### formatMachineCollection
+`PathResultFormatter::formatMachineCollection(array $results): array`
+
+Formats a list of path results into machine-readable payloads.
+
+### formatHumanCollection
+`PathResultFormatter::formatHumanCollection(array $results): string`
+
+Formats a list of path results into a multi-line human readable summary.
+
 ## SomeWork\P2PPathFinder\Application\Service\PathFinderService
 High level facade orchestrating order filtering, graph building and path search.
 
@@ -303,10 +324,15 @@ High level facade orchestrating order filtering, graph building and path search.
 ### __construct
 `PathFinderService::__construct(SomeWork\P2PPathFinder\Application\Graph\GraphBuilder $graphBuilder)`
 
+### findBestPaths
+`PathFinderService::findBestPaths(SomeWork\P2PPathFinder\Application\OrderBook\OrderBook $orderBook, SomeWork\P2PPathFinder\Application\Config\PathSearchConfig $config, string $targetAsset): array`
+
+Searches for the best conversion paths from the configured spend asset to the target asset.
+
 ### findBestPath
 `PathFinderService::findBestPath(SomeWork\P2PPathFinder\Application\OrderBook\OrderBook $orderBook, SomeWork\P2PPathFinder\Application\Config\PathSearchConfig $config, string $targetAsset): ?SomeWork\P2PPathFinder\Application\Result\PathResult`
 
-Searches for the best conversion path from the configured spend asset to the target asset.
+Returns the best path from {@see PathFinderService::findBestPaths()} or `null` when no routes exist.
 
 ## SomeWork\P2PPathFinder\Domain\Order\FeePolicy
 Describes how fees are computed for an order fill.

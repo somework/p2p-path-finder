@@ -105,13 +105,21 @@ $config = PathSearchConfig::builder()
     ->withSpendAmount(Money::fromString('USD', '100.00', 2))
     ->withToleranceBounds(0.00, 0.01)
     ->withHopLimits(1, 2)
+    ->withResultLimit(3)
     ->build();
 
 $service = new PathFinderService(new GraphBuilder());
-$result = $service->findBestPath($orderBook, $config, 'USDT');
+$results = $service->findBestPaths($orderBook, $config, 'USDT');
+
+if ($results === []) {
+    throw new RuntimeException('No viable routes found.');
+}
+
+$result = $results[0];
 ```
 
-The resulting `PathResult` contains a single `PathLeg` reflecting the direct USD→USDT
+The resulting array contains `PathResult` objects ordered from lowest to highest cost.
+In this example the first entry contains a single `PathLeg` reflecting the direct USD→USDT
 conversion.
 
 ### Scenario 2 – Selling through an intermediate asset with tight tolerance
@@ -154,19 +162,22 @@ $config = PathSearchConfig::builder()
     ->withHopLimits(2, 3)
     ->build();
 
-$result = (new PathFinderService(new GraphBuilder()))
-    ->findBestPath($orderBook, $config, 'EUR');
+$results = (new PathFinderService(new GraphBuilder()))
+    ->findBestPaths($orderBook, $config, 'EUR');
+
+$topTwo = array_slice($results, 0, 2);
 ```
 
 Because the tolerance window is narrow the service will only accept paths that stay close
-to the configured BTC spend amount while allowing up to three hops.
+to the configured BTC spend amount while allowing up to three hops. By requesting the first
+two results you can present both the optimal and a fallback route to downstream consumers.
 
-Use `PathResultFormatter` to turn the result into machine- or human-friendly output:
+Use `PathResultFormatter` to turn the results into machine- or human-friendly output:
 
 ```php
 $formatter = new PathResultFormatter();
-$payload = $formatter->formatMachine($result);
-echo $formatter->formatHuman($result);
+$payload = $formatter->formatMachineCollection($topTwo);
+echo $formatter->formatHumanCollection($topTwo);
 ```
 
 ## API documentation

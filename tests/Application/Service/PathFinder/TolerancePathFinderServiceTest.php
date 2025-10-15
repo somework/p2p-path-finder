@@ -26,9 +26,10 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $result = $this->makeService()->findBestPath($orderBook, $config, 'USD');
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
 
-        self::assertNotNull($result);
+        self::assertNotSame([], $results);
+        $result = $results[0];
 
         $totalSpent = $result->totalSpent()->withScale(3);
         self::assertSame('EUR', $totalSpent->currency());
@@ -58,9 +59,10 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $result = $this->makeService()->findBestPath($orderBook, $config, 'USD');
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
 
-        self::assertNotNull($result);
+        self::assertNotSame([], $results);
+        $result = $results[0];
 
         $legs = $result->legs();
         self::assertCount(1, $legs);
@@ -103,7 +105,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits($hopLimits[0], $hopLimits[1])
             ->build();
 
-        self::assertNull($this->makeService()->findBestPath($orderBook, $config, $target));
+        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, $target));
     }
 
     public static function toleranceRejectionProvider(): iterable
@@ -168,7 +170,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(3, 3)
             ->build();
 
-        self::assertNull($this->makeService()->findBestPath($orderBook, $config, 'JPY'));
+        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'JPY'));
     }
 
     /**
@@ -186,9 +188,10 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $result = $this->makeService()->findBestPath($orderBook, $config, 'USD');
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
 
-        self::assertNotNull($result);
+        self::assertNotSame([], $results);
+        $result = $results[0];
         self::assertSame('EUR', $result->totalSpent()->currency());
         self::assertSame('7.200', $result->totalSpent()->amount());
         self::assertSame('USD', $result->totalReceived()->currency());
@@ -211,9 +214,10 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $result = $this->makeService()->findBestPath($orderBook, $config, 'USD');
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
 
-        self::assertNotNull($result);
+        self::assertNotSame([], $results);
+        $result = $results[0];
         self::assertSame('EUR', $result->totalSpent()->currency());
         self::assertSame('50.000', $result->totalSpent()->amount());
         self::assertSame('USD', $result->totalReceived()->currency());
@@ -236,9 +240,10 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $result = $this->makeService()->findBestPath($orderBook, $config, 'USD');
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
 
-        self::assertNotNull($result);
+        self::assertNotSame([], $results);
+        $result = $results[0];
         self::assertSame('EUR', $result->totalSpent()->currency());
         self::assertSame('24.000', $result->totalSpent()->amount());
         self::assertSame('USD', $result->totalReceived()->currency());
