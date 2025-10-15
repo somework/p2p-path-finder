@@ -42,4 +42,34 @@ final class PathResultFormatterTest extends TestCase
 
         $this->assertSame($expectedHuman, $formatter->formatHuman($result));
     }
+
+    public function test_formatting_without_fees(): void
+    {
+        $leg = new PathLeg(
+            'usd',
+            'eur',
+            Money::fromString('USD', '100', 2),
+            Money::fromString('EUR', '100', 2),
+        );
+
+        $result = new PathResult(
+            Money::fromString('USD', '100', 2),
+            Money::fromString('EUR', '100', 2),
+            0.015,
+            [$leg],
+            [],
+        );
+
+        $formatter = new PathResultFormatter();
+
+        $this->assertSame($result->jsonSerialize(), $formatter->formatMachine($result));
+
+        $expectedHuman = 'Total spent: USD 100.00; total received: EUR 100.00; total fees: none; residual tolerance: 1.50%.'
+            .PHP_EOL
+            .'Legs:'
+            .PHP_EOL
+            .'  1. USD -> EUR | Spent USD 100.00 | Received EUR 100.00 | Fees none';
+
+        $this->assertSame($expectedHuman, $formatter->formatHuman($result));
+    }
 }
