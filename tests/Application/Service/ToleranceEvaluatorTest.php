@@ -85,6 +85,19 @@ final class ToleranceEvaluatorTest extends TestCase
             0.035,
         ];
 
+        $upperBoundaryConfig = PathSearchConfig::builder()
+            ->withSpendAmount($requested)
+            ->withToleranceBounds(0.01, 0.05)
+            ->withHopLimits(2, 4)
+            ->build();
+
+        yield 'overspend at exact upper tolerance is accepted' => [
+            $upperBoundaryConfig,
+            $requested,
+            $upperBoundaryConfig->maximumSpendAmount(),
+            0.05,
+        ];
+
         $highPrecisionSpend = Money::fromString('BTC', '0.12345678', 8);
 
         yield 'high precision rounding noise remains within tolerance' => [
@@ -138,5 +151,46 @@ final class ToleranceEvaluatorTest extends TestCase
             $requested,
             Money::fromString('EUR', '98.30', 2),
         ];
+    }
+
+    /**
+     * @return iterable<string, array{PathSearchConfig, Money, Money}>
+     */
+    public static function provideOverSpendRejectionCases(): iterable
+    {
+        $requested = Money::fromString('EUR', '100.00', 2);
+
+        yield 'overspend exceeding configured maximum tolerance is rejected' => [
+            PathSearchConfig::builder()
+                ->withSpendAmount($requested)
+                ->withToleranceBounds(0.01, 0.05)
+                ->withHopLimits(1, 3)
+                ->build(),
+            $requested,
+            Money::fromString('EUR', '105.10', 2),
+        ];
+
+        yield 'high precision overspend beyond tolerance is rejected' => [
+            PathSearchConfig::builder()
+                ->withSpendAmount(Money::fromString('BTC', '0.12345678', 8))
+                ->withToleranceBounds(0.0, 0.000002)
+                ->withHopLimits(1, 4)
+                ->build(),
+            Money::fromString('BTC', '0.12345678', 8),
+            Money::fromString('BTC', '0.12345780', 8),
+        ];
+    }
+
+    /**
+     * @dataProvider provideOverSpendRejectionCases
+     */
+    public function test_it_rejects_spend_above_upper_tolerance_window(
+        PathSearchConfig $config,
+        Money $requestedSpend,
+        Money $actualSpend
+    ): void {
+        $evaluator = new ToleranceEvaluator();
+
+        self::assertNull($evaluator->evaluate($config, $requestedSpend, $actualSpend));
     }
 }
