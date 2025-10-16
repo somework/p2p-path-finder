@@ -96,6 +96,64 @@ final class PathFinderHeuristicsTest extends TestCase
         self::assertSame(1, $newEntry['hops']);
     }
 
+    public function test_money_signature_formats_null_and_scaled_amounts(): void
+    {
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+
+        $method = new ReflectionMethod(PathFinder::class, 'moneySignature');
+        $method->setAccessible(true);
+
+        $amount = CurrencyScenarioFactory::money('USD', '3.210', 3);
+
+        self::assertSame('null', $method->invoke($finder, null));
+        self::assertSame('USD:3.210:3', $method->invoke($finder, $amount));
+        self::assertSame('USD:3.21000:5', $method->invoke($finder, $amount, 5));
+    }
+
+    public function test_has_state_with_signature_detects_matching_entries(): void
+    {
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+
+        $signatureMethod = new ReflectionMethod(PathFinder::class, 'stateSignature');
+        $signatureMethod->setAccessible(true);
+
+        $range = [
+            'min' => CurrencyScenarioFactory::money('EUR', '1.00', 2),
+            'max' => CurrencyScenarioFactory::money('EUR', '5.0000', 4),
+        ];
+        $desired = CurrencyScenarioFactory::money('EUR', '2.500', 3);
+        $signature = $signatureMethod->invoke($finder, $range, $desired);
+
+        $method = new ReflectionMethod(PathFinder::class, 'hasStateWithSignature');
+        $method->setAccessible(true);
+
+        $states = [
+            ['cost' => BcMath::normalize('1.000', 18), 'hops' => 1, 'signature' => $signature],
+        ];
+
+        self::assertTrue($method->invoke($finder, $states, $signature));
+        self::assertFalse($method->invoke($finder, $states, $signature.'-mismatch'));
+        self::assertFalse($method->invoke($finder, [], $signature));
+    }
+
+    public function test_state_signature_normalizes_range_and_desired_amounts(): void
+    {
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+
+        $method = new ReflectionMethod(PathFinder::class, 'stateSignature');
+        $method->setAccessible(true);
+
+        $range = [
+            'min' => CurrencyScenarioFactory::money('USD', '1.0', 1),
+            'max' => CurrencyScenarioFactory::money('USD', '5.0000', 4),
+        ];
+        $desired = CurrencyScenarioFactory::money('USD', '2.50', 2);
+
+        $signature = $method->invoke($finder, $range, $desired);
+
+        self::assertSame('range:USD:1.0000:5.0000:4|desired:USD:2.5000:4', $signature);
+    }
+
     public function test_edge_supports_amount_rejects_positive_spend_when_edge_only_supports_zero(): void
     {
         $order = OrderFactory::buy(

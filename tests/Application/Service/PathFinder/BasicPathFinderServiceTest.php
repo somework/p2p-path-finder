@@ -332,6 +332,25 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
     }
 
     /**
+     * @testdox Skips zero-hop candidates when the source and target assets are identical
+     */
+    public function test_it_discards_zero_hop_candidates_when_target_equals_source(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(OrderSide::BUY, 'USD', 'EUR', '10.000', '200.000', '0.900', 3),
+            $this->createOrder(OrderSide::SELL, 'EUR', 'USD', '10.000', '200.000', '1.100', 3),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.0)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'USD'));
+    }
+
+    /**
      * @testdox Provides only the leading result when calling the deprecated single-path helper
      */
     public function test_find_best_path_returns_first_materialized_result(): void
