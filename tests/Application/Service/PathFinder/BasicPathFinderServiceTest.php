@@ -287,6 +287,71 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertNotSame([], $this->makeService()->findBestPaths($orderBook, $relaxedConfig, 'JPY'));
     }
 
+    /**
+     * @testdox Returns no paths when every order is filtered out by spend bounds
+     */
+    public function test_it_returns_empty_result_when_orders_are_filtered_out(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(OrderSide::BUY, 'EUR', 'USD', '200.000', '300.000', '1.100', 3),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.05)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $service = $this->makeService();
+
+        self::assertSame([], $service->findBestPaths($orderBook, $config, 'USD'));
+    }
+
+    /**
+     * @testdox Provides only the leading result when calling the deprecated single-path helper
+     */
+    public function test_find_best_path_returns_first_materialized_result(): void
+    {
+        $orderBook = $this->scenarioCompetingGbpQuotes();
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.15)
+            ->withHopLimits(1, 3)
+            ->withResultLimit(2)
+            ->build();
+
+        $service = $this->makeService();
+
+        $allResults = $service->findBestPaths($orderBook, $config, 'USD');
+        self::assertNotSame([], $allResults);
+
+        $best = $service->findBestPath($orderBook, $config, 'USD');
+
+        self::assertNotNull($best);
+        self::assertSame($allResults[0], $best);
+    }
+
+    /**
+     * @testdox Deprecated single-path helper returns null when no candidates exist
+     */
+    public function test_find_best_path_returns_null_when_no_paths_exist(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '500.000', '0.900', 3),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.0)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $service = $this->makeService();
+
+        self::assertNull($service->findBestPath($orderBook, $config, 'JPY'));
+    }
+
     private function scenarioEuroToUsdToJpyBridge(): OrderBook
     {
         return $this->orderBook(
