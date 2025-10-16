@@ -838,6 +838,7 @@ final class PathFinder
             $normalized = BcMath::normalize($this->formatFloat($tolerance), self::SCALE);
         }
 
+        /** @var numeric-string $upperBound */
         $upperBound = '0.'.str_repeat('9', self::SCALE);
         if (1 === BcMath::comp($normalized, $upperBound, self::SCALE)) {
             return $upperBound;
@@ -904,6 +905,7 @@ final class SearchStateQueue extends SplPriorityQueue
      * @psalm-param SearchState                                               $value
      * @psalm-param array{cost: numeric-string, order: int}|SearchQueueEntry $priority
      */
+    #[\Override]
     public function insert($value, $priority): true
     {
         if (isset($priority['state'], $priority['priority'])) {
@@ -927,6 +929,7 @@ final class SearchStateQueue extends SplPriorityQueue
     /**
      * @psalm-return SearchState
      */
+    #[\Override]
     public function extract(): array
     {
         /** @var SearchQueueEntry $entry */
@@ -942,6 +945,7 @@ final class SearchStateQueue extends SplPriorityQueue
      * @psalm-param SearchQueueEntry $priority1
      * @psalm-param SearchQueueEntry $priority2
      */
+    #[\Override]
     public function compare($priority1, $priority2): int
     {
         $comparison = BcMath::comp($priority1['priority']['cost'], $priority2['priority']['cost'], $this->scale);
@@ -974,6 +978,7 @@ final class CandidateResultHeap extends SplPriorityQueue
      * @psalm-param CandidateHeapEntry $priority1
      * @psalm-param CandidateHeapEntry $priority2
      */
+    #[\Override]
     public function compare($priority1, $priority2): int
     {
         $comparison = BcMath::comp($priority1['cost'], $priority2['cost'], $this->scale);

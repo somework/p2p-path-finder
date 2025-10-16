@@ -109,6 +109,7 @@ final class PathResult implements JsonSerializable
      *     }>,
      * }
      */
+    #[\Override]
     public function jsonSerialize(): array
     {
         $fees = [];

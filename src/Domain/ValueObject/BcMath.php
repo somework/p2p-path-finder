@@ -39,8 +39,8 @@ final class BcMath
     /**
      * Asserts that all provided string values represent numeric quantities.
      *
-     * @param string ...$values
      * @phpstan-assert numeric-string $values
+     *
      * @psalm-assert numeric-string $values
      *
      * @throws InvalidArgumentException when at least one value is not numeric
@@ -198,20 +198,33 @@ final class BcMath
         self::ensureNumeric($value);
 
         if (0 === $scale) {
-            $increment = '' !== $value && '-' === $value[0] ? '-0.5' : '0.5';
+            /** @var numeric-string $increment */
+            $increment = '-' === $value[0] ? '-0.5' : '0.5';
+            self::ensureNumeric($increment);
+            /** @var numeric-string $rounded */
             $rounded = bcadd($value, $increment, 1);
 
-            return bcadd($rounded, '0', 0);
+            /** @var numeric-string $result */
+            $result = bcadd($rounded, '0', 0);
+
+            return $result;
         }
 
+        /** @var numeric-string $increment */
         $increment = '0.'.str_repeat('0', $scale).'5';
-        if ('' !== $value && '-' === $value[0]) {
+        if ('-' === $value[0]) {
             $increment = '-'.$increment;
         }
 
+        self::ensureNumeric($increment);
+
+        /** @var numeric-string $adjusted */
         $adjusted = bcadd($value, $increment, $scale + 1);
 
-        return bcadd($adjusted, '0', $scale);
+        /** @var numeric-string $result */
+        $result = bcadd($adjusted, '0', $scale);
+
+        return $result;
     }
 
     /**

@@ -39,10 +39,15 @@ final class GraphBuilder
      */
     public function build(iterable $orders): array
     {
+        /** @var Graph $graph */
         /** @psalm-var Graph $graph */
         $graph = [];
 
         foreach ($orders as $order) {
+            if (!$order instanceof Order) {
+                continue;
+            }
+
             $pair = $order->assetPair();
 
             [$fromCurrency, $toCurrency] = match ($order->side()) {
@@ -50,10 +55,13 @@ final class GraphBuilder
                 OrderSide::SELL => [$pair->quote(), $pair->base()],
             };
 
-            $this->initializeNode($graph, $fromCurrency);
-            $this->initializeNode($graph, $toCurrency);
+            $graph = $this->initializeNode($graph, $fromCurrency);
+            $graph = $this->initializeNode($graph, $toCurrency);
 
-            $graph[$fromCurrency]['edges'][] = $this->createEdge($order, $fromCurrency, $toCurrency);
+            /** @var array{currency: string, edges: list<GraphEdge>} $fromNode */
+            $fromNode = $graph[$fromCurrency];
+            $fromNode['edges'][] = $this->createEdge($order, $fromCurrency, $toCurrency);
+            $graph[$fromCurrency] = $fromNode;
         }
 
         return $graph;
@@ -63,11 +71,15 @@ final class GraphBuilder
      * @param Graph $graph
      *
      * @psalm-param Graph $graph
+     *
+     * @return Graph
+     *
+     * @psalm-return Graph
      */
-    private function initializeNode(array &$graph, string $currency): void
+    private function initializeNode(array $graph, string $currency): array
     {
         if (array_key_exists($currency, $graph)) {
-            return;
+            return $graph;
         }
 
         /** @psalm-var list<GraphEdge> $edges */
@@ -77,10 +89,14 @@ final class GraphBuilder
             'currency' => $currency,
             'edges' => $edges,
         ];
+
+        return $graph;
     }
 
     /**
      * @return GraphEdge
+     *
+     * @psalm-return GraphEdge
      */
     private function createEdge(Order $order, string $fromCurrency, string $toCurrency): array
     {

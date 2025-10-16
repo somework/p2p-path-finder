@@ -6,7 +6,13 @@
     findUnusedPsalmSuppress="true"
     findUnusedBaselineEntry="true"
     totallyTyped="true"
+    findUnusedCode="false"
 >
+    <issueHandlers>
+        <PossiblyUnusedMethod errorLevel="suppress" />
+        <UnusedClass errorLevel="suppress" />
+        <UnusedConstructor errorLevel="suppress" />
+    </issueHandlers>
     <projectFiles>
         <directory name="src" />
         <ignoreFiles>

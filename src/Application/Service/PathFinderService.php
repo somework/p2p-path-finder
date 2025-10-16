@@ -168,11 +168,8 @@ final class PathFinderService
              */
             static function (array $left, array $right): int {
                 $leftCost = $left['cost'];
-                /** @var numeric-string $leftCost */
-                $leftCost = $leftCost;
                 $rightCost = $right['cost'];
-                /** @var numeric-string $rightCost */
-                $rightCost = $rightCost;
+                BcMath::ensureNumeric($leftCost, $rightCost);
 
                 $comparison = BcMath::comp($leftCost, $rightCost, self::COST_SCALE);
                 if (0 !== $comparison) {

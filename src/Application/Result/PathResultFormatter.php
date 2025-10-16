@@ -70,7 +70,7 @@ final class PathResultFormatter
             $this->formatMoney($result->totalSpent()),
             $this->formatMoney($result->totalReceived()),
             $this->formatFeeSummary($result->feeBreakdown()),
-            number_format($result->residualTolerance() * 100, 2, '.', ''),
+            number_format($result->residualTolerance() * 100.0, 2, '.', ''),
         );
 
         $lines[] = 'Legs:';

@@ -45,6 +45,7 @@ final class ToleranceWindowFilter implements OrderFilterInterface
         $this->upperBound = BcMath::add($referenceRate->rate(), $offset, $this->scale);
     }
 
+    #[\Override]
     public function accepts(Order $order): bool
     {
         $effective = $order->effectiveRate();
