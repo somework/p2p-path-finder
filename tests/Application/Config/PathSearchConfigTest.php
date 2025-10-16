@@ -251,6 +251,65 @@ final class PathSearchConfigTest extends TestCase
         self::assertSame('0.0001', $method->invoke(null, 0.0001001, 4));
     }
 
+    public function test_constructor_enforces_default_limits_and_bounds(): void
+    {
+        $config = new PathSearchConfig(
+            Money::fromString('EUR', '100.00', 2),
+            0.1,
+            0.2,
+            1,
+            3,
+        );
+
+        self::assertSame(1, $config->resultLimit());
+        self::assertSame(PathFinder::DEFAULT_MAX_EXPANSIONS, $config->pathFinderMaxExpansions());
+        self::assertSame(PathFinder::DEFAULT_MAX_VISITED_STATES, $config->pathFinderMaxVisitedStates());
+    }
+
+    public function test_constructor_rejects_tolerance_equal_to_one(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new PathSearchConfig(
+            Money::fromString('EUR', '100.00', 2),
+            1.0,
+            0.2,
+            1,
+            3,
+        );
+    }
+
+    public function test_constructor_rejects_maximum_tolerance_equal_to_one(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new PathSearchConfig(
+            Money::fromString('EUR', '100.00', 2),
+            0.1,
+            1.0,
+            1,
+            3,
+        );
+    }
+
+    public function test_calculate_bounded_spend_retains_guard_scale(): void
+    {
+        $config = new PathSearchConfig(
+            Money::fromString('EUR', '123.45', 2),
+            0.1,
+            0.2,
+            1,
+            3,
+        );
+
+        $method = new ReflectionMethod(PathSearchConfig::class, 'calculateBoundedSpend');
+        $method->setAccessible(true);
+
+        $bounded = $method->invoke($config, 0.50008101);
+
+        self::assertSame('61.74', $bounded->amount());
+    }
+
     public function test_builder_requires_both_tolerance_bounds_to_be_configured(): void
     {
         $builder = PathSearchConfig::builder()

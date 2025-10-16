@@ -171,6 +171,28 @@ final class PathFinderTest extends TestCase
         self::assertGreaterThan(2, count($extendedResults));
     }
 
+    public function test_it_normalizes_endpoint_case_inputs(): void
+    {
+        $orders = self::buildComprehensiveOrderBook();
+        $graph = (new GraphBuilder())->build($orders);
+
+        $finder = new PathFinder(maxHops: 3, tolerance: 0.0);
+        $results = $finder->findBestPaths($graph, 'rub', 'idr');
+
+        self::assertNotSame([], $results);
+    }
+
+    public function test_it_returns_empty_when_target_missing_from_graph(): void
+    {
+        $orders = self::buildComprehensiveOrderBook();
+        $graph = (new GraphBuilder())->build($orders);
+
+        $finder = new PathFinder(maxHops: 3, tolerance: 0.0);
+
+        self::assertSame([], $finder->findBestPaths($graph, 'RUB', 'ZZZ'));
+        self::assertSame([], $finder->findBestPaths($graph, 'zzz', 'IDR'));
+    }
+
     /**
      * @return iterable<string, array{int, float, int, list<array{from: string, to: string}>, string}>
      */
