@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Application\PathFinder\SearchStateQueue;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
@@ -376,5 +377,155 @@ final class PathFinderHeuristicsTest extends TestCase
         $formatted = $method->invoke($finder, -0.0);
 
         self::assertSame('0', $formatted);
+    }
+
+    public function test_record_result_trims_heap_to_requested_limit(): void
+    {
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0, topK: 2);
+
+        $createHeap = new ReflectionMethod(PathFinder::class, 'createResultHeap');
+        $createHeap->setAccessible(true);
+        $heap = $createHeap->invoke($finder);
+
+        $record = new ReflectionMethod(PathFinder::class, 'recordResult');
+        $record->setAccessible(true);
+
+        $finalize = new ReflectionMethod(PathFinder::class, 'finalizeResults');
+        $finalize->setAccessible(true);
+
+        $candidates = [
+            ['cost' => '1.400', 'order' => 0],
+            ['cost' => '0.900', 'order' => 1],
+            ['cost' => '1.050', 'order' => 2],
+        ];
+
+        foreach ($candidates as $candidate) {
+            $normalizedCost = BcMath::normalize($candidate['cost'], 18);
+            $record->invoke(
+                $finder,
+                $heap,
+                [
+                    'cost' => $normalizedCost,
+                    'product' => BcMath::div('1', $normalizedCost, 18),
+                    'hops' => 1,
+                    'edges' => [],
+                    'amountRange' => null,
+                    'desiredAmount' => null,
+                ],
+                $candidate['order'],
+            );
+        }
+
+        $finalized = $finalize->invoke($finder, $heap);
+
+        self::assertCount(2, $finalized);
+        self::assertSame(BcMath::normalize('0.900', 18), $finalized[0]['cost']);
+        self::assertSame(BcMath::normalize('1.050', 18), $finalized[1]['cost']);
+    }
+
+    public function test_record_result_preserves_insertion_order_when_costs_are_equal(): void
+    {
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0, topK: 3);
+
+        $createHeap = new ReflectionMethod(PathFinder::class, 'createResultHeap');
+        $createHeap->setAccessible(true);
+        $heap = $createHeap->invoke($finder);
+
+        $record = new ReflectionMethod(PathFinder::class, 'recordResult');
+        $record->setAccessible(true);
+
+        $finalize = new ReflectionMethod(PathFinder::class, 'finalizeResults');
+        $finalize->setAccessible(true);
+
+        foreach ([0, 1, 2] as $order) {
+            $record->invoke(
+                $finder,
+                $heap,
+                [
+                    'cost' => BcMath::normalize('1.000', 18),
+                    'product' => BcMath::normalize('1.000', 18),
+                    'hops' => $order,
+                    'edges' => [],
+                    'amountRange' => null,
+                    'desiredAmount' => null,
+                ],
+                $order,
+            );
+        }
+
+        $finalized = $finalize->invoke($finder, $heap);
+
+        self::assertCount(3, $finalized);
+        self::assertSame(0, $finalized[0]['hops']);
+        self::assertSame(1, $finalized[1]['hops']);
+        self::assertSame(2, $finalized[2]['hops']);
+    }
+
+    public function test_search_state_queue_prioritizes_lowest_cost_entries(): void
+    {
+        new PathFinder(maxHops: 1, tolerance: 0.0);
+
+        $queue = new SearchStateQueue(18);
+        $queue->insert(
+            [
+                'node' => 'high',
+                'cost' => BcMath::normalize('1.500', 18),
+                'product' => BcMath::normalize('0.666', 18),
+                'hops' => 1,
+                'path' => [],
+                'amountRange' => null,
+                'desiredAmount' => null,
+                'visited' => [],
+            ],
+            ['cost' => BcMath::normalize('1.500', 18), 'order' => 0],
+        );
+
+        $queue->insert(
+            [
+                'node' => 'low',
+                'cost' => BcMath::normalize('0.750', 18),
+                'product' => BcMath::normalize('1.333', 18),
+                'hops' => 1,
+                'path' => [],
+                'amountRange' => null,
+                'desiredAmount' => null,
+                'visited' => [],
+            ],
+            ['cost' => BcMath::normalize('0.750', 18), 'order' => 1],
+        );
+
+        $first = $queue->extract();
+
+        self::assertSame('low', $first['node']);
+    }
+
+    public function test_search_state_queue_prefers_earlier_insertion_when_costs_are_equal(): void
+    {
+        new PathFinder(maxHops: 1, tolerance: 0.0);
+
+        $queue = new SearchStateQueue(18);
+
+        foreach (['first', 'second', 'third'] as $order => $label) {
+            $queue->insert(
+                [
+                    'node' => $label,
+                    'cost' => BcMath::normalize('0.500', 18),
+                    'product' => BcMath::normalize('2.000', 18),
+                    'hops' => 1,
+                    'path' => [],
+                    'amountRange' => null,
+                    'desiredAmount' => null,
+                    'visited' => [],
+                ],
+                ['cost' => BcMath::normalize('0.500', 18), 'order' => $order],
+            );
+        }
+
+        $extracted = [];
+        while (!$queue->isEmpty()) {
+            $extracted[] = $queue->extract()['node'];
+        }
+
+        self::assertSame(['first', 'second', 'third'], $extracted);
     }
 }
