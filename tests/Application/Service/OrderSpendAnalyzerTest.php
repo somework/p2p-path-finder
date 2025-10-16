@@ -131,6 +131,34 @@ final class OrderSpendAnalyzerTest extends TestCase
         self::assertNull($seed);
     }
 
+    public function test_it_rejects_sell_seed_when_quote_fee_eliminates_effective_window(): void
+    {
+        $order = OrderFactory::sell(
+            base: 'BTC',
+            quote: 'USD',
+            minAmount: '1.000',
+            maxAmount: '1.000',
+            rate: '100.00',
+            amountScale: 3,
+            rateScale: 2,
+            feePolicy: FeePolicyFactory::baseAndQuoteSurcharge('0.000000', '0.60', 3),
+        );
+
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $graph['USD']['edges'][0];
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '150.00', 2))
+            ->withToleranceBounds(0.1, 0.1)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $analyzer = new OrderSpendAnalyzer();
+        $seed = $analyzer->determineInitialSpendAmount($config, $edge);
+
+        self::assertNull($seed);
+    }
+
     public function test_it_excludes_orders_outside_spend_bounds(): void
     {
         $config = PathSearchConfig::builder()

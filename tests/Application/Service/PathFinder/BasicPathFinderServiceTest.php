@@ -199,6 +199,45 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('USD', $secondLegs[1]->to());
     }
 
+    public function test_it_enforces_minimum_hop_constraint_before_materialization(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '200.000', '0.900', 3),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.05)
+            ->withHopLimits(2, 3)
+            ->build();
+
+        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'USD'));
+    }
+
+    public function test_it_skips_candidates_when_sell_seed_window_is_empty(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(
+                OrderSide::SELL,
+                'BTC',
+                'USD',
+                '1.000',
+                '1.000',
+                '100.00',
+                2,
+                $this->percentageFeePolicy('0.60'),
+            ),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '150.00', 2))
+            ->withToleranceBounds(0.1, 0.1)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'BTC'));
+    }
+
     public function test_it_honors_path_finder_guard_configuration(): void
     {
         $orderBook = $this->scenarioEuroToUsdToJpyBridge();
