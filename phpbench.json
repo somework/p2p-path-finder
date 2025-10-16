@@ -1,0 +1,29 @@
+{
+    "$schema": "https://phpbench.github.io/schema/config.json",
+    "runner.bootstrap": "vendor/autoload.php",
+    "runner.path": [
+        "benchmarks"
+    ],
+    "runner.iterations": 2,
+    "runner.revs": 1,
+    "runner.retry_threshold": 3,
+    "runner.time_unit": "milliseconds",
+    "runner.progress": "plain",
+    "runner.php_config": {
+        "memory_limit": "-1"
+    },
+    "report.generators": {
+        "aggregate": {
+            "extends": "aggregate",
+            "title": "P2P path finder performance",
+            "cols": [
+                "subject",
+                "set",
+                "mode",
+                "rstdev",
+                "diff_mode",
+                "diff_rstdev"
+            ]
+        }
+    }
+}
