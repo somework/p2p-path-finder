@@ -16,6 +16,8 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 use function array_fill;
 use function array_merge;
+use function str_pad;
+use function strlen;
 
 use PhpBench\Attributes\BeforeMethods;
 use PhpBench\Attributes\ParamProviders;
@@ -193,15 +195,21 @@ class PathFinderBench
 
     private function syntheticCurrency(int &$counter): string
     {
-        $alphabet = range('A', 'Z');
+        $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        $base = strlen($alphabet);
 
         while (true) {
-            $first = intdiv($counter, 26 * 26) % 26;
-            $second = intdiv($counter, 26) % 26;
-            $third = $counter % 26;
-            ++$counter;
+            $value = $counter++;
+            $candidate = '';
 
-            $candidate = $alphabet[$first].$alphabet[$second].$alphabet[$third];
+            do {
+                $candidate = $alphabet[$value % $base].$candidate;
+                $value = intdiv($value, $base);
+            } while ($value > 0);
+
+            if (strlen($candidate) < 3) {
+                $candidate = str_pad($candidate, 3, $alphabet[0], STR_PAD_LEFT);
+            }
 
             if ($candidate === 'SRC' || $candidate === 'DST') {
                 continue;
