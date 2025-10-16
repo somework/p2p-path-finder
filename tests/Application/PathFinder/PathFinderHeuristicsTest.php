@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 
+use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
@@ -274,5 +275,106 @@ final class PathFinderHeuristicsTest extends TestCase
         self::assertSame('1.00', $clampedBelow->amount());
         self::assertSame('5.00', $clampedAbove->amount());
         self::assertSame('3.333', $clampedWithin->amount());
+    }
+
+    public function test_normalize_tolerance_rejects_non_numeric_strings(): void
+    {
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+
+        $method = new ReflectionMethod(PathFinder::class, 'normalizeTolerance');
+        $method->setAccessible(true);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Tolerance must be numeric.');
+
+        $method->invoke($finder, 'not-a-number');
+    }
+
+    public function test_normalize_tolerance_rejects_negative_values(): void
+    {
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+
+        $method = new ReflectionMethod(PathFinder::class, 'normalizeTolerance');
+        $method->setAccessible(true);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Tolerance must be non-negative.');
+
+        $method->invoke($finder, '-0.01');
+    }
+
+    public function test_normalize_tolerance_rejects_one_or_greater(): void
+    {
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+
+        $method = new ReflectionMethod(PathFinder::class, 'normalizeTolerance');
+        $method->setAccessible(true);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Tolerance must be less than one.');
+
+        $method->invoke($finder, '1.000');
+    }
+
+    public function test_normalize_tolerance_normalizes_float_inputs(): void
+    {
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+
+        $method = new ReflectionMethod(PathFinder::class, 'normalizeTolerance');
+        $method->setAccessible(true);
+
+        $normalized = $method->invoke($finder, 0.5);
+
+        self::assertSame(BcMath::normalize('0.5', 18), $normalized);
+    }
+
+    public function test_normalize_tolerance_caps_values_close_to_one(): void
+    {
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+
+        $method = new ReflectionMethod(PathFinder::class, 'normalizeTolerance');
+        $method->setAccessible(true);
+
+        $almostOne = '0.9999999999999999999';
+        $normalized = $method->invoke($finder, $almostOne);
+
+        self::assertSame('0.'.str_repeat('9', 18), $normalized);
+    }
+
+    public function test_calculate_tolerance_amplifier_returns_one_for_zero_tolerance(): void
+    {
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+
+        $method = new ReflectionMethod(PathFinder::class, 'calculateToleranceAmplifier');
+        $method->setAccessible(true);
+
+        $amplifier = $method->invoke($finder, BcMath::normalize('0', 18));
+
+        self::assertSame(BcMath::normalize('1', 18), $amplifier);
+    }
+
+    public function test_calculate_tolerance_amplifier_inverts_complement(): void
+    {
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+
+        $method = new ReflectionMethod(PathFinder::class, 'calculateToleranceAmplifier');
+        $method->setAccessible(true);
+
+        $tolerance = BcMath::normalize('0.25', 18);
+        $amplifier = $method->invoke($finder, $tolerance);
+
+        self::assertSame(BcMath::normalize('1.333333333333333333', 18), $amplifier);
+    }
+
+    public function test_format_float_normalizes_negative_zero(): void
+    {
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+
+        $method = new ReflectionMethod(PathFinder::class, 'formatFloat');
+        $method->setAccessible(true);
+
+        $formatted = $method->invoke($finder, -0.0);
+
+        self::assertSame('0', $formatted);
     }
 }
