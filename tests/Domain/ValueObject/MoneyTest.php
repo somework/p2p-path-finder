@@ -8,6 +8,8 @@ use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
+use function str_repeat;
+
 final class MoneyTest extends TestCase
 {
     public function test_normalization_rounds_half_up(): void
@@ -42,16 +44,16 @@ final class MoneyTest extends TestCase
     public function provideMalformedCurrencies(): iterable
     {
         yield 'too short' => ['US'];
-        yield 'too long' => ['USDA'];
         yield 'contains digits' => ['U5D'];
         yield 'contains symbols' => ['U$D'];
         yield 'contains whitespace' => ['U D'];
+        yield 'excessively long' => [str_repeat('A', 13)];
     }
 
     /**
      * @dataProvider provideValidCurrencies
      */
-    public function test_from_string_accepts_three_letter_currency(string $currency): void
+    public function test_from_string_accepts_valid_currency(string $currency): void
     {
         $money = Money::fromString($currency, '5.00', 2);
 
@@ -66,6 +68,8 @@ final class MoneyTest extends TestCase
         yield 'lowercase' => ['usd'];
         yield 'uppercase' => ['JPY'];
         yield 'mixed case' => ['eUr'];
+        yield 'extended length' => ['asset'];
+        yield 'upper bound length' => [str_repeat('Z', 12)];
     }
 
     public function test_add_and_subtract_respect_scale(): void
