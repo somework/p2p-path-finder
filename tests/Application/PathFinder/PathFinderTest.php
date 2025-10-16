@@ -19,6 +19,7 @@ use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
 use function array_unique;
+use function count;
 
 final class PathFinderTest extends TestCase
 {
@@ -32,6 +33,27 @@ final class PathFinderTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         new PathFinder($invalidMaxHops, 0.0);
+    }
+
+    public function test_it_requires_positive_result_limit(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new PathFinder(maxHops: 1, tolerance: 0.0, topK: 0);
+    }
+
+    public function test_it_requires_positive_expansion_guard(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new PathFinder(maxHops: 1, tolerance: 0.0, topK: 1, maxExpansions: 0);
+    }
+
+    public function test_it_requires_positive_visited_state_guard(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new PathFinder(maxHops: 1, tolerance: 0.0, topK: 1, maxExpansions: 1, maxVisitedStates: 0);
     }
 
     /**
@@ -128,6 +150,47 @@ final class PathFinderTest extends TestCase
         self::assertSame($expectedProduct, $result['product']);
         $expectedCost = BcMath::div('1', $expectedProduct, self::SCALE);
         self::assertSame($expectedCost, $result['cost']);
+    }
+
+    public function test_it_limits_results_to_requested_top_k(): void
+    {
+        $orders = self::buildComprehensiveOrderBook();
+        $graph = (new GraphBuilder())->build($orders);
+
+        $finder = new PathFinder(maxHops: 4, tolerance: 0.999, topK: 2);
+        $results = $finder->findBestPaths($graph, 'RUB', 'IDR');
+
+        self::assertGreaterThanOrEqual(2, count($results));
+        self::assertCount(2, $results);
+        self::assertLessThanOrEqual(0, BcMath::comp($results[0]['cost'], $results[1]['cost'], self::SCALE));
+        self::assertGreaterThanOrEqual(0, BcMath::comp($results[0]['product'], $results[1]['product'], self::SCALE));
+
+        $finderWithBroaderLimit = new PathFinder(maxHops: 4, tolerance: 0.999, topK: 3);
+        $extendedResults = $finderWithBroaderLimit->findBestPaths($graph, 'RUB', 'IDR');
+
+        self::assertGreaterThan(2, count($extendedResults));
+    }
+
+    public function test_it_normalizes_endpoint_case_inputs(): void
+    {
+        $orders = self::buildComprehensiveOrderBook();
+        $graph = (new GraphBuilder())->build($orders);
+
+        $finder = new PathFinder(maxHops: 3, tolerance: 0.0);
+        $results = $finder->findBestPaths($graph, 'rub', 'idr');
+
+        self::assertNotSame([], $results);
+    }
+
+    public function test_it_returns_empty_when_target_missing_from_graph(): void
+    {
+        $orders = self::buildComprehensiveOrderBook();
+        $graph = (new GraphBuilder())->build($orders);
+
+        $finder = new PathFinder(maxHops: 3, tolerance: 0.0);
+
+        self::assertSame([], $finder->findBestPaths($graph, 'RUB', 'ZZZ'));
+        self::assertSame([], $finder->findBestPaths($graph, 'zzz', 'IDR'));
     }
 
     /**
@@ -484,6 +547,42 @@ final class PathFinderTest extends TestCase
         self::assertNotNull($result['desiredAmount']);
         self::assertSame($result['amountRange']['min']->currency(), $result['desiredAmount']->currency());
         self::assertSame($result['amountRange']['min']->amount(), $result['desiredAmount']->amount());
+    }
+
+    public function test_it_clamps_desired_spend_into_feasible_range_before_conversion(): void
+    {
+        $order = OrderFactory::buy('EUR', 'USD', '1.000', '5.000', '1.200', 3, 3);
+        $graph = (new GraphBuilder())->build([$order]);
+
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+
+        $minimum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
+        $maximum = CurrencyScenarioFactory::money('EUR', '3.000', 3);
+        $desired = CurrencyScenarioFactory::money('EUR', '10.000', 3);
+
+        $results = $finder->findBestPaths(
+            $graph,
+            'EUR',
+            'USD',
+            [
+                'min' => $minimum,
+                'max' => $maximum,
+                'desired' => $desired,
+            ],
+        );
+
+        self::assertNotSame([], $results);
+        $result = $results[0];
+
+        self::assertNotNull($result['desiredAmount']);
+
+        $edge = $graph['EUR']['edges'][0];
+        $convertMethod = new \ReflectionMethod(PathFinder::class, 'convertEdgeAmount');
+        $convertMethod->setAccessible(true);
+        $expectedDesired = $convertMethod->invoke($finder, $edge, $maximum);
+
+        self::assertSame($expectedDesired->currency(), $result['desiredAmount']->currency());
+        self::assertSame($expectedDesired->amount(), $result['desiredAmount']->amount());
     }
 
     public function test_it_preserves_parallel_states_with_distinct_ranges(): void

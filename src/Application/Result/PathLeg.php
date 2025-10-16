@@ -89,6 +89,7 @@ final class PathLeg implements JsonSerializable
      *     fees: array<string, array{currency: string, amount: string, scale: int}>,
      * }
      */
+    #[\Override]
     public function jsonSerialize(): array
     {
         $fees = [];
@@ -123,6 +124,7 @@ final class PathLeg implements JsonSerializable
      */
     private function normalizeFees(array $fees): array
     {
+        /** @var array<string, Money> $normalized */
         $normalized = [];
 
         foreach ($fees as $fee) {

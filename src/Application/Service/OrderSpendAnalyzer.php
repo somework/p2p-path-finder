@@ -6,6 +6,7 @@ namespace SomeWork\P2PPathFinder\Application\Service;
 
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
+use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
@@ -15,6 +16,9 @@ use function max;
 
 /**
  * Encapsulates filtering orders and determining spend bounds.
+ *
+ * @psalm-import-type GraphEdge from PathFinder
+ * @psalm-import-type PathEdge from PathFinder
  */
 final class OrderSpendAnalyzer
 {
@@ -65,7 +69,7 @@ final class OrderSpendAnalyzer
     }
 
     /**
-     * @param array{from: string, to: string, order: Order, orderSide: OrderSide} $edge
+     * @param GraphEdge|PathEdge $edge
      *
      * @return array{net: Money, gross: Money, grossCeiling: Money}|null
      */

@@ -199,6 +199,71 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('USD', $secondLegs[1]->to());
     }
 
+    public function test_it_preserves_result_insertion_order_when_costs_are_identical(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '500.000', '0.900', 3),
+            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '10.000', '500.000', '0.750', 3),
+            $this->createOrder(OrderSide::SELL, 'USD', 'GBP', '10.000', '500.000', '1.199', 3),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.0)
+            ->withHopLimits(1, 2)
+            ->withResultLimit(2)
+            ->build();
+
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+
+        self::assertCount(2, $results);
+        self::assertSame('111.172', $results[0]->totalReceived()->amount());
+        self::assertSame('111.100', $results[1]->totalReceived()->amount());
+        self::assertSame(0.0, $results[0]->residualTolerance());
+        self::assertSame(0.0, $results[1]->residualTolerance());
+        self::assertCount(2, $results[0]->legs());
+        self::assertCount(1, $results[1]->legs());
+    }
+
+    public function test_it_enforces_minimum_hop_constraint_before_materialization(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '200.000', '0.900', 3),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.05)
+            ->withHopLimits(2, 3)
+            ->build();
+
+        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'USD'));
+    }
+
+    public function test_it_skips_candidates_when_sell_seed_window_is_empty(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(
+                OrderSide::SELL,
+                'BTC',
+                'USD',
+                '1.000',
+                '1.000',
+                '100.00',
+                2,
+                $this->percentageFeePolicy('0.60'),
+            ),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '150.00', 2))
+            ->withToleranceBounds(0.1, 0.1)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'BTC'));
+    }
+
     public function test_it_honors_path_finder_guard_configuration(): void
     {
         $orderBook = $this->scenarioEuroToUsdToJpyBridge();
@@ -220,6 +285,149 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->build();
 
         self::assertNotSame([], $this->makeService()->findBestPaths($orderBook, $relaxedConfig, 'JPY'));
+    }
+
+    /**
+     * @testdox Returns no paths when every order is filtered out by spend bounds
+     */
+    public function test_it_returns_empty_result_when_orders_are_filtered_out(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(OrderSide::BUY, 'EUR', 'USD', '200.000', '300.000', '1.100', 3),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.05)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $service = $this->makeService();
+
+        self::assertSame([], $service->findBestPaths($orderBook, $config, 'USD'));
+    }
+
+    public function test_it_returns_empty_result_when_source_node_is_missing(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'USD', 'JPY', '10.000', '200.000', '110.00', 2),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.05)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'JPY'));
+    }
+
+    public function test_it_discards_candidates_rejected_by_tolerance_bounds(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(
+                OrderSide::SELL,
+                'EUR',
+                'USD',
+                '10.000',
+                '500.000',
+                '1.100',
+                3,
+                $this->percentageFeePolicy('0.10'),
+            ),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.05)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'USD'));
+    }
+
+    public function test_it_rejects_candidates_exceeding_maximum_hops(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '200.000', '0.900', 3),
+            $this->createOrder(OrderSide::BUY, 'USD', 'GBP', '50.000', '200.000', '0.750', 3),
+            $this->createOrder(OrderSide::BUY, 'GBP', 'JPY', '50.000', '200.000', '150.000', 3),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.25)
+            ->withHopLimits(1, 2)
+            ->build();
+
+        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'JPY'));
+    }
+
+    /**
+     * @testdox Skips zero-hop candidates when the source and target assets are identical
+     */
+    public function test_it_discards_zero_hop_candidates_when_target_equals_source(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(OrderSide::BUY, 'USD', 'EUR', '10.000', '200.000', '0.900', 3),
+            $this->createOrder(OrderSide::SELL, 'EUR', 'USD', '10.000', '200.000', '1.100', 3),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.0)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'USD'));
+    }
+
+    /**
+     * @testdox Provides only the leading result when calling the deprecated single-path helper
+     */
+    public function test_find_best_path_returns_first_materialized_result(): void
+    {
+        $orderBook = $this->scenarioCompetingGbpQuotes();
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.15)
+            ->withHopLimits(1, 3)
+            ->withResultLimit(2)
+            ->build();
+
+        $service = $this->makeService();
+
+        $best = $service->findBestPath($orderBook, $config, 'USD');
+        self::assertNotNull($best);
+
+        $allResults = $service->findBestPaths($orderBook, $config, 'USD');
+        self::assertNotSame([], $allResults);
+
+        self::assertSame(
+            $allResults[0]->jsonSerialize(),
+            $best->jsonSerialize(),
+        );
+    }
+
+    /**
+     * @testdox Deprecated single-path helper returns null when no candidates exist
+     */
+    public function test_find_best_path_returns_null_when_no_paths_exist(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '500.000', '0.900', 3),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.0)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $service = $this->makeService();
+
+        self::assertNull($service->findBestPath($orderBook, $config, 'JPY'));
     }
 
     private function scenarioEuroToUsdToJpyBridge(): OrderBook

@@ -109,6 +109,7 @@ final class PathResult implements JsonSerializable
      *     }>,
      * }
      */
+    #[\Override]
     public function jsonSerialize(): array
     {
         $fees = [];
@@ -132,6 +133,7 @@ final class PathResult implements JsonSerializable
      */
     private function normalizeFeeBreakdown(array $feeBreakdown): array
     {
+        /** @var array<string, Money> $normalized */
         $normalized = [];
 
         foreach ($feeBreakdown as $entry) {

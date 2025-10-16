@@ -167,6 +167,40 @@ final class OrderTest extends TestCase
         self::assertTrue($effectiveQuote->lessThan($rawQuote));
     }
 
+    public function test_calculate_effective_quote_amount_rejects_mismatched_quote_fee_currency(): void
+    {
+        $policy = new class implements FeePolicy {
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                return FeeBreakdown::forQuote(Money::fromString('EUR', '5.000', 3));
+            }
+        };
+
+        $order = OrderFactory::buy(feePolicy: $policy);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Fee policy must return money in quote asset currency.');
+
+        $order->calculateEffectiveQuoteAmount(CurrencyScenarioFactory::money('BTC', '0.500', 3));
+    }
+
+    public function test_calculate_effective_quote_amount_rejects_mismatched_base_fee_currency(): void
+    {
+        $policy = new class implements FeePolicy {
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                return FeeBreakdown::of(Money::fromString('ETH', '0.010', 3), null);
+            }
+        };
+
+        $order = OrderFactory::buy(feePolicy: $policy);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Fee policy must return money in base asset currency.');
+
+        $order->calculateEffectiveQuoteAmount(CurrencyScenarioFactory::money('BTC', '0.500', 3));
+    }
+
     public function test_calculate_gross_base_spend_uses_precomputed_fee_breakdown(): void
     {
         $order = OrderFactory::buy(feePolicy: $this->failOnCalculatePolicy());
@@ -189,6 +223,23 @@ final class OrderTest extends TestCase
         $grossBase = $order->calculateGrossBaseSpend($baseAmount, FeeBreakdown::forQuote($quoteFee));
 
         self::assertTrue($grossBase->equals($baseAmount));
+    }
+
+    public function test_calculate_gross_base_spend_rejects_mismatched_base_fee_currency(): void
+    {
+        $policy = new class implements FeePolicy {
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                return FeeBreakdown::forBase(Money::fromString('ETH', '0.010', 3));
+            }
+        };
+
+        $order = OrderFactory::buy(feePolicy: $policy);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Fee policy must return money in base asset currency.');
+
+        $order->calculateGrossBaseSpend(CurrencyScenarioFactory::money('BTC', '0.500', 3));
     }
 
     public function test_calculate_effective_quote_amount_subtracts_fee_for_sell_order(): void

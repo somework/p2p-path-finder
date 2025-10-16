@@ -34,23 +34,7 @@ final class PathResultFormatter
      */
     public function formatMachine(PathResult $result): array
     {
-        /** @var array{
-         *     totalSpent: array{currency: string, amount: string, scale: int},
-         *     totalReceived: array{currency: string, amount: string, scale: int},
-         *     residualTolerance: float,
-         *     feeBreakdown: array<string, array{currency: string, amount: string, scale: int}>,
-         *     legs: list<array{
-         *         from: string,
-         *         to: string,
-         *         spent: array{currency: string, amount: string, scale: int},
-         *         received: array{currency: string, amount: string, scale: int},
-         *         fees: array<string, array{currency: string, amount: string, scale: int}>,
-         *     }>,
-         * } $payload
-         */
-        $payload = $result->jsonSerialize();
-
-        return $payload;
+        return $result->jsonSerialize();
     }
 
     /**
@@ -86,7 +70,7 @@ final class PathResultFormatter
             $this->formatMoney($result->totalSpent()),
             $this->formatMoney($result->totalReceived()),
             $this->formatFeeSummary($result->feeBreakdown()),
-            number_format($result->residualTolerance() * 100, 2, '.', ''),
+            number_format($result->residualTolerance() * 100.0, 2, '.', ''),
         );
 
         $lines[] = 'Legs:';

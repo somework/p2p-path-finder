@@ -24,6 +24,23 @@ use function usort;
 /**
  * Implementation of a tolerance-aware best-path search through the trading graph.
  *
+ * @psalm-type GraphEdge = array{
+ *     from: string,
+ *     to: string,
+ *     orderSide: OrderSide,
+ *     order: Order,
+ *     rate: ExchangeRate,
+ *     baseCapacity: array{min: Money, max: Money},
+ *     quoteCapacity: array{min: Money, max: Money},
+ *     grossBaseCapacity: array{min: Money, max: Money},
+ *     segments: list<array{
+ *         isMandatory: bool,
+ *         base: array{min: Money, max: Money},
+ *         quote: array{min: Money, max: Money},
+ *         grossBase: array{min: Money, max: Money},
+ *     }>,
+ * }
+ *
  * @phpstan-type GraphEdge array{
  *     from: string,
  *     to: string,
@@ -40,38 +57,92 @@ use function usort;
  *         grossBase: array{min: Money, max: Money},
  *     }>,
  * }
+ *
+ * @psalm-type Graph = array<string, array{currency: string, edges: list<GraphEdge>}>
+ *
  * @phpstan-type Graph array<string, array{currency: string, edges: list<GraphEdge>}>
+ *
+ * @psalm-type SpendRange = array{min: Money, max: Money}
+ *
  * @phpstan-type SpendRange array{min: Money, max: Money}
+ *
+ * @psalm-type SpendConstraints = array{min?: Money, max?: Money, desired?: Money|null}
+ *
  * @phpstan-type SpendConstraints array{min?: Money, max?: Money, desired?: Money|null}
+ *
+ * @psalm-type PathEdge = array{
+ *     from: string,
+ *     to: string,
+ *     order: Order,
+ *     rate: ExchangeRate,
+ *     orderSide: OrderSide,
+ *     conversionRate: numeric-string,
+ * }
+ *
  * @phpstan-type PathEdge array{
  *     from: string,
  *     to: string,
  *     order: Order,
  *     rate: ExchangeRate,
  *     orderSide: OrderSide,
- *     conversionRate: string,
+ *     conversionRate: numeric-string,
  * }
- * @phpstan-type Candidate array{
- *     cost: string,
- *     product: string,
+ *
+ * @psalm-type Candidate = array{
+ *     cost: numeric-string,
+ *     product: numeric-string,
  *     hops: int,
  *     edges: list<PathEdge>,
  *     amountRange: SpendRange|null,
  *     desiredAmount: Money|null,
  * }
+ *
+ * @phpstan-type Candidate array{
+ *     cost: numeric-string,
+ *     product: numeric-string,
+ *     hops: int,
+ *     edges: list<PathEdge>,
+ *     amountRange: SpendRange|null,
+ *     desiredAmount: Money|null,
+ * }
+ *
+ * @psalm-type CandidateHeapEntry = array{
+ *     candidate: Candidate,
+ *     order: int,
+ *     cost: numeric-string,
+ * }
+ *
  * @phpstan-type CandidateHeapEntry array{
  *     candidate: Candidate,
  *     order: int,
- *     cost: string,
+ *     cost: numeric-string,
  * }
+ *
+ * @psalm-type SearchQueueEntry = array{
+ *     state: SearchState,
+ *     priority: array{cost: numeric-string, order: int},
+ * }
+ *
  * @phpstan-type SearchQueueEntry array{
  *     state: SearchState,
- *     priority: array{cost: string, order: int},
+ *     priority: array{cost: numeric-string, order: int},
  * }
+ *
+ * @psalm-type SearchState = array{
+ *     node: string,
+ *     cost: numeric-string,
+ *     product: numeric-string,
+ *     hops: int,
+ *     path: list<PathEdge>,
+ *     amountRange: SpendRange|null,
+ *     desiredAmount: Money|null,
+ *     visited: array<string, bool>,
+ * }
+ *
  * @phpstan-type SearchState array{
  *     node: string,
- *     cost: string,
- *     product: string,
+ *     cost: numeric-string,
+ *     product: numeric-string,
  *     hops: int,
  *     path: list<PathEdge>,
  *     amountRange: SpendRange|null,
@@ -87,7 +158,10 @@ final class PathFinder
 
     public const DEFAULT_MAX_VISITED_STATES = 250000;
 
+    /** @var numeric-string */
     private readonly string $unitValue;
+
+    /** @var numeric-string */
     private readonly string $toleranceAmplifier;
     private readonly bool $hasTolerance;
 
@@ -118,9 +192,13 @@ final class PathFinder
             throw new InvalidArgumentException('Maximum visited states must be at least one.');
         }
 
-        $this->unitValue = BcMath::normalize('1', self::SCALE);
+        /** @var numeric-string $unit */
+        $unit = BcMath::normalize('1', self::SCALE);
+        $this->unitValue = $unit;
         $normalizedTolerance = $this->normalizeTolerance($tolerance);
-        $this->toleranceAmplifier = $this->calculateToleranceAmplifier($normalizedTolerance);
+        /** @var numeric-string $amplifier */
+        $amplifier = $this->calculateToleranceAmplifier($normalizedTolerance);
+        $this->toleranceAmplifier = $amplifier;
         $this->hasTolerance = 1 === BcMath::comp($normalizedTolerance, '0', self::SCALE);
     }
 
@@ -176,7 +254,7 @@ final class PathFinder
         ], ['cost' => $this->unitValue, 'order' => $insertionOrder++]);
 
         /**
-         * @var array<string, list<array{cost: string, hops: int, signature: string}>> $bestPerNode
+         * @var array<string, list<array{cost: numeric-string, hops: int, signature: string}>> $bestPerNode
          */
         $bestPerNode = [
             $source => [[
@@ -229,7 +307,6 @@ final class PathFinder
             }
 
             foreach ($graph[$state['node']]['edges'] as $edge) {
-                /** @var GraphEdge $edge */
                 $nextNode = $edge['to'];
                 if (!array_key_exists($nextNode, $graph)) {
                     continue;
@@ -341,7 +418,8 @@ final class PathFinder
     }
 
     /**
-     * @param list<array{cost: string, hops: int, signature: string}> $existing
+     * @param list<array{cost: numeric-string, hops: int, signature: string}> $existing
+     * @param numeric-string                                                  $cost
      */
     private function isDominated(array $existing, string $cost, int $hops, string $signature): bool
     {
@@ -362,8 +440,9 @@ final class PathFinder
     }
 
     /**
-     * @param array<string, list<array{cost: string, hops: int, signature: string}>> $registry
-     * @param array{min: Money, max: Money}|null                                     $range
+     * @param array<string, list<array{cost: numeric-string, hops: int, signature: string}>> $registry
+     * @param array{min: Money, max: Money}|null                                             $range
+     * @param numeric-string                                                                 $cost
      *
      * @return int net change in the number of tracked states
      */
@@ -441,7 +520,7 @@ final class PathFinder
     }
 
     /**
-     * @param list<array{cost: string, hops: int, signature: string}> $existing
+     * @param list<array{cost: numeric-string, hops: int, signature: string}> $existing
      */
     private function hasStateWithSignature(array $existing, string $signature): bool
     {
@@ -465,17 +544,19 @@ final class PathFinder
     }
 
     /**
-     * @param Candidate $candidate
+     * @phpstan-param Candidate $candidate
+     *
+     * @psalm-param Candidate $candidate
      */
     private function recordResult(CandidateResultHeap $results, array $candidate, int $order): void
     {
-        /** @var CandidateHeapEntry $entry */
         $entry = [
             'candidate' => $candidate,
             'order' => $order,
             'cost' => $candidate['cost'],
         ];
 
+        /* @var CandidateHeapEntry $entry */
         $results->insert($entry, $entry);
 
         if ($results->count() > $this->topK) {
@@ -500,10 +581,22 @@ final class PathFinder
 
         usort(
             $collected,
+            /**
+             * @phpstan-param array{candidate: Candidate, order: int, cost: numeric-string} $left
+             * @phpstan-param array{candidate: Candidate, order: int, cost: numeric-string} $right
+             *
+             * @psalm-param array{candidate: Candidate, order: int, cost: numeric-string} $left
+             * @psalm-param array{candidate: Candidate, order: int, cost: numeric-string} $right
+             */
             function (array $left, array $right): int {
-                /** @var CandidateHeapEntry $left */
-                /** @var CandidateHeapEntry $right */
-                $comparison = BcMath::comp($left['cost'], $right['cost'], self::SCALE);
+                $leftCost = $left['cost'];
+                /** @var numeric-string $leftCost */
+                $leftCost = $leftCost;
+                $rightCost = $right['cost'];
+                /** @var numeric-string $rightCost */
+                $rightCost = $rightCost;
+
+                $comparison = BcMath::comp($leftCost, $rightCost, self::SCALE);
                 if (0 !== $comparison) {
                     return $comparison;
                 }
@@ -524,8 +617,8 @@ final class PathFinder
     }
 
     /**
-     * @param array{orderSide: OrderSide, segments: list<array{isMandatory: bool, base: array{min: Money, max: Money}, quote: array{min: Money, max: Money}, grossBase: array{min: Money, max: Money}}>} $edge
-     * @param SpendRange                                                                                                                                                                                 $range
+     * @param GraphEdge  $edge
+     * @param SpendRange $range
      *
      * @return SpendRange|null
      */
@@ -585,8 +678,8 @@ final class PathFinder
     }
 
     /**
-     * @param array{to: string, orderSide: OrderSide, baseCapacity: array{min: Money, max: Money}, quoteCapacity: array{min: Money, max: Money}, grossBaseCapacity: array{min: Money, max: Money}} $edge
-     * @param SpendRange                                                                                                                                                                           $range
+     * @param GraphEdge  $edge
+     * @param SpendRange $range
      *
      * @return SpendRange
      */
@@ -603,7 +696,7 @@ final class PathFinder
     }
 
     /**
-     * @param array{to: string, orderSide: OrderSide, baseCapacity: array{min: Money, max: Money}, quoteCapacity: array{min: Money, max: Money}, grossBaseCapacity: array{min: Money, max: Money}} $edge
+     * @param GraphEdge $edge
      */
     private function convertEdgeAmount(array $edge, Money $current): Money
     {
@@ -674,7 +767,9 @@ final class PathFinder
     }
 
     /**
-     * @param array{orderSide: OrderSide, baseCapacity: array{min: Money, max: Money}, quoteCapacity: array{min: Money, max: Money}, grossBaseCapacity: array{min: Money, max: Money}} $edge
+     * @param GraphEdge $edge
+     *
+     * @return numeric-string
      */
     private function edgeEffectiveConversionRate(array $edge): string
     {
@@ -691,7 +786,9 @@ final class PathFinder
     }
 
     /**
-     * @param array{orderSide: OrderSide, baseCapacity: array{min: Money, max: Money}, quoteCapacity: array{min: Money, max: Money}, grossBaseCapacity: array{min: Money, max: Money}} $edge
+     * @param GraphEdge $edge
+     *
+     * @return numeric-string
      */
     private function edgeBaseToQuoteRatio(array $edge): string
     {
@@ -712,12 +809,17 @@ final class PathFinder
         return BcMath::div($quoteMax, $baseMax, self::SCALE);
     }
 
+    /**
+     * @return numeric-string
+     */
     private function normalizeTolerance(float|string $tolerance): string
     {
         if (is_string($tolerance)) {
             if (!BcMath::isNumeric($tolerance)) {
                 throw new InvalidArgumentException('Tolerance must be numeric.');
             }
+
+            BcMath::ensureNumeric($tolerance);
 
             if (-1 === BcMath::comp($tolerance, '0', self::SCALE)) {
                 throw new InvalidArgumentException('Tolerance must be non-negative.');
@@ -736,6 +838,7 @@ final class PathFinder
             $normalized = BcMath::normalize($this->formatFloat($tolerance), self::SCALE);
         }
 
+        /** @var numeric-string $upperBound */
         $upperBound = '0.'.str_repeat('9', self::SCALE);
         if (1 === BcMath::comp($normalized, $upperBound, self::SCALE)) {
             return $upperBound;
@@ -744,6 +847,11 @@ final class PathFinder
         return $normalized;
     }
 
+    /**
+     * @param numeric-string $tolerance
+     *
+     * @return numeric-string
+     */
     private function calculateToleranceAmplifier(string $tolerance): string
     {
         if (0 === BcMath::comp($tolerance, '0', self::SCALE)) {
@@ -756,14 +864,27 @@ final class PathFinder
         return BcMath::div('1', $complement, self::SCALE);
     }
 
+    /**
+     * @return numeric-string
+     */
     private function formatFloat(float $value): string
     {
-        return rtrim(rtrim(sprintf('%.'.self::SCALE.'F', $value), '0'), '.');
+        $formatted = rtrim(rtrim(sprintf('%.'.self::SCALE.'F', $value), '0'), '.');
+        if ('' === $formatted || '-' === $formatted) {
+            $formatted .= '0';
+        }
+
+        BcMath::ensureNumeric($formatted);
+
+        return $formatted;
     }
 }
 
 /**
  * @internal
+ *
+ * @psalm-import-type SearchState from PathFinder
+ * @psalm-import-type SearchQueueEntry from PathFinder
  *
  * @phpstan-import-type SearchState from PathFinder
  * @phpstan-import-type SearchQueueEntry from PathFinder
@@ -778,9 +899,13 @@ final class SearchStateQueue extends SplPriorityQueue
     }
 
     /**
-     * @param SearchState                                      $value
-     * @param array{cost: string, order: int}|SearchQueueEntry $priority
+     * @phpstan-param SearchState                                            $value
+     * @phpstan-param array{cost: numeric-string, order: int}|SearchQueueEntry $priority
+     *
+     * @psalm-param SearchState                                               $value
+     * @psalm-param array{cost: numeric-string, order: int}|SearchQueueEntry $priority
      */
+    #[\Override]
     public function insert($value, $priority): true
     {
         if (isset($priority['state'], $priority['priority'])) {
@@ -795,14 +920,16 @@ final class SearchStateQueue extends SplPriorityQueue
             ];
         }
 
+        /* @var SearchQueueEntry $entry */
         parent::insert($entry, $entry);
 
         return true;
     }
 
     /**
-     * @return SearchState
+     * @psalm-return SearchState
      */
+    #[\Override]
     public function extract(): array
     {
         /** @var SearchQueueEntry $entry */
@@ -812,9 +939,13 @@ final class SearchStateQueue extends SplPriorityQueue
     }
 
     /**
-     * @param SearchQueueEntry $priority1
-     * @param SearchQueueEntry $priority2
+     * @phpstan-param SearchQueueEntry $priority1
+     * @phpstan-param SearchQueueEntry $priority2
+     *
+     * @psalm-param SearchQueueEntry $priority1
+     * @psalm-param SearchQueueEntry $priority2
      */
+    #[\Override]
     public function compare($priority1, $priority2): int
     {
         $comparison = BcMath::comp($priority1['priority']['cost'], $priority2['priority']['cost'], $this->scale);
@@ -841,9 +972,13 @@ final class CandidateResultHeap extends SplPriorityQueue
     }
 
     /**
-     * @param CandidateHeapEntry $priority1
-     * @param CandidateHeapEntry $priority2
+     * @phpstan-param CandidateHeapEntry $priority1
+     * @phpstan-param CandidateHeapEntry $priority2
+     *
+     * @psalm-param CandidateHeapEntry $priority1
+     * @psalm-param CandidateHeapEntry $priority2
      */
+    #[\Override]
     public function compare($priority1, $priority2): int
     {
         $comparison = BcMath::comp($priority1['cost'], $priority2['cost'], $this->scale);

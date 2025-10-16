@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Filter\CurrencyPairFilter;
 use SomeWork\P2PPathFinder\Application\Filter\MaximumAmountFilter;
 use SomeWork\P2PPathFinder\Application\Filter\MinimumAmountFilter;
+use SomeWork\P2PPathFinder\Application\Filter\OrderFilterInterface;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
@@ -44,5 +45,56 @@ final class OrderBookTest extends TestCase
         $filtered = iterator_to_array($book->filter(...$filters));
 
         self::assertSame([$first, $third], $filtered);
+    }
+
+    public function test_filter_short_circuits_after_rejection(): void
+    {
+        $book = new OrderBook([OrderFactory::buy()]);
+
+        $rejections = 0;
+        $rejectingFilter = new class($rejections) implements OrderFilterInterface {
+            /**
+             * @var int
+             */
+            private $counter;
+
+            public function __construct(int &$counter)
+            {
+                $this->counter = &$counter;
+            }
+
+            public function accepts(\SomeWork\P2PPathFinder\Domain\Order\Order $order): bool
+            {
+                ++$this->counter;
+
+                return false;
+            }
+        };
+
+        $fallthroughInvocations = 0;
+        $fallthroughFilter = new class($fallthroughInvocations) implements OrderFilterInterface {
+            /**
+             * @var int
+             */
+            private $counter;
+
+            public function __construct(int &$counter)
+            {
+                $this->counter = &$counter;
+            }
+
+            public function accepts(\SomeWork\P2PPathFinder\Domain\Order\Order $order): bool
+            {
+                ++$this->counter;
+
+                return true;
+            }
+        };
+
+        $filtered = iterator_to_array($book->filter($rejectingFilter, $fallthroughFilter));
+
+        self::assertSame([], $filtered);
+        self::assertSame(1, $rejections);
+        self::assertSame(0, $fallthroughInvocations);
     }
 }
