@@ -199,6 +199,32 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('USD', $secondLegs[1]->to());
     }
 
+    public function test_it_preserves_result_insertion_order_when_costs_are_identical(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '500.000', '0.900', 3),
+            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '10.000', '500.000', '0.750', 3),
+            $this->createOrder(OrderSide::SELL, 'USD', 'GBP', '10.000', '500.000', '1.199', 3),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.0)
+            ->withHopLimits(1, 2)
+            ->withResultLimit(2)
+            ->build();
+
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+
+        self::assertCount(2, $results);
+        self::assertSame('111.172', $results[0]->totalReceived()->amount());
+        self::assertSame('111.100', $results[1]->totalReceived()->amount());
+        self::assertSame(0.0, $results[0]->residualTolerance());
+        self::assertSame(0.0, $results[1]->residualTolerance());
+        self::assertCount(2, $results[0]->legs());
+        self::assertCount(1, $results[1]->legs());
+    }
+
     public function test_it_enforces_minimum_hop_constraint_before_materialization(): void
     {
         $orderBook = $this->orderBook(
