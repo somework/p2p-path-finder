@@ -131,6 +131,64 @@ final class OrderSpendAnalyzerTest extends TestCase
         self::assertNull($seed);
     }
 
+    public function test_it_clamps_buy_seed_to_order_maximum_when_desired_exceeds_capacity(): void
+    {
+        $order = OrderFactory::buy(
+            base: 'EUR',
+            quote: 'USD',
+            minAmount: '100.00',
+            maxAmount: '150.00',
+            rate: '1.0500',
+            amountScale: 2,
+            rateScale: 4,
+        );
+
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $graph['EUR']['edges'][0];
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '200.00', 2))
+            ->withToleranceBounds(0.5, 0.6)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $analyzer = new OrderSpendAnalyzer();
+        $seed = $analyzer->determineInitialSpendAmount($config, $edge);
+
+        self::assertNotNull($seed);
+        self::assertTrue($seed['net']->equals(Money::fromString('EUR', '150.00', 2)));
+        self::assertTrue($seed['gross']->equals(Money::fromString('EUR', '150.00', 2)));
+        self::assertTrue($seed['grossCeiling']->equals(Money::fromString('EUR', '150.00', 2)));
+    }
+
+    public function test_it_rejects_sell_seed_when_quote_fees_exceed_tolerance_budget(): void
+    {
+        $order = OrderFactory::sell(
+            base: 'BTC',
+            quote: 'USD',
+            minAmount: '0.500',
+            maxAmount: '0.750',
+            rate: '100.00',
+            amountScale: 3,
+            rateScale: 2,
+            feePolicy: FeePolicyFactory::baseAndQuoteSurcharge('0.000000', '0.50', 3),
+        );
+
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $graph['USD']['edges'][0];
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.0)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $analyzer = new OrderSpendAnalyzer();
+        $seed = $analyzer->determineInitialSpendAmount($config, $edge);
+
+        self::assertNull($seed);
+    }
+
     public function test_it_rejects_sell_seed_when_quote_fee_eliminates_effective_window(): void
     {
         $order = OrderFactory::sell(

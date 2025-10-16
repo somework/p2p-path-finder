@@ -307,6 +307,30 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame([], $service->findBestPaths($orderBook, $config, 'USD'));
     }
 
+    public function test_it_discards_candidates_rejected_by_tolerance_bounds(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(
+                OrderSide::SELL,
+                'EUR',
+                'USD',
+                '10.000',
+                '500.000',
+                '1.100',
+                3,
+                $this->percentageFeePolicy('0.10'),
+            ),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.05)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'USD'));
+    }
+
     /**
      * @testdox Provides only the leading result when calling the deprecated single-path helper
      */
