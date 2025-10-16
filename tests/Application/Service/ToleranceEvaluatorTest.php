@@ -30,6 +30,24 @@ final class ToleranceEvaluatorTest extends TestCase
         self::assertLessThanOrEqual($config->maximumTolerance() + 1e-12, $residual);
     }
 
+    public function test_it_handles_zero_requested_spend_without_dividing_by_zero(): void
+    {
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '0.00', 2))
+            ->withToleranceBounds(0.0, 0.5)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $requested = Money::fromString('EUR', '0.00', 2);
+        $actual = Money::fromString('EUR', '0.00', 2);
+
+        $evaluator = new ToleranceEvaluator();
+        $residual = $evaluator->evaluate($config, $requested, $actual);
+
+        self::assertNotNull($residual);
+        self::assertSame(0.0, $residual);
+    }
+
     /**
      * @return iterable<string, array{PathSearchConfig, Money, Money, float}>
      */

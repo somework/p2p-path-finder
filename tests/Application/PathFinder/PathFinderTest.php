@@ -19,6 +19,7 @@ use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
 use function array_unique;
+use function count;
 
 final class PathFinderTest extends TestCase
 {
@@ -32,6 +33,27 @@ final class PathFinderTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         new PathFinder($invalidMaxHops, 0.0);
+    }
+
+    public function test_it_requires_positive_result_limit(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new PathFinder(maxHops: 1, tolerance: 0.0, topK: 0);
+    }
+
+    public function test_it_requires_positive_expansion_guard(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new PathFinder(maxHops: 1, tolerance: 0.0, topK: 1, maxExpansions: 0);
+    }
+
+    public function test_it_requires_positive_visited_state_guard(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new PathFinder(maxHops: 1, tolerance: 0.0, topK: 1, maxExpansions: 1, maxVisitedStates: 0);
     }
 
     /**
@@ -128,6 +150,25 @@ final class PathFinderTest extends TestCase
         self::assertSame($expectedProduct, $result['product']);
         $expectedCost = BcMath::div('1', $expectedProduct, self::SCALE);
         self::assertSame($expectedCost, $result['cost']);
+    }
+
+    public function test_it_limits_results_to_requested_top_k(): void
+    {
+        $orders = self::buildComprehensiveOrderBook();
+        $graph = (new GraphBuilder())->build($orders);
+
+        $finder = new PathFinder(maxHops: 4, tolerance: 0.999, topK: 2);
+        $results = $finder->findBestPaths($graph, 'RUB', 'IDR');
+
+        self::assertGreaterThanOrEqual(2, count($results));
+        self::assertCount(2, $results);
+        self::assertLessThanOrEqual(0, BcMath::comp($results[0]['cost'], $results[1]['cost'], self::SCALE));
+        self::assertGreaterThanOrEqual(0, BcMath::comp($results[0]['product'], $results[1]['product'], self::SCALE));
+
+        $finderWithBroaderLimit = new PathFinder(maxHops: 4, tolerance: 0.999, topK: 3);
+        $extendedResults = $finderWithBroaderLimit->findBestPaths($graph, 'RUB', 'IDR');
+
+        self::assertGreaterThan(2, count($extendedResults));
     }
 
     /**
