@@ -7,7 +7,9 @@ namespace SomeWork\P2PPathFinder\Tests\Application\Config;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
+use ReflectionProperty;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\Config\PathSearchConfigBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
@@ -59,6 +61,29 @@ final class PathSearchConfigTest extends TestCase
 
         self::assertSame(PathFinder::DEFAULT_MAX_EXPANSIONS, $config->pathFinderMaxExpansions());
         self::assertSame(PathFinder::DEFAULT_MAX_VISITED_STATES, $config->pathFinderMaxVisitedStates());
+    }
+
+    public function test_builder_defaults_to_single_result_limit(): void
+    {
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '25.00', 2))
+            ->withToleranceBounds(0.05, 0.10)
+            ->withHopLimits(1, 2)
+            ->build();
+
+        self::assertSame(1, $config->resultLimit());
+    }
+
+    public function test_builder_accepts_result_limit_of_one(): void
+    {
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '25.00', 2))
+            ->withToleranceBounds(0.05, 0.10)
+            ->withHopLimits(1, 2)
+            ->withResultLimit(1)
+            ->build();
+
+        self::assertSame(1, $config->resultLimit());
     }
 
     public function test_builder_accepts_custom_search_guards(): void
@@ -192,6 +217,22 @@ final class PathSearchConfigTest extends TestCase
         $method->invoke($config, -0.01);
     }
 
+    public function test_calculate_bounded_spend_allows_zero_multiplier(): void
+    {
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '10.00', 2))
+            ->withToleranceBounds(0.0, 0.1)
+            ->withHopLimits(1, 2)
+            ->build();
+
+        $method = new ReflectionMethod(PathSearchConfig::class, 'calculateBoundedSpend');
+        $method->setAccessible(true);
+
+        $zero = $method->invoke($config, 0.0);
+
+        self::assertTrue($zero->equals(Money::fromString('EUR', '0.00', 2)));
+    }
+
     public function test_float_to_string_collapses_negative_zero(): void
     {
         $method = new ReflectionMethod(PathSearchConfig::class, 'floatToString');
@@ -199,5 +240,42 @@ final class PathSearchConfigTest extends TestCase
 
         self::assertSame('0.0000', $method->invoke(null, -0.0, 4));
         self::assertSame('0.1234', $method->invoke(null, 0.1234, 4));
+    }
+
+    public function test_float_to_string_uses_guard_digits_for_rounding(): void
+    {
+        $method = new ReflectionMethod(PathSearchConfig::class, 'floatToString');
+        $method->setAccessible(true);
+
+        self::assertSame('0.0002', $method->invoke(null, 0.0001499, 4));
+        self::assertSame('0.0001', $method->invoke(null, 0.0001001, 4));
+    }
+
+    public function test_builder_requires_both_tolerance_bounds_to_be_configured(): void
+    {
+        $builder = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '10.00', 2))
+            ->withHopLimits(1, 2);
+
+        $minimum = new ReflectionProperty(PathSearchConfigBuilder::class, 'minimumTolerance');
+        $minimum->setAccessible(true);
+        $minimum->setValue($builder, 0.1);
+
+        $this->expectException(InvalidArgumentException::class);
+        $builder->build();
+    }
+
+    public function test_builder_requires_both_hop_limits_to_be_configured(): void
+    {
+        $builder = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '10.00', 2))
+            ->withToleranceBounds(0.0, 0.1);
+
+        $minimum = new ReflectionProperty(PathSearchConfigBuilder::class, 'minimumHops');
+        $minimum->setAccessible(true);
+        $minimum->setValue($builder, 1);
+
+        $this->expectException(InvalidArgumentException::class);
+        $builder->build();
     }
 }

@@ -323,13 +323,16 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $service = $this->makeService();
 
+        $best = $service->findBestPath($orderBook, $config, 'USD');
+        self::assertNotNull($best);
+
         $allResults = $service->findBestPaths($orderBook, $config, 'USD');
         self::assertNotSame([], $allResults);
 
-        $best = $service->findBestPath($orderBook, $config, 'USD');
-
-        self::assertNotNull($best);
-        self::assertSame($allResults[0], $best);
+        self::assertSame(
+            $allResults[0]->jsonSerialize(),
+            $best->jsonSerialize(),
+        );
     }
 
     /**

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Application\Graph;
 
 use PHPUnit\Framework\TestCase;
+use ReflectionProperty;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
@@ -101,6 +103,18 @@ final class GraphBuilderTest extends TestCase
         $this->assertEdgeCapacities($secondaryEdge, 'LTC', '1.000', '4.000', 'USD', '90.000', '360.000');
         $this->assertSegment($secondaryEdge['segments'][0], true, 'LTC', '1.000', 'USD', '90.000');
         $this->assertSegment($secondaryEdge['segments'][1], false, 'LTC', '3.000', 'USD', '270.000');
+    }
+
+    public function test_constructor_preserves_injected_fill_evaluator(): void
+    {
+        $customEvaluator = new OrderFillEvaluator();
+
+        $builder = new GraphBuilder($customEvaluator);
+
+        $property = new ReflectionProperty(GraphBuilder::class, 'fillEvaluator');
+        $property->setAccessible(true);
+
+        self::assertSame($customEvaluator, $property->getValue($builder));
     }
 
     public function test_build_uses_net_quote_capacity_for_buy_orders_with_fee(): void

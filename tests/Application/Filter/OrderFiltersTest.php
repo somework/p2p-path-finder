@@ -6,6 +6,7 @@ namespace SomeWork\P2PPathFinder\Tests\Application\Filter;
 
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use ReflectionProperty;
 use SomeWork\P2PPathFinder\Application\Filter\CurrencyPairFilter;
 use SomeWork\P2PPathFinder\Application\Filter\MaximumAmountFilter;
 use SomeWork\P2PPathFinder\Application\Filter\MinimumAmountFilter;
@@ -38,6 +39,15 @@ final class OrderFiltersTest extends TestCase
         self::assertTrue($filtered[0]->bounds()->min()->equals(CurrencyScenarioFactory::money('BTC', '0.100', 3)));
     }
 
+    public function test_currency_pair_filter_requires_exact_match(): void
+    {
+        $filter = new CurrencyPairFilter(CurrencyScenarioFactory::assetPair('BTC', 'USD'));
+
+        self::assertFalse($filter->accepts(OrderFactory::buy(base: 'BTC', quote: 'EUR')));
+        self::assertFalse($filter->accepts(OrderFactory::buy(base: 'ETH', quote: 'USD')));
+        self::assertTrue($filter->accepts(OrderFactory::buy()));
+    }
+
     /**
      * @dataProvider provideToleranceWindowCandidates
      */
@@ -66,6 +76,27 @@ final class OrderFiltersTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         new ToleranceWindowFilter($reference, '-0.01');
+    }
+
+    public function test_tolerance_window_filter_requires_numeric_tolerance(): void
+    {
+        $reference = CurrencyScenarioFactory::exchangeRate('BTC', 'USD', '30000', 2);
+
+        $this->expectException(InvalidArgumentException::class);
+
+        new ToleranceWindowFilter($reference, 'not-a-number');
+    }
+
+    public function test_tolerance_window_filter_clamps_negative_bounds_to_zero(): void
+    {
+        $reference = CurrencyScenarioFactory::exchangeRate('BTC', 'USD', '100.00', 2);
+
+        $filter = new ToleranceWindowFilter($reference, '1.50');
+
+        $lowerBound = new ReflectionProperty(ToleranceWindowFilter::class, 'lowerBound');
+        $lowerBound->setAccessible(true);
+
+        self::assertSame('0.00', $lowerBound->getValue($filter));
     }
 
     public function test_amount_filters_ignore_currency_mismatches(): void
