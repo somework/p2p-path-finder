@@ -527,6 +527,42 @@ final class PathFinderTest extends TestCase
         self::assertSame($result['amountRange']['min']->amount(), $result['desiredAmount']->amount());
     }
 
+    public function test_it_clamps_desired_spend_into_feasible_range_before_conversion(): void
+    {
+        $order = OrderFactory::buy('EUR', 'USD', '1.000', '5.000', '1.200', 3, 3);
+        $graph = (new GraphBuilder())->build([$order]);
+
+        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+
+        $minimum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
+        $maximum = CurrencyScenarioFactory::money('EUR', '3.000', 3);
+        $desired = CurrencyScenarioFactory::money('EUR', '10.000', 3);
+
+        $results = $finder->findBestPaths(
+            $graph,
+            'EUR',
+            'USD',
+            [
+                'min' => $minimum,
+                'max' => $maximum,
+                'desired' => $desired,
+            ],
+        );
+
+        self::assertNotSame([], $results);
+        $result = $results[0];
+
+        self::assertNotNull($result['desiredAmount']);
+
+        $edge = $graph['EUR']['edges'][0];
+        $convertMethod = new \ReflectionMethod(PathFinder::class, 'convertEdgeAmount');
+        $convertMethod->setAccessible(true);
+        $expectedDesired = $convertMethod->invoke($finder, $edge, $maximum);
+
+        self::assertSame($expectedDesired->currency(), $result['desiredAmount']->currency());
+        self::assertSame($expectedDesired->amount(), $result['desiredAmount']->amount());
+    }
+
     public function test_it_preserves_parallel_states_with_distinct_ranges(): void
     {
         $limitedCapacity = OrderFactory::sell('MID', 'SRC', '10.000', '15.000', '1.000', 3, 3);
