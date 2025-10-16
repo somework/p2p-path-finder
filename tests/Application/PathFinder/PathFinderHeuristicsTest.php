@@ -14,6 +14,8 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
+use function count;
+
 /**
  * @covers \SomeWork\P2PPathFinder\Application\PathFinder\PathFinder
  */
@@ -527,5 +529,84 @@ final class PathFinderHeuristicsTest extends TestCase
         }
 
         self::assertSame(['first', 'second', 'third'], $extracted);
+    }
+
+    public function test_finalize_results_sorts_candidates_by_cost(): void
+    {
+        $finder = new PathFinder(maxHops: 2, tolerance: 0.0, topK: 4);
+
+        $createHeap = new ReflectionMethod(PathFinder::class, 'createResultHeap');
+        $createHeap->setAccessible(true);
+
+        $heap = $createHeap->invoke($finder);
+
+        $recordResult = new ReflectionMethod(PathFinder::class, 'recordResult');
+        $recordResult->setAccessible(true);
+
+        $highCost = BcMath::normalize('2.000000000000000000', 18);
+        $lowCost = BcMath::normalize('1.500000000000000000', 18);
+
+        $recordResult->invokeArgs($finder, [$heap, $this->buildCandidate($highCost), 0]);
+        $recordResult->invokeArgs($finder, [$heap, $this->buildCandidate($lowCost), 1]);
+
+        $finalize = new ReflectionMethod(PathFinder::class, 'finalizeResults');
+        $finalize->setAccessible(true);
+
+        $results = $finalize->invoke($finder, $heap);
+
+        self::assertCount(2, $results);
+        self::assertSame($lowCost, $results[0]['cost']);
+        self::assertSame($highCost, $results[1]['cost']);
+    }
+
+    public function test_finalize_results_preserves_insertion_order_for_equal_costs(): void
+    {
+        $finder = new PathFinder(maxHops: 2, tolerance: 0.0, topK: 4);
+
+        $createHeap = new ReflectionMethod(PathFinder::class, 'createResultHeap');
+        $createHeap->setAccessible(true);
+
+        $heap = $createHeap->invoke($finder);
+
+        $recordResult = new ReflectionMethod(PathFinder::class, 'recordResult');
+        $recordResult->setAccessible(true);
+
+        $cost = BcMath::normalize('1.750000000000000000', 18);
+
+        $first = $this->buildCandidate($cost, [['label' => 'first']]);
+        $second = $this->buildCandidate($cost, [['label' => 'second']]);
+
+        $recordResult->invokeArgs($finder, [$heap, $first, 0]);
+        $recordResult->invokeArgs($finder, [$heap, $second, 1]);
+
+        $finalize = new ReflectionMethod(PathFinder::class, 'finalizeResults');
+        $finalize->setAccessible(true);
+
+        $results = $finalize->invoke($finder, $heap);
+
+        self::assertSame([['label' => 'first']], $results[0]['edges']);
+        self::assertSame([['label' => 'second']], $results[1]['edges']);
+    }
+
+    /**
+     * @return array{
+     *     cost: numeric-string,
+     *     product: numeric-string,
+     *     hops: int,
+     *     edges: list<array<string, string>>,
+     *     amountRange: null,
+     *     desiredAmount: null,
+     * }
+     */
+    private function buildCandidate(string $cost, array $edges = []): array
+    {
+        return [
+            'cost' => $cost,
+            'product' => BcMath::normalize('1.000000000000000000', 18),
+            'hops' => count($edges),
+            'edges' => $edges,
+            'amountRange' => null,
+            'desiredAmount' => null,
+        ];
     }
 }
