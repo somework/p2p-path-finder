@@ -307,6 +307,21 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame([], $service->findBestPaths($orderBook, $config, 'USD'));
     }
 
+    public function test_it_returns_empty_result_when_source_node_is_missing(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'USD', 'JPY', '10.000', '200.000', '110.00', 2),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.05)
+            ->withHopLimits(1, 1)
+            ->build();
+
+        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'JPY'));
+    }
+
     public function test_it_discards_candidates_rejected_by_tolerance_bounds(): void
     {
         $orderBook = $this->orderBook(
@@ -329,6 +344,23 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->build();
 
         self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'USD'));
+    }
+
+    public function test_it_rejects_candidates_exceeding_maximum_hops(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '200.000', '0.900', 3),
+            $this->createOrder(OrderSide::BUY, 'USD', 'GBP', '50.000', '200.000', '0.750', 3),
+            $this->createOrder(OrderSide::BUY, 'GBP', 'JPY', '50.000', '200.000', '150.000', 3),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.25)
+            ->withHopLimits(1, 2)
+            ->build();
+
+        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'JPY'));
     }
 
     /**
