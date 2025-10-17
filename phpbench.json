@@ -10,7 +10,8 @@
     "runner.time_unit": "milliseconds",
     "runner.progress": "plain",
     "runner.php_config": {
-        "memory_limit": "-1"
+        "memory_limit": "-1",
+        "xdebug.mode": "off"
     },
     "report.generators": {
         "p2p_aggregate": {

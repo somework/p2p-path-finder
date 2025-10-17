@@ -36,7 +36,8 @@
         "phpstan": "vendor/bin/phpstan analyse",
         "phpunit": "vendor/bin/phpunit",
         "psalm": "vendor/bin/psalm --config=psalm.xml.dist --show-info=false",
-        "phpdoc": "php bin/generate-phpdoc.php"
+        "phpdoc": "php bin/generate-phpdoc.php",
+        "phpbench": "php -d memory_limit=-1 -d xdebug.mode=off vendor/bin/phpbench run --config=phpbench.json --report=p2p_aggregate"
     },
     "suggest": {
         "symfony/polyfill-bcmath": "Provides BCMath functions when the extension cannot be installed."
