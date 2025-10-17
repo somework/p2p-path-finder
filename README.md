@@ -130,16 +130,16 @@ $config = PathSearchConfig::builder()
     ->build();
 
 $service = new PathFinderService(new GraphBuilder());
-$results = $service->findBestPaths($orderBook, $config, 'USDT');
+$resultOutcome = $service->findBestPaths($orderBook, $config, 'USDT');
 
-if ($results === []) {
+if (!$resultOutcome->hasPaths()) {
     throw new RuntimeException('No viable routes found.');
 }
 
-$result = $results[0];
+$result = $resultOutcome->paths()[0];
 ```
 
-The resulting array contains `PathResult` objects ordered from lowest to highest cost.
+The resulting `SearchOutcome` contains `PathResult` objects ordered from lowest to highest cost.
 In this example the first entry contains a single `PathLeg` reflecting the direct USD→USDT
 conversion.
 
@@ -183,10 +183,10 @@ $config = PathSearchConfig::builder()
     ->withHopLimits(2, 3)
     ->build();
 
-$results = (new PathFinderService(new GraphBuilder()))
+$resultOutcome = (new PathFinderService(new GraphBuilder()))
     ->findBestPaths($orderBook, $config, 'EUR');
 
-$topTwo = array_slice($results, 0, 2);
+$topTwo = array_slice($resultOutcome->paths(), 0, 2);
 ```
 
 Because the tolerance window is narrow the service will only accept paths that stay close

@@ -9,6 +9,8 @@ use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
@@ -50,9 +52,9 @@ final class PathFinderService
     /**
      * Searches for the best conversion paths from the configured spend asset to the target asset.
      *
-     * @return list<PathResult>
+     * @return SearchOutcome<PathResult>
      */
-    public function findBestPaths(OrderBook $orderBook, PathSearchConfig $config, string $targetAsset): array
+    public function findBestPaths(OrderBook $orderBook, PathSearchConfig $config, string $targetAsset): SearchOutcome
     {
         if ('' === $targetAsset) {
             throw new InvalidArgumentException('Target asset cannot be empty.');
@@ -64,12 +66,18 @@ final class PathFinderService
 
         $orders = $this->orderSpendAnalyzer->filterOrders($orderBook, $config);
         if ([] === $orders) {
-            return [];
+            /** @var SearchOutcome<PathResult> $empty */
+            $empty = SearchOutcome::empty(GuardLimitStatus::none());
+
+            return $empty;
         }
 
         $graph = $this->graphBuilder->build($orders);
         if (!isset($graph[$sourceCurrency], $graph[$targetCurrency])) {
-            return [];
+            /** @var SearchOutcome<PathResult> $empty */
+            $empty = SearchOutcome::empty(GuardLimitStatus::none());
+
+            return $empty;
         }
 
         $pathFinder = new PathFinder(
@@ -83,7 +91,7 @@ final class PathFinderService
         /** @var list<array{cost: numeric-string, order: int, result: PathResult}> $materializedResults */
         $materializedResults = [];
         $resultOrder = 0;
-        $pathFinder->findBestPaths(
+        $searchResult = $pathFinder->findBestPaths(
             $graph,
             $sourceCurrency,
             $targetCurrency,
@@ -154,7 +162,10 @@ final class PathFinderService
         );
 
         if ([] === $materializedResults) {
-            return [];
+            /** @var SearchOutcome<PathResult> $empty */
+            $empty = SearchOutcome::empty($searchResult->guardLimits());
+
+            return $empty;
         }
 
         usort(
@@ -180,9 +191,12 @@ final class PathFinderService
             },
         );
 
-        return array_map(
-            static fn (array $entry): PathResult => $entry['result'],
-            $materializedResults,
+        return new SearchOutcome(
+            array_map(
+                static fn (array $entry): PathResult => $entry['result'],
+                $materializedResults,
+            ),
+            $searchResult->guardLimits(),
         );
     }
 
@@ -193,6 +207,6 @@ final class PathFinderService
     {
         $results = $this->findBestPaths($orderBook, $config, $targetAsset);
 
-        return $results[0] ?? null;
+        return $results->paths()[0] ?? null;
     }
 }

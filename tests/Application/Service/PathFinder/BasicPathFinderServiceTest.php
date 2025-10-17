@@ -7,6 +7,9 @@ namespace SomeWork\P2PPathFinder\Tests\Application\Service\PathFinder;
 use InvalidArgumentException;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
+use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
@@ -14,6 +17,24 @@ use function count;
 
 final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 {
+    /**
+     * @param SearchOutcome<PathResult> $result
+     *
+     * @return list<PathResult>
+     */
+    private static function extractPaths(SearchOutcome $result): array
+    {
+        return $result->paths();
+    }
+
+    /**
+     * @param SearchOutcome<PathResult> $result
+     */
+    private static function extractGuardLimits(SearchOutcome $result): GuardLimitStatus
+    {
+        return $result->guardLimits();
+    }
+
     /**
      * @testdox Finds best EUR→JPY route by bridging through USD when multiple hops are needed
      */
@@ -27,7 +48,8 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 3)
             ->build();
 
-        $results = $this->makeService()->findBestPaths($orderBook, $config, 'JPY');
+        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'JPY');
+        $results = self::extractPaths($searchResult);
 
         self::assertNotSame([], $results);
         $result = $results[0];
@@ -87,7 +109,12 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'JPY'));
+        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'JPY');
+
+        self::assertSame([], self::extractPaths($searchResult));
+        $guardLimits = self::extractGuardLimits($searchResult);
+        self::assertFalse($guardLimits->expansionsReached());
+        self::assertFalse($guardLimits->visitedStatesReached());
     }
 
     /**
@@ -103,7 +130,8 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 3)
             ->build();
 
-        $results = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $results = self::extractPaths($searchResult);
 
         self::assertNotSame([], $results);
         $result = $results[0];
@@ -139,7 +167,8 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 3)
             ->build();
 
-        $results = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $results = self::extractPaths($searchResult);
 
         self::assertNotSame([], $results);
         $result = $results[0];
@@ -178,7 +207,8 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withResultLimit(2)
             ->build();
 
-        $results = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $results = self::extractPaths($searchResult);
 
         self::assertCount(2, $results);
 
@@ -217,7 +247,8 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withResultLimit(2)
             ->build();
 
-        $results = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $results = self::extractPaths($searchResult);
 
         self::assertCount(2, $results);
         self::assertSame('111.172', $results[0]->totalReceived()->amount());
@@ -242,7 +273,12 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(2, 3)
             ->build();
 
-        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'USD'));
+        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+
+        self::assertSame([], self::extractPaths($searchResult));
+        $guardLimits = self::extractGuardLimits($searchResult);
+        self::assertFalse($guardLimits->expansionsReached());
+        self::assertFalse($guardLimits->visitedStatesReached());
     }
 
     public function test_it_prefers_two_hop_route_when_direct_candidate_violates_minimum_hops(): void
@@ -259,7 +295,8 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(2, 3)
             ->build();
 
-        $results = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $results = self::extractPaths($searchResult);
 
         self::assertNotSame([], $results);
 
@@ -301,7 +338,12 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'BTC'));
+        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'BTC');
+
+        self::assertSame([], self::extractPaths($searchResult));
+        $guardLimits = self::extractGuardLimits($searchResult);
+        self::assertFalse($guardLimits->expansionsReached());
+        self::assertFalse($guardLimits->visitedStatesReached());
     }
 
     public function test_it_honors_path_finder_guard_configuration(): void
@@ -315,7 +357,11 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withSearchGuards(1, 1)
             ->build();
 
-        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $guardedConfig, 'JPY'));
+        $guardedResult = $this->makeService()->findBestPaths($orderBook, $guardedConfig, 'JPY');
+
+        self::assertSame([], self::extractPaths($guardedResult));
+        $guardLimits = self::extractGuardLimits($guardedResult);
+        self::assertTrue($guardLimits->anyLimitReached());
 
         $relaxedConfig = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
@@ -324,7 +370,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withSearchGuards(1000, 1000)
             ->build();
 
-        self::assertNotSame([], $this->makeService()->findBestPaths($orderBook, $relaxedConfig, 'JPY'));
+        self::assertNotSame([], self::extractPaths($this->makeService()->findBestPaths($orderBook, $relaxedConfig, 'JPY')));
     }
 
     /**
@@ -344,7 +390,12 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $service = $this->makeService();
 
-        self::assertSame([], $service->findBestPaths($orderBook, $config, 'USD'));
+        $searchResult = $service->findBestPaths($orderBook, $config, 'USD');
+
+        self::assertSame([], self::extractPaths($searchResult));
+        $guardLimits = self::extractGuardLimits($searchResult);
+        self::assertFalse($guardLimits->expansionsReached());
+        self::assertFalse($guardLimits->visitedStatesReached());
     }
 
     public function test_it_returns_empty_result_when_source_node_is_missing(): void
@@ -359,7 +410,12 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'JPY'));
+        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'JPY');
+
+        self::assertSame([], self::extractPaths($searchResult));
+        $guardLimits = self::extractGuardLimits($searchResult);
+        self::assertFalse($guardLimits->expansionsReached());
+        self::assertFalse($guardLimits->visitedStatesReached());
     }
 
     public function test_it_discards_candidates_rejected_by_tolerance_bounds(): void
@@ -383,7 +439,12 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'USD'));
+        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+
+        self::assertSame([], self::extractPaths($searchResult));
+        $guardLimits = self::extractGuardLimits($searchResult);
+        self::assertFalse($guardLimits->expansionsReached());
+        self::assertFalse($guardLimits->visitedStatesReached());
     }
 
     public function test_it_rejects_candidates_exceeding_maximum_hops(): void
@@ -400,7 +461,12 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 2)
             ->build();
 
-        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'JPY'));
+        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'JPY');
+
+        self::assertSame([], self::extractPaths($searchResult));
+        $guardLimits = self::extractGuardLimits($searchResult);
+        self::assertFalse($guardLimits->expansionsReached());
+        self::assertFalse($guardLimits->visitedStatesReached());
     }
 
     /**
@@ -419,7 +485,12 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'USD'));
+        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+
+        self::assertSame([], self::extractPaths($searchResult));
+        $guardLimits = self::extractGuardLimits($searchResult);
+        self::assertFalse($guardLimits->expansionsReached());
+        self::assertFalse($guardLimits->visitedStatesReached());
     }
 
     /**
@@ -442,10 +513,11 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertNotNull($best);
 
         $allResults = $service->findBestPaths($orderBook, $config, 'USD');
-        self::assertNotSame([], $allResults);
+        $paths = self::extractPaths($allResults);
+        self::assertNotSame([], $paths);
 
         self::assertSame(
-            $allResults[0]->jsonSerialize(),
+            $paths[0]->jsonSerialize(),
             $best->jsonSerialize(),
         );
     }

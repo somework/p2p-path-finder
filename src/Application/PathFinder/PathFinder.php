@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Application\PathFinder;
 
 use InvalidArgumentException;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
@@ -83,7 +85,7 @@ use function usort;
  *     order: Order,
  *     rate: ExchangeRate,
  *     orderSide: OrderSide,
- *     conversionRate: numeric-string,
+ *     conversionRate: string,
  * }
  *
  * @psalm-type Candidate = array{
@@ -96,8 +98,8 @@ use function usort;
  * }
  *
  * @phpstan-type Candidate array{
- *     cost: numeric-string,
- *     product: numeric-string,
+ *     cost: string,
+ *     product: string,
  *     hops: int,
  *     edges: list<PathEdge>,
  *     amountRange: SpendRange|null,
@@ -205,7 +207,11 @@ final class PathFinder
      * @param SpendConstraints|null         $spendConstraints
      * @param callable(Candidate):bool|null $acceptCandidate
      *
-     * @return list<Candidate>
+     * @return SearchOutcome<Candidate>
+     *
+     * @phpstan-return SearchOutcome<Candidate>
+     *
+     * @psalm-return SearchOutcome<Candidate>
      */
     public function findBestPaths(
         array $graph,
@@ -213,12 +219,15 @@ final class PathFinder
         string $target,
         ?array $spendConstraints = null,
         ?callable $acceptCandidate = null
-    ): array {
+    ): SearchOutcome {
         $source = strtoupper($source);
         $target = strtoupper($target);
 
         if (!array_key_exists($source, $graph) || !array_key_exists($target, $graph)) {
-            return [];
+            /** @var SearchOutcome<Candidate> $empty */
+            $empty = SearchOutcome::empty(GuardLimitStatus::none());
+
+            return $empty;
         }
 
         $range = null;
@@ -266,8 +275,12 @@ final class PathFinder
         $expansions = 0;
         $visitedStates = 1;
 
+        $expansionGuardReached = false;
+        $visitedGuardReached = false;
+
         while (!$queue->isEmpty()) {
             if ($expansions >= $this->maxExpansions) {
+                $expansionGuardReached = true;
                 break;
             }
 
@@ -276,9 +289,16 @@ final class PathFinder
             ++$expansions;
 
             if ($state['node'] === $target) {
+                /** @var numeric-string $candidateCost */
+                $candidateCost = $state['cost'];
+                /** @var numeric-string $candidateProduct */
+                $candidateProduct = $state['product'];
+
+                BcMath::ensureNumeric($candidateCost, $candidateProduct);
+
                 $candidate = [
-                    'cost' => $state['cost'],
-                    'product' => $state['product'],
+                    'cost' => $candidateCost,
+                    'product' => $candidateProduct,
                     'hops' => $state['hops'],
                     'edges' => $state['path'],
                     'amountRange' => $state['amountRange'],
@@ -318,6 +338,8 @@ final class PathFinder
                 }
 
                 $conversionRate = $this->edgeEffectiveConversionRate($edge);
+                /** @var numeric-string $conversionRate */
+                $conversionRate = $conversionRate;
                 if (1 !== BcMath::comp($conversionRate, '0', self::SCALE)) {
                     continue;
                 }
@@ -358,6 +380,7 @@ final class PathFinder
                     $visitedStates >= $this->maxVisitedStates
                     && !$this->hasStateWithSignature($bestPerNode[$nextNode] ?? [], $signature)
                 ) {
+                    $visitedGuardReached = true;
                     continue;
                 }
 
@@ -411,11 +434,19 @@ final class PathFinder
             }
         }
 
+        $guardLimits = new GuardLimitStatus($expansionGuardReached, $visitedGuardReached);
+
         if (0 === $results->count()) {
-            return [];
+            /** @var SearchOutcome<Candidate> $empty */
+            $empty = SearchOutcome::empty($guardLimits);
+
+            return $empty;
         }
 
-        return $this->finalizeResults($results);
+        /** @var list<Candidate> $finalized */
+        $finalized = $this->finalizeResults($results);
+
+        return new SearchOutcome($finalized, $guardLimits);
     }
 
     /**
@@ -551,10 +582,12 @@ final class PathFinder
      */
     private function recordResult(CandidateResultHeap $results, array $candidate, int $order): void
     {
+        /** @var numeric-string $candidateCost */
+        $candidateCost = $candidate['cost'];
         $entry = [
             'candidate' => $candidate,
             'order' => $order,
-            'cost' => $candidate['cost'],
+            'cost' => $candidateCost,
         ];
 
         /* @var CandidateHeapEntry $entry */
@@ -606,15 +639,17 @@ final class PathFinder
             },
         );
 
-        return array_map(
-            /**
-             * @param CandidateHeapEntry $entry
-             *
-             * @return Candidate
-             */
-            static fn (array $entry): array => $entry['candidate'],
-            $collected,
-        );
+        $finalized = [];
+
+        /** @var CandidateHeapEntry $entry */
+        foreach ($collected as $entry) {
+            /** @var Candidate $candidate */
+            $candidate = $entry['candidate'];
+
+            $finalized[] = $candidate;
+        }
+
+        return $finalized;
     }
 
     /**
@@ -913,7 +948,10 @@ final class SearchStateQueue extends SplPriorityQueue
         /** @var SearchQueueEntry $entry */
         $entry = parent::extract();
 
-        return $entry['state'];
+        /** @var SearchState $state */
+        $state = $entry['state'];
+
+        return $state;
     }
 
     /**
@@ -959,7 +997,14 @@ final class CandidateResultHeap extends SplPriorityQueue
     #[\Override]
     public function compare($priority1, $priority2): int
     {
-        $comparison = BcMath::comp($priority1['cost'], $priority2['cost'], $this->scale);
+        $leftCost = $priority1['cost'];
+        /** @var numeric-string $leftCost */
+        $leftCost = $leftCost;
+        $rightCost = $priority2['cost'];
+        /** @var numeric-string $rightCost */
+        $rightCost = $rightCost;
+
+        $comparison = BcMath::comp($leftCost, $rightCost, $this->scale);
         if (0 !== $comparison) {
             return $comparison;
         }
