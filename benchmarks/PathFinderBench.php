@@ -16,6 +16,7 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 use function array_fill;
 use function array_merge;
+use function number_format;
 use function str_pad;
 use function strlen;
 
@@ -74,6 +75,23 @@ class PathFinderBench
     }
 
     /**
+     * @param array{orderCount:int,resultLimit:int} $params
+     */
+    #[ParamProviders('provideKBestSearchScenarios')]
+    public function benchFindKBestPaths(array $params): void
+    {
+        $orderBook = $this->buildKBestOrderBook($params['orderCount']);
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('SRC', '1.00', 2))
+            ->withToleranceBounds(0.00, 0.00)
+            ->withHopLimits(2, 2)
+            ->withResultLimit($params['resultLimit'])
+            ->build();
+
+        $this->service->findBestPaths($orderBook, $config, 'DST');
+    }
+
+    /**
      * @return iterable<string, array{orderSetRepeats:int,minHop:int,maxHop:int}>
      */
     public function provideMarketDepthScenarios(): iterable
@@ -108,6 +126,27 @@ class PathFinderBench
             'fanout' => 7,
             'maxHop' => 6,
             'searchGuard' => 30000,
+        ];
+    }
+
+    /**
+     * @return iterable<string, array{orderCount:int,resultLimit:int}>
+     */
+    public function provideKBestSearchScenarios(): iterable
+    {
+        yield 'k-best-n1e2' => [
+            'orderCount' => 100,
+            'resultLimit' => 16,
+        ];
+
+        yield 'k-best-n1e3' => [
+            'orderCount' => 1000,
+            'resultLimit' => 16,
+        ];
+
+        yield 'k-best-n1e4' => [
+            'orderCount' => 10000,
+            'resultLimit' => 16,
         ];
     }
 
@@ -217,5 +256,42 @@ class PathFinderBench
 
             return $candidate;
         }
+    }
+
+    private function buildKBestOrderBook(int $orderCount): OrderBook
+    {
+        $orders = [];
+        $counter = 0;
+        $paths = intdiv($orderCount, 2);
+
+        for ($pathIndex = 0; $pathIndex < $paths; ++$pathIndex) {
+            $branchCurrency = $this->syntheticCurrency($counter);
+            $orders[] = new Order(
+                OrderSide::BUY,
+                AssetPair::fromString('SRC', $branchCurrency),
+                OrderBounds::from(
+                    Money::fromString('SRC', '1.00', 2),
+                    Money::fromString('SRC', '1.00', 2),
+                ),
+                ExchangeRate::fromString('SRC', $branchCurrency, '1.000000', 6),
+            );
+
+            $orders[] = new Order(
+                OrderSide::BUY,
+                AssetPair::fromString($branchCurrency, 'DST'),
+                OrderBounds::from(
+                    Money::fromString($branchCurrency, '1.00', 2),
+                    Money::fromString($branchCurrency, '1.00', 2),
+                ),
+                ExchangeRate::fromString(
+                    $branchCurrency,
+                    'DST',
+                    number_format(1.0 - (($pathIndex + 1) * 0.00001), 6, '.', ''),
+                    6,
+                ),
+            );
+        }
+
+        return new OrderBook($orders);
     }
 }
