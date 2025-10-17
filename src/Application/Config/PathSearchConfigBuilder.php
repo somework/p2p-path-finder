@@ -159,6 +159,7 @@ final class PathSearchConfigBuilder
     {
         if (is_string($value)) {
             BcMath::ensureNumeric($value);
+            /** @var numeric-string $value */
             $normalized = BcMath::normalize($value, self::PATH_FINDER_TOLERANCE_SCALE);
 
             if (BcMath::comp($normalized, '0', self::PATH_FINDER_TOLERANCE_SCALE) < 0 || BcMath::comp($normalized, '1', self::PATH_FINDER_TOLERANCE_SCALE) >= 0) {
@@ -178,6 +179,7 @@ final class PathSearchConfigBuilder
         }
 
         $formatted = sprintf('%.'.self::PATH_FINDER_TOLERANCE_SCALE.'F', $value);
+        /** @var numeric-string $formatted */
         $normalized = BcMath::normalize($formatted, self::PATH_FINDER_TOLERANCE_SCALE);
 
         return [$value, $normalized];
