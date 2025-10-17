@@ -27,14 +27,14 @@ final class ToleranceEvaluatorTest extends TestCase
         self::assertNotNull($residual);
         self::assertEqualsWithDelta($expectedResidual, $residual, 1e-12);
         self::assertGreaterThanOrEqual(0.0, $residual);
-        self::assertLessThanOrEqual($config->maximumTolerance() + 1e-12, $residual);
+        self::assertLessThanOrEqual((float) $config->maximumTolerance() + 1e-12, $residual);
     }
 
     public function test_it_handles_zero_requested_spend_without_dividing_by_zero(): void
     {
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '0.00', 2))
-            ->withToleranceBounds(0.0, 0.5)
+            ->withToleranceBounds('0.0', '0.5')
             ->withHopLimits(1, 1)
             ->build();
 
@@ -58,7 +58,7 @@ final class ToleranceEvaluatorTest extends TestCase
         yield 'zero tolerance requires exact spend' => [
             PathSearchConfig::builder()
                 ->withSpendAmount($requested)
-                ->withToleranceBounds(0.0, 0.0)
+                ->withToleranceBounds('0.0', '0.0')
                 ->withHopLimits(1, 1)
                 ->build(),
             $requested,
@@ -69,7 +69,7 @@ final class ToleranceEvaluatorTest extends TestCase
         yield 'asymmetric tolerance allows lower boundary spend' => [
             PathSearchConfig::builder()
                 ->withSpendAmount($requested)
-                ->withToleranceBounds(0.02, 0.10)
+                ->withToleranceBounds('0.02', '0.10')
                 ->withHopLimits(1, 3)
                 ->build(),
             $requested,
@@ -79,7 +79,7 @@ final class ToleranceEvaluatorTest extends TestCase
 
         $narrowWindowConfig = PathSearchConfig::builder()
             ->withSpendAmount($requested)
-            ->withToleranceBounds(0.015, 0.035)
+            ->withToleranceBounds('0.015', '0.035')
             ->withHopLimits(1, 2)
             ->build();
 
@@ -92,7 +92,7 @@ final class ToleranceEvaluatorTest extends TestCase
 
         $maximumWindowConfig = PathSearchConfig::builder()
             ->withSpendAmount($requested)
-            ->withToleranceBounds(0.015, 0.035)
+            ->withToleranceBounds('0.015', '0.035')
             ->withHopLimits(1, 2)
             ->build();
 
@@ -105,7 +105,7 @@ final class ToleranceEvaluatorTest extends TestCase
 
         $upperBoundaryConfig = PathSearchConfig::builder()
             ->withSpendAmount($requested)
-            ->withToleranceBounds(0.01, 0.05)
+            ->withToleranceBounds('0.01', '0.05')
             ->withHopLimits(2, 4)
             ->build();
 
@@ -121,7 +121,7 @@ final class ToleranceEvaluatorTest extends TestCase
         yield 'high precision rounding noise remains within tolerance' => [
             PathSearchConfig::builder()
                 ->withSpendAmount($highPrecisionSpend)
-                ->withToleranceBounds(0.0, 0.000002)
+                ->withToleranceBounds('0.0', '0.000002')
                 ->withHopLimits(1, 4)
                 ->build(),
             $highPrecisionSpend,
@@ -153,7 +153,7 @@ final class ToleranceEvaluatorTest extends TestCase
         yield 'zero tolerance rejects fractional under spend' => [
             PathSearchConfig::builder()
                 ->withSpendAmount($requested)
-                ->withToleranceBounds(0.0, 0.05)
+                ->withToleranceBounds('0.0', '0.05')
                 ->withHopLimits(1, 3)
                 ->build(),
             $requested,
@@ -163,7 +163,7 @@ final class ToleranceEvaluatorTest extends TestCase
         yield 'underspend exceeding configured minimum tolerance is rejected' => [
             PathSearchConfig::builder()
                 ->withSpendAmount($requested)
-                ->withToleranceBounds(0.015, 0.02)
+                ->withToleranceBounds('0.015', '0.02')
                 ->withHopLimits(1, 2)
                 ->build(),
             $requested,
@@ -181,7 +181,7 @@ final class ToleranceEvaluatorTest extends TestCase
         yield 'overspend exceeding configured maximum tolerance is rejected' => [
             PathSearchConfig::builder()
                 ->withSpendAmount($requested)
-                ->withToleranceBounds(0.01, 0.05)
+                ->withToleranceBounds('0.01', '0.05')
                 ->withHopLimits(1, 3)
                 ->build(),
             $requested,
@@ -191,7 +191,7 @@ final class ToleranceEvaluatorTest extends TestCase
         yield 'high precision overspend beyond tolerance is rejected' => [
             PathSearchConfig::builder()
                 ->withSpendAmount(Money::fromString('BTC', '0.12345678', 8))
-                ->withToleranceBounds(0.0, 0.000002)
+                ->withToleranceBounds('0.0', '0.000002')
                 ->withHopLimits(1, 4)
                 ->build(),
             Money::fromString('BTC', '0.12345678', 8),

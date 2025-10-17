@@ -23,7 +23,7 @@ final class PathFinderConstructorTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Result limit must be at least one.');
 
-        new PathFinder(maxHops: 2, tolerance: 0.0, topK: 0);
+        new PathFinder(maxHops: 2, tolerance: '0.0', topK: 0);
     }
 
     public function test_it_requires_maximum_expansions_to_be_positive(): void
@@ -31,7 +31,7 @@ final class PathFinderConstructorTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Maximum expansions must be at least one.');
 
-        new PathFinder(maxHops: 2, tolerance: 0.0, topK: 1, maxExpansions: 0);
+        new PathFinder(maxHops: 2, tolerance: '0.0', topK: 1, maxExpansions: 0);
     }
 
     public function test_it_requires_maximum_visited_states_to_be_positive(): void
@@ -39,6 +39,6 @@ final class PathFinderConstructorTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Maximum visited states must be at least one.');
 
-        new PathFinder(maxHops: 2, tolerance: 0.0, topK: 1, maxExpansions: 10, maxVisitedStates: 0);
+        new PathFinder(maxHops: 2, tolerance: '0.0', topK: 1, maxExpansions: 10, maxVisitedStates: 0);
     }
 }

@@ -6,7 +6,6 @@ namespace SomeWork\P2PPathFinder\Tests\Application\Config;
 
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
-use ReflectionMethod;
 use ReflectionProperty;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfigBuilder;
@@ -19,7 +18,7 @@ final class PathSearchConfigTest extends TestCase
     {
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.10, 0.25)
+            ->withToleranceBounds('0.10', '0.25')
             ->withHopLimits(1, 3)
             ->build();
 
@@ -33,11 +32,11 @@ final class PathSearchConfigTest extends TestCase
     {
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '250.00', 2))
-            ->withToleranceBounds(0.15, 0.05)
+            ->withToleranceBounds('0.15', '0.05')
             ->withHopLimits(1, 4)
             ->build();
 
-        self::assertSame(0.15, $config->pathFinderTolerance());
+        self::assertSame('0.150000000000000000', $config->pathFinderTolerance());
     }
 
     public function test_path_finder_tolerance_preserves_high_precision_string(): void
@@ -59,14 +58,14 @@ final class PathSearchConfigTest extends TestCase
             ->withHopLimits(1, 4)
             ->build();
 
-        self::assertSame(0.9999999999999999, $config->maximumTolerance());
+        self::assertSame('0.999999999999999999', $config->maximumTolerance());
     }
 
     public function test_builder_provides_default_search_guards(): void
     {
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '50.00', 2))
-            ->withToleranceBounds(0.0, 0.1)
+            ->withToleranceBounds('0.0', '0.1')
             ->withHopLimits(1, 2)
             ->build();
 
@@ -78,7 +77,7 @@ final class PathSearchConfigTest extends TestCase
     {
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '25.00', 2))
-            ->withToleranceBounds(0.05, 0.10)
+            ->withToleranceBounds('0.05', '0.10')
             ->withHopLimits(1, 2)
             ->build();
 
@@ -89,7 +88,7 @@ final class PathSearchConfigTest extends TestCase
     {
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '25.00', 2))
-            ->withToleranceBounds(0.05, 0.10)
+            ->withToleranceBounds('0.05', '0.10')
             ->withHopLimits(1, 2)
             ->withResultLimit(1)
             ->build();
@@ -101,7 +100,7 @@ final class PathSearchConfigTest extends TestCase
     {
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '50.00', 2))
-            ->withToleranceBounds(0.0, 0.1)
+            ->withToleranceBounds('0.0', '0.1')
             ->withHopLimits(1, 2)
             ->withSearchGuards(42, 64)
             ->build();
@@ -113,7 +112,7 @@ final class PathSearchConfigTest extends TestCase
     public function test_builder_requires_spend_amount(): void
     {
         $builder = PathSearchConfig::builder()
-            ->withToleranceBounds(0.0, 0.1)
+            ->withToleranceBounds('0.0', '0.1')
             ->withHopLimits(1, 2);
 
         $this->expectException(InvalidArgumentException::class);
@@ -150,7 +149,7 @@ final class PathSearchConfigTest extends TestCase
     {
         $builder = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '10.00', 2))
-            ->withToleranceBounds(0.0, 0.1);
+            ->withToleranceBounds('0.0', '0.1');
 
         $this->expectException(InvalidArgumentException::class);
         $builder->build();
@@ -167,7 +166,7 @@ final class PathSearchConfigTest extends TestCase
     /**
      * @dataProvider provideInvalidToleranceBounds
      */
-    public function test_tolerance_bounds_are_validated(float $minimum, float $maximum): void
+    public function test_tolerance_bounds_are_validated(string $minimum, string $maximum): void
     {
         $builder = PathSearchConfig::builder();
 
@@ -176,14 +175,14 @@ final class PathSearchConfigTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{float, float}>
+     * @return iterable<string, array{string, string}>
      */
     public static function provideInvalidToleranceBounds(): iterable
     {
-        yield 'negative minimum' => [-0.01, 0.1];
-        yield 'negative maximum' => [0.1, -0.5];
-        yield 'minimum equal to one' => [1.0, 0.1];
-        yield 'maximum equal to one' => [0.1, 1.0];
+        yield 'negative minimum' => ['-0.01', '0.1'];
+        yield 'negative maximum' => ['0.1', '-0.5'];
+        yield 'minimum equal to one' => ['1.0', '0.1'];
+        yield 'maximum equal to one' => ['0.1', '1.0'];
     }
 
     /**
@@ -213,7 +212,7 @@ final class PathSearchConfigTest extends TestCase
     {
         $builder = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '10.00', 2))
-            ->withToleranceBounds(0.0, 0.1)
+            ->withToleranceBounds('0.0', '0.1')
             ->withHopLimits(1, 2);
 
         $this->expectException(InvalidArgumentException::class);
@@ -229,61 +228,12 @@ final class PathSearchConfigTest extends TestCase
         yield 'expansions zero' => [10, 0];
     }
 
-    public function test_calculate_bounded_spend_rejects_negative_multiplier(): void
-    {
-        $config = PathSearchConfig::builder()
-            ->withSpendAmount(Money::fromString('EUR', '10.00', 2))
-            ->withToleranceBounds(0.0, 0.1)
-            ->withHopLimits(1, 2)
-            ->build();
-
-        $method = new ReflectionMethod(PathSearchConfig::class, 'calculateBoundedSpend');
-        $method->setAccessible(true);
-
-        $this->expectException(InvalidArgumentException::class);
-        $method->invoke($config, -0.01);
-    }
-
-    public function test_calculate_bounded_spend_allows_zero_multiplier(): void
-    {
-        $config = PathSearchConfig::builder()
-            ->withSpendAmount(Money::fromString('EUR', '10.00', 2))
-            ->withToleranceBounds(0.0, 0.1)
-            ->withHopLimits(1, 2)
-            ->build();
-
-        $method = new ReflectionMethod(PathSearchConfig::class, 'calculateBoundedSpend');
-        $method->setAccessible(true);
-
-        $zero = $method->invoke($config, 0.0);
-
-        self::assertTrue($zero->equals(Money::fromString('EUR', '0.00', 2)));
-    }
-
-    public function test_float_to_string_collapses_negative_zero(): void
-    {
-        $method = new ReflectionMethod(PathSearchConfig::class, 'floatToString');
-        $method->setAccessible(true);
-
-        self::assertSame('0.0000', $method->invoke(null, -0.0, 4));
-        self::assertSame('0.1234', $method->invoke(null, 0.1234, 4));
-    }
-
-    public function test_float_to_string_uses_guard_digits_for_rounding(): void
-    {
-        $method = new ReflectionMethod(PathSearchConfig::class, 'floatToString');
-        $method->setAccessible(true);
-
-        self::assertSame('0.0002', $method->invoke(null, 0.0001499, 4));
-        self::assertSame('0.0001', $method->invoke(null, 0.0001001, 4));
-    }
-
     public function test_constructor_enforces_default_limits_and_bounds(): void
     {
         $config = new PathSearchConfig(
             Money::fromString('EUR', '100.00', 2),
-            0.1,
-            0.2,
+            '0.1',
+            '0.2',
             1,
             3,
         );
@@ -299,8 +249,8 @@ final class PathSearchConfigTest extends TestCase
 
         new PathSearchConfig(
             Money::fromString('EUR', '100.00', 2),
-            1.0,
-            0.2,
+            '1.0',
+            '0.2',
             1,
             3,
         );
@@ -312,29 +262,23 @@ final class PathSearchConfigTest extends TestCase
 
         new PathSearchConfig(
             Money::fromString('EUR', '100.00', 2),
-            0.1,
-            1.0,
+            '0.1',
+            '1.0',
             1,
             3,
         );
     }
 
-    public function test_calculate_bounded_spend_retains_guard_scale(): void
+    public function test_bounded_spend_calculation_maintains_scale_precision(): void
     {
-        $config = new PathSearchConfig(
-            Money::fromString('EUR', '123.45', 2),
-            0.1,
-            0.2,
-            1,
-            3,
-        );
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '123.45', 2))
+            ->withToleranceBounds('0.50008101', '0.0')
+            ->withHopLimits(1, 3)
+            ->build();
 
-        $method = new ReflectionMethod(PathSearchConfig::class, 'calculateBoundedSpend');
-        $method->setAccessible(true);
-
-        $bounded = $method->invoke($config, 0.50008101);
-
-        self::assertSame('61.74', $bounded->amount());
+        self::assertSame('61.71', $config->minimumSpendAmount()->amount());
+        self::assertSame(2, $config->minimumSpendAmount()->scale());
     }
 
     public function test_builder_requires_both_tolerance_bounds_to_be_configured(): void
@@ -345,7 +289,7 @@ final class PathSearchConfigTest extends TestCase
 
         $minimum = new ReflectionProperty(PathSearchConfigBuilder::class, 'minimumTolerance');
         $minimum->setAccessible(true);
-        $minimum->setValue($builder, 0.1);
+        $minimum->setValue($builder, '0.100000000000000000');
 
         $this->expectException(InvalidArgumentException::class);
         $builder->build();
@@ -355,7 +299,7 @@ final class PathSearchConfigTest extends TestCase
     {
         $builder = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '10.00', 2))
-            ->withToleranceBounds(0.0, 0.1);
+            ->withToleranceBounds('0.0', '0.1');
 
         $minimum = new ReflectionProperty(PathSearchConfigBuilder::class, 'minimumHops');
         $minimum->setAccessible(true);

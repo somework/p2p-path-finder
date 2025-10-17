@@ -16,7 +16,8 @@ use function substr;
  */
 final class ToleranceEvaluator
 {
-    private const RESIDUAL_TOLERANCE_EPSILON = 0.000001;
+    private const RESIDUAL_TOLERANCE_EPSILON = '0.000001';
+    private const RESIDUAL_SCALE = 18;
 
     public function evaluate(PathSearchConfig $config, Money $requestedSpend, Money $actualSpend): ?float
     {
@@ -27,28 +28,42 @@ final class ToleranceEvaluator
 
         if (
             $actualComparable->lessThan($requestedComparable)
-            && $residual - $config->minimumTolerance() > self::RESIDUAL_TOLERANCE_EPSILON
+            && 1 === BcMath::comp(
+                BcMath::sub($residual, $config->minimumTolerance(), self::RESIDUAL_SCALE),
+                self::RESIDUAL_TOLERANCE_EPSILON,
+                self::RESIDUAL_SCALE,
+            )
         ) {
             return null;
         }
 
         if (
             $actualComparable->greaterThan($requestedComparable)
-            && $residual - $config->maximumTolerance() > self::RESIDUAL_TOLERANCE_EPSILON
+            && 1 === BcMath::comp(
+                BcMath::sub($residual, $config->maximumTolerance(), self::RESIDUAL_SCALE),
+                self::RESIDUAL_TOLERANCE_EPSILON,
+                self::RESIDUAL_SCALE,
+            )
         ) {
             return null;
         }
 
-        return $residual;
+        return (float) $residual;
     }
 
-    private function calculateResidualTolerance(Money $desired, Money $actual): float
+    /**
+     * @return numeric-string
+     */
+    /**
+     * @return numeric-string
+     */
+    private function calculateResidualTolerance(Money $desired, Money $actual): string
     {
-        $scale = max($desired->scale(), $actual->scale(), 8);
+        $scale = max($desired->scale(), $actual->scale(), self::RESIDUAL_SCALE);
         $desiredAmount = $desired->withScale($scale)->amount();
 
         if (0 === BcMath::comp($desiredAmount, '0', $scale)) {
-            return 0.0;
+            return BcMath::normalize('0', self::RESIDUAL_SCALE);
         }
 
         $actualAmount = $actual->withScale($scale)->amount();
@@ -63,8 +78,8 @@ final class ToleranceEvaluator
         }
 
         BcMath::ensureNumeric($diff);
-        $ratio = BcMath::div($diff, $desiredAmount, $scale + 4);
+        $ratio = BcMath::div($diff, $desiredAmount, self::RESIDUAL_SCALE + 4);
 
-        return (float) $ratio;
+        return BcMath::normalize($ratio, self::RESIDUAL_SCALE);
     }
 }

@@ -62,7 +62,7 @@ abstract class PathFinderServiceTestCase extends TestCase
         return new OrderBook($orders);
     }
 
-    protected function assertGrossWithinTolerance(Money $requested, Money $actual, float $maximumTolerance, string $message): void
+    protected function assertGrossWithinTolerance(Money $requested, Money $actual, string $maximumTolerance, string $message): void
     {
         $grossScale = max($requested->scale(), $actual->scale());
         $requestedGross = $requested->withScale($grossScale)->amount();
@@ -83,7 +83,7 @@ abstract class PathFinderServiceTestCase extends TestCase
         self::assertTrue(
             BcMath::comp(
                 $relativeDifference,
-                BcMath::normalize(sprintf('%.'.($grossScale + 6).'F', $maximumTolerance), $grossScale + 6),
+                BcMath::normalize($maximumTolerance, $grossScale + 6),
                 $grossScale + 6,
             ) <= 0,
             sprintf($message, $difference),

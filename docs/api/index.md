@@ -8,7 +8,7 @@ Immutable configuration carrying constraints used by {@see PathFinderService}.
 ### Public methods
 
 ### __construct
-`PathSearchConfig::__construct(SomeWork\P2PPathFinder\Domain\ValueObject\Money $spendAmount, float $minimumTolerance, float $maximumTolerance, int $minimumHops, int $maximumHops, int $resultLimit = 1, int $pathFinderMaxExpansions = SomeWork\P2PPathFinder\Application\PathFinder\PathFinder::DEFAULT_MAX_EXPANSIONS, int $pathFinderMaxVisitedStates = SomeWork\P2PPathFinder\Application\PathFinder\PathFinder::DEFAULT_MAX_VISITED_STATES, float|string|null $pathFinderToleranceOverride = null)`
+`PathSearchConfig::__construct(SomeWork\P2PPathFinder\Domain\ValueObject\Money $spendAmount, string $minimumTolerance, string $maximumTolerance, int $minimumHops, int $maximumHops, int $resultLimit = 1, int $pathFinderMaxExpansions = SomeWork\P2PPathFinder\Application\PathFinder\PathFinder::DEFAULT_MAX_EXPANSIONS, int $pathFinderMaxVisitedStates = SomeWork\P2PPathFinder\Application\PathFinder\PathFinder::DEFAULT_MAX_VISITED_STATES, ?string $pathFinderToleranceOverride = null)`
 
 ### builder
 `PathSearchConfig::builder(): SomeWork\P2PPathFinder\Application\Config\PathSearchConfigBuilder`
@@ -21,12 +21,12 @@ Returns a fluent builder for constructing configuration instances.
 Returns the target spend amount expressed in the source asset.
 
 ### minimumTolerance
-`PathSearchConfig::minimumTolerance(): float`
+`PathSearchConfig::minimumTolerance(): string`
 
 Returns the lower relative tolerance bound expressed as a fraction.
 
 ### maximumTolerance
-`PathSearchConfig::maximumTolerance(): float`
+`PathSearchConfig::maximumTolerance(): string`
 
 Returns the upper relative tolerance bound expressed as a fraction.
 
@@ -56,7 +56,7 @@ Returns the minimum amount that can be spent after tolerance adjustments.
 Returns the maximum amount that can be spent after tolerance adjustments.
 
 ### pathFinderTolerance
-`PathSearchConfig::pathFinderTolerance(): float|string`
+`PathSearchConfig::pathFinderTolerance(): string`
 
 Returns the tolerance value used by the graph search heuristic.
 
@@ -71,7 +71,7 @@ Fluent builder used to construct {@see PathSearchConfig} instances.
 Sets the amount of the source asset that will be spent during path search.
 
 ### withToleranceBounds
-`PathSearchConfigBuilder::withToleranceBounds(float|string $minimumTolerance, float|string $maximumTolerance): self`
+`PathSearchConfigBuilder::withToleranceBounds(string $minimumTolerance, string $maximumTolerance): self`
 
 Configures the acceptable relative deviation from the desired spend amount.
 
@@ -176,7 +176,7 @@ Implementation of a tolerance-aware best-path search through the trading graph.
 ### Public methods
 
 ### __construct
-`PathFinder::__construct(int $maxHops = 4, float $tolerance = 0, int $topK = 1)`
+`PathFinder::__construct(int $maxHops = 4, string $tolerance = '0', int $topK = 1)`
 
 ### findBestPaths
 `PathFinder::findBestPaths(array $graph, string $source, string $target, ?array $spendConstraints = null, ?callable $acceptCandidate = null): array`

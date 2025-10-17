@@ -33,28 +33,28 @@ final class PathFinderTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
 
-        new PathFinder($invalidMaxHops, 0.0);
+        new PathFinder($invalidMaxHops, '0.0');
     }
 
     public function test_it_requires_positive_result_limit(): void
     {
         $this->expectException(InvalidArgumentException::class);
 
-        new PathFinder(maxHops: 1, tolerance: 0.0, topK: 0);
+        new PathFinder(maxHops: 1, tolerance: '0.0', topK: 0);
     }
 
     public function test_it_requires_positive_expansion_guard(): void
     {
         $this->expectException(InvalidArgumentException::class);
 
-        new PathFinder(maxHops: 1, tolerance: 0.0, topK: 1, maxExpansions: 0);
+        new PathFinder(maxHops: 1, tolerance: '0.0', topK: 1, maxExpansions: 0);
     }
 
     public function test_it_requires_positive_visited_state_guard(): void
     {
         $this->expectException(InvalidArgumentException::class);
 
-        new PathFinder(maxHops: 1, tolerance: 0.0, topK: 1, maxExpansions: 1, maxVisitedStates: 0);
+        new PathFinder(maxHops: 1, tolerance: '0.0', topK: 1, maxExpansions: 1, maxVisitedStates: 0);
     }
 
     /**
@@ -69,7 +69,7 @@ final class PathFinderTest extends TestCase
     /**
      * @dataProvider provideInvalidTolerances
      */
-    public function test_it_requires_tolerance_within_expected_range(float|string $invalidTolerance): void
+    public function test_it_requires_tolerance_within_expected_range(string $invalidTolerance): void
     {
         $this->expectException(InvalidArgumentException::class);
 
@@ -77,12 +77,12 @@ final class PathFinderTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{float|string}>
+     * @return iterable<string, array{string}>
      */
     public static function provideInvalidTolerances(): iterable
     {
-        yield 'negative' => [-0.001];
-        yield 'greater_than_or_equal_to_one' => [1.0];
+        yield 'negative' => ['-0.001'];
+        yield 'greater_than_or_equal_to_one' => ['1.0'];
         yield 'string_out_of_range' => ['1.0000000000000001'];
     }
 
@@ -126,7 +126,7 @@ final class PathFinderTest extends TestCase
      */
     public function test_it_finds_best_rub_to_idr_path_under_various_filters(
         int $maxHops,
-        float $tolerance,
+        string $tolerance,
         int $expectedHopCount,
         array $expectedRoute,
         string $expectedProduct
@@ -158,7 +158,7 @@ final class PathFinderTest extends TestCase
         $orders = self::buildComprehensiveOrderBook();
         $graph = (new GraphBuilder())->build($orders);
 
-        $finder = new PathFinder(maxHops: 4, tolerance: 0.999, topK: 2);
+        $finder = new PathFinder(maxHops: 4, tolerance: '0.999', topK: 2);
         $results = $finder->findBestPaths($graph, 'RUB', 'IDR');
 
         self::assertGreaterThanOrEqual(2, count($results));
@@ -166,7 +166,7 @@ final class PathFinderTest extends TestCase
         self::assertLessThanOrEqual(0, BcMath::comp($results[0]['cost'], $results[1]['cost'], self::SCALE));
         self::assertGreaterThanOrEqual(0, BcMath::comp($results[0]['product'], $results[1]['product'], self::SCALE));
 
-        $finderWithBroaderLimit = new PathFinder(maxHops: 4, tolerance: 0.999, topK: 3);
+        $finderWithBroaderLimit = new PathFinder(maxHops: 4, tolerance: '0.999', topK: 3);
         $extendedResults = $finderWithBroaderLimit->findBestPaths($graph, 'RUB', 'IDR');
 
         self::assertGreaterThan(2, count($extendedResults));
@@ -177,7 +177,7 @@ final class PathFinderTest extends TestCase
         $orders = self::buildComprehensiveOrderBook();
         $graph = (new GraphBuilder())->build($orders);
 
-        $finder = new PathFinder(maxHops: 3, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.0');
         $results = $finder->findBestPaths($graph, 'rub', 'idr');
 
         self::assertNotSame([], $results);
@@ -188,7 +188,7 @@ final class PathFinderTest extends TestCase
         $orders = self::buildComprehensiveOrderBook();
         $graph = (new GraphBuilder())->build($orders);
 
-        $finder = new PathFinder(maxHops: 3, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.0');
 
         self::assertSame([], $finder->findBestPaths($graph, 'RUB', 'ZZZ'));
         self::assertSame([], $finder->findBestPaths($graph, 'zzz', 'IDR'));
@@ -203,7 +203,7 @@ final class PathFinderTest extends TestCase
         ];
 
         $graph = (new GraphBuilder())->build($orders);
-        $finder = new PathFinder(maxHops: 3, tolerance: 0.0, topK: 3);
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.0', topK: 3);
 
         $visitedCandidates = [];
         $spend = Money::fromString('EUR', '100.00', 2);
@@ -249,13 +249,13 @@ final class PathFinderTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{int, float, int, list<array{from: string, to: string}>, string}>
+     * @return iterable<string, array{int, string, int, list<array{from: string, to: string}>, string}>
      */
     public static function provideRubToIdrConstraintScenarios(): iterable
     {
         yield 'direct_route_only' => [
             1,
-            0.0,
+            '0.0',
             1,
             [
                 ['from' => 'RUB', 'to' => 'IDR'],
@@ -271,7 +271,7 @@ final class PathFinderTest extends TestCase
         );
         yield 'two_hop_best_path_with_strict_tolerance' => [
             2,
-            0.0,
+            '0.0',
             2,
             [
                 ['from' => 'RUB', 'to' => 'USD'],
@@ -282,7 +282,7 @@ final class PathFinderTest extends TestCase
 
         yield 'two_hop_best_path_with_relaxed_tolerance' => [
             2,
-            0.12,
+            '0.12',
             2,
             [
                 ['from' => 'RUB', 'to' => 'USD'],
@@ -302,7 +302,7 @@ final class PathFinderTest extends TestCase
         );
         yield 'three_hop_path_outperforms_direct_conversion' => [
             3,
-            0.995,
+            '0.995',
             3,
             [
                 ['from' => 'RUB', 'to' => 'USD'],
@@ -319,7 +319,7 @@ final class PathFinderTest extends TestCase
     public function test_it_returns_null_when_no_viable_path(
         array $orders,
         int $maxHops,
-        float $tolerance,
+        string $tolerance,
         string $source,
         string $target
     ): void {
@@ -332,14 +332,14 @@ final class PathFinderTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{list<Order>, int, float, string, string}>
+     * @return iterable<string, array{list<Order>, int, string, string, string}>
      */
     public static function provideImpossibleScenarios(): iterable
     {
         yield 'missing_second_leg' => [
             self::createRubToUsdSellOrders(),
             3,
-            0.05,
+            '0.05',
             'RUB',
             'IDR',
         ];
@@ -352,7 +352,7 @@ final class PathFinderTest extends TestCase
         yield 'hop_budget_too_strict' => [
             $withoutDirectEdge,
             1,
-            0.0,
+            '0.0',
             'RUB',
             'IDR',
         ];
@@ -360,7 +360,7 @@ final class PathFinderTest extends TestCase
         yield 'missing_source_currency' => [
             self::buildComprehensiveOrderBook(),
             3,
-            0.0,
+            '0.0',
             'GBP',
             'IDR',
         ];
@@ -368,7 +368,7 @@ final class PathFinderTest extends TestCase
         yield 'missing_target_currency' => [
             self::buildComprehensiveOrderBook(),
             3,
-            0.0,
+            '0.0',
             'RUB',
             'CHF',
         ];
@@ -385,7 +385,7 @@ final class PathFinderTest extends TestCase
     ): void {
         $graph = (new GraphBuilder())->build($orders);
 
-        $finder = new PathFinder(maxHops: 2, tolerance: 0.05);
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.05');
         $results = $finder->findBestPaths($graph, $source, $target);
 
         self::assertNotSame([], $results);
@@ -426,7 +426,7 @@ final class PathFinderTest extends TestCase
         $orders = self::createRubToUsdSellOrders();
         $graph = (new GraphBuilder())->build($orders);
 
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
         $this->expectException(InvalidArgumentException::class);
         $finder->findBestPaths($graph, 'RUB', 'USD', $constraints);
@@ -467,7 +467,7 @@ final class PathFinderTest extends TestCase
         $order = OrderFactory::buy('EUR', 'USD', '1.000', '1.000', '1.100', 3, 3);
         $graph = (new GraphBuilder())->build([$order]);
 
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Spend constraints must include both minimum and maximum bounds.');
@@ -501,7 +501,7 @@ final class PathFinderTest extends TestCase
         $order = OrderFactory::buy('EUR', 'USD', '1.000', '1.000', '1.100', 3, 3);
         $graph = (new GraphBuilder())->build([$order]);
 
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
         $minimum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
         $maximum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
@@ -535,7 +535,7 @@ final class PathFinderTest extends TestCase
         $order = OrderFactory::buy('EUR', 'USD', '1.000', '1.000', '1.100', 3, 3);
         $graph = (new GraphBuilder())->build([$order]);
 
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
         $minimum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
         $maximum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
@@ -570,7 +570,7 @@ final class PathFinderTest extends TestCase
         $order = OrderFactory::buy('EUR', 'USD', '1.000', '1.000', '1.100', 3, 3);
         $graph = (new GraphBuilder())->build([$order]);
 
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
         $minimum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
         $maximum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
@@ -609,7 +609,7 @@ final class PathFinderTest extends TestCase
         $order = OrderFactory::buy('EUR', 'USD', '1.000', '5.000', '1.200', 3, 3);
         $graph = (new GraphBuilder())->build([$order]);
 
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
         $minimum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
         $maximum = CurrencyScenarioFactory::money('EUR', '3.000', 3);
@@ -652,7 +652,7 @@ final class PathFinderTest extends TestCase
             $finalLeg,
         ]);
 
-        $finder = new PathFinder(maxHops: 2, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
 
         $minSpend = CurrencyScenarioFactory::money('SRC', '10.000', 3);
         $maxSpend = CurrencyScenarioFactory::money('SRC', '20.000', 3);
@@ -699,7 +699,7 @@ final class PathFinderTest extends TestCase
     ): void {
         $graph = (new GraphBuilder())->build([$order]);
 
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
         $accepted = false;
 
         $result = $finder->findBestPaths(
@@ -768,7 +768,7 @@ final class PathFinderTest extends TestCase
 
         $graph = (new GraphBuilder())->build($orders);
 
-        $finder = new PathFinder(maxHops: 3, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.0');
         $results = $finder->findBestPaths($graph, 'USD', 'EUR');
 
         self::assertNotSame([], $results);
@@ -810,7 +810,7 @@ final class PathFinderTest extends TestCase
 
         $graph = (new GraphBuilder())->build([$order]);
 
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
         $grossSpend = CurrencyScenarioFactory::money('EUR', '1.050', 3);
 
         $results = $finder->findBestPaths(
@@ -855,7 +855,7 @@ final class PathFinderTest extends TestCase
 
         $graph = (new GraphBuilder())->build([$order]);
 
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.10);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.10');
         $results = $finder->findBestPaths($graph, 'EUR', 'USD');
 
         self::assertNotSame([], $results);
@@ -879,7 +879,7 @@ final class PathFinderTest extends TestCase
         $orders = self::buildComprehensiveOrderBook();
         $graph = (new GraphBuilder())->build($orders);
 
-        $finder = new PathFinder(maxHops: 3, tolerance: 0.15);
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.15');
         $results = $finder->findBestPaths($graph, 'USD', 'USD');
 
         self::assertNotSame([], $results);
@@ -905,7 +905,7 @@ final class PathFinderTest extends TestCase
     ): void {
         $graph = (new GraphBuilder())->build($orders);
 
-        $finder = new PathFinder(maxHops: 3, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.0');
         $first = $finder->findBestPaths($graph, $source, $target);
         $second = $finder->findBestPaths($graph, $source, $target);
 
@@ -1022,7 +1022,7 @@ final class PathFinderTest extends TestCase
 
         $graph = (new GraphBuilder())->build($orders);
 
-        $finder = new PathFinder(maxHops: 4, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 4, tolerance: '0.0');
         $results = $finder->findBestPaths($graph, 'SRC', 'DST');
 
         self::assertNotSame([], $results);
@@ -1043,7 +1043,7 @@ final class PathFinderTest extends TestCase
 
         $guardedFinder = new PathFinder(
             maxHops: 5,
-            tolerance: 0.0,
+            tolerance: '0.0',
             topK: 1,
             maxExpansions: 1,
             maxVisitedStates: 100,
@@ -1053,7 +1053,7 @@ final class PathFinderTest extends TestCase
 
         $relaxedFinder = new PathFinder(
             maxHops: 5,
-            tolerance: 0.0,
+            tolerance: '0.0',
             topK: 1,
             maxExpansions: 20000,
             maxVisitedStates: 20000,
@@ -1072,7 +1072,7 @@ final class PathFinderTest extends TestCase
 
         $guardedFinder = new PathFinder(
             maxHops: 4,
-            tolerance: 0.0,
+            tolerance: '0.0',
             topK: 1,
             maxExpansions: 100,
             maxVisitedStates: 1,
@@ -1082,7 +1082,7 @@ final class PathFinderTest extends TestCase
 
         $relaxedFinder = new PathFinder(
             maxHops: 4,
-            tolerance: 0.0,
+            tolerance: '0.0',
             topK: 1,
             maxExpansions: 10000,
             maxVisitedStates: 10000,

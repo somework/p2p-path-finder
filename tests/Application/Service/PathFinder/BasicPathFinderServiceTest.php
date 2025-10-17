@@ -23,7 +23,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.25)
+            ->withToleranceBounds('0.0', '0.25')
             ->withHopLimits(1, 3)
             ->build();
 
@@ -61,7 +61,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '1.00', 2))
-            ->withToleranceBounds(0.0, 0.0)
+            ->withToleranceBounds('0.0', '0.0')
             ->withHopLimits(1, 1)
             ->build();
 
@@ -82,7 +82,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '50.00', 2))
-            ->withToleranceBounds(0.0, 0.0)
+            ->withToleranceBounds('0.0', '0.0')
             ->withHopLimits(1, 1)
             ->build();
 
@@ -98,7 +98,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.20)
+            ->withToleranceBounds('0.0', '0.20')
             ->withHopLimits(1, 3)
             ->build();
 
@@ -134,7 +134,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.15)
+            ->withToleranceBounds('0.0', '0.15')
             ->withHopLimits(1, 3)
             ->build();
 
@@ -172,7 +172,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.05)
+            ->withToleranceBounds('0.0', '0.05')
             ->withHopLimits(1, 2)
             ->withResultLimit(2)
             ->build();
@@ -211,7 +211,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.0)
+            ->withToleranceBounds('0.0', '0.0')
             ->withHopLimits(1, 2)
             ->withResultLimit(2)
             ->build();
@@ -235,7 +235,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.05)
+            ->withToleranceBounds('0.0', '0.05')
             ->withHopLimits(2, 3)
             ->build();
 
@@ -252,7 +252,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.05)
+            ->withToleranceBounds('0.0', '0.05')
             ->withHopLimits(2, 3)
             ->build();
 
@@ -294,7 +294,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '150.00', 2))
-            ->withToleranceBounds(0.1, 0.1)
+            ->withToleranceBounds('0.1', '0.1')
             ->withHopLimits(1, 1)
             ->build();
 
@@ -307,7 +307,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $guardedConfig = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.25)
+            ->withToleranceBounds('0.0', '0.25')
             ->withHopLimits(1, 3)
             ->withSearchGuards(1, 1)
             ->build();
@@ -316,7 +316,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $relaxedConfig = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.25)
+            ->withToleranceBounds('0.0', '0.25')
             ->withHopLimits(1, 3)
             ->withSearchGuards(1000, 1000)
             ->build();
@@ -335,7 +335,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.05)
+            ->withToleranceBounds('0.0', '0.05')
             ->withHopLimits(1, 1)
             ->build();
 
@@ -352,7 +352,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.05)
+            ->withToleranceBounds('0.0', '0.05')
             ->withHopLimits(1, 1)
             ->build();
 
@@ -376,7 +376,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.05)
+            ->withToleranceBounds('0.0', '0.05')
             ->withHopLimits(1, 1)
             ->build();
 
@@ -393,7 +393,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.25)
+            ->withToleranceBounds('0.0', '0.25')
             ->withHopLimits(1, 2)
             ->build();
 
@@ -412,7 +412,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.0)
+            ->withToleranceBounds('0.0', '0.0')
             ->withHopLimits(1, 1)
             ->build();
 
@@ -428,7 +428,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.15)
+            ->withToleranceBounds('0.0', '0.15')
             ->withHopLimits(1, 3)
             ->withResultLimit(2)
             ->build();
@@ -458,7 +458,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.0)
+            ->withToleranceBounds('0.0', '0.0')
             ->withHopLimits(1, 1)
             ->build();
 

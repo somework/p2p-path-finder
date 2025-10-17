@@ -33,7 +33,7 @@ final class OrderSpendAnalyzerTest extends TestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.000', 3))
-            ->withToleranceBounds(0.0, 0.25)
+            ->withToleranceBounds('0.0', '0.25')
             ->withHopLimits(1, 1)
             ->build();
 
@@ -64,7 +64,7 @@ final class OrderSpendAnalyzerTest extends TestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.000', 3))
-            ->withToleranceBounds(0.0, 0.05)
+            ->withToleranceBounds('0.0', '0.05')
             ->withHopLimits(1, 1)
             ->build();
 
@@ -91,7 +91,7 @@ final class OrderSpendAnalyzerTest extends TestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '14000.00', 2))
-            ->withToleranceBounds(0.1, 0.1)
+            ->withToleranceBounds('0.1', '0.1')
             ->withHopLimits(1, 1)
             ->build();
 
@@ -121,7 +121,7 @@ final class OrderSpendAnalyzerTest extends TestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '14000.00', 2))
-            ->withToleranceBounds(0.0, 0.05)
+            ->withToleranceBounds('0.0', '0.05')
             ->withHopLimits(1, 1)
             ->build();
 
@@ -148,7 +148,7 @@ final class OrderSpendAnalyzerTest extends TestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '200.00', 2))
-            ->withToleranceBounds(0.5, 0.6)
+            ->withToleranceBounds('0.5', '0.6')
             ->withHopLimits(1, 1)
             ->build();
 
@@ -179,7 +179,7 @@ final class OrderSpendAnalyzerTest extends TestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.0)
+            ->withToleranceBounds('0.0', '0.0')
             ->withHopLimits(1, 1)
             ->build();
 
@@ -207,7 +207,7 @@ final class OrderSpendAnalyzerTest extends TestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '150.00', 2))
-            ->withToleranceBounds(0.1, 0.1)
+            ->withToleranceBounds('0.1', '0.1')
             ->withHopLimits(1, 1)
             ->build();
 
@@ -221,7 +221,7 @@ final class OrderSpendAnalyzerTest extends TestCase
     {
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '100.00', 2))
-            ->withToleranceBounds(0.1, 0.2)
+            ->withToleranceBounds('0.1', '0.2')
             ->withHopLimits(1, 3)
             ->build();
 
@@ -279,7 +279,7 @@ final class OrderSpendAnalyzerTest extends TestCase
     {
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '100.00', 2))
-            ->withToleranceBounds(0.1, 0.2)
+            ->withToleranceBounds('0.1', '0.2')
             ->withHopLimits(1, 3)
             ->build();
 
@@ -320,7 +320,7 @@ final class OrderSpendAnalyzerTest extends TestCase
     {
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '100.00', 2))
-            ->withToleranceBounds(0.1, 0.2)
+            ->withToleranceBounds('0.1', '0.2')
             ->withHopLimits(1, 3)
             ->build();
 

@@ -38,7 +38,7 @@ final class LegMaterializerTest extends TestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.25)
+            ->withToleranceBounds('0.0', '0.25')
             ->withHopLimits(1, 3)
             ->build();
 
@@ -110,7 +110,7 @@ final class LegMaterializerTest extends TestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '100.000', 3))
-            ->withToleranceBounds(0.0, 0.15)
+            ->withToleranceBounds('0.0', '0.15')
             ->withHopLimits(1, 3)
             ->build();
 
@@ -178,7 +178,7 @@ final class LegMaterializerTest extends TestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.25)
+            ->withToleranceBounds('0.0', '0.25')
             ->withHopLimits(1, 3)
             ->build();
 
@@ -213,7 +213,7 @@ final class LegMaterializerTest extends TestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.25)
+            ->withToleranceBounds('0.0', '0.25')
             ->withHopLimits(1, 3)
             ->build();
 
