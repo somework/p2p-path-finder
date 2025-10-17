@@ -153,6 +153,14 @@ use function usort;
 final class PathFinder
 {
     private const SCALE = 18;
+    /**
+     * Extra precision used when converting target and source deltas into a ratio to avoid premature rounding.
+     */
+    private const RATIO_EXTRA_SCALE = 4;
+    /**
+     * Extra precision used when applying the ratio to offsets before normalizing to the target scale.
+     */
+    private const SUM_EXTRA_SCALE = 2;
 
     public const DEFAULT_MAX_EXPANSIONS = 250000;
 
@@ -777,31 +785,39 @@ final class PathFinder
         $targetMax = $targetCapacity['max']->withScale($targetScale);
         $targetDelta = $targetMax->subtract($targetMin, $targetScale);
 
-        if ($sourceDelta->isZero()) {
-            return $targetMin->withScale(max($targetScale, self::SCALE));
-        }
-
         $ratioScale = max($sourceScale, $targetScale, self::SCALE);
         $sourceDeltaAmount = $sourceDelta->withScale($ratioScale)->amount();
         if (0 === BcMath::comp($sourceDeltaAmount, '0', $ratioScale)) {
-            return $targetMin->withScale(max($targetScale, self::SCALE));
+            return $targetMin->withScale($targetScale);
         }
-
         $targetDeltaAmount = $targetDelta->withScale($ratioScale)->amount();
-        $ratio = BcMath::div($targetDeltaAmount, $sourceDeltaAmount, $ratioScale + 4);
+        $ratio = BcMath::div(
+            $targetDeltaAmount,
+            $sourceDeltaAmount,
+            $ratioScale + self::RATIO_EXTRA_SCALE,
+        );
 
         $offset = $clampedCurrent->subtract($sourceMin, $sourceScale);
         $offsetAmount = $offset->withScale($ratioScale)->amount();
-        $incrementAmount = BcMath::mul($offsetAmount, $ratio, $ratioScale + 2);
+        $incrementAmount = BcMath::mul(
+            $offsetAmount,
+            $ratio,
+            $ratioScale + self::SUM_EXTRA_SCALE,
+        );
         $baseAmount = BcMath::add(
             $targetMin->withScale($ratioScale)->amount(),
             $incrementAmount,
-            $ratioScale + 2,
+            $ratioScale + self::SUM_EXTRA_SCALE,
         );
 
-        $normalized = BcMath::normalize($baseAmount, $ratioScale);
+        $normalized = BcMath::normalize($baseAmount, $ratioScale + self::SUM_EXTRA_SCALE);
+        $result = Money::fromString(
+            $edge['to'],
+            $normalized,
+            $ratioScale + self::SUM_EXTRA_SCALE,
+        );
 
-        return Money::fromString($edge['to'], $normalized, $ratioScale);
+        return $result->withScale($targetScale);
     }
 
     /**
