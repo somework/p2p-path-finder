@@ -92,5 +92,10 @@ jobs:
         with:
           composer-options: --prefer-dist --no-interaction --no-progress
           custom-cache-suffix: ${{ hashFiles('composer.json') }}
-      - name: Run PhpBench smoke suite
-        run: vendor/bin/phpbench run --config=phpbench.json.dist --progress=none --report=aggregate --iterations=1 --revs=1
+      - name: Run PhpBench regression suite
+        run: >-
+          php -d memory_limit=-1 vendor/bin/phpbench run
+          --config=phpbench.json
+          --ref=baseline
+          --progress=plain
+          --assert="mean(variant.time.avg) <= mean(baseline.time.avg) +/- 20%"

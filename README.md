@@ -208,3 +208,44 @@ composer php-cs-fixer
 ```
 
 All commands rely on the development dependencies declared in `composer.json`.
+
+## Benchmarking path search performance
+
+Path search performance is tracked with [PhpBench](https://phpbench.readthedocs.io/).
+The benchmark suite exercises two real-world usage patterns:
+
+* `benchFindBestPaths` covers shallow books with repeat liquidity, capturing:
+  * `light-depth-hop-3` – ~15 orders with a maximum hop count of three.
+  * `moderate-depth-hop-4` – ~45 orders with a maximum hop count of four.
+* `benchFindBestPathsDenseGraph` synthesises increasingly dense graphs, covering:
+  * `dense-4x4-hop-5` – four layers of fanout (256 synthetic assets) and five-hop cap.
+  * `dense-3x7-hop-6` – three layers of fanout (343 synthetic assets) and six-hop cap.
+
+Run the suite locally and compare against the stored baseline with:
+
+```bash
+php -d memory_limit=-1 vendor/bin/phpbench run \
+    --config=phpbench.json \
+    --ref=baseline \
+    --progress=plain \
+    --assert="mean(variant.time.avg) <= mean(baseline.time.avg) +/- 20%"
+```
+
+> ℹ️  Append `--report=p2p_aggregate` when you want a human-readable summary.
+> It produces the same results but forces PhpBench to hold more state in memory,
+> so the regression command above keeps it disabled by default.
+
+The baseline lives under `.phpbench/storage/`. When intentional optimisations shift
+performance, refresh it by rerunning:
+
+```bash
+php -d memory_limit=-1 vendor/bin/phpbench run \
+    --config=phpbench.json \
+    --tag=baseline \
+    --store \
+    --progress=plain
+```
+
+The flags mirror the GitHub Actions job so the stored XML matches what CI expects.
+
+The CI “PhpBench” job executes the same comparison to guard against regressions.

@@ -30,7 +30,7 @@ final class Money
     /**
      * Creates a new money instance from raw string components.
      *
-     * @param string         $currency three-letter ISO-like currency symbol
+     * @param string         $currency ISO-like currency symbol comprised of 3-12 alphabetic characters
      * @param numeric-string $amount   numeric string compatible with BCMath functions
      * @param int            $scale    number of decimal digits to retain after normalization
      */
@@ -214,7 +214,7 @@ final class Money
         if ('' === $currency) {
             throw new InvalidArgumentException('Currency cannot be empty.');
         }
-        if (!preg_match('/^[A-Z]{3}$/i', $currency)) {
+        if (!preg_match('/^[A-Z]{3,12}$/i', $currency)) {
             throw new InvalidArgumentException(sprintf('Invalid currency "%s" supplied.', $currency));
         }
     }

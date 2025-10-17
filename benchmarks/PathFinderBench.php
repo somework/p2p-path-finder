@@ -16,24 +16,105 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 use function array_fill;
 use function array_merge;
-use function sprintf;
+use function str_pad;
+use function strlen;
 
 use PhpBench\Attributes\BeforeMethods;
+use PhpBench\Attributes\ParamProviders;
 
 #[BeforeMethods('setUp')]
 class PathFinderBench
 {
     private PathFinderService $service;
 
-    private OrderBook $orderBook;
-
-    private PathSearchConfig $config;
-
-    private OrderBook $denseOrderBook;
-
-    private PathSearchConfig $denseConfig;
+    /**
+     * @var list<Order>
+     */
+    private array $baseOrders;
 
     public function setUp(): void
+    {
+        $this->service = new PathFinderService(new GraphBuilder());
+        $this->baseOrders = $this->createBaseOrderSet();
+    }
+
+    /**
+     * @param array{orderSetRepeats:int,minHop:int,maxHop:int} $params
+     */
+    #[ParamProviders('provideMarketDepthScenarios')]
+    public function benchFindBestPaths(array $params): void
+    {
+        $orderBook = new OrderBook(array_merge(...array_fill(0, $params['orderSetRepeats'], $this->baseOrders)));
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+            ->withToleranceBounds(0.00, 0.02)
+            ->withHopLimits($params['minHop'], $params['maxHop'])
+            ->withResultLimit(5)
+            ->build();
+
+        $this->service->findBestPaths($orderBook, $config, 'BTC');
+    }
+
+    /**
+     * @param array{depth:int,fanout:int,maxHop:int,searchGuard:int} $params
+     */
+    #[ParamProviders('provideDenseGraphScenarios')]
+    public function benchFindBestPathsDenseGraph(array $params): void
+    {
+        $orderBook = $this->buildDenseOrderBook($params['depth'], $params['fanout']);
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('SRC', '10.00', 2))
+            ->withToleranceBounds(0.00, 0.00)
+            ->withHopLimits(1, $params['maxHop'])
+            ->withSearchGuards($params['searchGuard'], $params['searchGuard'])
+            ->withResultLimit(3)
+            ->build();
+
+        $this->service->findBestPaths($orderBook, $config, 'DST');
+    }
+
+    /**
+     * @return iterable<string, array{orderSetRepeats:int,minHop:int,maxHop:int}>
+     */
+    public function provideMarketDepthScenarios(): iterable
+    {
+        yield 'light-depth-hop-3' => [
+            'orderSetRepeats' => 5,
+            'minHop' => 1,
+            'maxHop' => 3,
+        ];
+
+        yield 'moderate-depth-hop-4' => [
+            'orderSetRepeats' => 15,
+            'minHop' => 1,
+            'maxHop' => 4,
+        ];
+    }
+
+    /**
+     * @return iterable<string, array{depth:int,fanout:int,maxHop:int,searchGuard:int}>
+     */
+    public function provideDenseGraphScenarios(): iterable
+    {
+        yield 'dense-4x4-hop-5' => [
+            'depth' => 4,
+            'fanout' => 4,
+            'maxHop' => 5,
+            'searchGuard' => 20000,
+        ];
+
+        yield 'dense-3x7-hop-6' => [
+            'depth' => 3,
+            'fanout' => 7,
+            'maxHop' => 6,
+            'searchGuard' => 30000,
+        ];
+    }
+
+    /**
+     * @return list<Order>
+     */
+    private function createBaseOrderSet(): array
     {
         $orderSet = [];
         $orderSet[] = new Order(
@@ -66,33 +147,7 @@ class PathFinderBench
             ExchangeRate::fromString('EUR', 'BTC', '0.000015', 8),
         );
 
-        $this->orderBook = new OrderBook(array_merge(...array_fill(0, 5, $orderSet)));
-        $this->service = new PathFinderService(new GraphBuilder());
-        $this->config = PathSearchConfig::builder()
-            ->withSpendAmount(Money::fromString('USD', '100.00', 2))
-            ->withToleranceBounds(0.00, 0.02)
-            ->withHopLimits(1, 3)
-            ->withResultLimit(5)
-            ->build();
-
-        $this->denseOrderBook = $this->buildDenseOrderBook(4, 4);
-        $this->denseConfig = PathSearchConfig::builder()
-            ->withSpendAmount(Money::fromString('SRC', '10.00', 2))
-            ->withToleranceBounds(0.00, 0.00)
-            ->withHopLimits(1, 5)
-            ->withSearchGuards(100000, 100000)
-            ->withResultLimit(3)
-            ->build();
-    }
-
-    public function benchFindBestPaths(): void
-    {
-        $this->service->findBestPaths($this->orderBook, $this->config, 'BTC');
-    }
-
-    public function benchFindBestPathsDenseGraph(): void
-    {
-        $this->service->findBestPaths($this->denseOrderBook, $this->denseConfig, 'DST');
+        return $orderSet;
     }
 
     private function buildDenseOrderBook(int $depth, int $fanout): OrderBook
@@ -106,7 +161,7 @@ class PathFinderBench
 
             foreach ($currentLayer as $index => $asset) {
                 for ($i = 0; $i < $fanout; ++$i) {
-                    $nextAsset = $this->syntheticCurrency($counter++);
+                    $nextAsset = $this->syntheticCurrency($counter);
                     $orders[] = new Order(
                         OrderSide::SELL,
                         AssetPair::fromString($nextAsset, $asset),
@@ -138,14 +193,29 @@ class PathFinderBench
         return new OrderBook($orders);
     }
 
-    private function syntheticCurrency(int $index): string
+    private function syntheticCurrency(int &$counter): string
     {
-        $alphabet = range('A', 'Z');
+        $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        $base = strlen($alphabet);
 
-        $first = intdiv($index, 26 * 26) % 26;
-        $second = intdiv($index, 26) % 26;
-        $third = $index % 26;
+        while (true) {
+            $value = $counter++;
+            $candidate = '';
 
-        return $alphabet[$first].$alphabet[$second].$alphabet[$third];
+            do {
+                $candidate = $alphabet[$value % $base].$candidate;
+                $value = intdiv($value, $base);
+            } while ($value > 0);
+
+            if (strlen($candidate) < 3) {
+                $candidate = str_pad($candidate, 3, $alphabet[0], STR_PAD_LEFT);
+            }
+
+            if ($candidate === 'SRC' || $candidate === 'DST') {
+                continue;
+            }
+
+            return $candidate;
+        }
     }
 }
