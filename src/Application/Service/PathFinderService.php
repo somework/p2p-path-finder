@@ -66,12 +66,18 @@ final class PathFinderService
 
         $orders = $this->orderSpendAnalyzer->filterOrders($orderBook, $config);
         if ([] === $orders) {
-            return new SearchOutcome([], GuardLimitStatus::none());
+            /** @var SearchOutcome<PathResult> $empty */
+            $empty = SearchOutcome::empty(GuardLimitStatus::none());
+
+            return $empty;
         }
 
         $graph = $this->graphBuilder->build($orders);
         if (!isset($graph[$sourceCurrency], $graph[$targetCurrency])) {
-            return new SearchOutcome([], GuardLimitStatus::none());
+            /** @var SearchOutcome<PathResult> $empty */
+            $empty = SearchOutcome::empty(GuardLimitStatus::none());
+
+            return $empty;
         }
 
         $pathFinder = new PathFinder(
@@ -156,7 +162,10 @@ final class PathFinderService
         );
 
         if ([] === $materializedResults) {
-            return new SearchOutcome([], $searchResult->guardLimits());
+            /** @var SearchOutcome<PathResult> $empty */
+            $empty = SearchOutcome::empty($searchResult->guardLimits());
+
+            return $empty;
         }
 
         usort(

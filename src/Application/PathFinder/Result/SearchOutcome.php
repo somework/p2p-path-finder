@@ -26,6 +26,14 @@ final class SearchOutcome
     }
 
     /**
+     * @return SearchOutcome<mixed>
+     */
+    public static function empty(GuardLimitStatus $guardLimits): self
+    {
+        return new self([], $guardLimits);
+    }
+
+    /**
      * @return list<TPath>
      */
     public function paths(): array

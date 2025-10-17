@@ -98,8 +98,8 @@ use function usort;
  * }
  *
  * @phpstan-type Candidate array{
- *     cost: numeric-string,
- *     product: numeric-string,
+ *     cost: string,
+ *     product: string,
  *     hops: int,
  *     edges: list<PathEdge>,
  *     amountRange: SpendRange|null,
@@ -207,23 +207,9 @@ final class PathFinder
      * @param SpendConstraints|null         $spendConstraints
      * @param callable(Candidate):bool|null $acceptCandidate
      *
-     * @return SearchOutcome<array{
-     *     cost: string,
-     *     product: string,
-     *     hops: int,
-     *     edges: list<PathEdge>,
-     *     amountRange: SpendRange|null,
-     *     desiredAmount: Money|null,
-     * }>
+     * @return SearchOutcome<Candidate>
      *
-     * @phpstan-return SearchOutcome<array{
-     *     cost: string,
-     *     product: string,
-     *     hops: int,
-     *     edges: list<PathEdge>,
-     *     amountRange: SpendRange|null,
-     *     desiredAmount: Money|null,
-     * }>
+     * @phpstan-return SearchOutcome<Candidate>
      *
      * @psalm-return SearchOutcome<Candidate>
      */
@@ -238,7 +224,10 @@ final class PathFinder
         $target = strtoupper($target);
 
         if (!array_key_exists($source, $graph) || !array_key_exists($target, $graph)) {
-            return new SearchOutcome([], GuardLimitStatus::none());
+            /** @var SearchOutcome<Candidate> $empty */
+            $empty = SearchOutcome::empty(GuardLimitStatus::none());
+
+            return $empty;
         }
 
         $range = null;
@@ -305,6 +294,8 @@ final class PathFinder
                 /** @var numeric-string $candidateProduct */
                 $candidateProduct = $state['product'];
 
+                BcMath::ensureNumeric($candidateCost, $candidateProduct);
+
                 $candidate = [
                     'cost' => $candidateCost,
                     'product' => $candidateProduct,
@@ -347,6 +338,8 @@ final class PathFinder
                 }
 
                 $conversionRate = $this->edgeEffectiveConversionRate($edge);
+                /** @var numeric-string $conversionRate */
+                $conversionRate = $conversionRate;
                 if (1 !== BcMath::comp($conversionRate, '0', self::SCALE)) {
                     continue;
                 }
@@ -444,19 +437,13 @@ final class PathFinder
         $guardLimits = new GuardLimitStatus($expansionGuardReached, $visitedGuardReached);
 
         if (0 === $results->count()) {
-            return new SearchOutcome([], $guardLimits);
+            /** @var SearchOutcome<Candidate> $empty */
+            $empty = SearchOutcome::empty($guardLimits);
+
+            return $empty;
         }
 
-        /**
-         * @var list<array{
-         *     cost: string,
-         *     product: string,
-         *     hops: int,
-         *     edges: list<PathEdge>,
-         *     amountRange: SpendRange|null,
-         *     desiredAmount: Money|null,
-         * }> $finalized
-         */
+        /** @var list<Candidate> $finalized */
         $finalized = $this->finalizeResults($results);
 
         return new SearchOutcome($finalized, $guardLimits);
@@ -652,15 +639,17 @@ final class PathFinder
             },
         );
 
-        return array_map(
-            /**
-             * @param CandidateHeapEntry $entry
-             *
-             * @return Candidate
-             */
-            static fn (array $entry): array => $entry['candidate'],
-            $collected,
-        );
+        $finalized = [];
+
+        /** @var CandidateHeapEntry $entry */
+        foreach ($collected as $entry) {
+            /** @var Candidate $candidate */
+            $candidate = $entry['candidate'];
+
+            $finalized[] = $candidate;
+        }
+
+        return $finalized;
     }
 
     /**
@@ -959,7 +948,10 @@ final class SearchStateQueue extends SplPriorityQueue
         /** @var SearchQueueEntry $entry */
         $entry = parent::extract();
 
-        return $entry['state'];
+        /** @var SearchState $state */
+        $state = $entry['state'];
+
+        return $state;
     }
 
     /**
