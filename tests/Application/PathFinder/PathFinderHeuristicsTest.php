@@ -10,7 +10,12 @@ use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\SearchStateQueue;
+use SomeWork\P2PPathFinder\Application\Service\LegMaterializer;
+use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
+use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
+use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
+use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
@@ -280,6 +285,55 @@ final class PathFinderHeuristicsTest extends TestCase
 
         self::assertSame('USD', $converted->currency());
         self::assertSame('0.000000000000000000', $converted->amount());
+    }
+
+    public function test_calculate_next_range_aligns_with_materializer_for_sell_with_fixed_quote_fee(): void
+    {
+        $feePolicy = new class implements FeePolicy {
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                $fee = Money::fromString($quoteAmount->currency(), '5.000000', max($quoteAmount->scale(), 6));
+
+                return FeeBreakdown::forQuote($fee->withScale($quoteAmount->scale()));
+            }
+        };
+
+        $order = OrderFactory::sell(
+            base: 'BTC',
+            quote: 'USD',
+            minAmount: '1.000',
+            maxAmount: '3.000',
+            rate: '20000.000',
+            amountScale: 3,
+            rateScale: 3,
+            feePolicy: $feePolicy,
+        );
+
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $graph['USD']['edges'][0];
+
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
+        $range = [
+            'min' => $edge['quoteCapacity']['min'],
+            'max' => $edge['quoteCapacity']['max'],
+        ];
+
+        $method = new ReflectionMethod(PathFinder::class, 'calculateNextRange');
+        $method->setAccessible(true);
+        $convertedRange = $method->invoke($finder, $edge, $range);
+
+        $materializer = new LegMaterializer();
+
+        foreach (['min', 'max'] as $bound) {
+            $baseAmount = $convertedRange[$bound];
+            $evaluation = $materializer->evaluateSellQuote($order, $baseAmount);
+            $grossQuote = $evaluation['grossQuote']->withScale(
+                max($evaluation['grossQuote']->scale(), $range[$bound]->scale())
+            );
+            $rangeComparable = $range[$bound]->withScale($grossQuote->scale());
+
+            self::assertSame($rangeComparable->amount(), $grossQuote->amount());
+        }
     }
 
     public function test_edge_effective_conversion_rate_inverts_sell_edges(): void

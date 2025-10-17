@@ -55,4 +55,38 @@ final class FeePolicyFactory
             }
         };
     }
+
+    /**
+     * @param numeric-string $percentage
+     * @param numeric-string $fixed
+     */
+    public static function quotePercentageWithFixed(string $percentage, string $fixed, int $scale = 6): FeePolicy
+    {
+        return new class($percentage, $fixed, $scale) implements FeePolicy {
+            public function __construct(
+                private readonly string $percentage,
+                private readonly string $fixed,
+                private readonly int $scale
+            ) {
+            }
+
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                $calculationScale = max($this->scale, $quoteAmount->scale());
+                $percentageComponent = $quoteAmount
+                    ->multiply($this->percentage, $calculationScale)
+                    ->withScale($quoteAmount->scale());
+
+                $fixedComponent = Money::fromString(
+                    $quoteAmount->currency(),
+                    $this->fixed,
+                    $calculationScale
+                )->withScale($quoteAmount->scale());
+
+                $fee = $percentageComponent->add($fixedComponent, $quoteAmount->scale());
+
+                return FeeBreakdown::forQuote($fee);
+            }
+        };
+    }
 }
