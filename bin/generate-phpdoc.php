@@ -46,6 +46,7 @@ function normalizeDocComment(false|string|null $comment): string
 
     $lines = preg_split('/\r?\n/', $comment) ?: [];
     $stripped = [];
+    $skipIndentedAnnotation = false;
     foreach ($lines as $line) {
         $line = trim($line);
         if (str_starts_with($line, '/**')) {
@@ -56,11 +57,18 @@ function normalizeDocComment(false|string|null $comment): string
         }
         $line = ltrim($line, '* ');
         if ('' === $line) {
+            $skipIndentedAnnotation = false;
             $stripped[] = '';
             continue;
         }
         if (str_starts_with($line, '@')) {
-            // Skip annotations in this lightweight export.
+            $line = transformAnnotationLine($line);
+            if (null === $line) {
+                $skipIndentedAnnotation = true;
+                continue;
+            }
+            $skipIndentedAnnotation = false;
+        } elseif ($skipIndentedAnnotation) {
             continue;
         }
         $stripped[] = $line;
@@ -69,6 +77,23 @@ function normalizeDocComment(false|string|null $comment): string
     $text = trim(implode("\n", $stripped));
 
     return $text;
+}
+
+function transformAnnotationLine(string $line): ?string
+{
+    if (str_starts_with($line, '@psalm-type ')) {
+        return 'psalm-type '.substr($line, strlen('@psalm-type '));
+    }
+
+    if (str_starts_with($line, '@phpstan-type ')) {
+        return 'phpstan-type '.substr($line, strlen('@phpstan-type '));
+    }
+
+    if (preg_match('/^@return\s+(.+)$/', $line, $matches)) {
+        return 'Returns: '.$matches[1];
+    }
+
+    return null;
 }
 
 function describeMethodSignature(\ReflectionMethod $method): string

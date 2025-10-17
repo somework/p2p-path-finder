@@ -29,11 +29,11 @@ The codebase is intentionally split into two layers:
   * `PathFinderService`, a façade that applies filters, builds the search graph and returns
     `PathResult` aggregates complete with `PathLeg` breakdowns.
 
-The path finder accepts tolerance values as either PHP floats or decimal strings. Supplying
-string tolerances (for example `'0.9999999999999999'`) preserves the full precision of the
-input without depending on floating-point formatting. Internally all tolerances are
-normalised to 18 decimal places before calculating the amplifier used by the search
-heuristic.
+The path finder accepts tolerance values exclusively as decimal strings. Supplying
+numeric-string tolerances (for example `'0.9999999999999999'`) preserves the full
+precision of the input without depending on floating-point formatting. Internally all
+tolerances are normalised to 18 decimal places before calculating the amplifier used by the
+search heuristic.
 
 The separation allows you to extend or replace either layer (e.g. load orders from an API
 or swap in a different search algorithm) without leaking implementation details.
@@ -45,7 +45,6 @@ manually or use the fluent builder:
 
 ```php
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
-use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
@@ -56,8 +55,8 @@ $config = PathSearchConfig::builder()
     ->build();
 ```
 
-`withToleranceBounds()` accepts only numeric-string values. Providing a string keeps
-the original precision intact when it is passed to `PathFinder`:
+`withToleranceBounds()` accepts only numeric-string values. Providing a string keeps the
+original precision intact when it is passed to `PathFinder`:
 
 ```php
 $config = PathSearchConfig::builder()
@@ -68,6 +67,23 @@ $config = PathSearchConfig::builder()
 
 // `PathFinder` receives the tolerance as the exact string value.
 ```
+
+You can also guard against runaway searches by configuring the optional search guard
+limits. These guardrails are applied directly to the underlying `PathFinder` instance:
+
+```php
+$config = PathSearchConfig::builder()
+    ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+    ->withToleranceBounds('0.02', '0.10')
+    ->withHopLimits(1, 4)
+    ->withSearchGuards(10000, 25000) // visited states, expansions
+    ->build();
+
+// The search honours the configured guard thresholds.
+```
+
+See [docs/guarded-search-example.md](docs/guarded-search-example.md) for a complete,
+ready-to-run integration walkthrough that demonstrates these guard limits in context.
 
 The builder enforces presence and validity of each piece of configuration. Internally the
 configuration pre-computes minimum/maximum spend amounts derived from the tolerance window,
