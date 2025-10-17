@@ -237,7 +237,7 @@ target column establishes the KPI enforced by CI via PhpBench regression asserti
 Run the suite locally and compare against the stored baseline with:
 
 ```bash
-php -d memory_limit=-1 vendor/bin/phpbench run \
+php -d memory_limit=-1 -d xdebug.mode=off vendor/bin/phpbench run \
     --config=phpbench.json \
     --ref=baseline \
     --progress=plain \
@@ -247,12 +247,15 @@ php -d memory_limit=-1 vendor/bin/phpbench run \
 > ℹ️  Append `--report=p2p_aggregate` when you want a human-readable summary.
 > It produces the same results but forces PhpBench to hold more state in memory,
 > so the regression command above keeps it disabled by default.
+> Ensure Xdebug is disabled (for example via `-d xdebug.mode=off` or
+> `XDEBUG_MODE=off`) when running benchmarks so results align with the stored
+> baseline and CI.
 
 The baseline lives under `.phpbench/storage/`. When intentional optimisations shift
 performance, refresh it by rerunning:
 
 ```bash
-php -d memory_limit=-1 vendor/bin/phpbench run \
+php -d memory_limit=-1 -d xdebug.mode=off vendor/bin/phpbench run \
     --config=phpbench.json \
     --tag=baseline \
     --store \
