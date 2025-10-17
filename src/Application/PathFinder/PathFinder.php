@@ -278,10 +278,6 @@ final class PathFinder
             ++$expansions;
 
             if ($state['node'] === $target) {
-                if (null === $bestTargetCost || -1 === BcMath::comp($state['cost'], $bestTargetCost, self::SCALE)) {
-                    $bestTargetCost = $state['cost'];
-                }
-
                 $candidate = [
                     'cost' => $state['cost'],
                     'product' => $state['product'],
@@ -292,6 +288,13 @@ final class PathFinder
                 ];
 
                 if (null === $acceptCandidate || $acceptCandidate($candidate)) {
+                    if (
+                        null === $bestTargetCost
+                        || -1 === BcMath::comp($candidate['cost'], $bestTargetCost, self::SCALE)
+                    ) {
+                        $bestTargetCost = $candidate['cost'];
+                    }
+
                     $this->recordResult($results, $candidate, $resultInsertionOrder++);
                 }
 

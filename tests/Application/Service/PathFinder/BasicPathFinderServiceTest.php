@@ -10,6 +10,8 @@ use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
+use function count;
+
 final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 {
     /**
@@ -238,6 +240,41 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->build();
 
         self::assertSame([], $this->makeService()->findBestPaths($orderBook, $config, 'USD'));
+    }
+
+    public function test_it_prefers_two_hop_route_when_direct_candidate_violates_minimum_hops(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '500.000', '0.900', 3),
+            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '10.000', '500.000', '0.850', 3),
+            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '10.000', '500.000', '0.900', 3),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds(0.0, 0.05)
+            ->withHopLimits(2, 3)
+            ->build();
+
+        $results = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+
+        self::assertNotSame([], $results);
+
+        $best = $results[0];
+        self::assertSame('EUR', $best->totalSpent()->currency());
+        self::assertSame('100.000', $best->totalSpent()->amount());
+        self::assertSame('USD', $best->totalReceived()->currency());
+
+        $legs = $best->legs();
+        self::assertCount(2, $legs);
+        self::assertSame('EUR', $legs[0]->from());
+        self::assertSame('GBP', $legs[0]->to());
+        self::assertSame('GBP', $legs[1]->from());
+        self::assertSame('USD', $legs[1]->to());
+
+        foreach ($results as $result) {
+            self::assertGreaterThanOrEqual(2, count($result->legs()));
+        }
     }
 
     public function test_it_skips_candidates_when_sell_seed_window_is_empty(): void
