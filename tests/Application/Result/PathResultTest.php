@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
+use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 final class PathResultTest extends TestCase
@@ -33,7 +34,7 @@ final class PathResultTest extends TestCase
         $result = new PathResult(
             Money::fromString('USD', '60', 2),
             Money::fromString('EUR', '55', 2),
-            0.05,
+            DecimalTolerance::fromNumericString('0.05'),
             [$firstLeg, $secondLeg],
             [
                 'USD' => Money::fromString('USD', '0.30', 2),
@@ -45,7 +46,7 @@ final class PathResultTest extends TestCase
             [
                 'totalSpent' => ['currency' => 'USD', 'amount' => '60.00', 'scale' => 2],
                 'totalReceived' => ['currency' => 'EUR', 'amount' => '55.00', 'scale' => 2],
-                'residualTolerance' => 0.05,
+                'residualTolerance' => '0.050000000000000000',
                 'feeBreakdown' => [
                     'EUR' => ['currency' => 'EUR', 'amount' => '0.10', 'scale' => 2],
                     'USD' => ['currency' => 'USD', 'amount' => '0.30', 'scale' => 2],
@@ -83,7 +84,7 @@ final class PathResultTest extends TestCase
         new PathResult(
             Money::fromString('USD', '10', 2),
             Money::fromString('EUR', '9', 2),
-            -0.01,
+            DecimalTolerance::fromNumericString('-0.01'),
         );
     }
 
@@ -95,7 +96,7 @@ final class PathResultTest extends TestCase
         new PathResult(
             Money::fromString('USD', '10', 2),
             Money::fromString('EUR', '9', 2),
-            1.01,
+            DecimalTolerance::fromNumericString('1.01'),
         );
     }
 
@@ -115,7 +116,7 @@ final class PathResultTest extends TestCase
         new PathResult(
             Money::fromString('USD', '10', 2),
             Money::fromString('BTC', '0.001', 6),
-            0.1,
+            DecimalTolerance::fromNumericString('0.1'),
             ['first' => $leg],
         );
     }
@@ -133,7 +134,7 @@ final class PathResultTest extends TestCase
         $result = new PathResult(
             Money::fromString('USD', '10', 2),
             Money::fromString('BTC', '0.001', 6),
-            0.1,
+            DecimalTolerance::fromNumericString('0.1'),
             [$leg],
             [
                 Money::fromString('USD', '0.30', 2),
@@ -163,7 +164,7 @@ final class PathResultTest extends TestCase
         $result = new PathResult(
             Money::fromString('USD', '0', 2),
             Money::fromString('EUR', '0', 2),
-            0.0,
+            DecimalTolerance::fromNumericString('0.0'),
         );
 
         $this->assertSame([], $result->legs());
@@ -172,7 +173,7 @@ final class PathResultTest extends TestCase
         $this->assertSame([
             'totalSpent' => ['currency' => 'USD', 'amount' => '0.00', 'scale' => 2],
             'totalReceived' => ['currency' => 'EUR', 'amount' => '0.00', 'scale' => 2],
-            'residualTolerance' => 0.0,
+            'residualTolerance' => '0.000000000000000000',
             'feeBreakdown' => [],
             'legs' => [],
         ], $result->jsonSerialize());

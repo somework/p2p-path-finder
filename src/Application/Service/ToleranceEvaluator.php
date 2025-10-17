@@ -6,6 +6,7 @@ namespace SomeWork\P2PPathFinder\Application\Service;
 
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
+use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 use function max;
@@ -19,7 +20,7 @@ final class ToleranceEvaluator
     private const RESIDUAL_TOLERANCE_EPSILON = '0.000001';
     private const RESIDUAL_SCALE = 18;
 
-    public function evaluate(PathSearchConfig $config, Money $requestedSpend, Money $actualSpend): ?float
+    public function evaluate(PathSearchConfig $config, Money $requestedSpend, Money $actualSpend): ?DecimalTolerance
     {
         $residual = $this->calculateResidualTolerance($requestedSpend, $actualSpend);
 
@@ -48,12 +49,9 @@ final class ToleranceEvaluator
             return null;
         }
 
-        return (float) $residual;
+        return DecimalTolerance::fromNumericString($residual, self::RESIDUAL_SCALE);
     }
 
-    /**
-     * @return numeric-string
-     */
     /**
      * @return numeric-string
      */

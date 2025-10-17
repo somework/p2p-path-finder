@@ -129,7 +129,7 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             $legs[0]->spent()->withScale($result->totalSpent()->scale())->amount(),
             $result->totalSpent()->amount(),
         );
-        self::assertEqualsWithDelta(0.02, $result->residualTolerance(), 0.0000001);
+        self::assertSame('0.020000000000000000', $result->residualTolerance()->ratio());
 
         self::assertSame('102.000', $legs[0]->spent()->amount());
 
@@ -163,7 +163,7 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('102.000', $result->totalSpent()->amount());
         self::assertSame('USD', $result->totalReceived()->currency());
         self::assertSame('114.000', $result->totalReceived()->amount());
-        self::assertEqualsWithDelta(0.02, $result->residualTolerance(), 0.0000001);
+        self::assertSame('0.020000000000000000', $result->residualTolerance()->ratio());
 
         $legs = $result->legs();
         self::assertCount(1, $legs);
@@ -208,7 +208,8 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('100.000', $result->totalSpent()->amount());
         self::assertSame('JPY', $result->totalReceived()->currency());
         self::assertSame('15361.500', $result->totalReceived()->amount());
-        self::assertSame(0.0, $result->residualTolerance());
+        self::assertTrue($result->residualTolerance()->isZero());
+        self::assertSame('0.000000000000000000', $result->residualTolerance()->ratio());
 
         $legs = $result->legs();
         self::assertCount(2, $legs);

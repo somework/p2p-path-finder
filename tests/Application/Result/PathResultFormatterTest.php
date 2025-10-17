@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Result\PathResultFormatter;
+use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 use const PHP_EOL;
@@ -27,7 +28,7 @@ final class PathResultFormatterTest extends TestCase
         $result = new PathResult(
             Money::fromString('USD', '100', 2),
             Money::fromString('EUR', '95', 2),
-            0.025,
+            DecimalTolerance::fromNumericString('0.025'),
             [$leg],
             ['USD' => Money::fromString('USD', '1.50', 2)],
         );
@@ -60,7 +61,7 @@ final class PathResultFormatterTest extends TestCase
         $result = new PathResult(
             Money::fromString('USD', '100', 2),
             Money::fromString('EUR', '100', 2),
-            0.015,
+            DecimalTolerance::fromNumericString('0.015'),
             [$leg],
             [],
         );

@@ -6,6 +6,7 @@ namespace SomeWork\P2PPathFinder\Application\Result;
 
 use InvalidArgumentException;
 use JsonSerializable;
+use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 use function array_is_list;
@@ -32,14 +33,10 @@ final class PathResult implements JsonSerializable
     public function __construct(
         private readonly Money $totalSpent,
         private readonly Money $totalReceived,
-        private readonly float $residualTolerance,
+        private readonly DecimalTolerance $residualTolerance,
         array $legs = [],
         array $feeBreakdown = [],
     ) {
-        if ($residualTolerance < 0.0 || $residualTolerance > 1.0) {
-            throw new InvalidArgumentException('Residual tolerance must be a value between 0 and 1 inclusive.');
-        }
-
         if (!array_is_list($legs)) {
             throw new InvalidArgumentException('Path legs must be provided as a list.');
         }
@@ -81,9 +78,14 @@ final class PathResult implements JsonSerializable
     /**
      * Returns the remaining tolerance after accounting for the chosen path.
      */
-    public function residualTolerance(): float
+    public function residualTolerance(): DecimalTolerance
     {
         return $this->residualTolerance;
+    }
+
+    public function residualTolerancePercentage(int $scale = 2): string
+    {
+        return $this->residualTolerance->percentage($scale);
     }
 
     /**
@@ -98,7 +100,7 @@ final class PathResult implements JsonSerializable
      * @return array{
      *     totalSpent: array{currency: string, amount: string, scale: int},
      *     totalReceived: array{currency: string, amount: string, scale: int},
-     *     residualTolerance: float,
+     *     residualTolerance: numeric-string,
      *     feeBreakdown: array<string, array{currency: string, amount: string, scale: int}>,
      *     legs: list<array{
      *         from: string,
@@ -120,7 +122,7 @@ final class PathResult implements JsonSerializable
         return [
             'totalSpent' => self::serializeMoney($this->totalSpent),
             'totalReceived' => self::serializeMoney($this->totalReceived),
-            'residualTolerance' => $this->residualTolerance,
+            'residualTolerance' => $this->residualTolerance->ratio(),
             'feeBreakdown' => $fees,
             'legs' => array_map(static fn (PathLeg $leg): array => $leg->jsonSerialize(), $this->legs),
         ];

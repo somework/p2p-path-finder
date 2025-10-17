@@ -18,16 +18,16 @@ final class ToleranceEvaluatorTest extends TestCase
         PathSearchConfig $config,
         Money $requestedSpend,
         Money $actualSpend,
-        float $expectedResidual
+        string $expectedResidual
     ): void {
         $evaluator = new ToleranceEvaluator();
 
         $residual = $evaluator->evaluate($config, $requestedSpend, $actualSpend);
 
         self::assertNotNull($residual);
-        self::assertEqualsWithDelta($expectedResidual, $residual, 1e-12);
-        self::assertGreaterThanOrEqual(0.0, $residual);
-        self::assertLessThanOrEqual((float) $config->maximumTolerance() + 1e-12, $residual);
+        self::assertSame($expectedResidual, $residual->ratio());
+        self::assertTrue($residual->isGreaterThanOrEqual('0'));
+        self::assertTrue($residual->isLessThanOrEqual($config->maximumTolerance(), 18));
     }
 
     public function test_it_handles_zero_requested_spend_without_dividing_by_zero(): void
@@ -45,11 +45,12 @@ final class ToleranceEvaluatorTest extends TestCase
         $residual = $evaluator->evaluate($config, $requested, $actual);
 
         self::assertNotNull($residual);
-        self::assertSame(0.0, $residual);
+        self::assertTrue($residual->isZero());
+        self::assertSame('0.000000000000000000', $residual->ratio());
     }
 
     /**
-     * @return iterable<string, array{PathSearchConfig, Money, Money, float}>
+     * @return iterable<string, array{PathSearchConfig, Money, Money, string}>
      */
     public static function provideSpendScenariosWithinTolerance(): iterable
     {
@@ -63,7 +64,7 @@ final class ToleranceEvaluatorTest extends TestCase
                 ->build(),
             $requested,
             Money::fromString('EUR', '100.000000', 6),
-            0.0,
+            '0.000000000000000000',
         ];
 
         yield 'asymmetric tolerance allows lower boundary spend' => [
@@ -74,7 +75,7 @@ final class ToleranceEvaluatorTest extends TestCase
                 ->build(),
             $requested,
             Money::fromString('EUR', '98.000', 3),
-            0.02,
+            '0.020000000000000000',
         ];
 
         $narrowWindowConfig = PathSearchConfig::builder()
@@ -87,7 +88,7 @@ final class ToleranceEvaluatorTest extends TestCase
             $narrowWindowConfig,
             $requested,
             $narrowWindowConfig->minimumSpendAmount(),
-            0.015,
+            '0.015000000000000000',
         ];
 
         $maximumWindowConfig = PathSearchConfig::builder()
@@ -100,7 +101,7 @@ final class ToleranceEvaluatorTest extends TestCase
             $maximumWindowConfig,
             $requested,
             $maximumWindowConfig->maximumSpendAmount(),
-            0.035,
+            '0.035000000000000000',
         ];
 
         $upperBoundaryConfig = PathSearchConfig::builder()
@@ -113,7 +114,7 @@ final class ToleranceEvaluatorTest extends TestCase
             $upperBoundaryConfig,
             $requested,
             $upperBoundaryConfig->maximumSpendAmount(),
-            0.05,
+            '0.050000000000000000',
         ];
 
         $highPrecisionSpend = Money::fromString('BTC', '0.12345678', 8);
@@ -126,7 +127,18 @@ final class ToleranceEvaluatorTest extends TestCase
                 ->build(),
             $highPrecisionSpend,
             Money::fromString('BTC', '0.12345690', 8),
-            9.720000797040065e-7,
+            '0.000000972000079704',
+        ];
+
+        yield 'ultra high precision overspend remains representable as string' => [
+            PathSearchConfig::builder()
+                ->withSpendAmount(Money::fromString('USD', '1.000000000000000000', 18))
+                ->withToleranceBounds('0.0', '0.000000000000000200')
+                ->withHopLimits(1, 1)
+                ->build(),
+            Money::fromString('USD', '1.000000000000000000', 18),
+            Money::fromString('USD', '1.000000000000000123', 18),
+            '0.000000000000000123',
         ];
     }
 

@@ -38,8 +38,9 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('EUR', $totalSpent->currency());
         self::assertSame('102.000', $totalSpent->amount());
 
-        self::assertGreaterThan(0.0, $result->residualTolerance());
-        self::assertLessThanOrEqual((float) $config->maximumTolerance(), $result->residualTolerance());
+        self::assertSame(1, $result->residualTolerance()->compare('0'));
+        self::assertTrue($result->residualTolerance()->isLessThanOrEqual($config->maximumTolerance(), 18));
+        self::assertSame('0.020000000000000000', $result->residualTolerance()->ratio());
 
         $legs = $result->legs();
         self::assertCount(1, $legs);
@@ -81,7 +82,10 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('4.857', $legFees['EUR']->withScale(3)->amount());
 
         self::assertSame($maximumSpend->amount(), $result->totalSpent()->withScale(3)->amount());
-        self::assertEqualsWithDelta((float) $config->maximumTolerance(), $result->residualTolerance(), 0.0000001);
+        self::assertSame(
+            BcMath::normalize($config->maximumTolerance(), 18),
+            $result->residualTolerance()->ratio(),
+        );
     }
 
     /**
@@ -234,7 +238,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('7.200', $result->totalSpent()->amount());
         self::assertSame('USD', $result->totalReceived()->currency());
         self::assertSame('7.999', $result->totalReceived()->amount());
-        self::assertEqualsWithDelta(0.1, $result->residualTolerance(), 1e-9);
+        self::assertSame('0.100000000000000000', $result->residualTolerance()->ratio());
     }
 
     /**
@@ -260,7 +264,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('50.000', $result->totalSpent()->amount());
         self::assertSame('USD', $result->totalReceived()->currency());
         self::assertSame('60.000', $result->totalReceived()->amount());
-        self::assertEqualsWithDelta(0.25, $result->residualTolerance(), 1e-9);
+        self::assertSame('0.250000000000000000', $result->residualTolerance()->ratio());
     }
 
     /**
@@ -286,7 +290,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('24.000', $result->totalSpent()->amount());
         self::assertSame('USD', $result->totalReceived()->currency());
         self::assertSame('30.000', $result->totalReceived()->amount());
-        self::assertEqualsWithDelta(2 / 22, $result->residualTolerance(), 1e-9);
+        self::assertSame('0.090909090909090909', $result->residualTolerance()->ratio());
     }
 
     public function test_it_propagates_high_precision_tolerance_to_path_finder(): void
