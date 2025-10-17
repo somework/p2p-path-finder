@@ -215,17 +215,24 @@ final class GraphScenarioGenerator
     private function maybeFeePolicy(): ?FeePolicy
     {
         $roll = $this->randomizer->getInt(0, 100);
-        if ($roll < 40) {
+        if ($roll < 35) {
             $ratio = $this->randomRatio();
 
             return FeePolicyFactory::baseSurcharge($ratio);
         }
 
-        if ($roll < 70) {
+        if ($roll < 65) {
             $baseRatio = $this->randomRatio();
             $quoteRatio = $this->randomRatio();
 
             return FeePolicyFactory::baseAndQuoteSurcharge($baseRatio, $quoteRatio);
+        }
+
+        if ($roll < 85) {
+            $percentage = $this->randomRatio(5);
+            $fixed = $this->randomFixedComponent(5);
+
+            return FeePolicyFactory::quotePercentageWithFixed($percentage, $fixed, 5);
         }
 
         return null;
@@ -238,6 +245,17 @@ final class GraphScenarioGenerator
     {
         $multiplier = $this->powerOfTen($scale);
         $units = $this->randomizer->getInt(1, (int) ($multiplier * 0.05));
+
+        return $this->formatUnits($units, $scale);
+    }
+
+    /**
+     * @return numeric-string
+     */
+    private function randomFixedComponent(int $scale): string
+    {
+        $multiplier = $this->powerOfTen($scale);
+        $units = $this->randomizer->getInt(1, $multiplier * 5);
 
         return $this->formatUnits($units, $scale);
     }

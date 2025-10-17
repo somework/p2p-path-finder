@@ -741,43 +741,67 @@ final class PathFinder
             return Money::zero($edge['to'], max($current->scale(), self::SCALE));
         }
 
-        [$sourceScale, $targetScale] = match ($edge['orderSide']) {
-            OrderSide::BUY => [
-                max(
-                    $edge['grossBaseCapacity']['max']->scale(),
-                    $edge['grossBaseCapacity']['min']->scale(),
-                    $current->scale(),
-                    self::SCALE,
-                ),
-                max(
-                    $edge['quoteCapacity']['max']->scale(),
-                    $edge['quoteCapacity']['min']->scale(),
-                    $current->scale(),
-                    self::SCALE,
-                ),
-            ],
-            OrderSide::SELL => [
-                max(
-                    $edge['quoteCapacity']['max']->scale(),
-                    $edge['quoteCapacity']['min']->scale(),
-                    $current->scale(),
-                    self::SCALE,
-                ),
-                max(
-                    $edge['baseCapacity']['max']->scale(),
-                    $edge['baseCapacity']['min']->scale(),
-                    $current->scale(),
-                    self::SCALE,
-                ),
-            ],
-        };
+        $sourceCapacity = OrderSide::BUY === $edge['orderSide']
+            ? $edge['grossBaseCapacity']
+            : $edge['quoteCapacity'];
+        $targetCapacity = OrderSide::BUY === $edge['orderSide']
+            ? $edge['quoteCapacity']
+            : $edge['baseCapacity'];
 
-        $operationScale = max($sourceScale, $targetScale, self::SCALE);
-        $normalizedCurrent = $current->withScale($operationScale)->amount();
-        $raw = BcMath::mul($normalizedCurrent, $conversionRate, $operationScale + 2);
-        $normalized = BcMath::normalize($raw, $targetScale);
+        $sourceScale = max(
+            $sourceCapacity['min']->scale(),
+            $sourceCapacity['max']->scale(),
+            $current->scale(),
+            self::SCALE,
+        );
+        $targetScale = max(
+            $targetCapacity['min']->scale(),
+            $targetCapacity['max']->scale(),
+            self::SCALE,
+        );
 
-        return Money::fromString($edge['to'], $normalized, $targetScale);
+        $sourceMin = $sourceCapacity['min']->withScale($sourceScale);
+        $sourceMax = $sourceCapacity['max']->withScale($sourceScale);
+        $clampedCurrent = $current->withScale($sourceScale);
+
+        if ($clampedCurrent->lessThan($sourceMin)) {
+            $clampedCurrent = $sourceMin;
+        }
+
+        if ($clampedCurrent->greaterThan($sourceMax)) {
+            $clampedCurrent = $sourceMax;
+        }
+
+        $sourceDelta = $sourceMax->subtract($sourceMin, $sourceScale);
+        $targetMin = $targetCapacity['min']->withScale($targetScale);
+        $targetMax = $targetCapacity['max']->withScale($targetScale);
+        $targetDelta = $targetMax->subtract($targetMin, $targetScale);
+
+        if ($sourceDelta->isZero()) {
+            return $targetMin->withScale(max($targetScale, self::SCALE));
+        }
+
+        $ratioScale = max($sourceScale, $targetScale, self::SCALE);
+        $sourceDeltaAmount = $sourceDelta->withScale($ratioScale)->amount();
+        if (0 === BcMath::comp($sourceDeltaAmount, '0', $ratioScale)) {
+            return $targetMin->withScale(max($targetScale, self::SCALE));
+        }
+
+        $targetDeltaAmount = $targetDelta->withScale($ratioScale)->amount();
+        $ratio = BcMath::div($targetDeltaAmount, $sourceDeltaAmount, $ratioScale + 4);
+
+        $offset = $clampedCurrent->subtract($sourceMin, $sourceScale);
+        $offsetAmount = $offset->withScale($ratioScale)->amount();
+        $incrementAmount = BcMath::mul($offsetAmount, $ratio, $ratioScale + 2);
+        $baseAmount = BcMath::add(
+            $targetMin->withScale($ratioScale)->amount(),
+            $incrementAmount,
+            $ratioScale + 2,
+        );
+
+        $normalized = BcMath::normalize($baseAmount, $ratioScale);
+
+        return Money::fromString($edge['to'], $normalized, $ratioScale);
     }
 
     /**
