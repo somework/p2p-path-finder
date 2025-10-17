@@ -13,16 +13,16 @@
         "memory_limit": "-1"
     },
     "report.generators": {
-        "aggregate": {
+        "p2p_aggregate": {
             "extends": "aggregate",
             "title": "P2P path finder performance",
             "cols": [
                 "subject",
                 "set",
                 "mode",
+                "mean",
                 "rstdev",
-                "diff_mode",
-                "diff_rstdev"
+                "mem_peak"
             ]
         }
     }

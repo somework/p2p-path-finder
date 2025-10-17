@@ -38,7 +38,7 @@ Only run when you want to verify test quality.
 
 ### 5. PhpBench Performance (optional)
 ```bash
-vendor/bin/phpbench run --config=phpbench.json.dist --report=aggregate --iterations=1 --revs=1
+vendor/bin/phpbench run --config=phpbench.json.dist --report=p2p_aggregate --iterations=1 --revs=1
 ```
 Only run when making performance-related changes.
 

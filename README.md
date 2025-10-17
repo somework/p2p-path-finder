@@ -231,7 +231,7 @@ php -d memory_limit=-1 vendor/bin/phpbench run \
     --assert="mean(variant.time.avg) <= mean(baseline.time.avg) +/- 20%"
 ```
 
-> ℹ️  Append `--report=aggregate` when you want a human-readable summary.
+> ℹ️  Append `--report=p2p_aggregate` when you want a human-readable summary.
 > It produces the same results but forces PhpBench to hold more state in memory,
 > so the regression command above keeps it disabled by default.
 
