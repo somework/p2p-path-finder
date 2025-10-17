@@ -239,7 +239,13 @@ The baseline lives under `.phpbench/storage/`. When intentional optimisations sh
 performance, refresh it by rerunning:
 
 ```bash
-php -d memory_limit=-1 vendor/bin/phpbench run --config=phpbench.json --tag=baseline
+php -d memory_limit=-1 vendor/bin/phpbench run \
+    --config=phpbench.json \
+    --tag=baseline \
+    --store \
+    --progress=plain
 ```
+
+The flags mirror the GitHub Actions job so the stored XML matches what CI expects.
 
 The CI “PhpBench” job executes the same comparison to guard against regressions.
