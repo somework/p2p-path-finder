@@ -170,6 +170,9 @@ final class PathResultTest extends TestCase
         $this->assertSame([], $result->legs());
         $this->assertSame([], $result->feeBreakdown());
 
+        self::assertSame('0.00', $result->residualTolerancePercentage());
+        self::assertSame('0.0000', $result->residualTolerancePercentage(4));
+
         $this->assertSame([
             'totalSpent' => ['currency' => 'USD', 'amount' => '0.00', 'scale' => 2],
             'totalReceived' => ['currency' => 'EUR', 'amount' => '0.00', 'scale' => 2],

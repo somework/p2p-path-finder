@@ -45,6 +45,15 @@ final class DecimalToleranceTest extends TestCase
         self::assertLessThan(0, $tolerance->compare('0.1252', 4));
     }
 
+    public function test_compare_uses_internal_scale_when_not_provided(): void
+    {
+        $tolerance = DecimalTolerance::fromNumericString('0.333333333333333333');
+
+        self::assertSame(0, $tolerance->compare('0.333333333333333333'));
+        self::assertGreaterThan(0, $tolerance->compare('0.333333333333333332'));
+        self::assertLessThan(0, $tolerance->compare('0.333333333333333334'));
+    }
+
     public function test_compare_throws_when_negative_scale_is_provided(): void
     {
         $tolerance = DecimalTolerance::fromNumericString('0.5');
@@ -63,6 +72,16 @@ final class DecimalToleranceTest extends TestCase
         self::assertSame('12.35', $tolerance->percentage(2));
     }
 
+    public function test_percentage_throws_when_scale_is_negative(): void
+    {
+        $tolerance = DecimalTolerance::fromNumericString('0.123');
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Scale must be a non-negative integer.');
+
+        $tolerance->percentage(-1);
+    }
+
     public function test_json_serialization_returns_ratio_string(): void
     {
         $tolerance = DecimalTolerance::fromNumericString('0.045');
@@ -78,11 +97,31 @@ final class DecimalToleranceTest extends TestCase
         DecimalTolerance::fromNumericString('1.2');
     }
 
+    public function test_from_numeric_string_accepts_boundary_values(): void
+    {
+        $zero = DecimalTolerance::fromNumericString('0');
+        $one = DecimalTolerance::fromNumericString('1');
+
+        self::assertTrue($zero->isZero());
+        self::assertTrue($one->isGreaterThanOrEqual('1'));
+        self::assertSame('1.000000000000000000', $one->ratio());
+    }
+
     public function test_from_numeric_string_rejects_negative_scale(): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Scale must be a non-negative integer.');
 
         DecimalTolerance::fromNumericString('0.5', -1);
+    }
+
+    public function test_comparison_helpers_cover_both_directions(): void
+    {
+        $tolerance = DecimalTolerance::fromNumericString('0.25');
+
+        self::assertTrue($tolerance->isGreaterThanOrEqual('0.249999999999999999'));
+        self::assertTrue($tolerance->isLessThanOrEqual('0.25'));
+        self::assertFalse($tolerance->isLessThanOrEqual('0.249'));
+        self::assertFalse($tolerance->isGreaterThanOrEqual('0.251'));
     }
 }
