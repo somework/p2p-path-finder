@@ -44,9 +44,6 @@
     },
     "config": {
         "sort-packages": true,
-        "platform": {
-            "ext-bcmath": "0"
-        },
         "allow-plugins": {
             "infection/extension-installer": true
         }

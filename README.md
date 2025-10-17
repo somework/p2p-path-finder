@@ -10,7 +10,7 @@ clear separation between the domain model and application services.
 ## Requirements
 
 * PHP 8.2 or newer.
-* The [BCMath extension](https://www.php.net/manual/en/book.bc.php) (`ext-bcmath`). When installing the extension is not possible, require [`symfony/polyfill-bcmath`](https://github.com/symfony/polyfill-bcmath) to emulate the necessary functions.
+* The [BCMath extension](https://www.php.net/manual/en/book.bc.php) (`ext-bcmath`). Install it before running `composer install`; otherwise `composer check-platform-reqs` will fail and dependencies will not be installed. See [docs/local-development.md](docs/local-development.md) for an optional polyfill workflow when the native extension is unavailable.
 
 ## Architecture overview
 
