@@ -48,7 +48,7 @@ class PathFinderBench
         $orderBook = new OrderBook(array_merge(...array_fill(0, $params['orderSetRepeats'], $this->baseOrders)));
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '100.00', 2))
-            ->withToleranceBounds(0.00, 0.02)
+            ->withToleranceBounds('0.00', '0.02')
             ->withHopLimits($params['minHop'], $params['maxHop'])
             ->withResultLimit(5)
             ->build();
@@ -65,7 +65,7 @@ class PathFinderBench
         $orderBook = $this->buildDenseOrderBook($params['depth'], $params['fanout']);
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('SRC', '10.00', 2))
-            ->withToleranceBounds(0.00, 0.00)
+            ->withToleranceBounds('0.00', '0.00')
             ->withHopLimits(1, $params['maxHop'])
             ->withSearchGuards($params['searchGuard'], $params['searchGuard'])
             ->withResultLimit(3)
@@ -83,7 +83,7 @@ class PathFinderBench
         $orderBook = $this->buildKBestOrderBook($params['orderCount']);
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('SRC', '1.00', 2))
-            ->withToleranceBounds(0.00, 0.00)
+            ->withToleranceBounds('0.00', '0.00')
             ->withHopLimits(2, 2)
             ->withResultLimit($params['resultLimit'])
             ->build();

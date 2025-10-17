@@ -23,7 +23,7 @@ final class PathFinderHeuristicsTest extends TestCase
 {
     public function test_dominated_state_is_detected(): void
     {
-        $finder = new PathFinder(maxHops: 2, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
 
         $method = new ReflectionMethod(PathFinder::class, 'isDominated');
         $method->setAccessible(true);
@@ -50,7 +50,7 @@ final class PathFinderHeuristicsTest extends TestCase
 
     public function test_record_state_replaces_inferior_entries(): void
     {
-        $finder = new PathFinder(maxHops: 2, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
 
         $signatureMethod = new ReflectionMethod(PathFinder::class, 'stateSignature');
         $signatureMethod->setAccessible(true);
@@ -98,7 +98,7 @@ final class PathFinderHeuristicsTest extends TestCase
 
     public function test_money_signature_formats_null_and_scaled_amounts(): void
     {
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
         $method = new ReflectionMethod(PathFinder::class, 'moneySignature');
         $method->setAccessible(true);
@@ -112,7 +112,7 @@ final class PathFinderHeuristicsTest extends TestCase
 
     public function test_has_state_with_signature_detects_matching_entries(): void
     {
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
         $signatureMethod = new ReflectionMethod(PathFinder::class, 'stateSignature');
         $signatureMethod->setAccessible(true);
@@ -138,7 +138,7 @@ final class PathFinderHeuristicsTest extends TestCase
 
     public function test_state_signature_normalizes_range_and_desired_amounts(): void
     {
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
         $method = new ReflectionMethod(PathFinder::class, 'stateSignature');
         $method->setAccessible(true);
@@ -177,7 +177,7 @@ final class PathFinderHeuristicsTest extends TestCase
             'max' => CurrencyScenarioFactory::money('EUR', '2.000', 3),
         ];
 
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
         $result = $method->invoke($finder, $edge, $range);
 
         self::assertNull($result);
@@ -206,7 +206,7 @@ final class PathFinderHeuristicsTest extends TestCase
             'max' => CurrencyScenarioFactory::money('EUR', '0', 3),
         ];
 
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
         $result = $method->invoke($finder, $edge, $range);
 
         self::assertNotNull($result);
@@ -237,7 +237,7 @@ final class PathFinderHeuristicsTest extends TestCase
             'max' => CurrencyScenarioFactory::money('EUR', '1.000', 3),
         ];
 
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
         $result = $method->invoke($finder, $edge, $range);
 
         $convertMethod = new ReflectionMethod(PathFinder::class, 'convertEdgeAmount');
@@ -274,7 +274,7 @@ final class PathFinderHeuristicsTest extends TestCase
         $method = new ReflectionMethod(PathFinder::class, 'convertEdgeAmount');
         $method->setAccessible(true);
 
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
         $amount = CurrencyScenarioFactory::money('EUR', '5.000', 3);
         $converted = $method->invoke($finder, $edge, $amount);
 
@@ -297,7 +297,7 @@ final class PathFinderHeuristicsTest extends TestCase
         $graph = (new GraphBuilder())->build([$order]);
         $edge = $graph['USD']['edges'][0];
 
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
         $ratioMethod = new ReflectionMethod(PathFinder::class, 'edgeBaseToQuoteRatio');
         $ratioMethod->setAccessible(true);
@@ -315,7 +315,7 @@ final class PathFinderHeuristicsTest extends TestCase
 
     public function test_clamp_to_range_bounds_value(): void
     {
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
         $range = [
             'min' => CurrencyScenarioFactory::money('USD', '1.00', 2),
@@ -340,7 +340,7 @@ final class PathFinderHeuristicsTest extends TestCase
 
     public function test_normalize_tolerance_rejects_non_numeric_strings(): void
     {
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
         $method = new ReflectionMethod(PathFinder::class, 'normalizeTolerance');
         $method->setAccessible(true);
@@ -353,7 +353,7 @@ final class PathFinderHeuristicsTest extends TestCase
 
     public function test_normalize_tolerance_rejects_negative_values(): void
     {
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
         $method = new ReflectionMethod(PathFinder::class, 'normalizeTolerance');
         $method->setAccessible(true);
@@ -366,7 +366,7 @@ final class PathFinderHeuristicsTest extends TestCase
 
     public function test_normalize_tolerance_rejects_one_or_greater(): void
     {
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
         $method = new ReflectionMethod(PathFinder::class, 'normalizeTolerance');
         $method->setAccessible(true);
@@ -377,21 +377,9 @@ final class PathFinderHeuristicsTest extends TestCase
         $method->invoke($finder, '1.000');
     }
 
-    public function test_normalize_tolerance_normalizes_float_inputs(): void
-    {
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
-
-        $method = new ReflectionMethod(PathFinder::class, 'normalizeTolerance');
-        $method->setAccessible(true);
-
-        $normalized = $method->invoke($finder, 0.5);
-
-        self::assertSame(BcMath::normalize('0.5', 18), $normalized);
-    }
-
     public function test_normalize_tolerance_caps_values_close_to_one(): void
     {
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
         $method = new ReflectionMethod(PathFinder::class, 'normalizeTolerance');
         $method->setAccessible(true);
@@ -404,7 +392,7 @@ final class PathFinderHeuristicsTest extends TestCase
 
     public function test_calculate_tolerance_amplifier_returns_one_for_zero_tolerance(): void
     {
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
         $method = new ReflectionMethod(PathFinder::class, 'calculateToleranceAmplifier');
         $method->setAccessible(true);
@@ -416,7 +404,7 @@ final class PathFinderHeuristicsTest extends TestCase
 
     public function test_calculate_tolerance_amplifier_inverts_complement(): void
     {
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
         $method = new ReflectionMethod(PathFinder::class, 'calculateToleranceAmplifier');
         $method->setAccessible(true);
@@ -427,21 +415,9 @@ final class PathFinderHeuristicsTest extends TestCase
         self::assertSame(BcMath::normalize('1.333333333333333333', 18), $amplifier);
     }
 
-    public function test_format_float_normalizes_negative_zero(): void
-    {
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0);
-
-        $method = new ReflectionMethod(PathFinder::class, 'formatFloat');
-        $method->setAccessible(true);
-
-        $formatted = $method->invoke($finder, -0.0);
-
-        self::assertSame('0', $formatted);
-    }
-
     public function test_record_result_trims_heap_to_requested_limit(): void
     {
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0, topK: 2);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0', topK: 2);
 
         $createHeap = new ReflectionMethod(PathFinder::class, 'createResultHeap');
         $createHeap->setAccessible(true);
@@ -485,7 +461,7 @@ final class PathFinderHeuristicsTest extends TestCase
 
     public function test_record_result_preserves_insertion_order_when_costs_are_equal(): void
     {
-        $finder = new PathFinder(maxHops: 1, tolerance: 0.0, topK: 3);
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0', topK: 3);
 
         $createHeap = new ReflectionMethod(PathFinder::class, 'createResultHeap');
         $createHeap->setAccessible(true);
@@ -523,7 +499,7 @@ final class PathFinderHeuristicsTest extends TestCase
 
     public function test_search_state_queue_prioritizes_lowest_cost_entries(): void
     {
-        new PathFinder(maxHops: 1, tolerance: 0.0);
+        new PathFinder(maxHops: 1, tolerance: '0.0');
 
         $queue = new SearchStateQueue(18);
         $queue->insert(
@@ -561,7 +537,7 @@ final class PathFinderHeuristicsTest extends TestCase
 
     public function test_search_state_queue_prefers_earlier_insertion_when_costs_are_equal(): void
     {
-        new PathFinder(maxHops: 1, tolerance: 0.0);
+        new PathFinder(maxHops: 1, tolerance: '0.0');
 
         $queue = new SearchStateQueue(18);
 
@@ -591,7 +567,7 @@ final class PathFinderHeuristicsTest extends TestCase
 
     public function test_finalize_results_sorts_candidates_by_cost(): void
     {
-        $finder = new PathFinder(maxHops: 2, tolerance: 0.0, topK: 4);
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 4);
 
         $createHeap = new ReflectionMethod(PathFinder::class, 'createResultHeap');
         $createHeap->setAccessible(true);
@@ -619,7 +595,7 @@ final class PathFinderHeuristicsTest extends TestCase
 
     public function test_finalize_results_preserves_insertion_order_for_equal_costs(): void
     {
-        $finder = new PathFinder(maxHops: 2, tolerance: 0.0, topK: 4);
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 4);
 
         $createHeap = new ReflectionMethod(PathFinder::class, 'createResultHeap');
         $createHeap->setAccessible(true);

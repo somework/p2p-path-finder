@@ -25,7 +25,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.05)
+            ->withToleranceBounds('0.0', '0.05')
             ->withHopLimits(1, 1)
             ->build();
 
@@ -39,7 +39,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('102.000', $totalSpent->amount());
 
         self::assertGreaterThan(0.0, $result->residualTolerance());
-        self::assertLessThanOrEqual($config->maximumTolerance(), $result->residualTolerance());
+        self::assertLessThanOrEqual((float) $config->maximumTolerance(), $result->residualTolerance());
 
         $legs = $result->legs();
         self::assertCount(1, $legs);
@@ -58,7 +58,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.02)
+            ->withToleranceBounds('0.0', '0.02')
             ->withHopLimits(1, 1)
             ->build();
 
@@ -81,7 +81,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('4.857', $legFees['EUR']->withScale(3)->amount());
 
         self::assertSame($maximumSpend->amount(), $result->totalSpent()->withScale(3)->amount());
-        self::assertEqualsWithDelta($config->maximumTolerance(), $result->residualTolerance(), 0.0000001);
+        self::assertEqualsWithDelta((float) $config->maximumTolerance(), $result->residualTolerance(), 0.0000001);
     }
 
     /**
@@ -100,7 +100,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
      *     feePolicy?: array{type: string, value: numeric-string}|null,
      * }> $orders
      * @param array{currency: non-empty-string, amount: numeric-string, scale: int} $spend
-     * @param array{0: float, 1: float}                                             $tolerance
+     * @param array{0: string, 1: string}                                           $tolerance
      * @param array{0: int, 1: int}                                                 $hopLimits
      * @param non-empty-string                                                      $target
      */
@@ -141,7 +141,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
      *         feePolicy?: array{type: string, value: numeric-string}|null,
      *     }>,
      *     1: array{currency: non-empty-string, amount: numeric-string, scale: int},
-     *     2: array{0: float, 1: float},
+     *     2: array{0: string, 1: string},
      *     3: array{0: int, 1: int},
      *     4: non-empty-string,
      * }>
@@ -170,7 +170,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
                 ],
             ],
             ['currency' => 'EUR', 'amount' => '5.00', 'scale' => 2],
-            [0.0, 0.40],
+            ['0.0', '0.40'],
             [1, 2],
             'USD',
         ];
@@ -189,7 +189,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
                 ],
             ],
             ['currency' => 'EUR', 'amount' => '100.00', 'scale' => 2],
-            [0.0, 0.05],
+            ['0.0', '0.05'],
             [1, 1],
             'USD',
         ];
@@ -204,7 +204,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds(0.0, 0.25)
+            ->withToleranceBounds('0.0', '0.25')
             ->withHopLimits(3, 3)
             ->build();
 
@@ -222,7 +222,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '8.00', 2))
-            ->withToleranceBounds(0.25, 0.05)
+            ->withToleranceBounds('0.25', '0.05')
             ->withHopLimits(1, 1)
             ->build();
 
@@ -248,7 +248,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '40.00', 2))
-            ->withToleranceBounds(0.5, 0.5)
+            ->withToleranceBounds('0.5', '0.5')
             ->withHopLimits(1, 1)
             ->build();
 
@@ -274,7 +274,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '22.00', 2))
-            ->withToleranceBounds(0.1, 0.5)
+            ->withToleranceBounds('0.1', '0.5')
             ->withHopLimits(1, 1)
             ->build();
 

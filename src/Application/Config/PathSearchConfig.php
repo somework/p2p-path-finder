@@ -9,8 +9,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
-use function is_string;
-use function sprintf;
+use function max;
 
 /**
  * Immutable configuration carrying constraints used by {@see PathFinderService}.
@@ -21,26 +20,28 @@ final class PathSearchConfig
 
     private readonly Money $maximumSpendAmount;
 
-    private readonly float|string $pathFinderTolerance;
+    /** @var numeric-string */
+    private readonly string $minimumTolerance;
+
+    /** @var numeric-string */
+    private readonly string $maximumTolerance;
+
+    /** @var numeric-string */
+    private readonly string $pathFinderTolerance;
 
     public function __construct(
         private readonly Money $spendAmount,
-        private readonly float $minimumTolerance,
-        private readonly float $maximumTolerance,
+        string $minimumTolerance,
+        string $maximumTolerance,
         private readonly int $minimumHops,
         private readonly int $maximumHops,
         private readonly int $resultLimit = 1,
         private readonly int $pathFinderMaxExpansions = PathFinder::DEFAULT_MAX_EXPANSIONS,
         private readonly int $pathFinderMaxVisitedStates = PathFinder::DEFAULT_MAX_VISITED_STATES,
-        float|string|null $pathFinderToleranceOverride = null,
+        ?string $pathFinderToleranceOverride = null,
     ) {
-        if ($minimumTolerance < 0.0 || $minimumTolerance >= 1.0) {
-            throw new InvalidArgumentException('Minimum tolerance must be in the [0, 1) range.');
-        }
-
-        if ($maximumTolerance < 0.0 || $maximumTolerance >= 1.0) {
-            throw new InvalidArgumentException('Maximum tolerance must be in the [0, 1) range.');
-        }
+        $this->minimumTolerance = $this->assertTolerance($minimumTolerance, 'Minimum tolerance');
+        $this->maximumTolerance = $this->assertTolerance($maximumTolerance, 'Maximum tolerance');
 
         if ($minimumHops < 1) {
             throw new InvalidArgumentException('Minimum hops must be at least one.');
@@ -62,22 +63,18 @@ final class PathSearchConfig
             throw new InvalidArgumentException('Maximum visited states must be at least one.');
         }
 
-        if (null !== $pathFinderToleranceOverride) {
-            if (is_string($pathFinderToleranceOverride)) {
-                BcMath::ensureNumeric($pathFinderToleranceOverride);
+        $this->pathFinderTolerance = $this->resolvePathFinderTolerance($pathFinderToleranceOverride);
 
-                if (BcMath::comp($pathFinderToleranceOverride, '0', 18) < 0 || BcMath::comp($pathFinderToleranceOverride, '1', 18) >= 0) {
-                    throw new InvalidArgumentException('Path finder tolerance must be in the [0, 1) range.');
-                }
-            } elseif ($pathFinderToleranceOverride < 0.0 || $pathFinderToleranceOverride >= 1.0) {
-                throw new InvalidArgumentException('Path finder tolerance must be in the [0, 1) range.');
-            }
-        }
+        $scale = max($this->spendAmount->scale(), self::BOUND_SCALE);
+        $lowerMultiplier = BcMath::sub('1', $this->minimumTolerance, $scale);
+        $upperMultiplier = BcMath::add('1', $this->maximumTolerance, $scale);
 
-        $this->minimumSpendAmount = $this->calculateBoundedSpend(1.0 - $minimumTolerance);
-        $this->maximumSpendAmount = $this->calculateBoundedSpend(1.0 + $maximumTolerance);
-
-        $this->pathFinderTolerance = $pathFinderToleranceOverride ?? max($minimumTolerance, $maximumTolerance);
+        $this->minimumSpendAmount = $this->spendAmount
+            ->multiply($lowerMultiplier, $scale)
+            ->withScale($this->spendAmount->scale());
+        $this->maximumSpendAmount = $this->spendAmount
+            ->multiply($upperMultiplier, $scale)
+            ->withScale($this->spendAmount->scale());
     }
 
     /**
@@ -98,16 +95,20 @@ final class PathSearchConfig
 
     /**
      * Returns the lower relative tolerance bound expressed as a fraction.
+     *
+     * @return numeric-string
      */
-    public function minimumTolerance(): float
+    public function minimumTolerance(): string
     {
         return $this->minimumTolerance;
     }
 
     /**
      * Returns the upper relative tolerance bound expressed as a fraction.
+     *
+     * @return numeric-string
      */
-    public function maximumTolerance(): float
+    public function maximumTolerance(): string
     {
         return $this->maximumTolerance;
     }
@@ -170,39 +171,45 @@ final class PathSearchConfig
 
     /**
      * Returns the tolerance value used by the graph search heuristic.
+     *
+     * @return numeric-string
      */
-    public function pathFinderTolerance(): float|string
+    public function pathFinderTolerance(): string
     {
         return $this->pathFinderTolerance;
-    }
-
-    private function calculateBoundedSpend(float $multiplier): Money
-    {
-        if ($multiplier < 0.0) {
-            throw new InvalidArgumentException('Spend multiplier must be non-negative.');
-        }
-
-        $scale = max($this->spendAmount->scale(), 8);
-        $factor = self::floatToString($multiplier, $scale);
-
-        $adjusted = $this->spendAmount->multiply($factor, $scale);
-
-        return $adjusted->withScale($this->spendAmount->scale());
     }
 
     /**
      * @return numeric-string
      */
-    private static function floatToString(float $value, int $scale): string
+    private function assertTolerance(string $value, string $context): string
     {
-        $formatted = sprintf('%.'.($scale + 2).'F', $value);
-        BcMath::ensureNumeric($formatted);
-        $normalized = BcMath::normalize($formatted, $scale);
+        BcMath::ensureNumeric($value);
+        $normalized = BcMath::normalize($value, self::TOLERANCE_SCALE);
 
-        if ('-0' === $normalized) {
-            return '0';
+        if (BcMath::comp($normalized, '0', self::TOLERANCE_SCALE) < 0 || BcMath::comp($normalized, '1', self::TOLERANCE_SCALE) >= 0) {
+            throw new InvalidArgumentException($context.' must be in the [0, 1) range.');
         }
 
         return $normalized;
     }
+
+    /**
+     * @return numeric-string
+     */
+    private function resolvePathFinderTolerance(?string $override): string
+    {
+        if (null !== $override) {
+            $normalized = $this->assertTolerance($override, 'Path finder tolerance');
+
+            return $normalized;
+        }
+
+        return BcMath::comp($this->minimumTolerance, $this->maximumTolerance, self::TOLERANCE_SCALE) >= 0
+            ? $this->minimumTolerance
+            : $this->maximumTolerance;
+    }
+
+    private const TOLERANCE_SCALE = 18;
+    private const BOUND_SCALE = 8;
 }

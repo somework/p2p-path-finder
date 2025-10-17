@@ -9,7 +9,6 @@ use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
-use function is_float;
 use function is_int;
 use function is_string;
 use function sprintf;
@@ -21,9 +20,11 @@ final class PathSearchConfigBuilder
 {
     private ?Money $spendAmount = null;
 
-    private ?float $minimumTolerance = null;
+    /** @var numeric-string|null */
+    private ?string $minimumTolerance = null;
 
-    private ?float $maximumTolerance = null;
+    /** @var numeric-string|null */
+    private ?string $maximumTolerance = null;
 
     private ?string $pathFinderToleranceOverride = null;
 
@@ -50,19 +51,14 @@ final class PathSearchConfigBuilder
     /**
      * Configures the acceptable relative deviation from the desired spend amount.
      */
-    public function withToleranceBounds(float|string $minimumTolerance, float|string $maximumTolerance): self
+    public function withToleranceBounds(string $minimumTolerance, string $maximumTolerance): self
     {
-        [$minimumFloat, $minimumString] = $this->normalizeTolerance($minimumTolerance, 'Minimum tolerance');
-        [$maximumFloat, $maximumString] = $this->normalizeTolerance($maximumTolerance, 'Maximum tolerance');
+        $minimumString = $this->normalizeTolerance($minimumTolerance, 'Minimum tolerance');
+        $maximumString = $this->normalizeTolerance($maximumTolerance, 'Maximum tolerance');
 
-        $this->minimumTolerance = $minimumFloat;
-        $this->maximumTolerance = $maximumFloat;
-
-        if (is_string($minimumTolerance) || is_string($maximumTolerance)) {
-            $this->pathFinderToleranceOverride = $this->resolvePathFinderTolerance($minimumString, $maximumString);
-        } else {
-            $this->pathFinderToleranceOverride = null;
-        }
+        $this->minimumTolerance = $minimumString;
+        $this->maximumTolerance = $maximumString;
+        $this->pathFinderToleranceOverride = $this->resolvePathFinderTolerance($minimumString, $maximumString);
 
         return $this;
     }
@@ -128,7 +124,7 @@ final class PathSearchConfigBuilder
             throw new InvalidArgumentException('Spend amount must be provided.');
         }
 
-        if (!is_float($this->minimumTolerance) || !is_float($this->maximumTolerance)) {
+        if (!is_string($this->minimumTolerance) || !is_string($this->maximumTolerance)) {
             throw new InvalidArgumentException('Tolerance bounds must be configured.');
         }
 
@@ -153,36 +149,19 @@ final class PathSearchConfigBuilder
     }
 
     /**
-     * @return array{0: float, 1: numeric-string}
+     * @return numeric-string
      */
-    private function normalizeTolerance(float|string $value, string $context): array
+    private function normalizeTolerance(string $value, string $context): string
     {
-        if (is_string($value)) {
-            BcMath::ensureNumeric($value);
-            /** @var numeric-string $value */
-            $normalized = BcMath::normalize($value, self::PATH_FINDER_TOLERANCE_SCALE);
+        BcMath::ensureNumeric($value);
+        /** @var numeric-string $value */
+        $normalized = BcMath::normalize($value, self::PATH_FINDER_TOLERANCE_SCALE);
 
-            if (BcMath::comp($normalized, '0', self::PATH_FINDER_TOLERANCE_SCALE) < 0 || BcMath::comp($normalized, '1', self::PATH_FINDER_TOLERANCE_SCALE) >= 0) {
-                throw new InvalidArgumentException(sprintf('%s must be in the [0, 1) range.', $context));
-            }
-
-            $floatValue = (float) $value;
-            if ($floatValue >= 1.0) {
-                $floatValue = self::FLOAT_TOLERANCE_CAP;
-            }
-
-            return [$floatValue, $normalized];
-        }
-
-        if ($value < 0.0 || $value >= 1.0) {
+        if (BcMath::comp($normalized, '0', self::PATH_FINDER_TOLERANCE_SCALE) < 0 || BcMath::comp($normalized, '1', self::PATH_FINDER_TOLERANCE_SCALE) >= 0) {
             throw new InvalidArgumentException(sprintf('%s must be in the [0, 1) range.', $context));
         }
 
-        $formatted = sprintf('%.'.self::PATH_FINDER_TOLERANCE_SCALE.'F', $value);
-        /** @var numeric-string $formatted */
-        $normalized = BcMath::normalize($formatted, self::PATH_FINDER_TOLERANCE_SCALE);
-
-        return [$value, $normalized];
+        return $normalized;
     }
 
     /**
@@ -201,6 +180,4 @@ final class PathSearchConfigBuilder
     }
 
     private const PATH_FINDER_TOLERANCE_SCALE = 18;
-
-    private const FLOAT_TOLERANCE_CAP = 0.9999999999999999;
 }

@@ -14,8 +14,6 @@ use SplPriorityQueue;
 
 use function array_key_exists;
 use function array_values;
-use function is_string;
-use function rtrim;
 use function sprintf;
 use function str_repeat;
 use function strtoupper;
@@ -166,12 +164,12 @@ final class PathFinder
     private readonly bool $hasTolerance;
 
     /**
-     * @param int          $maxHops   maximum number of edges a path may contain
-     * @param float|string $tolerance value in the [0, 1) range representing the acceptable degradation of the best product
+     * @param int    $maxHops   maximum number of edges a path may contain
+     * @param string $tolerance value in the [0, 1) range representing the acceptable degradation of the best product
      */
     public function __construct(
         private readonly int $maxHops = 4,
-        float|string $tolerance = 0.0,
+        string $tolerance = '0',
         private readonly int $topK = 1,
         private readonly int $maxExpansions = self::DEFAULT_MAX_EXPANSIONS,
         private readonly int $maxVisitedStates = self::DEFAULT_MAX_VISITED_STATES,
@@ -815,31 +813,23 @@ final class PathFinder
     /**
      * @return numeric-string
      */
-    private function normalizeTolerance(float|string $tolerance): string
+    private function normalizeTolerance(string $tolerance): string
     {
-        if (is_string($tolerance)) {
-            if (!BcMath::isNumeric($tolerance)) {
-                throw new InvalidArgumentException('Tolerance must be numeric.');
-            }
-
-            BcMath::ensureNumeric($tolerance);
-
-            if (-1 === BcMath::comp($tolerance, '0', self::SCALE)) {
-                throw new InvalidArgumentException('Tolerance must be non-negative.');
-            }
-
-            if (BcMath::comp($tolerance, '1', self::SCALE) >= 0) {
-                throw new InvalidArgumentException('Tolerance must be less than one.');
-            }
-
-            $normalized = BcMath::normalize($tolerance, self::SCALE);
-        } else {
-            if ($tolerance < 0.0 || $tolerance >= 1.0) {
-                throw new InvalidArgumentException('Tolerance must be in the [0, 1) range.');
-            }
-
-            $normalized = BcMath::normalize($this->formatFloat($tolerance), self::SCALE);
+        if (!BcMath::isNumeric($tolerance)) {
+            throw new InvalidArgumentException('Tolerance must be numeric.');
         }
+
+        BcMath::ensureNumeric($tolerance);
+
+        if (-1 === BcMath::comp($tolerance, '0', self::SCALE)) {
+            throw new InvalidArgumentException('Tolerance must be non-negative.');
+        }
+
+        if (BcMath::comp($tolerance, '1', self::SCALE) >= 0) {
+            throw new InvalidArgumentException('Tolerance must be less than one.');
+        }
+
+        $normalized = BcMath::normalize($tolerance, self::SCALE);
 
         /** @var numeric-string $upperBound */
         $upperBound = '0.'.str_repeat('9', self::SCALE);
@@ -865,21 +855,6 @@ final class PathFinder
         $complement = BcMath::sub('1', $normalizedTolerance, self::SCALE);
 
         return BcMath::div('1', $complement, self::SCALE);
-    }
-
-    /**
-     * @return numeric-string
-     */
-    private function formatFloat(float $value): string
-    {
-        $formatted = rtrim(rtrim(sprintf('%.'.self::SCALE.'F', $value), '0'), '.');
-        if ('' === $formatted || '-' === $formatted) {
-            $formatted .= '0';
-        }
-
-        BcMath::ensureNumeric($formatted);
-
-        return $formatted;
     }
 }
 
