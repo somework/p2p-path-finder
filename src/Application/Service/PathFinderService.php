@@ -9,6 +9,8 @@ use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
@@ -50,12 +52,9 @@ final class PathFinderService
     /**
      * Searches for the best conversion paths from the configured spend asset to the target asset.
      *
-     * @return array{
-     *     paths: list<PathResult>,
-     *     guardLimits: array{expansions: bool, visitedStates: bool}
-     * }
+     * @return SearchOutcome<PathResult>
      */
-    public function findBestPaths(OrderBook $orderBook, PathSearchConfig $config, string $targetAsset): array
+    public function findBestPaths(OrderBook $orderBook, PathSearchConfig $config, string $targetAsset): SearchOutcome
     {
         if ('' === $targetAsset) {
             throw new InvalidArgumentException('Target asset cannot be empty.');
@@ -67,24 +66,12 @@ final class PathFinderService
 
         $orders = $this->orderSpendAnalyzer->filterOrders($orderBook, $config);
         if ([] === $orders) {
-            return [
-                'paths' => [],
-                'guardLimits' => [
-                    'expansions' => false,
-                    'visitedStates' => false,
-                ],
-            ];
+            return new SearchOutcome([], GuardLimitStatus::none());
         }
 
         $graph = $this->graphBuilder->build($orders);
         if (!isset($graph[$sourceCurrency], $graph[$targetCurrency])) {
-            return [
-                'paths' => [],
-                'guardLimits' => [
-                    'expansions' => false,
-                    'visitedStates' => false,
-                ],
-            ];
+            return new SearchOutcome([], GuardLimitStatus::none());
         }
 
         $pathFinder = new PathFinder(
@@ -169,10 +156,7 @@ final class PathFinderService
         );
 
         if ([] === $materializedResults) {
-            return [
-                'paths' => [],
-                'guardLimits' => $searchResult['guardLimits'],
-            ];
+            return new SearchOutcome([], $searchResult->guardLimits());
         }
 
         usort(
@@ -198,13 +182,13 @@ final class PathFinderService
             },
         );
 
-        return [
-            'paths' => array_map(
+        return new SearchOutcome(
+            array_map(
                 static fn (array $entry): PathResult => $entry['result'],
                 $materializedResults,
             ),
-            'guardLimits' => $searchResult['guardLimits'],
-        ];
+            $searchResult->guardLimits(),
+        );
     }
 
     /**
@@ -214,6 +198,6 @@ final class PathFinderService
     {
         $results = $this->findBestPaths($orderBook, $config, $targetAsset);
 
-        return $results['paths'][0] ?? null;
+        return $results->paths()[0] ?? null;
     }
 }

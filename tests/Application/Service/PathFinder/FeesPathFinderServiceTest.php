@@ -6,6 +6,8 @@ namespace SomeWork\P2PPathFinder\Tests\Application\Service\PathFinder;
 
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Service\LegMaterializer;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
@@ -17,29 +19,21 @@ use function sprintf;
 final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
 {
     /**
-     * @param array{
-     *     paths: list<PathResult>,
-     *     guardLimits: array{expansions: bool, visitedStates: bool}
-     * } $result
+     * @param SearchOutcome<PathResult> $result
      *
      * @return list<PathResult>
      */
-    private static function extractPaths(array $result): array
+    private static function extractPaths(SearchOutcome $result): array
     {
-        return $result['paths'];
+        return $result->paths();
     }
 
     /**
-     * @param array{
-     *     paths: list<PathResult>,
-     *     guardLimits: array{expansions: bool, visitedStates: bool}
-     * } $result
-     *
-     * @return array{expansions: bool, visitedStates: bool}
+     * @param SearchOutcome<PathResult> $result
      */
-    private static function extractGuardLimits(array $result): array
+    private static function extractGuardLimits(SearchOutcome $result): GuardLimitStatus
     {
-        return $result['guardLimits'];
+        return $result->guardLimits();
     }
 
     /**
@@ -471,10 +465,9 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
         $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'BTC');
 
         self::assertSame([], self::extractPaths($searchResult));
-        self::assertSame([
-            'expansions' => false,
-            'visitedStates' => false,
-        ], self::extractGuardLimits($searchResult));
+        $guardLimits = self::extractGuardLimits($searchResult);
+        self::assertFalse($guardLimits->expansionsReached());
+        self::assertFalse($guardLimits->visitedStatesReached());
     }
 
     /**
@@ -538,10 +531,9 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
         $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
 
         self::assertSame([], self::extractPaths($searchResult));
-        self::assertSame([
-            'expansions' => false,
-            'visitedStates' => false,
-        ], self::extractGuardLimits($searchResult));
+        $guardLimits = self::extractGuardLimits($searchResult);
+        self::assertFalse($guardLimits->expansionsReached());
+        self::assertFalse($guardLimits->visitedStatesReached());
     }
 
     private function scenarioEurToJpyBridgeWithLegFees(): OrderBook

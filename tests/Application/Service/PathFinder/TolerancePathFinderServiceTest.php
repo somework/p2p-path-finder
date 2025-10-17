@@ -8,6 +8,8 @@ use ReflectionProperty;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
@@ -18,29 +20,21 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
 {
     /**
-     * @param array{
-     *     paths: list<PathResult>,
-     *     guardLimits: array{expansions: bool, visitedStates: bool}
-     * } $result
+     * @param SearchOutcome<PathResult> $result
      *
      * @return list<PathResult>
      */
-    private static function extractPaths(array $result): array
+    private static function extractPaths(SearchOutcome $result): array
     {
-        return $result['paths'];
+        return $result->paths();
     }
 
     /**
-     * @param array{
-     *     paths: list<PathResult>,
-     *     guardLimits: array{expansions: bool, visitedStates: bool}
-     * } $result
-     *
-     * @return array{expansions: bool, visitedStates: bool}
+     * @param SearchOutcome<PathResult> $result
      */
-    private static function extractGuardLimits(array $result): array
+    private static function extractGuardLimits(SearchOutcome $result): GuardLimitStatus
     {
-        return $result['guardLimits'];
+        return $result->guardLimits();
     }
 
     /**
@@ -161,10 +155,9 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
         $searchResult = $this->makeService()->findBestPaths($orderBook, $config, $target);
 
         self::assertSame([], self::extractPaths($searchResult));
-        self::assertSame([
-            'expansions' => false,
-            'visitedStates' => false,
-        ], self::extractGuardLimits($searchResult));
+        $guardLimits = self::extractGuardLimits($searchResult);
+        self::assertFalse($guardLimits->expansionsReached());
+        self::assertFalse($guardLimits->visitedStatesReached());
     }
 
     /**
@@ -250,10 +243,9 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
         $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'JPY');
 
         self::assertSame([], self::extractPaths($searchResult));
-        self::assertSame([
-            'expansions' => false,
-            'visitedStates' => false,
-        ], self::extractGuardLimits($searchResult));
+        $guardLimits = self::extractGuardLimits($searchResult);
+        self::assertFalse($guardLimits->expansionsReached());
+        self::assertFalse($guardLimits->visitedStatesReached());
     }
 
     /**

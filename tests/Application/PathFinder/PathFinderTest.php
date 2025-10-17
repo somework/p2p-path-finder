@@ -9,6 +9,8 @@ use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
@@ -27,29 +29,21 @@ final class PathFinderTest extends TestCase
     private const SCALE = 18;
 
     /**
-     * @param array{
-     *     paths: list<array>,
-     *     guardLimits: array{expansions: bool, visitedStates: bool}
-     * } $searchResult
+     * @param SearchOutcome<array> $searchResult
      *
      * @return list<array>
      */
-    private static function extractPaths(array $searchResult): array
+    private static function extractPaths(SearchOutcome $searchResult): array
     {
-        return $searchResult['paths'];
+        return $searchResult->paths();
     }
 
     /**
-     * @param array{
-     *     paths: list<array>,
-     *     guardLimits: array{expansions: bool, visitedStates: bool}
-     * } $searchResult
-     *
-     * @return array{expansions: bool, visitedStates: bool}
+     * @param SearchOutcome<array> $searchResult
      */
-    private static function extractGuardLimits(array $searchResult): array
+    private static function extractGuardLimits(SearchOutcome $searchResult): GuardLimitStatus
     {
-        return $searchResult['guardLimits'];
+        return $searchResult->guardLimits();
     }
 
     /**
@@ -186,7 +180,7 @@ final class PathFinderTest extends TestCase
 
         $finder = new PathFinder(maxHops: 4, tolerance: '0.999', topK: 2);
         $searchResult = $finder->findBestPaths($graph, 'RUB', 'IDR');
-        $results = $searchResult['paths'];
+        $results = $searchResult->paths();
 
         self::assertGreaterThanOrEqual(2, count($results));
         self::assertCount(2, $results);
@@ -195,7 +189,7 @@ final class PathFinderTest extends TestCase
 
         $finderWithBroaderLimit = new PathFinder(maxHops: 4, tolerance: '0.999', topK: 3);
         $extendedResults = $finderWithBroaderLimit->findBestPaths($graph, 'RUB', 'IDR');
-        $extendedPaths = $extendedResults['paths'];
+        $extendedPaths = $extendedResults->paths();
 
         self::assertGreaterThan(2, count($extendedPaths));
     }
@@ -251,7 +245,7 @@ final class PathFinderTest extends TestCase
             },
         );
 
-        $results = $searchResult['paths'];
+        $results = $searchResult->paths();
 
         self::assertNotSame([], $results);
         self::assertGreaterThanOrEqual(2, count($visitedCandidates));
@@ -358,11 +352,9 @@ final class PathFinderTest extends TestCase
         $finder = new PathFinder($maxHops, $tolerance);
         $result = $finder->findBestPaths($graph, $source, $target);
 
-        self::assertSame([], $result['paths']);
-        self::assertSame([
-            'expansions' => false,
-            'visitedStates' => false,
-        ], $result['guardLimits']);
+        self::assertSame([], $result->paths());
+        self::assertFalse($result->guardLimits()->expansionsReached());
+        self::assertFalse($result->guardLimits()->visitedStatesReached());
     }
 
     /**
@@ -752,11 +744,9 @@ final class PathFinderTest extends TestCase
             },
         );
 
-        self::assertSame([], $searchResult['paths']);
-        self::assertSame([
-            'expansions' => false,
-            'visitedStates' => false,
-        ], $searchResult['guardLimits']);
+        self::assertSame([], $searchResult->paths());
+        self::assertFalse($searchResult->guardLimits()->expansionsReached());
+        self::assertFalse($searchResult->guardLimits()->visitedStatesReached());
         self::assertFalse($accepted);
     }
 
@@ -947,12 +937,22 @@ final class PathFinderTest extends TestCase
         $first = $finder->findBestPaths($graph, $source, $target);
         $second = $finder->findBestPaths($graph, $source, $target);
 
-        self::assertNotSame([], $first['paths']);
-        self::assertNotSame([], $second['paths']);
+        self::assertTrue($first->hasPaths());
+        self::assertTrue($second->hasPaths());
 
-        self::assertSame($first, $second, 'Extreme rate scenarios should produce deterministic outcomes.');
+        self::assertSame($first->paths(), $second->paths(), 'Extreme rate scenarios should produce deterministic outcomes.');
+        self::assertSame(
+            $first->guardLimits()->expansionsReached(),
+            $second->guardLimits()->expansionsReached(),
+            'Extreme rate scenarios should produce deterministic guard exhaustion state.',
+        );
+        self::assertSame(
+            $first->guardLimits()->visitedStatesReached(),
+            $second->guardLimits()->visitedStatesReached(),
+            'Extreme rate scenarios should produce deterministic guard exhaustion state.',
+        );
 
-        $best = $first['paths'][0];
+        $best = $first->paths()[0];
         self::assertSame($expectedHops, $best['hops']);
         self::assertSame($expectedProduct, $best['product']);
         $expectedCost = BcMath::div('1', $expectedProduct, self::SCALE);
@@ -1089,9 +1089,9 @@ final class PathFinderTest extends TestCase
 
         $guardedResult = $guardedFinder->findBestPaths($graph, 'SRC', 'DST');
 
-        self::assertSame([], $guardedResult['paths']);
-        self::assertTrue($guardedResult['guardLimits']['expansions']);
-        self::assertFalse($guardedResult['guardLimits']['visitedStates']);
+        self::assertSame([], $guardedResult->paths());
+        self::assertTrue($guardedResult->guardLimits()->expansionsReached());
+        self::assertFalse($guardedResult->guardLimits()->visitedStatesReached());
 
         $relaxedFinder = new PathFinder(
             maxHops: 5,
@@ -1122,9 +1122,9 @@ final class PathFinderTest extends TestCase
 
         $guardedResult = $guardedFinder->findBestPaths($graph, 'SRC', 'DST');
 
-        self::assertSame([], $guardedResult['paths']);
-        self::assertFalse($guardedResult['guardLimits']['expansions']);
-        self::assertTrue($guardedResult['guardLimits']['visitedStates']);
+        self::assertSame([], $guardedResult->paths());
+        self::assertFalse($guardedResult->guardLimits()->expansionsReached());
+        self::assertTrue($guardedResult->guardLimits()->visitedStatesReached());
 
         $relaxedFinder = new PathFinder(
             maxHops: 4,
