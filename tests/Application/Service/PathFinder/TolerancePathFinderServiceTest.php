@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\Service\PathFinder;
 
+use ReflectionProperty;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
+use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
+use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
@@ -284,6 +287,31 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('USD', $result->totalReceived()->currency());
         self::assertSame('30.000', $result->totalReceived()->amount());
         self::assertEqualsWithDelta(2 / 22, $result->residualTolerance(), 1e-9);
+    }
+
+    public function test_it_propagates_high_precision_tolerance_to_path_finder(): void
+    {
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '1.00', 2))
+            ->withToleranceBounds('0.1', '0.999999999999999999')
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $tolerance = $config->pathFinderTolerance();
+
+        self::assertIsString($tolerance);
+
+        $pathFinder = new PathFinder($config->maximumHops(), $tolerance);
+
+        $amplifierProperty = new ReflectionProperty(PathFinder::class, 'toleranceAmplifier');
+        $amplifierProperty->setAccessible(true);
+
+        /** @var string $amplifier */
+        $amplifier = $amplifierProperty->getValue($pathFinder);
+
+        $expectedAmplifier = BcMath::div('1', BcMath::sub('1', $tolerance, 18), 18);
+
+        self::assertSame($expectedAmplifier, $amplifier);
     }
 
     /**

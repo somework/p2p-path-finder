@@ -6,10 +6,13 @@ namespace SomeWork\P2PPathFinder\Application\Config;
 
 use InvalidArgumentException;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 use function is_float;
 use function is_int;
+use function is_string;
+use function sprintf;
 
 /**
  * Fluent builder used to construct {@see PathSearchConfig} instances.
@@ -21,6 +24,8 @@ final class PathSearchConfigBuilder
     private ?float $minimumTolerance = null;
 
     private ?float $maximumTolerance = null;
+
+    private ?string $pathFinderToleranceOverride = null;
 
     private ?int $minimumHops = null;
 
@@ -45,18 +50,19 @@ final class PathSearchConfigBuilder
     /**
      * Configures the acceptable relative deviation from the desired spend amount.
      */
-    public function withToleranceBounds(float $minimumTolerance, float $maximumTolerance): self
+    public function withToleranceBounds(float|string $minimumTolerance, float|string $maximumTolerance): self
     {
-        if ($minimumTolerance < 0.0 || $minimumTolerance >= 1.0) {
-            throw new InvalidArgumentException('Minimum tolerance must be in the [0, 1) range.');
-        }
+        [$minimumFloat, $minimumString] = $this->normalizeTolerance($minimumTolerance, 'Minimum tolerance');
+        [$maximumFloat, $maximumString] = $this->normalizeTolerance($maximumTolerance, 'Maximum tolerance');
 
-        if ($maximumTolerance < 0.0 || $maximumTolerance >= 1.0) {
-            throw new InvalidArgumentException('Maximum tolerance must be in the [0, 1) range.');
-        }
+        $this->minimumTolerance = $minimumFloat;
+        $this->maximumTolerance = $maximumFloat;
 
-        $this->minimumTolerance = $minimumTolerance;
-        $this->maximumTolerance = $maximumTolerance;
+        if (is_string($minimumTolerance) || is_string($maximumTolerance)) {
+            $this->pathFinderToleranceOverride = $this->resolvePathFinderTolerance($minimumString, $maximumString);
+        } else {
+            $this->pathFinderToleranceOverride = null;
+        }
 
         return $this;
     }
@@ -142,6 +148,57 @@ final class PathSearchConfigBuilder
             $this->resultLimit,
             $maxExpansions,
             $maxVisitedStates,
+            $this->pathFinderToleranceOverride,
         );
     }
+
+    /**
+     * @return array{0: float, 1: numeric-string}
+     */
+    private function normalizeTolerance(float|string $value, string $context): array
+    {
+        if (is_string($value)) {
+            BcMath::ensureNumeric($value);
+            $normalized = BcMath::normalize($value, self::PATH_FINDER_TOLERANCE_SCALE);
+
+            if (BcMath::comp($normalized, '0', self::PATH_FINDER_TOLERANCE_SCALE) < 0 || BcMath::comp($normalized, '1', self::PATH_FINDER_TOLERANCE_SCALE) >= 0) {
+                throw new InvalidArgumentException(sprintf('%s must be in the [0, 1) range.', $context));
+            }
+
+            $floatValue = (float) $value;
+            if ($floatValue >= 1.0) {
+                $floatValue = self::FLOAT_TOLERANCE_CAP;
+            }
+
+            return [$floatValue, $normalized];
+        }
+
+        if ($value < 0.0 || $value >= 1.0) {
+            throw new InvalidArgumentException(sprintf('%s must be in the [0, 1) range.', $context));
+        }
+
+        $formatted = sprintf('%.'.self::PATH_FINDER_TOLERANCE_SCALE.'F', $value);
+        $normalized = BcMath::normalize($formatted, self::PATH_FINDER_TOLERANCE_SCALE);
+
+        return [$value, $normalized];
+    }
+
+    /**
+     * @param numeric-string $minimum
+     * @param numeric-string $maximum
+     *
+     * @return numeric-string
+     */
+    private function resolvePathFinderTolerance(string $minimum, string $maximum): string
+    {
+        if (BcMath::comp($minimum, $maximum, self::PATH_FINDER_TOLERANCE_SCALE) >= 0) {
+            return $minimum;
+        }
+
+        return $maximum;
+    }
+
+    private const PATH_FINDER_TOLERANCE_SCALE = 18;
+
+    private const FLOAT_TOLERANCE_CAP = 0.9999999999999999;
 }

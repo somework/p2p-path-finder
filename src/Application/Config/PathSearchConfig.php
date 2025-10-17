@@ -9,6 +9,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
+use function is_string;
 use function sprintf;
 
 /**
@@ -20,6 +21,8 @@ final class PathSearchConfig
 
     private readonly Money $maximumSpendAmount;
 
+    private readonly float|string $pathFinderTolerance;
+
     public function __construct(
         private readonly Money $spendAmount,
         private readonly float $minimumTolerance,
@@ -29,6 +32,7 @@ final class PathSearchConfig
         private readonly int $resultLimit = 1,
         private readonly int $pathFinderMaxExpansions = PathFinder::DEFAULT_MAX_EXPANSIONS,
         private readonly int $pathFinderMaxVisitedStates = PathFinder::DEFAULT_MAX_VISITED_STATES,
+        float|string|null $pathFinderToleranceOverride = null,
     ) {
         if ($minimumTolerance < 0.0 || $minimumTolerance >= 1.0) {
             throw new InvalidArgumentException('Minimum tolerance must be in the [0, 1) range.');
@@ -58,8 +62,22 @@ final class PathSearchConfig
             throw new InvalidArgumentException('Maximum visited states must be at least one.');
         }
 
+        if (null !== $pathFinderToleranceOverride) {
+            if (is_string($pathFinderToleranceOverride)) {
+                BcMath::ensureNumeric($pathFinderToleranceOverride);
+
+                if (BcMath::comp($pathFinderToleranceOverride, '0', 18) < 0 || BcMath::comp($pathFinderToleranceOverride, '1', 18) >= 0) {
+                    throw new InvalidArgumentException('Path finder tolerance must be in the [0, 1) range.');
+                }
+            } elseif ($pathFinderToleranceOverride < 0.0 || $pathFinderToleranceOverride >= 1.0) {
+                throw new InvalidArgumentException('Path finder tolerance must be in the [0, 1) range.');
+            }
+        }
+
         $this->minimumSpendAmount = $this->calculateBoundedSpend(1.0 - $minimumTolerance);
         $this->maximumSpendAmount = $this->calculateBoundedSpend(1.0 + $maximumTolerance);
+
+        $this->pathFinderTolerance = $pathFinderToleranceOverride ?? max($minimumTolerance, $maximumTolerance);
     }
 
     /**
@@ -153,9 +171,9 @@ final class PathSearchConfig
     /**
      * Returns the tolerance value used by the graph search heuristic.
      */
-    public function pathFinderTolerance(): float
+    public function pathFinderTolerance(): float|string
     {
-        return min(max($this->minimumTolerance, $this->maximumTolerance), 0.999999);
+        return $this->pathFinderTolerance;
     }
 
     private function calculateBoundedSpend(float $multiplier): Money

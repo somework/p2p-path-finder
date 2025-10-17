@@ -40,15 +40,15 @@ final class PathSearchConfigTest extends TestCase
         self::assertSame(0.15, $config->pathFinderTolerance());
     }
 
-    public function test_path_finder_tolerance_is_capped_below_one(): void
+    public function test_path_finder_tolerance_preserves_high_precision_string(): void
     {
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '250.00', 2))
-            ->withToleranceBounds(0.50, 0.9999995)
+            ->withToleranceBounds('0.50', '0.999999999999999999')
             ->withHopLimits(1, 4)
             ->build();
 
-        self::assertSame(0.999999, $config->pathFinderTolerance());
+        self::assertSame('0.999999999999999999', $config->pathFinderTolerance());
     }
 
     public function test_builder_provides_default_search_guards(): void
@@ -117,6 +117,14 @@ final class PathSearchConfigTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $builder->build();
+    }
+
+    public function test_builder_rejects_non_numeric_string_tolerances(): void
+    {
+        $builder = PathSearchConfig::builder();
+
+        $this->expectException(InvalidArgumentException::class);
+        $builder->withToleranceBounds('invalid', '0.1');
     }
 
     public function test_builder_requires_hop_limits(): void

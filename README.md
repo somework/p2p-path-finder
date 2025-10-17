@@ -56,6 +56,19 @@ $config = PathSearchConfig::builder()
     ->build();
 ```
 
+`withToleranceBounds()` accepts either floats or decimal strings. Providing a string keeps
+the original precision intact when it is passed to `PathFinder`:
+
+```php
+$config = PathSearchConfig::builder()
+    ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+    ->withToleranceBounds('0.0', '0.999999999999999999')
+    ->withHopLimits(1, 3)
+    ->build();
+
+// `PathFinder` receives the tolerance as the exact string value.
+```
+
 The builder enforces presence and validity of each piece of configuration. Internally the
 configuration pre-computes minimum/maximum spend amounts derived from the tolerance window,
 which are then used when filtering the order book.
