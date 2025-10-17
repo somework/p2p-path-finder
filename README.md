@@ -226,11 +226,14 @@ Run the suite locally and compare against the stored baseline with:
 ```bash
 php -d memory_limit=-1 vendor/bin/phpbench run \
     --config=phpbench.json \
-    --report=aggregate \
     --ref=baseline \
     --progress=plain \
     --assert="mean(variant.time.avg) <= mean(baseline.time.avg) +/- 20%"
 ```
+
+> ℹ️  Append `--report=aggregate` when you want a human-readable summary.
+> It produces the same results but forces PhpBench to hold more state in memory,
+> so the regression command above keeps it disabled by default.
 
 The baseline lives under `.phpbench/storage/`. When intentional optimisations shift
 performance, refresh it by rerunning:

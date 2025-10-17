@@ -96,7 +96,6 @@ jobs:
         run: >-
           php -d memory_limit=-1 vendor/bin/phpbench run
           --config=phpbench.json
-          --report=aggregate
           --ref=baseline
           --progress=plain
           --assert="mean(variant.time.avg) <= mean(baseline.time.avg) +/- 20%"
