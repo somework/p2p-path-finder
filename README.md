@@ -130,13 +130,13 @@ $config = PathSearchConfig::builder()
     ->build();
 
 $service = new PathFinderService(new GraphBuilder());
-$results = $service->findBestPaths($orderBook, $config, 'USDT');
+$resultPayload = $service->findBestPaths($orderBook, $config, 'USDT');
 
-if ($results === []) {
+if ($resultPayload['paths'] === []) {
     throw new RuntimeException('No viable routes found.');
 }
 
-$result = $results[0];
+$result = $resultPayload['paths'][0];
 ```
 
 The resulting array contains `PathResult` objects ordered from lowest to highest cost.
@@ -183,10 +183,10 @@ $config = PathSearchConfig::builder()
     ->withHopLimits(2, 3)
     ->build();
 
-$results = (new PathFinderService(new GraphBuilder()))
+$resultPayload = (new PathFinderService(new GraphBuilder()))
     ->findBestPaths($orderBook, $config, 'EUR');
 
-$topTwo = array_slice($results, 0, 2);
+$topTwo = array_slice($resultPayload['paths'], 0, 2);
 ```
 
 Because the tolerance window is narrow the service will only accept paths that stay close

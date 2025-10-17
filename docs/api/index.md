@@ -179,7 +179,7 @@ Implementation of a tolerance-aware best-path search through the trading graph.
 `PathFinder::__construct(int $maxHops = 4, string $tolerance = '0', int $topK = 1)`
 
 ### findBestPaths
-`PathFinder::findBestPaths(array $graph, string $source, string $target, ?array $spendConstraints = null, ?callable $acceptCandidate = null): array`
+`PathFinder::findBestPaths(array $graph, string $source, string $target, ?array $spendConstraints = null, ?callable $acceptCandidate = null): array{paths: list<array>, guardLimits: array{expansions: bool, visitedStates: bool}}`
 
 list<array{
     cost: float,
@@ -325,7 +325,7 @@ High level facade orchestrating order filtering, graph building and path search.
 `PathFinderService::__construct(SomeWork\P2PPathFinder\Application\Graph\GraphBuilder $graphBuilder)`
 
 ### findBestPaths
-`PathFinderService::findBestPaths(SomeWork\P2PPathFinder\Application\OrderBook\OrderBook $orderBook, SomeWork\P2PPathFinder\Application\Config\PathSearchConfig $config, string $targetAsset): array`
+`PathFinderService::findBestPaths(SomeWork\P2PPathFinder\Application\OrderBook\OrderBook $orderBook, SomeWork\P2PPathFinder\Application\Config\PathSearchConfig $config, string $targetAsset): array{paths: list<PathResult>, guardLimits: array{expansions: bool, visitedStates: bool}}`
 
 Searches for the best conversion paths from the configured spend asset to the target asset.
 

@@ -207,6 +207,15 @@ final class PathFinder
      *
      * @return list<Candidate>
      */
+    /**
+     * @param Graph                 $graph
+     * @param SpendConstraints|null $spendConstraints
+     *
+     * @return array{
+     *     paths: list<Candidate>,
+     *     guardLimits: array{expansions: bool, visitedStates: bool}
+     * }
+     */
     public function findBestPaths(
         array $graph,
         string $source,
@@ -218,7 +227,13 @@ final class PathFinder
         $target = strtoupper($target);
 
         if (!array_key_exists($source, $graph) || !array_key_exists($target, $graph)) {
-            return [];
+            return [
+                'paths' => [],
+                'guardLimits' => [
+                    'expansions' => false,
+                    'visitedStates' => false,
+                ],
+            ];
         }
 
         $range = null;
@@ -266,8 +281,12 @@ final class PathFinder
         $expansions = 0;
         $visitedStates = 1;
 
+        $expansionGuardReached = false;
+        $visitedGuardReached = false;
+
         while (!$queue->isEmpty()) {
             if ($expansions >= $this->maxExpansions) {
+                $expansionGuardReached = true;
                 break;
             }
 
@@ -358,6 +377,7 @@ final class PathFinder
                     $visitedStates >= $this->maxVisitedStates
                     && !$this->hasStateWithSignature($bestPerNode[$nextNode] ?? [], $signature)
                 ) {
+                    $visitedGuardReached = true;
                     continue;
                 }
 
@@ -412,10 +432,22 @@ final class PathFinder
         }
 
         if (0 === $results->count()) {
-            return [];
+            return [
+                'paths' => [],
+                'guardLimits' => [
+                    'expansions' => $expansionGuardReached,
+                    'visitedStates' => $visitedGuardReached,
+                ],
+            ];
         }
 
-        return $this->finalizeResults($results);
+        return [
+            'paths' => $this->finalizeResults($results),
+            'guardLimits' => [
+                'expansions' => $expansionGuardReached,
+                'visitedStates' => $visitedGuardReached,
+            ],
+        ];
     }
 
     /**

@@ -50,7 +50,10 @@ final class PathFinderService
     /**
      * Searches for the best conversion paths from the configured spend asset to the target asset.
      *
-     * @return list<PathResult>
+     * @return array{
+     *     paths: list<PathResult>,
+     *     guardLimits: array{expansions: bool, visitedStates: bool}
+     * }
      */
     public function findBestPaths(OrderBook $orderBook, PathSearchConfig $config, string $targetAsset): array
     {
@@ -64,12 +67,24 @@ final class PathFinderService
 
         $orders = $this->orderSpendAnalyzer->filterOrders($orderBook, $config);
         if ([] === $orders) {
-            return [];
+            return [
+                'paths' => [],
+                'guardLimits' => [
+                    'expansions' => false,
+                    'visitedStates' => false,
+                ],
+            ];
         }
 
         $graph = $this->graphBuilder->build($orders);
         if (!isset($graph[$sourceCurrency], $graph[$targetCurrency])) {
-            return [];
+            return [
+                'paths' => [],
+                'guardLimits' => [
+                    'expansions' => false,
+                    'visitedStates' => false,
+                ],
+            ];
         }
 
         $pathFinder = new PathFinder(
@@ -83,7 +98,7 @@ final class PathFinderService
         /** @var list<array{cost: numeric-string, order: int, result: PathResult}> $materializedResults */
         $materializedResults = [];
         $resultOrder = 0;
-        $pathFinder->findBestPaths(
+        $searchResult = $pathFinder->findBestPaths(
             $graph,
             $sourceCurrency,
             $targetCurrency,
@@ -154,7 +169,10 @@ final class PathFinderService
         );
 
         if ([] === $materializedResults) {
-            return [];
+            return [
+                'paths' => [],
+                'guardLimits' => $searchResult['guardLimits'],
+            ];
         }
 
         usort(
@@ -180,10 +198,13 @@ final class PathFinderService
             },
         );
 
-        return array_map(
-            static fn (array $entry): PathResult => $entry['result'],
-            $materializedResults,
-        );
+        return [
+            'paths' => array_map(
+                static fn (array $entry): PathResult => $entry['result'],
+                $materializedResults,
+            ),
+            'guardLimits' => $searchResult['guardLimits'],
+        ];
     }
 
     /**
@@ -193,6 +214,6 @@ final class PathFinderService
     {
         $results = $this->findBestPaths($orderBook, $config, $targetAsset);
 
-        return $results[0] ?? null;
+        return $results['paths'][0] ?? null;
     }
 }

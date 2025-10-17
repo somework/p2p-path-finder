@@ -27,6 +27,32 @@ final class PathFinderTest extends TestCase
     private const SCALE = 18;
 
     /**
+     * @param array{
+     *     paths: list<array>,
+     *     guardLimits: array{expansions: bool, visitedStates: bool}
+     * } $searchResult
+     *
+     * @return list<array>
+     */
+    private static function extractPaths(array $searchResult): array
+    {
+        return $searchResult['paths'];
+    }
+
+    /**
+     * @param array{
+     *     paths: list<array>,
+     *     guardLimits: array{expansions: bool, visitedStates: bool}
+     * } $searchResult
+     *
+     * @return array{expansions: bool, visitedStates: bool}
+     */
+    private static function extractGuardLimits(array $searchResult): array
+    {
+        return $searchResult['guardLimits'];
+    }
+
+    /**
      * @dataProvider provideInvalidMaxHops
      */
     public function test_it_requires_positive_max_hops(int $invalidMaxHops): void
@@ -135,7 +161,7 @@ final class PathFinderTest extends TestCase
         $graph = (new GraphBuilder())->build($orders);
 
         $finder = new PathFinder($maxHops, $tolerance);
-        $results = $finder->findBestPaths($graph, 'RUB', 'IDR');
+        $results = self::extractPaths($finder->findBestPaths($graph, 'RUB', 'IDR'));
 
         self::assertNotSame([], $results);
         $result = $results[0];
@@ -159,7 +185,8 @@ final class PathFinderTest extends TestCase
         $graph = (new GraphBuilder())->build($orders);
 
         $finder = new PathFinder(maxHops: 4, tolerance: '0.999', topK: 2);
-        $results = $finder->findBestPaths($graph, 'RUB', 'IDR');
+        $searchResult = $finder->findBestPaths($graph, 'RUB', 'IDR');
+        $results = $searchResult['paths'];
 
         self::assertGreaterThanOrEqual(2, count($results));
         self::assertCount(2, $results);
@@ -168,8 +195,9 @@ final class PathFinderTest extends TestCase
 
         $finderWithBroaderLimit = new PathFinder(maxHops: 4, tolerance: '0.999', topK: 3);
         $extendedResults = $finderWithBroaderLimit->findBestPaths($graph, 'RUB', 'IDR');
+        $extendedPaths = $extendedResults['paths'];
 
-        self::assertGreaterThan(2, count($extendedResults));
+        self::assertGreaterThan(2, count($extendedPaths));
     }
 
     public function test_it_normalizes_endpoint_case_inputs(): void
@@ -178,7 +206,7 @@ final class PathFinderTest extends TestCase
         $graph = (new GraphBuilder())->build($orders);
 
         $finder = new PathFinder(maxHops: 3, tolerance: '0.0');
-        $results = $finder->findBestPaths($graph, 'rub', 'idr');
+        $results = self::extractPaths($finder->findBestPaths($graph, 'rub', 'idr'));
 
         self::assertNotSame([], $results);
     }
@@ -190,8 +218,8 @@ final class PathFinderTest extends TestCase
 
         $finder = new PathFinder(maxHops: 3, tolerance: '0.0');
 
-        self::assertSame([], $finder->findBestPaths($graph, 'RUB', 'ZZZ'));
-        self::assertSame([], $finder->findBestPaths($graph, 'zzz', 'IDR'));
+        self::assertSame([], self::extractPaths($finder->findBestPaths($graph, 'RUB', 'ZZZ')));
+        self::assertSame([], self::extractPaths($finder->findBestPaths($graph, 'zzz', 'IDR')));
     }
 
     public function test_it_continues_search_when_callback_rejects_initial_target_candidate(): void
@@ -207,7 +235,7 @@ final class PathFinderTest extends TestCase
 
         $visitedCandidates = [];
         $spend = Money::fromString('EUR', '100.00', 2);
-        $results = $finder->findBestPaths(
+        $searchResult = $finder->findBestPaths(
             $graph,
             'EUR',
             'USD',
@@ -222,6 +250,8 @@ final class PathFinderTest extends TestCase
                 return $candidate['hops'] >= 2;
             },
         );
+
+        $results = $searchResult['paths'];
 
         self::assertNotSame([], $results);
         self::assertGreaterThanOrEqual(2, count($visitedCandidates));
@@ -328,7 +358,11 @@ final class PathFinderTest extends TestCase
         $finder = new PathFinder($maxHops, $tolerance);
         $result = $finder->findBestPaths($graph, $source, $target);
 
-        self::assertSame([], $result);
+        self::assertSame([], $result['paths']);
+        self::assertSame([
+            'expansions' => false,
+            'visitedStates' => false,
+        ], $result['guardLimits']);
     }
 
     /**
@@ -386,7 +420,7 @@ final class PathFinderTest extends TestCase
         $graph = (new GraphBuilder())->build($orders);
 
         $finder = new PathFinder(maxHops: 2, tolerance: '0.05');
-        $results = $finder->findBestPaths($graph, $source, $target);
+        $results = self::extractPaths($finder->findBestPaths($graph, $source, $target));
 
         self::assertNotSame([], $results);
         $result = $results[0];
@@ -506,7 +540,7 @@ final class PathFinderTest extends TestCase
         $minimum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
         $maximum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
 
-        $results = $finder->findBestPaths(
+        $results = self::extractPaths($finder->findBestPaths(
             $graph,
             'EUR',
             'USD',
@@ -514,7 +548,7 @@ final class PathFinderTest extends TestCase
                 'min' => $minimum,
                 'max' => $maximum,
             ],
-        );
+        ));
 
         self::assertNotSame([], $results);
         $result = $results[0];
@@ -540,7 +574,7 @@ final class PathFinderTest extends TestCase
         $minimum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
         $maximum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
 
-        $results = $finder->findBestPaths(
+        $results = self::extractPaths($finder->findBestPaths(
             $graph,
             'EUR',
             'USD',
@@ -548,7 +582,7 @@ final class PathFinderTest extends TestCase
                 'min' => $minimum,
                 'max' => $maximum,
             ],
-        );
+        ));
 
         self::assertNotSame([], $results);
         $result = $results[0];
@@ -576,7 +610,7 @@ final class PathFinderTest extends TestCase
         $maximum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
         $desired = CurrencyScenarioFactory::money('EUR', '1.000', 3);
 
-        $results = $finder->findBestPaths(
+        $results = self::extractPaths($finder->findBestPaths(
             $graph,
             'EUR',
             'USD',
@@ -585,7 +619,7 @@ final class PathFinderTest extends TestCase
                 'max' => $maximum,
                 'desired' => $desired,
             ],
-        );
+        ));
 
         self::assertNotSame([], $results);
         $result = $results[0];
@@ -615,7 +649,7 @@ final class PathFinderTest extends TestCase
         $maximum = CurrencyScenarioFactory::money('EUR', '3.000', 3);
         $desired = CurrencyScenarioFactory::money('EUR', '10.000', 3);
 
-        $results = $finder->findBestPaths(
+        $results = self::extractPaths($finder->findBestPaths(
             $graph,
             'EUR',
             'USD',
@@ -624,7 +658,7 @@ final class PathFinderTest extends TestCase
                 'max' => $maximum,
                 'desired' => $desired,
             ],
-        );
+        ));
 
         self::assertNotSame([], $results);
         $result = $results[0];
@@ -657,7 +691,7 @@ final class PathFinderTest extends TestCase
         $minSpend = CurrencyScenarioFactory::money('SRC', '10.000', 3);
         $maxSpend = CurrencyScenarioFactory::money('SRC', '20.000', 3);
 
-        $results = $finder->findBestPaths(
+        $results = self::extractPaths($finder->findBestPaths(
             $graph,
             'SRC',
             'DST',
@@ -665,7 +699,7 @@ final class PathFinderTest extends TestCase
                 'min' => $minSpend,
                 'max' => $maxSpend,
             ],
-        );
+        ));
 
         self::assertNotSame([], $results);
         $result = $results[0];
@@ -702,7 +736,7 @@ final class PathFinderTest extends TestCase
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
         $accepted = false;
 
-        $result = $finder->findBestPaths(
+        $searchResult = $finder->findBestPaths(
             $graph,
             $source,
             $target,
@@ -718,7 +752,11 @@ final class PathFinderTest extends TestCase
             },
         );
 
-        self::assertSame([], $result);
+        self::assertSame([], $searchResult['paths']);
+        self::assertSame([
+            'expansions' => false,
+            'visitedStates' => false,
+        ], $searchResult['guardLimits']);
         self::assertFalse($accepted);
     }
 
@@ -769,7 +807,7 @@ final class PathFinderTest extends TestCase
         $graph = (new GraphBuilder())->build($orders);
 
         $finder = new PathFinder(maxHops: 3, tolerance: '0.0');
-        $results = $finder->findBestPaths($graph, 'USD', 'EUR');
+        $results = self::extractPaths($finder->findBestPaths($graph, 'USD', 'EUR'));
 
         self::assertNotSame([], $results);
         $result = $results[0];
@@ -813,7 +851,7 @@ final class PathFinderTest extends TestCase
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
         $grossSpend = CurrencyScenarioFactory::money('EUR', '1.050', 3);
 
-        $results = $finder->findBestPaths(
+        $results = self::extractPaths($finder->findBestPaths(
             $graph,
             'EUR',
             'USD',
@@ -822,7 +860,7 @@ final class PathFinderTest extends TestCase
                 'max' => $grossSpend,
                 'desired' => $grossSpend,
             ],
-        );
+        ));
 
         self::assertNotSame([], $results);
         $result = $results[0];
@@ -856,7 +894,7 @@ final class PathFinderTest extends TestCase
         $graph = (new GraphBuilder())->build([$order]);
 
         $finder = new PathFinder(maxHops: 1, tolerance: '0.10');
-        $results = $finder->findBestPaths($graph, 'EUR', 'USD');
+        $results = self::extractPaths($finder->findBestPaths($graph, 'EUR', 'USD'));
 
         self::assertNotSame([], $results);
         $result = $results[0];
@@ -880,7 +918,7 @@ final class PathFinderTest extends TestCase
         $graph = (new GraphBuilder())->build($orders);
 
         $finder = new PathFinder(maxHops: 3, tolerance: '0.15');
-        $results = $finder->findBestPaths($graph, 'USD', 'USD');
+        $results = self::extractPaths($finder->findBestPaths($graph, 'USD', 'USD'));
 
         self::assertNotSame([], $results);
         $result = $results[0];
@@ -909,12 +947,12 @@ final class PathFinderTest extends TestCase
         $first = $finder->findBestPaths($graph, $source, $target);
         $second = $finder->findBestPaths($graph, $source, $target);
 
-        self::assertNotSame([], $first);
-        self::assertNotSame([], $second);
+        self::assertNotSame([], $first['paths']);
+        self::assertNotSame([], $second['paths']);
 
         self::assertSame($first, $second, 'Extreme rate scenarios should produce deterministic outcomes.');
 
-        $best = $first[0];
+        $best = $first['paths'][0];
         self::assertSame($expectedHops, $best['hops']);
         self::assertSame($expectedProduct, $best['product']);
         $expectedCost = BcMath::div('1', $expectedProduct, self::SCALE);
@@ -1023,7 +1061,7 @@ final class PathFinderTest extends TestCase
         $graph = (new GraphBuilder())->build($orders);
 
         $finder = new PathFinder(maxHops: 4, tolerance: '0.0');
-        $results = $finder->findBestPaths($graph, 'SRC', 'DST');
+        $results = self::extractPaths($finder->findBestPaths($graph, 'SRC', 'DST'));
 
         self::assertNotSame([], $results);
         $best = $results[0];
@@ -1049,7 +1087,11 @@ final class PathFinderTest extends TestCase
             maxVisitedStates: 100,
         );
 
-        self::assertSame([], $guardedFinder->findBestPaths($graph, 'SRC', 'DST'));
+        $guardedResult = $guardedFinder->findBestPaths($graph, 'SRC', 'DST');
+
+        self::assertSame([], $guardedResult['paths']);
+        self::assertTrue($guardedResult['guardLimits']['expansions']);
+        self::assertFalse($guardedResult['guardLimits']['visitedStates']);
 
         $relaxedFinder = new PathFinder(
             maxHops: 5,
@@ -1059,7 +1101,7 @@ final class PathFinderTest extends TestCase
             maxVisitedStates: 20000,
         );
 
-        $results = $relaxedFinder->findBestPaths($graph, 'SRC', 'DST');
+        $results = self::extractPaths($relaxedFinder->findBestPaths($graph, 'SRC', 'DST'));
 
         self::assertNotSame([], $results);
         self::assertGreaterThan(0, $results[0]['hops']);
@@ -1078,7 +1120,11 @@ final class PathFinderTest extends TestCase
             maxVisitedStates: 1,
         );
 
-        self::assertSame([], $guardedFinder->findBestPaths($graph, 'SRC', 'DST'));
+        $guardedResult = $guardedFinder->findBestPaths($graph, 'SRC', 'DST');
+
+        self::assertSame([], $guardedResult['paths']);
+        self::assertFalse($guardedResult['guardLimits']['expansions']);
+        self::assertTrue($guardedResult['guardLimits']['visitedStates']);
 
         $relaxedFinder = new PathFinder(
             maxHops: 4,
@@ -1088,7 +1134,7 @@ final class PathFinderTest extends TestCase
             maxVisitedStates: 10000,
         );
 
-        $results = $relaxedFinder->findBestPaths($graph, 'SRC', 'DST');
+        $results = self::extractPaths($relaxedFinder->findBestPaths($graph, 'SRC', 'DST'));
 
         self::assertNotSame([], $results);
     }
