@@ -51,12 +51,12 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 $config = PathSearchConfig::builder()
     ->withSpendAmount(Money::fromString('USD', '100.00', 2))
-    ->withToleranceBounds(0.05, 0.10) // -5%/+10% relative tolerance window
+    ->withToleranceBounds('0.05', '0.10') // -5%/+10% relative tolerance window
     ->withHopLimits(1, 3)             // allow between 1 and 3 conversions
     ->build();
 ```
 
-`withToleranceBounds()` accepts either floats or decimal strings. Providing a string keeps
+`withToleranceBounds()` accepts only numeric-string values. Providing a string keeps
 the original precision intact when it is passed to `PathFinder`:
 
 ```php
@@ -124,7 +124,7 @@ $order = new Order(
 $orderBook = new OrderBook([$order]);
 $config = PathSearchConfig::builder()
     ->withSpendAmount(Money::fromString('USD', '100.00', 2))
-    ->withToleranceBounds(0.00, 0.01)
+    ->withToleranceBounds('0.00', '0.01')
     ->withHopLimits(1, 2)
     ->withResultLimit(3)
     ->build();
@@ -179,7 +179,7 @@ $orderBook = new OrderBook([
 
 $config = PathSearchConfig::builder()
     ->withSpendAmount(Money::fromString('BTC', '0.10000000', 8))
-    ->withToleranceBounds(0.00, 0.02)
+    ->withToleranceBounds('0.00', '0.02')
     ->withHopLimits(2, 3)
     ->build();
 
