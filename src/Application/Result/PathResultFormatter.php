@@ -7,7 +7,6 @@ namespace SomeWork\P2PPathFinder\Application\Result;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 use function implode;
-use function number_format;
 use function sprintf;
 
 use const PHP_EOL;
@@ -21,7 +20,7 @@ final class PathResultFormatter
      * @return array{
      *     totalSpent: array{currency: string, amount: string, scale: int},
      *     totalReceived: array{currency: string, amount: string, scale: int},
-     *     residualTolerance: float,
+     *     residualTolerance: numeric-string,
      *     feeBreakdown: array<string, array{currency: string, amount: string, scale: int}>,
      *     legs: list<array{
      *         from: string,
@@ -43,7 +42,7 @@ final class PathResultFormatter
      * @return list<array{
      *     totalSpent: array{currency: string, amount: string, scale: int},
      *     totalReceived: array{currency: string, amount: string, scale: int},
-     *     residualTolerance: float,
+     *     residualTolerance: numeric-string,
      *     feeBreakdown: array<string, array{currency: string, amount: string, scale: int}>,
      *     legs: list<array{
      *         from: string,
@@ -70,7 +69,7 @@ final class PathResultFormatter
             $this->formatMoney($result->totalSpent()),
             $this->formatMoney($result->totalReceived()),
             $this->formatFeeSummary($result->feeBreakdown()),
-            number_format($result->residualTolerance() * 100.0, 2, '.', ''),
+            $result->residualTolerancePercentage(2),
         );
 
         $lines[] = 'Legs:';

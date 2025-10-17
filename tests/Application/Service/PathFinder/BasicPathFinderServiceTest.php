@@ -36,7 +36,8 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('100.000', $result->totalSpent()->amount());
         self::assertSame('JPY', $result->totalReceived()->currency());
         self::assertSame('16665.000', $result->totalReceived()->amount());
-        self::assertSame(0.0, $result->residualTolerance());
+        self::assertTrue($result->residualTolerance()->isZero());
+        self::assertSame('0.000000000000000000', $result->residualTolerance()->ratio());
 
         $legs = $result->legs();
         self::assertCount(2, $legs);
@@ -221,8 +222,10 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertCount(2, $results);
         self::assertSame('111.172', $results[0]->totalReceived()->amount());
         self::assertSame('111.100', $results[1]->totalReceived()->amount());
-        self::assertSame(0.0, $results[0]->residualTolerance());
-        self::assertSame(0.0, $results[1]->residualTolerance());
+        self::assertTrue($results[0]->residualTolerance()->isZero());
+        self::assertSame('0.000000000000000000', $results[0]->residualTolerance()->ratio());
+        self::assertTrue($results[1]->residualTolerance()->isZero());
+        self::assertSame('0.000000000000000000', $results[1]->residualTolerance()->ratio());
         self::assertCount(2, $results[0]->legs());
         self::assertCount(1, $results[1]->legs());
     }
