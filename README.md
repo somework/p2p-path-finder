@@ -226,13 +226,13 @@ The benchmark suite exercises two real-world usage patterns:
   * `k-best-n1e4` – 10,000 deterministic orders (5,000 routes) targeting the best 16.
 
 Latest reference numbers on PHP 8.3 (Ubuntu 22.04, Xeon vCPU) are summarised below. The
-target column establishes the KPI enforced by CI via PhpBench regression assertions.
+target columns establish the KPIs enforced by CI via PhpBench regression assertions.
 
-| Scenario (orders)      | Mean (ms) | Peak memory | KPI target (mean) |
-|------------------------|-----------|-------------|-------------------|
-| k-best-n1e2 (100)      | 30.7      | 5.8 MB      | ≤ 35 ms           |
-| k-best-n1e3 (1,000)    | 323.5     | 12.5 MB     | ≤ 350 ms          |
-| k-best-n1e4 (10,000)   | 4,344.2   | 79.8 MB     | ≤ 4.5 s           |
+| Scenario (orders)      | Mean (ms) | Peak memory | KPI target (mean) | KPI target (peak memory) |
+|------------------------|-----------|-------------|-------------------|--------------------------|
+| k-best-n1e2 (100)      | 30.7      | 5.8 MB      | ≤ 35 ms           | ≤ 7 MB                   |
+| k-best-n1e3 (1,000)    | 323.5     | 12.5 MB     | ≤ 350 ms          | ≤ 15 MB                  |
+| k-best-n1e4 (10,000)   | 4,344.2   | 79.8 MB     | ≤ 4.5 s           | ≤ 96 MB                  |
 
 Run the suite locally and compare against the stored baseline with:
 
@@ -241,15 +241,16 @@ php -d memory_limit=-1 -d xdebug.mode=off vendor/bin/phpbench run \
     --config=phpbench.json \
     --ref=baseline \
     --progress=plain \
-    --assert="mean(variant.time.avg) <= mean(baseline.time.avg) +/- 20%"
+    --assert="mean(variant.time.avg) <= mean(baseline.time.avg) +/- 20%" \
+    --assert="mean(variant.mem.peak) <= mean(baseline.mem.peak) +/- 20%"
 ```
 
 > ℹ️  Append `--report=p2p_aggregate` when you want a human-readable summary.
 > It produces the same results but forces PhpBench to hold more state in memory,
-> so the regression command above keeps it disabled by default.
-> Ensure Xdebug is disabled (for example via `-d xdebug.mode=off` or
-> `XDEBUG_MODE=off`) when running benchmarks so results align with the stored
-> baseline and CI.
+> so the regression command above keeps it disabled by default. The assertions
+> cover both runtime and peak memory usage to avoid silent regressions. Ensure
+> Xdebug is disabled (for example via `-d xdebug.mode=off` or `XDEBUG_MODE=off`)
+> when running benchmarks so results align with the stored baseline and CI.
 
 The baseline lives under `.phpbench/storage/`. When intentional optimisations shift
 performance, refresh it by rerunning:

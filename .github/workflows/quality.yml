@@ -94,8 +94,9 @@ jobs:
           custom-cache-suffix: ${{ hashFiles('composer.json') }}
       - name: Run PhpBench regression suite
         run: >-
-          php -d memory_limit=-1 vendor/bin/phpbench run
+          php -d memory_limit=-1 -d xdebug.mode=off vendor/bin/phpbench run
           --config=phpbench.json
           --ref=baseline
           --progress=plain
           --assert="mean(variant.time.avg) <= mean(baseline.time.avg) +/- 20%"
+          --assert="mean(variant.mem.peak) <= mean(baseline.mem.peak) +/- 20%"
