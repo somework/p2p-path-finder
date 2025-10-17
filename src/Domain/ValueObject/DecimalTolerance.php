@@ -82,8 +82,11 @@ final class DecimalTolerance implements JsonSerializable
      */
     public function compare(string $value, ?int $scale = null): int
     {
+        if (null !== $scale) {
+            self::assertScale($scale);
+        }
+
         $comparisonScale = max($this->scale, $scale ?? $this->scale, self::DEFAULT_SCALE);
-        self::assertScale($comparisonScale);
 
         $normalized = BcMath::normalize($value, $comparisonScale);
 
