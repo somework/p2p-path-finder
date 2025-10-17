@@ -18,6 +18,7 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
+use function array_key_last;
 use function array_unique;
 use function count;
 
@@ -191,6 +192,60 @@ final class PathFinderTest extends TestCase
 
         self::assertSame([], $finder->findBestPaths($graph, 'RUB', 'ZZZ'));
         self::assertSame([], $finder->findBestPaths($graph, 'zzz', 'IDR'));
+    }
+
+    public function test_it_continues_search_when_callback_rejects_initial_target_candidate(): void
+    {
+        $orders = [
+            OrderFactory::sell('USD', 'EUR', '10.000', '500.000', '0.900', 3, 3),
+            OrderFactory::sell('GBP', 'EUR', '10.000', '500.000', '0.850', 3, 3),
+            OrderFactory::buy('GBP', 'USD', '10.000', '500.000', '0.900', 3, 3),
+        ];
+
+        $graph = (new GraphBuilder())->build($orders);
+        $finder = new PathFinder(maxHops: 3, tolerance: 0.0, topK: 3);
+
+        $visitedCandidates = [];
+        $spend = Money::fromString('EUR', '100.00', 2);
+        $results = $finder->findBestPaths(
+            $graph,
+            'EUR',
+            'USD',
+            [
+                'min' => $spend,
+                'max' => $spend,
+                'desired' => $spend,
+            ],
+            static function (array $candidate) use (&$visitedCandidates): bool {
+                $visitedCandidates[] = $candidate;
+
+                return $candidate['hops'] >= 2;
+            },
+        );
+
+        self::assertNotSame([], $results);
+        self::assertGreaterThanOrEqual(2, count($visitedCandidates));
+
+        $firstCandidate = $visitedCandidates[0];
+        self::assertSame(1, $firstCandidate['hops']);
+        self::assertCount(1, $firstCandidate['edges']);
+        self::assertSame('EUR', $firstCandidate['edges'][0]['from']);
+        self::assertSame('USD', $firstCandidate['edges'][0]['to']);
+
+        $acceptedCandidate = $visitedCandidates[array_key_last($visitedCandidates)];
+        self::assertSame(2, $acceptedCandidate['hops']);
+
+        $best = $results[0];
+        self::assertSame(2, $best['hops']);
+        self::assertCount(2, $best['edges']);
+        self::assertSame('EUR', $best['edges'][0]['from']);
+        self::assertSame('GBP', $best['edges'][0]['to']);
+        self::assertSame('GBP', $best['edges'][1]['from']);
+        self::assertSame('USD', $best['edges'][1]['to']);
+
+        foreach ($results as $result) {
+            self::assertGreaterThanOrEqual(2, $result['hops']);
+        }
     }
 
     /**
