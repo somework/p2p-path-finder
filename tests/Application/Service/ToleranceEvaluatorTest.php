@@ -209,6 +209,16 @@ final class ToleranceEvaluatorTest extends TestCase
             Money::fromString('BTC', '0.12345678', 8),
             Money::fromString('BTC', '0.12345780', 8),
         ];
+
+        yield 'micro tolerance overspend is rejected' => [
+            PathSearchConfig::builder()
+                ->withSpendAmount(Money::fromString('USD', '1.000000000', 9))
+                ->withToleranceBounds('0.0', '0.0000005')
+                ->withHopLimits(1, 2)
+                ->build(),
+            Money::fromString('USD', '1.000000000', 9),
+            Money::fromString('USD', '1.000000501', 9),
+        ];
     }
 
     /**

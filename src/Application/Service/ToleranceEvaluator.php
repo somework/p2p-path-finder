@@ -14,10 +14,14 @@ use function substr;
 
 /**
  * Validates materialized paths against configured tolerance bounds.
+ *
+ * The evaluator derives a residual ratio between the requested and actual spend
+ * and compares it directly to the configured tolerance window using a common
+ * scale. This keeps comparisons deterministic and eliminates the need for
+ * hard-coded guard epsilons that could otherwise mask meaningful overshoot.
  */
 final class ToleranceEvaluator
 {
-    private const RESIDUAL_TOLERANCE_EPSILON = '0.000001';
     private const RESIDUAL_SCALE = 18;
 
     public function evaluate(PathSearchConfig $config, Money $requestedSpend, Money $actualSpend): ?DecimalTolerance
@@ -27,24 +31,19 @@ final class ToleranceEvaluator
         $requestedComparable = $requestedSpend->withScale(max($requestedSpend->scale(), $actualSpend->scale()));
         $actualComparable = $actualSpend->withScale($requestedComparable->scale());
 
+        $minimumTolerance = BcMath::normalize($config->minimumTolerance(), self::RESIDUAL_SCALE);
+        $maximumTolerance = BcMath::normalize($config->maximumTolerance(), self::RESIDUAL_SCALE);
+
         if (
             $actualComparable->lessThan($requestedComparable)
-            && 1 === BcMath::comp(
-                BcMath::sub($residual, $config->minimumTolerance(), self::RESIDUAL_SCALE),
-                self::RESIDUAL_TOLERANCE_EPSILON,
-                self::RESIDUAL_SCALE,
-            )
+            && 1 === BcMath::comp($residual, $minimumTolerance, self::RESIDUAL_SCALE)
         ) {
             return null;
         }
 
         if (
             $actualComparable->greaterThan($requestedComparable)
-            && 1 === BcMath::comp(
-                BcMath::sub($residual, $config->maximumTolerance(), self::RESIDUAL_SCALE),
-                self::RESIDUAL_TOLERANCE_EPSILON,
-                self::RESIDUAL_SCALE,
-            )
+            && 1 === BcMath::comp($residual, $maximumTolerance, self::RESIDUAL_SCALE)
         ) {
             return null;
         }
