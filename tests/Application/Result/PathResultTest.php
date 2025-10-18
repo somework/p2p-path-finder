@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\Result;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 final class PathResultTest extends TestCase
 {
@@ -78,7 +78,7 @@ final class PathResultTest extends TestCase
 
     public function test_residual_tolerance_cannot_be_negative(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Residual tolerance must be a value between 0 and 1 inclusive.');
 
         new PathResult(
@@ -90,7 +90,7 @@ final class PathResultTest extends TestCase
 
     public function test_residual_tolerance_cannot_exceed_one(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Residual tolerance must be a value between 0 and 1 inclusive.');
 
         new PathResult(
@@ -110,7 +110,7 @@ final class PathResultTest extends TestCase
             [],
         );
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Path legs must be provided as a list.');
 
         new PathResult(

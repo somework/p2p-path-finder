@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\Filter;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
 use SomeWork\P2PPathFinder\Application\Filter\CurrencyPairFilter;
@@ -13,6 +12,7 @@ use SomeWork\P2PPathFinder\Application\Filter\MinimumAmountFilter;
 use SomeWork\P2PPathFinder\Application\Filter\ToleranceWindowFilter;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
@@ -73,7 +73,7 @@ final class OrderFiltersTest extends TestCase
     {
         $reference = CurrencyScenarioFactory::exchangeRate('BTC', 'USD', '30000', 2);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
 
         new ToleranceWindowFilter($reference, '-0.01');
     }
@@ -82,7 +82,7 @@ final class OrderFiltersTest extends TestCase
     {
         $reference = CurrencyScenarioFactory::exchangeRate('BTC', 'USD', '30000', 2);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
 
         new ToleranceWindowFilter($reference, 'not-a-number');
     }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
@@ -17,6 +16,7 @@ use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
@@ -51,28 +51,28 @@ final class PathFinderTest extends TestCase
      */
     public function test_it_requires_positive_max_hops(int $invalidMaxHops): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
 
         new PathFinder($invalidMaxHops, '0.0');
     }
 
     public function test_it_requires_positive_result_limit(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
 
         new PathFinder(maxHops: 1, tolerance: '0.0', topK: 0);
     }
 
     public function test_it_requires_positive_expansion_guard(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
 
         new PathFinder(maxHops: 1, tolerance: '0.0', topK: 1, maxExpansions: 0);
     }
 
     public function test_it_requires_positive_visited_state_guard(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
 
         new PathFinder(maxHops: 1, tolerance: '0.0', topK: 1, maxExpansions: 1, maxVisitedStates: 0);
     }
@@ -91,7 +91,7 @@ final class PathFinderTest extends TestCase
      */
     public function test_it_requires_tolerance_within_expected_range(string $invalidTolerance): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
 
         new PathFinder(1, $invalidTolerance);
     }
@@ -454,7 +454,7 @@ final class PathFinderTest extends TestCase
 
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $finder->findBestPaths($graph, 'RUB', 'USD', $constraints);
     }
 
@@ -495,7 +495,7 @@ final class PathFinderTest extends TestCase
 
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Spend constraints must include both minimum and maximum bounds.');
 
         $finder->findBestPaths($graph, 'EUR', 'USD', $constraints);

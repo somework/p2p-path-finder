@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Domain\Order;
 
-use InvalidArgumentException;
 use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 /**
  * Domain entity describing an order that can be traversed within a path search.
@@ -67,18 +68,22 @@ final class Order
 
     /**
      * Validates that the provided amount can be used to partially fill the order.
+     *
+     * @throws InvalidInput|PrecisionViolation when the amount currency is invalid or outside the allowed bounds
      */
     public function validatePartialFill(Money $baseAmount): void
     {
         $this->assertBaseCurrency($baseAmount);
 
         if (!$this->bounds->contains($baseAmount)) {
-            throw new InvalidArgumentException('Fill amount must be within order bounds.');
+            throw new InvalidInput('Fill amount must be within order bounds.');
         }
     }
 
     /**
      * Calculates the quote currency proceeds for the provided base amount.
+     *
+     * @throws InvalidInput|PrecisionViolation when the base amount does not use the order's base currency
      */
     public function calculateQuoteAmount(Money $baseAmount): Money
     {
@@ -91,6 +96,8 @@ final class Order
 
     /**
      * Calculates the quote amount adjusted by the fee policy when present.
+     *
+     * @throws InvalidInput|PrecisionViolation when the provided amounts or fee breakdown violate currency constraints
      */
     public function calculateEffectiveQuoteAmount(Money $baseAmount): Money
     {
@@ -126,6 +133,8 @@ final class Order
 
     /**
      * Calculates the total base asset required to fill the provided net amount.
+     *
+     * @throws InvalidInput|PrecisionViolation when the requested amount or fee breakdown uses inconsistent currencies
      */
     public function calculateGrossBaseSpend(Money $baseAmount, ?FeeBreakdown $feeBreakdown = null): Money
     {
@@ -155,36 +164,36 @@ final class Order
     {
         $boundsCurrency = $this->bounds->min()->currency();
         if ($boundsCurrency !== $this->assetPair->base()) {
-            throw new InvalidArgumentException('Order bounds must be expressed in the base asset.');
+            throw new InvalidInput('Order bounds must be expressed in the base asset.');
         }
 
         if ($this->effectiveRate->baseCurrency() !== $this->assetPair->base()) {
-            throw new InvalidArgumentException('Effective rate base currency must match asset pair base.');
+            throw new InvalidInput('Effective rate base currency must match asset pair base.');
         }
 
         if ($this->effectiveRate->quoteCurrency() !== $this->assetPair->quote()) {
-            throw new InvalidArgumentException('Effective rate quote currency must match asset pair quote.');
+            throw new InvalidInput('Effective rate quote currency must match asset pair quote.');
         }
     }
 
     private function assertBaseCurrency(Money $money): void
     {
         if ($money->currency() !== $this->assetPair->base()) {
-            throw new InvalidArgumentException('Fill amount must use the order base asset.');
+            throw new InvalidInput('Fill amount must use the order base asset.');
         }
     }
 
     private function assertQuoteFeeCurrency(Money $fee, Money $quoteAmount): void
     {
         if ($fee->currency() !== $quoteAmount->currency()) {
-            throw new InvalidArgumentException('Fee policy must return money in quote asset currency.');
+            throw new InvalidInput('Fee policy must return money in quote asset currency.');
         }
     }
 
     private function assertBaseFeeCurrency(Money $fee, Money $baseAmount): void
     {
         if ($fee->currency() !== $baseAmount->currency()) {
-            throw new InvalidArgumentException('Fee policy must return money in base asset currency.');
+            throw new InvalidInput('Fee policy must return money in base asset currency.');
         }
     }
 }

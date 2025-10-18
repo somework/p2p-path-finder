@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Service;
 
-use InvalidArgumentException;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
@@ -14,6 +13,8 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function strtoupper;
 use function usort;
@@ -52,12 +53,15 @@ final class PathFinderService
     /**
      * Searches for the best conversion paths from the configured spend asset to the target asset.
      *
+     * @throws InvalidInput       when the requested target asset identifier is empty
+     * @throws PrecisionViolation when arbitrary precision operations required for cost ordering cannot be performed
+     *
      * @return SearchOutcome<PathResult>
      */
     public function findBestPaths(OrderBook $orderBook, PathSearchConfig $config, string $targetAsset): SearchOutcome
     {
         if ('' === $targetAsset) {
-            throw new InvalidArgumentException('Target asset cannot be empty.');
+            throw new InvalidInput('Target asset cannot be empty.');
         }
 
         $sourceCurrency = $config->spendAmount()->currency();

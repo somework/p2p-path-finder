@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
-use InvalidArgumentException;
 use JsonSerializable;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function max;
 
@@ -36,6 +37,8 @@ final class DecimalTolerance implements JsonSerializable
 
     /**
      * @param numeric-string $ratio
+     *
+     * @throws InvalidInput|PrecisionViolation when the ratio or scale fall outside the supported range
      */
     public static function fromNumericString(string $ratio, ?int $scale = null): self
     {
@@ -48,7 +51,7 @@ final class DecimalTolerance implements JsonSerializable
         $comparisonScale = max($scale, self::DEFAULT_SCALE);
 
         if (BcMath::comp($normalized, '0', $comparisonScale) < 0 || BcMath::comp($normalized, '1', $comparisonScale) > 0) {
-            throw new InvalidArgumentException('Residual tolerance must be a value between 0 and 1 inclusive.');
+            throw new InvalidInput('Residual tolerance must be a value between 0 and 1 inclusive.');
         }
 
         return new self($normalized, $scale);
@@ -79,6 +82,8 @@ final class DecimalTolerance implements JsonSerializable
 
     /**
      * @param numeric-string $value
+     *
+     * @throws InvalidInput|PrecisionViolation when the value cannot be normalized for comparison
      */
     public function compare(string $value, ?int $scale = null): int
     {
@@ -95,6 +100,8 @@ final class DecimalTolerance implements JsonSerializable
 
     /**
      * @param numeric-string $value
+     *
+     * @throws InvalidInput|PrecisionViolation when the value cannot be compared using BCMath
      */
     public function isGreaterThanOrEqual(string $value, ?int $scale = null): bool
     {
@@ -103,6 +110,8 @@ final class DecimalTolerance implements JsonSerializable
 
     /**
      * @param numeric-string $value
+     *
+     * @throws InvalidInput|PrecisionViolation when the value cannot be compared using BCMath
      */
     public function isLessThanOrEqual(string $value, ?int $scale = null): bool
     {
@@ -110,6 +119,8 @@ final class DecimalTolerance implements JsonSerializable
     }
 
     /**
+     * @throws InvalidInput|PrecisionViolation when the tolerance cannot be converted to a percentage
+     *
      * @return numeric-string
      */
     public function percentage(int $scale = 2): string
@@ -134,7 +145,7 @@ final class DecimalTolerance implements JsonSerializable
     private static function assertScale(int $scale): void
     {
         if ($scale < 0) {
-            throw new InvalidArgumentException('Scale must be a non-negative integer.');
+            throw new InvalidInput('Scale must be a non-negative integer.');
         }
     }
 }

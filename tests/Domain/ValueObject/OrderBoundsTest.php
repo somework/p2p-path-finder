@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Domain\ValueObject;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 final class OrderBoundsTest extends TestCase
 {
@@ -36,13 +36,13 @@ final class OrderBoundsTest extends TestCase
 
     public function test_creation_with_inverted_bounds_fails(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         OrderBounds::from(Money::fromString('GBP', '5.00'), Money::fromString('GBP', '2.00'));
     }
 
     public function test_creation_with_currency_mismatch_fails(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         OrderBounds::from(Money::fromString('USD', '1.00'), Money::fromString('EUR', '2.00'));
     }
 }

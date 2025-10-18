@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathFinder;
 
-use InvalidArgumentException;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
@@ -12,6 +11,8 @@ use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 use SplPriorityQueue;
 
 use function array_key_exists;
@@ -185,19 +186,19 @@ final class PathFinder
         private readonly int $maxVisitedStates = self::DEFAULT_MAX_VISITED_STATES,
     ) {
         if ($maxHops < 1) {
-            throw new InvalidArgumentException('Maximum hops must be at least one.');
+            throw new InvalidInput('Maximum hops must be at least one.');
         }
 
         if ($this->topK < 1) {
-            throw new InvalidArgumentException('Result limit must be at least one.');
+            throw new InvalidInput('Result limit must be at least one.');
         }
 
         if ($this->maxExpansions < 1) {
-            throw new InvalidArgumentException('Maximum expansions must be at least one.');
+            throw new InvalidInput('Maximum expansions must be at least one.');
         }
 
         if ($this->maxVisitedStates < 1) {
-            throw new InvalidArgumentException('Maximum visited states must be at least one.');
+            throw new InvalidInput('Maximum visited states must be at least one.');
         }
 
         /** @var numeric-string $unit */
@@ -242,7 +243,7 @@ final class PathFinder
         $desiredSpend = null;
         if (null !== $spendConstraints) {
             if (!isset($spendConstraints['min'], $spendConstraints['max'])) {
-                throw new InvalidArgumentException('Spend constraints must include both minimum and maximum bounds.');
+                throw new InvalidInput('Spend constraints must include both minimum and maximum bounds.');
             }
 
             $range = [
@@ -822,6 +823,8 @@ final class PathFinder
 
     /**
      * @param SpendRange $range
+     *
+     * @throws PrecisionViolation when normalization fails due to missing BCMath support
      */
     private function clampToRange(Money $value, array $range): Money
     {
@@ -845,6 +848,8 @@ final class PathFinder
     /**
      * @param GraphEdge $edge
      *
+     * @throws PrecisionViolation when the edge ratio cannot be evaluated using BCMath
+     *
      * @return numeric-string
      */
     private function edgeEffectiveConversionRate(array $edge): string
@@ -863,6 +868,8 @@ final class PathFinder
 
     /**
      * @param GraphEdge $edge
+     *
+     * @throws PrecisionViolation when the edge capacity ratios cannot be evaluated using BCMath
      *
      * @return numeric-string
      */
@@ -886,25 +893,28 @@ final class PathFinder
     }
 
     /**
+     * @throws InvalidInput|PrecisionViolation when the tolerance value is malformed
+     *
      * @return numeric-string
      */
     private function normalizeTolerance(string $tolerance): string
     {
         if (!BcMath::isNumeric($tolerance)) {
-            throw new InvalidArgumentException('Tolerance must be numeric.');
+            throw new InvalidInput('Tolerance must be numeric.');
         }
 
-        BcMath::ensureNumeric($tolerance);
+        /** @var numeric-string $numericTolerance */
+        $numericTolerance = $tolerance;
 
-        if (-1 === BcMath::comp($tolerance, '0', self::SCALE)) {
-            throw new InvalidArgumentException('Tolerance must be non-negative.');
+        if (-1 === BcMath::comp($numericTolerance, '0', self::SCALE)) {
+            throw new InvalidInput('Tolerance must be non-negative.');
         }
 
-        if (BcMath::comp($tolerance, '1', self::SCALE) >= 0) {
-            throw new InvalidArgumentException('Tolerance must be less than one.');
+        if (BcMath::comp($numericTolerance, '1', self::SCALE) >= 0) {
+            throw new InvalidInput('Tolerance must be less than one.');
         }
 
-        $normalized = BcMath::normalize($tolerance, self::SCALE);
+        $normalized = BcMath::normalize($numericTolerance, self::SCALE);
 
         /** @var numeric-string $upperBound */
         $upperBound = '0.'.str_repeat('9', self::SCALE);
@@ -917,6 +927,8 @@ final class PathFinder
 
     /**
      * @param numeric-string $tolerance
+     *
+     * @throws PrecisionViolation when BCMath operations required for amplification cannot be performed
      *
      * @return numeric-string
      */

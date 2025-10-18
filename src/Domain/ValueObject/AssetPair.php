@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
-use InvalidArgumentException;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 /**
  * Value object describing a directed asset pair (base -> quote).
@@ -19,6 +19,8 @@ final class AssetPair
 
     /**
      * Creates an asset pair ensuring the provided currencies are distinct and valid.
+     *
+     * @throws InvalidInput when either currency code is invalid or both represent the same asset
      */
     public static function fromString(string $base, string $quote): self
     {
@@ -26,7 +28,7 @@ final class AssetPair
         $normalizedQuote = self::assertCurrency($quote);
 
         if ($normalizedBase === $normalizedQuote) {
-            throw new InvalidArgumentException('Asset pair requires distinct assets.');
+            throw new InvalidInput('Asset pair requires distinct assets.');
         }
 
         return new self($normalizedBase, $normalizedQuote);
@@ -48,6 +50,9 @@ final class AssetPair
         return $this->quote;
     }
 
+    /**
+     * @throws InvalidInput when the currency symbol does not conform to the expected format
+     */
     private static function assertCurrency(string $currency): string
     {
         $money = Money::fromString($currency, '0');

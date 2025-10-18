@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Result;
 
-use InvalidArgumentException;
 use JsonSerializable;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function array_is_list;
 
@@ -27,8 +28,10 @@ final class PathResult implements JsonSerializable
     private readonly array $legs;
 
     /**
-     * @param list<PathLeg>        $legs
-     * @param array<string, Money> $feeBreakdown
+     * @param list<PathLeg>           $legs
+     * @param array<array-key, Money> $feeBreakdown
+     *
+     * @throws InvalidInput|PrecisionViolation when fee entries are invalid or cannot be merged deterministically
      */
     public function __construct(
         private readonly Money $totalSpent,
@@ -38,12 +41,12 @@ final class PathResult implements JsonSerializable
         array $feeBreakdown = [],
     ) {
         if (!array_is_list($legs)) {
-            throw new InvalidArgumentException('Path legs must be provided as a list.');
+            throw new InvalidInput('Path legs must be provided as a list.');
         }
 
         foreach ($legs as $leg) {
             if (!$leg instanceof PathLeg) {
-                throw new InvalidArgumentException('Every path leg must be an instance of PathLeg.');
+                throw new InvalidInput('Every path leg must be an instance of PathLeg.');
             }
         }
 
@@ -83,6 +86,9 @@ final class PathResult implements JsonSerializable
         return $this->residualTolerance;
     }
 
+    /**
+     * @throws InvalidInput|PrecisionViolation when the tolerance percentage cannot be calculated at the requested scale
+     */
     public function residualTolerancePercentage(int $scale = 2): string
     {
         return $this->residualTolerance->percentage($scale);
@@ -129,7 +135,9 @@ final class PathResult implements JsonSerializable
     }
 
     /**
-     * @param array<string, Money> $feeBreakdown
+     * @param array<array-key, Money> $feeBreakdown
+     *
+     * @throws InvalidInput|PrecisionViolation when fee entries are invalid or cannot be merged deterministically
      *
      * @return array<string, Money>
      */
@@ -140,7 +148,7 @@ final class PathResult implements JsonSerializable
 
         foreach ($feeBreakdown as $entry) {
             if (!$entry instanceof Money) {
-                throw new InvalidArgumentException('Fee breakdown must contain instances of Money.');
+                throw new InvalidInput('Fee breakdown must contain instances of Money.');
             }
 
             $currency = $entry->currency();

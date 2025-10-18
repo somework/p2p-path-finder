@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Result;
 
-use InvalidArgumentException;
 use JsonSerializable;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function sprintf;
 use function strtoupper;
@@ -111,7 +112,7 @@ final class PathLeg implements JsonSerializable
         $normalized = strtoupper($asset);
 
         if ('' === $normalized) {
-            throw new InvalidArgumentException(sprintf('Path leg %s asset cannot be empty.', $field));
+            throw new InvalidInput(sprintf('Path leg %s asset cannot be empty.', $field));
         }
 
         return $normalized;
@@ -119,6 +120,8 @@ final class PathLeg implements JsonSerializable
 
     /**
      * @param array<array-key, Money> $fees
+     *
+     * @throws InvalidInput|PrecisionViolation when fee entries are invalid or cannot be merged deterministically
      *
      * @return array<string, Money>
      */
@@ -129,7 +132,7 @@ final class PathLeg implements JsonSerializable
 
         foreach ($fees as $fee) {
             if (!$fee instanceof Money) {
-                throw new InvalidArgumentException('Path leg fees must be instances of Money.');
+                throw new InvalidInput('Path leg fees must be instances of Money.');
             }
 
             if ($fee->isZero()) {

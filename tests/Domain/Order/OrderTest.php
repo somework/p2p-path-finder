@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Domain\Order;
 
-use InvalidArgumentException;
 use LogicException;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
@@ -15,6 +14,7 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
@@ -29,7 +29,7 @@ final class OrderTest extends TestCase
         );
         $rate = ExchangeRate::fromString('BTC', 'USD', '30000', 3);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Order bounds must be expressed in the base asset.');
 
         new Order(OrderSide::BUY, $assetPair, $bounds, $rate);
@@ -44,7 +44,7 @@ final class OrderTest extends TestCase
         );
         $rate = ExchangeRate::fromString('ETH', 'USD', '30000', 3);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Effective rate base currency must match asset pair base.');
 
         new Order(OrderSide::BUY, $assetPair, $bounds, $rate);
@@ -59,7 +59,7 @@ final class OrderTest extends TestCase
         );
         $rate = ExchangeRate::fromString('BTC', 'EUR', '30000', 3);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Effective rate quote currency must match asset pair quote.');
 
         new Order(OrderSide::BUY, $assetPair, $bounds, $rate);
@@ -79,7 +79,7 @@ final class OrderTest extends TestCase
     ): void {
         $order = OrderFactory::buy(base: $baseCurrency);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
 
         $order->validatePartialFill(OrderFactory::partialFill($partialFillCurrency, $amount));
     }
@@ -178,7 +178,7 @@ final class OrderTest extends TestCase
 
         $order = OrderFactory::buy(feePolicy: $policy);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Fee policy must return money in quote asset currency.');
 
         $order->calculateEffectiveQuoteAmount(CurrencyScenarioFactory::money('BTC', '0.500', 3));
@@ -195,7 +195,7 @@ final class OrderTest extends TestCase
 
         $order = OrderFactory::buy(feePolicy: $policy);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Fee policy must return money in base asset currency.');
 
         $order->calculateEffectiveQuoteAmount(CurrencyScenarioFactory::money('BTC', '0.500', 3));
@@ -236,7 +236,7 @@ final class OrderTest extends TestCase
 
         $order = OrderFactory::buy(feePolicy: $policy);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Fee policy must return money in base asset currency.');
 
         $order->calculateGrossBaseSpend(CurrencyScenarioFactory::money('BTC', '0.500', 3));
@@ -260,7 +260,7 @@ final class OrderTest extends TestCase
             }
         });
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
 
         $order->calculateEffectiveQuoteAmount(CurrencyScenarioFactory::money('BTC', '0.500', 3));
     }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
@@ -16,6 +15,7 @@ use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
@@ -399,7 +399,7 @@ final class PathFinderHeuristicsTest extends TestCase
         $method = new ReflectionMethod(PathFinder::class, 'normalizeTolerance');
         $method->setAccessible(true);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Tolerance must be numeric.');
 
         $method->invoke($finder, 'not-a-number');
@@ -412,7 +412,7 @@ final class PathFinderHeuristicsTest extends TestCase
         $method = new ReflectionMethod(PathFinder::class, 'normalizeTolerance');
         $method->setAccessible(true);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Tolerance must be non-negative.');
 
         $method->invoke($finder, '-0.01');
@@ -425,7 +425,7 @@ final class PathFinderHeuristicsTest extends TestCase
         $method = new ReflectionMethod(PathFinder::class, 'normalizeTolerance');
         $method->setAccessible(true);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Tolerance must be less than one.');
 
         $method->invoke($finder, '1.000');

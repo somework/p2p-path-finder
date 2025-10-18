@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Domain\ValueObject;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 use function str_repeat;
 
@@ -23,7 +23,7 @@ final class MoneyTest extends TestCase
 
     public function test_from_string_rejects_empty_currency(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
 
         Money::fromString('', '1.00');
     }
@@ -33,7 +33,7 @@ final class MoneyTest extends TestCase
      */
     public function test_from_string_rejects_malformed_currency(string $currency): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
 
         Money::fromString($currency, '1.00');
     }
@@ -112,7 +112,7 @@ final class MoneyTest extends TestCase
     {
         $money = Money::fromString('USD', '10.00', 2);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
 
         $money->divide($divisor);
     }
@@ -156,7 +156,7 @@ final class MoneyTest extends TestCase
 
     public function test_currency_mismatch_throws_exception(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
 
         Money::fromString('USD', '1.00')->add(Money::fromString('EUR', '1.00'));
     }

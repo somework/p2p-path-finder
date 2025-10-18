@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
-use InvalidArgumentException;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 /**
  * Represents inclusive lower/upper bounds for the fillable base asset amount of an order.
@@ -19,12 +20,14 @@ final class OrderBounds
 
     /**
      * Constructs an order bounds instance after validating currency consistency.
+     *
+     * @throws InvalidInput|PrecisionViolation when the provided amounts are inconsistent or cannot be normalized
      */
     public static function from(Money $min, Money $max): self
     {
         self::assertCurrencyConsistency($min, $max);
         if ($min->greaterThan($max)) {
-            throw new InvalidArgumentException('Minimum amount cannot exceed the maximum amount.');
+            throw new InvalidInput('Minimum amount cannot exceed the maximum amount.');
         }
 
         $scale = max($min->scale(), $max->scale());
@@ -50,6 +53,8 @@ final class OrderBounds
 
     /**
      * Checks whether the provided amount falls within the configured bounds.
+     *
+     * @throws InvalidInput|PrecisionViolation when the amount currency or scale is incompatible with the bounds
      */
     public function contains(Money $amount): bool
     {
@@ -61,6 +66,8 @@ final class OrderBounds
 
     /**
      * Clamps the provided amount to the bounds and returns the adjusted value.
+     *
+     * @throws InvalidInput|PrecisionViolation when the amount currency or scale is incompatible with the bounds
      */
     public function clamp(Money $amount): Money
     {
@@ -81,14 +88,14 @@ final class OrderBounds
     private static function assertCurrencyConsistency(Money $first, Money $second): void
     {
         if ($first->currency() !== $second->currency()) {
-            throw new InvalidArgumentException('Bounds must share the same currency.');
+            throw new InvalidInput('Bounds must share the same currency.');
         }
     }
 
     private function assertCurrency(Money $money): void
     {
         if ($money->currency() !== $this->min->currency()) {
-            throw new InvalidArgumentException('Money currency must match order bounds.');
+            throw new InvalidInput('Money currency must match order bounds.');
         }
     }
 }

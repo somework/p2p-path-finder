@@ -16,6 +16,7 @@ use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
 {
@@ -365,7 +366,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
 
         return match ($definition['type']) {
             'percentage' => $this->percentageFeePolicy($definition['value']),
-            default => throw new \InvalidArgumentException('Unsupported fee policy type: '.$definition['type']),
+            default => throw new InvalidInput('Unsupported fee policy type: '.$definition['type']),
         };
     }
 

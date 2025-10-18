@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\Config;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfigBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 final class PathSearchConfigTest extends TestCase
 {
@@ -115,7 +115,7 @@ final class PathSearchConfigTest extends TestCase
             ->withToleranceBounds('0.0', '0.1')
             ->withHopLimits(1, 2);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $builder->build();
     }
 
@@ -125,7 +125,7 @@ final class PathSearchConfigTest extends TestCase
             ->withSpendAmount(Money::fromString('EUR', '10.00', 2))
             ->withHopLimits(1, 2);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $builder->build();
     }
 
@@ -133,7 +133,7 @@ final class PathSearchConfigTest extends TestCase
     {
         $builder = PathSearchConfig::builder();
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $builder->withToleranceBounds('invalid', '0.1');
     }
 
@@ -141,7 +141,7 @@ final class PathSearchConfigTest extends TestCase
     {
         $builder = PathSearchConfig::builder();
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $builder->withToleranceBounds('0.1', '1.000000000000000000');
     }
 
@@ -151,7 +151,7 @@ final class PathSearchConfigTest extends TestCase
             ->withSpendAmount(Money::fromString('EUR', '10.00', 2))
             ->withToleranceBounds('0.0', '0.1');
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $builder->build();
     }
 
@@ -159,7 +159,7 @@ final class PathSearchConfigTest extends TestCase
     {
         $builder = PathSearchConfig::builder();
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $builder->withResultLimit(0);
     }
 
@@ -170,7 +170,7 @@ final class PathSearchConfigTest extends TestCase
     {
         $builder = PathSearchConfig::builder();
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $builder->withToleranceBounds($minimum, $maximum);
     }
 
@@ -192,7 +192,7 @@ final class PathSearchConfigTest extends TestCase
     {
         $builder = PathSearchConfig::builder();
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $builder->withHopLimits($minimum, $maximum);
     }
 
@@ -215,7 +215,7 @@ final class PathSearchConfigTest extends TestCase
             ->withToleranceBounds('0.0', '0.1')
             ->withHopLimits(1, 2);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $builder->withSearchGuards($maxVisited, $maxExpansions);
     }
 
@@ -245,7 +245,7 @@ final class PathSearchConfigTest extends TestCase
 
     public function test_constructor_rejects_tolerance_equal_to_one(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
 
         new PathSearchConfig(
             Money::fromString('EUR', '100.00', 2),
@@ -258,7 +258,7 @@ final class PathSearchConfigTest extends TestCase
 
     public function test_constructor_rejects_maximum_tolerance_equal_to_one(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
 
         new PathSearchConfig(
             Money::fromString('EUR', '100.00', 2),
@@ -291,7 +291,7 @@ final class PathSearchConfigTest extends TestCase
         $minimum->setAccessible(true);
         $minimum->setValue($builder, '0.100000000000000000');
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $builder->build();
     }
 
@@ -305,7 +305,7 @@ final class PathSearchConfigTest extends TestCase
         $minimum->setAccessible(true);
         $minimum->setValue($builder, 1);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $builder->build();
     }
 }

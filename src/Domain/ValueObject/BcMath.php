@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
-use InvalidArgumentException;
-use RuntimeException;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function bcadd;
 use function bccomp;
@@ -43,13 +43,13 @@ final class BcMath
      *
      * @psalm-assert numeric-string $values
      *
-     * @throws InvalidArgumentException when at least one value is not numeric
+     * @throws InvalidInput when at least one value is not numeric
      */
     public static function ensureNumeric(string ...$values): void
     {
         foreach ($values as $value) {
             if (!self::isNumeric($value)) {
-                throw new InvalidArgumentException(sprintf('Value "%s" is not numeric.', $value));
+                throw new InvalidInput(sprintf('Value "%s" is not numeric.', $value));
             }
         }
     }
@@ -74,6 +74,8 @@ final class BcMath
      *
      * @param numeric-string $value
      *
+     * @throws InvalidInput|PrecisionViolation when the provided value cannot be normalized at the requested scale
+     *
      * @return numeric-string
      */
     public static function normalize(string $value, int $scale): string
@@ -90,6 +92,8 @@ final class BcMath
      *
      * @param numeric-string $left
      * @param numeric-string $right
+     *
+     * @throws InvalidInput|PrecisionViolation when operands or the requested scale are invalid
      *
      * @return numeric-string
      */
@@ -112,6 +116,8 @@ final class BcMath
      * @param numeric-string $left
      * @param numeric-string $right
      *
+     * @throws InvalidInput|PrecisionViolation when operands or the requested scale are invalid
+     *
      * @return numeric-string
      */
     public static function sub(string $left, string $right, int $scale): string
@@ -132,6 +138,8 @@ final class BcMath
      *
      * @param numeric-string $left
      * @param numeric-string $right
+     *
+     * @throws InvalidInput|PrecisionViolation when operands or the requested scale are invalid
      *
      * @return numeric-string
      */
@@ -154,6 +162,8 @@ final class BcMath
      * @param numeric-string $left
      * @param numeric-string $right
      *
+     * @throws InvalidInput|PrecisionViolation when operands, scale or divisor are invalid
+     *
      * @return numeric-string
      */
     public static function div(string $left, string $right, int $scale): string
@@ -175,6 +185,8 @@ final class BcMath
      *
      * @param numeric-string $left
      * @param numeric-string $right
+     *
+     * @throws InvalidInput|PrecisionViolation when operands or scale validation fails
      */
     public static function comp(string $left, string $right, int $scale): int
     {
@@ -191,6 +203,8 @@ final class BcMath
      * Rounds a numeric string to the provided scale using half-up semantics.
      *
      * @param numeric-string $value
+     *
+     * @throws InvalidInput|PrecisionViolation when the provided value cannot be rounded at the requested scale
      *
      * @return numeric-string
      */
@@ -235,6 +249,8 @@ final class BcMath
      *
      * @param numeric-string $first
      * @param numeric-string $second
+     *
+     * @throws PrecisionViolation when the BCMath extension is unavailable
      */
     public static function scaleForComparison(string $first, string $second, int $fallbackScale = self::DEFAULT_SCALE): int
     {
@@ -259,7 +275,7 @@ final class BcMath
     private static function ensureScale(int $scale): void
     {
         if ($scale < 0) {
-            throw new InvalidArgumentException('Scale cannot be negative.');
+            throw new InvalidInput('Scale cannot be negative.');
         }
     }
 
@@ -270,7 +286,7 @@ final class BcMath
         $scale = max(self::scaleOf($value), 1);
 
         if (0 === bccomp($value, '0', $scale)) {
-            throw new InvalidArgumentException('Division by zero.');
+            throw new InvalidInput('Division by zero.');
         }
     }
 
@@ -281,7 +297,7 @@ final class BcMath
         }
 
         if (!extension_loaded('bcmath')) {
-            throw new RuntimeException('The BCMath extension (ext-bcmath) is required. Install it or require symfony/polyfill-bcmath when the extension cannot be loaded.');
+            throw new PrecisionViolation('The BCMath extension (ext-bcmath) is required. Install it or require symfony/polyfill-bcmath when the extension cannot be loaded.');
         }
 
         self::$extensionVerified = true;
