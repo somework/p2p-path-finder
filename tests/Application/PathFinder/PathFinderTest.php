@@ -21,6 +21,7 @@ use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
 use function array_key_last;
+use function array_reverse;
 use function array_unique;
 use function count;
 
@@ -192,6 +193,47 @@ final class PathFinderTest extends TestCase
         $extendedPaths = $extendedResults->paths();
 
         self::assertGreaterThan(2, count($extendedPaths));
+    }
+
+    public function test_it_preserves_discovery_order_for_equal_cost_candidates(): void
+    {
+        $orders = [
+            OrderFactory::sell('USD', 'EUR', '1.000', '1.000', '2.000', 3, 3),
+            OrderFactory::sell('GBP', 'EUR', '1.000', '1.000', '4.000', 3, 3),
+            OrderFactory::buy('GBP', 'USD', '1.000', '1.000', '2.000', 3, 3),
+        ];
+
+        $graph = (new GraphBuilder())->build($orders);
+
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.0', topK: 2);
+        $results = self::extractPaths($finder->findBestPaths($graph, 'EUR', 'USD'));
+
+        self::assertCount(1, $results);
+        self::assertSame(1, $results[0]['hops']);
+
+        $direct = $results[0];
+        self::assertSame('EUR', $direct['edges'][0]['from']);
+        self::assertSame('USD', $direct['edges'][0]['to']);
+    }
+
+    public function test_it_returns_same_paths_when_order_book_is_permuted(): void
+    {
+        $orders = [
+            OrderFactory::sell('USD', 'EUR', '1.000', '1.000', '2.000', 3, 3),
+            OrderFactory::sell('GBP', 'EUR', '1.000', '1.000', '4.000', 3, 3),
+            OrderFactory::buy('GBP', 'USD', '1.000', '1.000', '2.000', 3, 3),
+        ];
+
+        $graph = (new GraphBuilder())->build($orders);
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.0', topK: 3);
+
+        $originalResults = self::extractPaths($finder->findBestPaths($graph, 'EUR', 'USD'));
+
+        $permutedGraph = (new GraphBuilder())->build(array_reverse($orders));
+        $permutedFinder = new PathFinder(maxHops: 3, tolerance: '0.0', topK: 3);
+        $permutedResults = self::extractPaths($permutedFinder->findBestPaths($permutedGraph, 'EUR', 'USD'));
+
+        self::assertSame($originalResults, $permutedResults);
     }
 
     public function test_it_normalizes_endpoint_case_inputs(): void
