@@ -73,17 +73,17 @@ final class FeePolicyFactory
             public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
             {
                 $calculationScale = max($this->scale, $quoteAmount->scale());
-                $percentageComponent = $quoteAmount
-                    ->multiply($this->percentage, $calculationScale)
-                    ->withScale($quoteAmount->scale());
+                $percentageComponent = $quoteAmount->multiply($this->percentage, $calculationScale);
 
                 $fixedComponent = Money::fromString(
                     $quoteAmount->currency(),
                     $this->fixed,
-                    $quoteAmount->scale()
+                    $calculationScale
                 );
 
-                $fee = $percentageComponent->add($fixedComponent, $quoteAmount->scale());
+                $fee = $percentageComponent
+                    ->add($fixedComponent, $calculationScale)
+                    ->withScale($quoteAmount->scale());
 
                 return FeeBreakdown::forQuote($fee);
             }

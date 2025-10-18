@@ -212,23 +212,32 @@ final class GraphScenarioGenerator
         return $integer * $this->powerOfTen($scale) + (int) substr($fraction, 0, $scale);
     }
 
+    /**
+     * Probability split for optional fee policies when materializing graph scenarios.
+     *
+     * Values represent cumulative thresholds out of 100.
+     */
+    private const FEE_POLICY_BASE_SURCHARGE_THRESHOLD = 35;
+    private const FEE_POLICY_BASE_AND_QUOTE_SURCHARGE_THRESHOLD = 65;
+    private const FEE_POLICY_QUOTE_FIXED_THRESHOLD = 85;
+
     private function maybeFeePolicy(): ?FeePolicy
     {
         $roll = $this->randomizer->getInt(0, 100);
-        if ($roll < 35) {
+        if ($roll < self::FEE_POLICY_BASE_SURCHARGE_THRESHOLD) {
             $ratio = $this->randomRatio();
 
             return FeePolicyFactory::baseSurcharge($ratio);
         }
 
-        if ($roll < 65) {
+        if ($roll < self::FEE_POLICY_BASE_AND_QUOTE_SURCHARGE_THRESHOLD) {
             $baseRatio = $this->randomRatio();
             $quoteRatio = $this->randomRatio();
 
             return FeePolicyFactory::baseAndQuoteSurcharge($baseRatio, $quoteRatio);
         }
 
-        if ($roll < 85) {
+        if ($roll < self::FEE_POLICY_QUOTE_FIXED_THRESHOLD) {
             $percentage = $this->randomRatio(5);
             $fixed = $this->randomFixedComponent(5);
 
