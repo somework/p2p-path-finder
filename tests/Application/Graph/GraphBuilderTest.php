@@ -84,6 +84,28 @@ final class GraphBuilderTest extends TestCase
         $this->assertSegment($secondaryEdge['segments'][1], false, 'BTC', '0.600', 'EUR', '16800.000', true);
     }
 
+    public function test_build_skips_entries_that_are_not_orders(): void
+    {
+        $validOrder = $this->createOrder(
+            OrderSide::BUY,
+            'BTC',
+            'USD',
+            '0.100',
+            '1.000',
+            '30000.000',
+        );
+
+        $graph = (new GraphBuilder())->build([
+            $validOrder,
+            'not-an-order',
+            42,
+        ]);
+
+        self::assertSame(['BTC', 'USD'], array_keys($graph));
+        self::assertCount(1, $graph['BTC']['edges']);
+        self::assertSame($validOrder, $graph['BTC']['edges'][0]['order']);
+    }
+
     public function test_build_creates_sell_edges_for_each_order(): void
     {
         [$graph, $orders] = $this->buildGraphFromSampleOrders();
