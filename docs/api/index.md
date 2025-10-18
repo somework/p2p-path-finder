@@ -781,7 +781,10 @@ Checks whether the provided string represents a numeric value compatible with BC
 ### normalize
 `BcMath::normalize(string $value, int $scale): string`
 
-Normalizes a numeric string to the provided scale using bankers rounding.
+Normalizes a numeric string to the provided scale using half-up rounding.
+
+The path finder normalizes tolerances and costs to 18 decimal places by default,
+so half-up rounding keeps deterministic behaviour even for tie-breaking cases.
 
 
 Returns: numeric-string

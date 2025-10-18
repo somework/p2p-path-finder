@@ -34,6 +34,8 @@ final class BcMathTest extends TestCase
     {
         self::assertSame('1.235', BcMath::round('1.2345', 3));
         self::assertSame('-1.235', BcMath::round('-1.2345', 3));
+        self::assertSame('1', BcMath::round('0.5', 0));
+        self::assertSame('-1', BcMath::round('-0.5', 0));
         self::assertSame('3', BcMath::round('2.5', 0));
         self::assertSame('-3', BcMath::round('-2.5', 0));
     }
