@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Service;
 
-use InvalidArgumentException;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
@@ -14,6 +13,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 use function strtoupper;
 use function usort;
@@ -57,7 +57,7 @@ final class PathFinderService
     public function findBestPaths(OrderBook $orderBook, PathSearchConfig $config, string $targetAsset): SearchOutcome
     {
         if ('' === $targetAsset) {
-            throw new InvalidArgumentException('Target asset cannot be empty.');
+            throw new InvalidInput('Target asset cannot be empty.');
         }
 
         $sourceCurrency = $config->spendAmount()->currency();

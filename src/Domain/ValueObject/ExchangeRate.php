@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
-use InvalidArgumentException;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 /**
  * Value object encapsulating an exchange rate between two assets.
@@ -37,12 +37,12 @@ final class ExchangeRate
         Money::fromString($quoteCurrency, '0', $scale);
 
         if (0 === strcasecmp($baseCurrency, $quoteCurrency)) {
-            throw new InvalidArgumentException('Exchange rate requires distinct currencies.');
+            throw new InvalidInput('Exchange rate requires distinct currencies.');
         }
 
         $normalizedRate = BcMath::normalize($rate, $scale);
         if (1 !== BcMath::comp($normalizedRate, '0', $scale)) {
-            throw new InvalidArgumentException('Exchange rate must be greater than zero.');
+            throw new InvalidInput('Exchange rate must be greater than zero.');
         }
 
         return new self(strtoupper($baseCurrency), strtoupper($quoteCurrency), $normalizedRate, $scale);
@@ -54,7 +54,7 @@ final class ExchangeRate
     public function convert(Money $money, ?int $scale = null): Money
     {
         if ($money->currency() !== $this->baseCurrency) {
-            throw new InvalidArgumentException('Money currency must match exchange rate base currency.');
+            throw new InvalidInput('Money currency must match exchange rate base currency.');
         }
 
         $scale ??= max($this->scale, $money->scale());

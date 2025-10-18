@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Config;
 
-use InvalidArgumentException;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 use function max;
 
@@ -44,23 +44,23 @@ final class PathSearchConfig
         $this->maximumTolerance = $this->assertTolerance($maximumTolerance, 'Maximum tolerance');
 
         if ($minimumHops < 1) {
-            throw new InvalidArgumentException('Minimum hops must be at least one.');
+            throw new InvalidInput('Minimum hops must be at least one.');
         }
 
         if ($maximumHops < $minimumHops) {
-            throw new InvalidArgumentException('Maximum hops must be greater than or equal to minimum hops.');
+            throw new InvalidInput('Maximum hops must be greater than or equal to minimum hops.');
         }
 
         if ($resultLimit < 1) {
-            throw new InvalidArgumentException('Result limit must be at least one.');
+            throw new InvalidInput('Result limit must be at least one.');
         }
 
         if ($pathFinderMaxExpansions < 1) {
-            throw new InvalidArgumentException('Maximum expansions must be at least one.');
+            throw new InvalidInput('Maximum expansions must be at least one.');
         }
 
         if ($pathFinderMaxVisitedStates < 1) {
-            throw new InvalidArgumentException('Maximum visited states must be at least one.');
+            throw new InvalidInput('Maximum visited states must be at least one.');
         }
 
         $this->pathFinderTolerance = $this->resolvePathFinderTolerance($pathFinderToleranceOverride);
@@ -188,7 +188,7 @@ final class PathSearchConfig
         $normalized = BcMath::normalize($value, self::TOLERANCE_SCALE);
 
         if (BcMath::comp($normalized, '0', self::TOLERANCE_SCALE) < 0 || BcMath::comp($normalized, '1', self::TOLERANCE_SCALE) >= 0) {
-            throw new InvalidArgumentException($context.' must be in the [0, 1) range.');
+            throw new InvalidInput($context.' must be in the [0, 1) range.');
         }
 
         return $normalized;

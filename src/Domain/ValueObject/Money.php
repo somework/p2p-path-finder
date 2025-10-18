@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
-use InvalidArgumentException;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 use function sprintf;
 
@@ -212,17 +212,17 @@ final class Money
     private static function assertCurrency(string $currency): void
     {
         if ('' === $currency) {
-            throw new InvalidArgumentException('Currency cannot be empty.');
+            throw new InvalidInput('Currency cannot be empty.');
         }
         if (!preg_match('/^[A-Z]{3,12}$/i', $currency)) {
-            throw new InvalidArgumentException(sprintf('Invalid currency "%s" supplied.', $currency));
+            throw new InvalidInput(sprintf('Invalid currency "%s" supplied.', $currency));
         }
     }
 
     private function assertSameCurrency(self $other): void
     {
         if ($this->currency !== $other->currency) {
-            throw new InvalidArgumentException('Currency mismatch.');
+            throw new InvalidInput('Currency mismatch.');
         }
     }
 }

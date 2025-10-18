@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
-use InvalidArgumentException;
 use JsonSerializable;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 use function max;
 
@@ -48,7 +48,7 @@ final class DecimalTolerance implements JsonSerializable
         $comparisonScale = max($scale, self::DEFAULT_SCALE);
 
         if (BcMath::comp($normalized, '0', $comparisonScale) < 0 || BcMath::comp($normalized, '1', $comparisonScale) > 0) {
-            throw new InvalidArgumentException('Residual tolerance must be a value between 0 and 1 inclusive.');
+            throw new InvalidInput('Residual tolerance must be a value between 0 and 1 inclusive.');
         }
 
         return new self($normalized, $scale);
@@ -134,7 +134,7 @@ final class DecimalTolerance implements JsonSerializable
     private static function assertScale(int $scale): void
     {
         if ($scale < 0) {
-            throw new InvalidArgumentException('Scale must be a non-negative integer.');
+            throw new InvalidInput('Scale must be a non-negative integer.');
         }
     }
 }

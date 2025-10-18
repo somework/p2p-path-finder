@@ -127,6 +127,7 @@ use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
+use SomeWork\P2PPathFinder\Exception\InfeasiblePath;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
@@ -156,7 +157,7 @@ $service = new PathFinderService(new GraphBuilder());
 $resultOutcome = $service->findBestPaths($orderBook, $config, 'USDT');
 
 if (!$resultOutcome->hasPaths()) {
-    throw new RuntimeException('No viable routes found.');
+    throw new InfeasiblePath('No viable routes found.');
 }
 
 $result = $resultOutcome->paths()[0];
@@ -223,6 +224,22 @@ $formatter = new PathResultFormatter();
 $payload = $formatter->formatMachineCollection($topTwo);
 echo $formatter->formatHumanCollection($topTwo);
 ```
+
+## Migration guide
+
+### Upgrading from 0.x to 0.y
+
+* Domain and application services now throw dedicated exceptions under the
+  `SomeWork\P2PPathFinder\Exception` namespace.
+  * Input validation failures raise `InvalidInput` instead of
+    `InvalidArgumentException`.
+  * Search guard overflows can be reported with `GuardLimitExceeded`.
+  * Attempts to materialise a path that violates residual constraints can raise
+    `InfeasiblePath`.
+  * Precision-related errors (for example a missing BCMath extension) map to
+    `PrecisionViolation`.
+* Update consumer code and tests that previously asserted against the SPL
+  exceptions to handle the new types.
 
 ## API documentation
 

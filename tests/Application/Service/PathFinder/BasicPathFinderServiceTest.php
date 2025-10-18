@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\Service\PathFinder;
 
-use InvalidArgumentException;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
@@ -12,6 +11,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 use function count;
 
@@ -88,7 +88,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Target asset cannot be empty.');
 
         $this->makeService()->findBestPaths($orderBook, $config, '');

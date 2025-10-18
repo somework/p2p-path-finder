@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Domain\Order;
 
-use InvalidArgumentException;
 use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 /**
  * Domain entity describing an order that can be traversed within a path search.
@@ -73,7 +73,7 @@ final class Order
         $this->assertBaseCurrency($baseAmount);
 
         if (!$this->bounds->contains($baseAmount)) {
-            throw new InvalidArgumentException('Fill amount must be within order bounds.');
+            throw new InvalidInput('Fill amount must be within order bounds.');
         }
     }
 
@@ -155,36 +155,36 @@ final class Order
     {
         $boundsCurrency = $this->bounds->min()->currency();
         if ($boundsCurrency !== $this->assetPair->base()) {
-            throw new InvalidArgumentException('Order bounds must be expressed in the base asset.');
+            throw new InvalidInput('Order bounds must be expressed in the base asset.');
         }
 
         if ($this->effectiveRate->baseCurrency() !== $this->assetPair->base()) {
-            throw new InvalidArgumentException('Effective rate base currency must match asset pair base.');
+            throw new InvalidInput('Effective rate base currency must match asset pair base.');
         }
 
         if ($this->effectiveRate->quoteCurrency() !== $this->assetPair->quote()) {
-            throw new InvalidArgumentException('Effective rate quote currency must match asset pair quote.');
+            throw new InvalidInput('Effective rate quote currency must match asset pair quote.');
         }
     }
 
     private function assertBaseCurrency(Money $money): void
     {
         if ($money->currency() !== $this->assetPair->base()) {
-            throw new InvalidArgumentException('Fill amount must use the order base asset.');
+            throw new InvalidInput('Fill amount must use the order base asset.');
         }
     }
 
     private function assertQuoteFeeCurrency(Money $fee, Money $quoteAmount): void
     {
         if ($fee->currency() !== $quoteAmount->currency()) {
-            throw new InvalidArgumentException('Fee policy must return money in quote asset currency.');
+            throw new InvalidInput('Fee policy must return money in quote asset currency.');
         }
     }
 
     private function assertBaseFeeCurrency(Money $fee, Money $baseAmount): void
     {
         if ($fee->currency() !== $baseAmount->currency()) {
-            throw new InvalidArgumentException('Fee policy must return money in base asset currency.');
+            throw new InvalidInput('Fee policy must return money in base asset currency.');
         }
     }
 }

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Filter;
 
-use InvalidArgumentException;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 /**
  * Accepts orders whose effective rates fall within a tolerance window around a reference rate.
@@ -31,7 +31,7 @@ final class ToleranceWindowFilter implements OrderFilterInterface
         $normalizedTolerance = BcMath::normalize($tolerance, $this->scale);
 
         if (-1 === BcMath::comp($normalizedTolerance, '0', $this->scale)) {
-            throw new InvalidArgumentException('Tolerance cannot be negative.');
+            throw new InvalidInput('Tolerance cannot be negative.');
         }
 
         $offset = BcMath::mul($referenceRate->rate(), $normalizedTolerance, $this->scale);

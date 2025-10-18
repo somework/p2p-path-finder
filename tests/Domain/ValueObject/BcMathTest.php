@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Domain\ValueObject;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 final class BcMathTest extends TestCase
 {
@@ -25,7 +25,7 @@ final class BcMathTest extends TestCase
 
     public function test_division_by_zero_throws_exception(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
 
         BcMath::div('1', '0', 4);
     }
@@ -47,7 +47,7 @@ final class BcMathTest extends TestCase
         try {
             BcMath::normalize('not-a-number', 2);
             self::fail('An exception should be thrown for invalid numeric input.');
-        } catch (InvalidArgumentException $exception) {
+        } catch (InvalidInput $exception) {
             self::assertSame('Value "not-a-number" is not numeric.', $exception->getMessage());
         }
     }
@@ -73,14 +73,14 @@ final class BcMathTest extends TestCase
 
     public function test_ensure_numeric_throws_for_invalid_values(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
 
         BcMath::ensureNumeric('123', 'abc');
     }
 
     public function test_operations_reject_negative_scale(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
 
         BcMath::add('1', '1', -1);
     }

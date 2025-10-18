@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Config;
 
-use InvalidArgumentException;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 use function is_int;
 use function is_string;
@@ -69,11 +69,11 @@ final class PathSearchConfigBuilder
     public function withHopLimits(int $minimumHops, int $maximumHops): self
     {
         if ($minimumHops < 1) {
-            throw new InvalidArgumentException('Minimum hops must be at least one.');
+            throw new InvalidInput('Minimum hops must be at least one.');
         }
 
         if ($maximumHops < $minimumHops) {
-            throw new InvalidArgumentException('Maximum hops must be greater than or equal to minimum hops.');
+            throw new InvalidInput('Maximum hops must be greater than or equal to minimum hops.');
         }
 
         $this->minimumHops = $minimumHops;
@@ -88,7 +88,7 @@ final class PathSearchConfigBuilder
     public function withResultLimit(int $limit): self
     {
         if ($limit < 1) {
-            throw new InvalidArgumentException('Result limit must be at least one.');
+            throw new InvalidInput('Result limit must be at least one.');
         }
 
         $this->resultLimit = $limit;
@@ -102,11 +102,11 @@ final class PathSearchConfigBuilder
     public function withSearchGuards(int $maxVisitedStates, int $maxExpansions): self
     {
         if ($maxVisitedStates < 1) {
-            throw new InvalidArgumentException('Maximum visited states must be at least one.');
+            throw new InvalidInput('Maximum visited states must be at least one.');
         }
 
         if ($maxExpansions < 1) {
-            throw new InvalidArgumentException('Maximum expansions must be at least one.');
+            throw new InvalidInput('Maximum expansions must be at least one.');
         }
 
         $this->maxVisitedStates = $maxVisitedStates;
@@ -121,15 +121,15 @@ final class PathSearchConfigBuilder
     public function build(): PathSearchConfig
     {
         if (!$this->spendAmount instanceof Money) {
-            throw new InvalidArgumentException('Spend amount must be provided.');
+            throw new InvalidInput('Spend amount must be provided.');
         }
 
         if (!is_string($this->minimumTolerance) || !is_string($this->maximumTolerance)) {
-            throw new InvalidArgumentException('Tolerance bounds must be configured.');
+            throw new InvalidInput('Tolerance bounds must be configured.');
         }
 
         if (!is_int($this->minimumHops) || !is_int($this->maximumHops)) {
-            throw new InvalidArgumentException('Hop limits must be configured.');
+            throw new InvalidInput('Hop limits must be configured.');
         }
 
         $maxVisitedStates = $this->maxVisitedStates ?? PathFinder::DEFAULT_MAX_VISITED_STATES;
@@ -158,7 +158,7 @@ final class PathSearchConfigBuilder
         $normalized = BcMath::normalize($value, self::PATH_FINDER_TOLERANCE_SCALE);
 
         if (BcMath::comp($normalized, '0', self::PATH_FINDER_TOLERANCE_SCALE) < 0 || BcMath::comp($normalized, '1', self::PATH_FINDER_TOLERANCE_SCALE) >= 0) {
-            throw new InvalidArgumentException(sprintf('%s must be in the [0, 1) range.', $context));
+            throw new InvalidInput(sprintf('%s must be in the [0, 1) range.', $context));
         }
 
         return $normalized;

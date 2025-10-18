@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Domain\ValueObject;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 final class DecimalToleranceTest extends TestCase
 {
@@ -58,7 +58,7 @@ final class DecimalToleranceTest extends TestCase
     {
         $tolerance = DecimalTolerance::fromNumericString('0.5');
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Scale must be a non-negative integer.');
 
         $tolerance->compare('0.4', -1);
@@ -76,7 +76,7 @@ final class DecimalToleranceTest extends TestCase
     {
         $tolerance = DecimalTolerance::fromNumericString('0.123');
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Scale must be a non-negative integer.');
 
         $tolerance->percentage(-1);
@@ -91,7 +91,7 @@ final class DecimalToleranceTest extends TestCase
 
     public function test_from_numeric_string_rejects_out_of_range_values(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Residual tolerance must be a value between 0 and 1 inclusive.');
 
         DecimalTolerance::fromNumericString('1.2');
@@ -109,7 +109,7 @@ final class DecimalToleranceTest extends TestCase
 
     public function test_from_numeric_string_rejects_negative_scale(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Scale must be a non-negative integer.');
 
         DecimalTolerance::fromNumericString('0.5', -1);

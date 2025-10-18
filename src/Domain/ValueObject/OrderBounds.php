@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
-use InvalidArgumentException;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 /**
  * Represents inclusive lower/upper bounds for the fillable base asset amount of an order.
@@ -24,7 +24,7 @@ final class OrderBounds
     {
         self::assertCurrencyConsistency($min, $max);
         if ($min->greaterThan($max)) {
-            throw new InvalidArgumentException('Minimum amount cannot exceed the maximum amount.');
+            throw new InvalidInput('Minimum amount cannot exceed the maximum amount.');
         }
 
         $scale = max($min->scale(), $max->scale());
@@ -81,14 +81,14 @@ final class OrderBounds
     private static function assertCurrencyConsistency(Money $first, Money $second): void
     {
         if ($first->currency() !== $second->currency()) {
-            throw new InvalidArgumentException('Bounds must share the same currency.');
+            throw new InvalidInput('Bounds must share the same currency.');
         }
     }
 
     private function assertCurrency(Money $money): void
     {
         if ($money->currency() !== $this->min->currency()) {
-            throw new InvalidArgumentException('Money currency must match order bounds.');
+            throw new InvalidInput('Money currency must match order bounds.');
         }
     }
 }

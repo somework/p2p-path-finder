@@ -365,7 +365,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
 
         return match ($definition['type']) {
             'percentage' => $this->percentageFeePolicy($definition['value']),
-            default => throw new \InvalidArgumentException('Unsupported fee policy type: '.$definition['type']),
+            default => throw new InvalidInput('Unsupported fee policy type: '.$definition['type']),
         };
     }
 

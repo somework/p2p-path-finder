@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\Result;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 final class PathLegTest extends TestCase
 {
@@ -55,7 +55,7 @@ final class PathLegTest extends TestCase
 
     public function test_empty_asset_symbol_throws_exception(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Path leg from asset cannot be empty.');
 
         new PathLeg(
@@ -68,7 +68,7 @@ final class PathLegTest extends TestCase
 
     public function test_non_money_fee_entries_throw_exception(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Path leg fees must be instances of Money.');
 
         new PathLeg(

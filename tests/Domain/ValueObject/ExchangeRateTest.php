@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Domain\ValueObject;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 final class ExchangeRateTest extends TestCase
 {
@@ -26,7 +26,7 @@ final class ExchangeRateTest extends TestCase
     {
         $rate = ExchangeRate::fromString('USD', 'EUR', '1.1000', 4);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
         $rate->convert(Money::fromString('GBP', '5.00'));
     }
 
@@ -43,7 +43,7 @@ final class ExchangeRateTest extends TestCase
 
     public function test_from_string_rejects_identical_currencies(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
 
         ExchangeRate::fromString('USD', 'USD', '1.0000', 4);
     }
@@ -55,7 +55,7 @@ final class ExchangeRateTest extends TestCase
      */
     public function test_from_string_rejects_non_positive_rates(string $rate): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidInput::class);
 
         ExchangeRate::fromString('USD', 'EUR', $rate, 4);
     }

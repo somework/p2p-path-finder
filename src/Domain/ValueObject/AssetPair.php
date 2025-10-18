@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
-use InvalidArgumentException;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 /**
  * Value object describing a directed asset pair (base -> quote).
@@ -26,7 +26,7 @@ final class AssetPair
         $normalizedQuote = self::assertCurrency($quote);
 
         if ($normalizedBase === $normalizedQuote) {
-            throw new InvalidArgumentException('Asset pair requires distinct assets.');
+            throw new InvalidInput('Asset pair requires distinct assets.');
         }
 
         return new self($normalizedBase, $normalizedQuote);
