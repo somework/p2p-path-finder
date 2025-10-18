@@ -542,6 +542,34 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertNull($service->findBestPath($orderBook, $config, 'JPY'));
     }
 
+    public function test_find_best_path_returns_first_materialized_route(): void
+    {
+        $orderBook = $this->orderBook(
+            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '500.000', '0.900', 3),
+            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '10.000', '500.000', '0.750', 3),
+            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '10.000', '500.000', '0.900', 3),
+        );
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds('0.0', '0.05')
+            ->withHopLimits(1, 3)
+            ->withResultLimit(3)
+            ->build();
+
+        $service = $this->makeService();
+        $allResults = $service->findBestPaths($orderBook, $config, 'USD');
+        $bestPath = $service->findBestPath($orderBook, $config, 'USD');
+
+        self::assertNotNull($bestPath);
+        self::assertNotSame([], $allResults->paths());
+        $first = $allResults->paths()[0];
+
+        self::assertSame($first->totalReceived()->amount(), $bestPath->totalReceived()->amount());
+        self::assertSame($first->legs()[0]->to(), $bestPath->legs()[0]->to());
+        self::assertCount(count($first->legs()), $bestPath->legs());
+    }
+
     private function scenarioEuroToUsdToJpyBridge(): OrderBook
     {
         return $this->orderBook(

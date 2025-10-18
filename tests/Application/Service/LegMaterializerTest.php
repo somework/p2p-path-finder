@@ -391,6 +391,170 @@ final class LegMaterializerTest extends TestCase
         self::assertSame($budget->currency(), $remaining->currency());
     }
 
+    public function test_resolve_sell_leg_amounts_respects_available_quote_budget_with_fees(): void
+    {
+        $order = OrderFactory::sell(
+            'AAA',
+            'USD',
+            '10.000',
+            '500.000',
+            '1.000',
+            3,
+            3,
+            FeePolicyFactory::baseAndQuoteSurcharge('0.050', '0.020', 6),
+        );
+
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $graph['USD']['edges'][0];
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '100.000', 3))
+            ->withToleranceBounds('0.0', '0.15')
+            ->withHopLimits(1, 3)
+            ->build();
+
+        $materializer = new LegMaterializer();
+        $analyzer = new OrderSpendAnalyzer(null, $materializer);
+        $seed = $analyzer->determineInitialSpendAmount($config, $edge);
+
+        self::assertNotNull($seed);
+
+        $resolved = $materializer->resolveSellLegAmounts($order, $seed['net'], $seed['gross']);
+
+        self::assertNotNull($resolved);
+        [$grossSpent, $baseReceived, $fees] = $resolved;
+
+        self::assertSame($seed['gross']->amount(), $grossSpent->withScale($seed['gross']->scale())->amount());
+        self::assertSame('AAA', $baseReceived->currency());
+
+        $quoteFee = $fees->quoteFee();
+        self::assertNotNull($quoteFee);
+        self::assertTrue($quoteFee->greaterThan(Money::zero('USD', $quoteFee->scale())));
+
+        $tightBudget = $seed['gross']->subtract(Money::fromString('USD', '0.001', 3));
+        $adjusted = $materializer->resolveSellLegAmounts($order, $seed['net'], $tightBudget);
+        self::assertNotNull($adjusted);
+        self::assertFalse($adjusted[0]->greaterThan($tightBudget));
+
+        $overlyTightBudget = Money::fromString('USD', '50.000', 3);
+        $clamped = $materializer->resolveSellLegAmounts($order, $seed['net'], $overlyTightBudget);
+        self::assertNotNull($clamped);
+        self::assertFalse($clamped[0]->greaterThan($overlyTightBudget));
+        self::assertTrue($clamped[1]->lessThan($baseReceived));
+    }
+
+    public function test_materialize_returns_null_when_terminal_currency_does_not_match_target(): void
+    {
+        $orders = [
+            OrderFactory::buy('EUR', 'USD', '10.000', '200.000', '1.100', 3, 3),
+            OrderFactory::buy('USD', 'GBP', '10.000', '200.000', '0.800', 3, 3),
+        ];
+
+        $graph = (new GraphBuilder())->build($orders);
+        $edges = [
+            $graph['EUR']['edges'][0],
+            $graph['USD']['edges'][0],
+        ];
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '50.00', 2))
+            ->withToleranceBounds('0.0', '0.10')
+            ->withHopLimits(1, 2)
+            ->build();
+
+        $materializer = new LegMaterializer();
+        $analyzer = new OrderSpendAnalyzer(null, $materializer);
+        $initialSeed = $analyzer->determineInitialSpendAmount($config, $edges[0]);
+
+        self::assertNotNull($initialSeed);
+
+        self::assertNull(
+            $materializer->materialize($edges, $config->spendAmount(), $initialSeed, 'JPY'),
+        );
+    }
+
+    public function test_resolve_buy_fill_adjusts_candidate_to_budget_ceiling(): void
+    {
+        $order = OrderFactory::buy(
+            base: 'USD',
+            quote: 'BTC',
+            minAmount: '100.000',
+            maxAmount: '600.000',
+            rate: '0.010000',
+            amountScale: 3,
+            rateScale: 6,
+            feePolicy: FeePolicyFactory::baseSurcharge('0.150'),
+        );
+
+        $materializer = new LegMaterializer();
+
+        $netSeed = Money::fromString('USD', '500.000', 3);
+        $grossSeed = Money::fromString('USD', '500.000', 3);
+        $grossCeiling = Money::fromString('USD', '520.000', 3);
+
+        $resolved = $materializer->resolveBuyFill($order, $netSeed, $grossSeed, $grossCeiling);
+
+        self::assertNotNull($resolved);
+        self::assertFalse($resolved['gross']->greaterThan($grossCeiling));
+        self::assertTrue($resolved['gross']->greaterThan($resolved['net']));
+        self::assertSame('BTC', $resolved['quote']->currency());
+    }
+
+    public function test_materialize_consumes_tolerance_budget_before_switching_currencies(): void
+    {
+        $orders = [
+            OrderFactory::buy(
+                'USD',
+                'EUR',
+                '50.000',
+                '120.000',
+                '0.9000',
+                3,
+                4,
+                FeePolicyFactory::quotePercentageWithFixed('0.010', '2.00', 4),
+            ),
+            OrderFactory::buy(
+                'EUR',
+                'JPY',
+                '30.000',
+                '150.000',
+                '150.000',
+                3,
+                3,
+                FeePolicyFactory::baseAndQuoteSurcharge('0.020', '0.015', 5),
+            ),
+        ];
+
+        $graph = (new GraphBuilder())->build($orders);
+        $edges = [
+            $graph['USD']['edges'][0],
+            $graph['EUR']['edges'][0],
+        ];
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '100.000', 3))
+            ->withToleranceBounds('0.0', '0.25')
+            ->withHopLimits(1, 3)
+            ->build();
+
+        $materializer = new LegMaterializer();
+        $analyzer = new OrderSpendAnalyzer(null, $materializer);
+        $initialSeed = $analyzer->determineInitialSpendAmount($config, $edges[0]);
+
+        self::assertNotNull($initialSeed);
+
+        $materialized = $materializer->materialize($edges, $config->spendAmount(), $initialSeed, 'JPY');
+
+        self::assertNotNull($materialized);
+        self::assertSame('USD', $materialized['totalSpent']->currency());
+        self::assertSame($materialized['totalSpent']->amount(), $materialized['toleranceSpent']->amount());
+        self::assertCount(2, $materialized['legs']);
+        self::assertSame('USD', $materialized['legs'][0]->spent()->currency());
+        self::assertSame('EUR', $materialized['legs'][0]->received()->currency());
+        self::assertSame('EUR', $materialized['legs'][1]->spent()->currency());
+        self::assertSame('JPY', $materialized['legs'][1]->received()->currency());
+    }
+
     private function createOrder(OrderSide $side, string $base, string $quote, string $min, string $max, string $rate, int $rateScale): Order
     {
         $assetPair = AssetPair::fromString($base, $quote);
