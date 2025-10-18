@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
@@ -13,15 +14,25 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Application\Support\Generator\GraphScenarioGenerator;
 
+use function sprintf;
+
 final class PathFinderHeuristicsPropertyTest extends TestCase
 {
     private GraphScenarioGenerator $generator;
+    private int $pathFinderScale;
+    private int $ratioExtraScale;
+    private int $sumExtraScale;
 
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->generator = new GraphScenarioGenerator();
+
+        $pathFinderReflection = new ReflectionClass(PathFinder::class);
+        $this->pathFinderScale = $this->reflectIntConstant($pathFinderReflection, 'SCALE');
+        $this->ratioExtraScale = $this->reflectIntConstant($pathFinderReflection, 'RATIO_EXTRA_SCALE');
+        $this->sumExtraScale = $this->reflectIntConstant($pathFinderReflection, 'SUM_EXTRA_SCALE');
     }
 
     public function test_convert_edge_amount_matches_materializer_for_generated_orders(): void
@@ -106,7 +117,7 @@ final class PathFinderHeuristicsPropertyTest extends TestCase
         Money $targetMin,
         Money $targetMax
     ): Money {
-        $referenceScale = 18;
+        $referenceScale = $this->pathFinderScale;
         $sourceScale = max($sourceMin->scale(), $sourceMax->scale(), $value->scale(), $referenceScale);
         $targetScale = max($targetMin->scale(), $targetMax->scale(), $referenceScale);
 
@@ -127,11 +138,37 @@ final class PathFinderHeuristicsPropertyTest extends TestCase
         }
 
         $targetDelta = $targetMax->subtract($targetMin, $targetScale)->withScale($ratioScale)->amount();
-        $ratio = BcMath::div($targetDelta, $sourceDelta, $ratioScale + 4);
+        $ratio = BcMath::div($targetDelta, $sourceDelta, $ratioScale + $this->ratioExtraScale);
         $offset = $current->subtract($sourceMin, $sourceScale)->withScale($ratioScale)->amount();
-        $increment = BcMath::mul($offset, $ratio, $ratioScale + 2);
-        $result = BcMath::add($targetMin->withScale($ratioScale)->amount(), $increment, $ratioScale + 2);
+        $increment = BcMath::mul($offset, $ratio, $ratioScale + $this->sumExtraScale);
+        $result = BcMath::add(
+            $targetMin->withScale($ratioScale)->amount(),
+            $increment,
+            $ratioScale + $this->sumExtraScale,
+        );
 
-        return Money::fromString($targetMin->currency(), BcMath::normalize($result, $ratioScale), $ratioScale);
+        $normalized = BcMath::normalize($result, $ratioScale + $this->sumExtraScale);
+
+        $interpolated = Money::fromString(
+            $targetMin->currency(),
+            $normalized,
+            $ratioScale + $this->sumExtraScale,
+        );
+
+        return $interpolated->withScale($targetScale);
+    }
+
+    private function reflectIntConstant(ReflectionClass $class, string $name): int
+    {
+        $constant = $class->getReflectionConstant($name);
+        self::assertNotNull($constant, sprintf('Constant %s::%s is not defined.', $class->getName(), $name));
+
+        $value = $constant->getValue();
+        self::assertIsInt(
+            $value,
+            sprintf('Expected %s::%s to be an integer, got %s.', $class->getName(), $name, get_debug_type($value)),
+        );
+
+        return $value;
     }
 }

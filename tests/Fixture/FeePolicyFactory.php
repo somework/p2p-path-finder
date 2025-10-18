@@ -80,8 +80,8 @@ final class FeePolicyFactory
                 $fixedComponent = Money::fromString(
                     $quoteAmount->currency(),
                     $this->fixed,
-                    $calculationScale
-                )->withScale($quoteAmount->scale());
+                    $quoteAmount->scale()
+                );
 
                 $fee = $percentageComponent->add($fixedComponent, $quoteAmount->scale());
 
