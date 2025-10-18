@@ -108,6 +108,13 @@ By routing every calculation through this helper the library avoids floating-poi
 rounding drift and guarantees that two identical operations will always yield the same
 string representation.
 
+### Decimal policy
+
+The path finder consistently normalises tolerances, costs and ratios to 18 decimal places
+using half-up rounding. Normalising via `BcMath::normalize()` ensures that tie-breaking
+values such as `0.5` and `-0.5` deterministically round away from zero, keeping matching
+behaviour stable across PHP versions and environments.
+
 ## Quick-start scenarios
 
 Below are two end-to-end examples that showcase the typical workflow. In both snippets the

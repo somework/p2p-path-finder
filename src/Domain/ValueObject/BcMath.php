@@ -67,7 +67,10 @@ final class BcMath
     }
 
     /**
-     * Normalizes a numeric string to the provided scale using bankers rounding.
+     * Normalizes a numeric string to the provided scale using half-up rounding.
+     *
+     * The path finder normalizes tolerances and costs to 18 decimal places by default,
+     * so half-up rounding keeps deterministic behaviour even for tie-breaking cases.
      *
      * @param numeric-string $value
      *
