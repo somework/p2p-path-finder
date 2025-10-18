@@ -468,6 +468,104 @@ final class PathFinderInternalsTest extends TestCase
         self::assertSame(BcMath::normalize('1.50', self::SCALE), $second['candidate']['product']);
     }
 
+    public function test_find_best_paths_skips_edges_with_unknown_target_nodes(): void
+    {
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
+        $edge = $this->createSellEdge([
+            'from' => 'EUR',
+            'to' => 'GAP',
+        ]);
+
+        $graph = [
+            'EUR' => [
+                'currency' => 'EUR',
+                'edges' => [$edge],
+            ],
+            'USD' => [
+                'currency' => 'USD',
+                'edges' => [],
+            ],
+        ];
+
+        $outcome = $finder->findBestPaths(
+            $graph,
+            'EUR',
+            'USD',
+            [
+                'min' => CurrencyScenarioFactory::money('EUR', '5.00', 2),
+                'max' => CurrencyScenarioFactory::money('EUR', '10.00', 2),
+                'desired' => null,
+            ],
+        );
+
+        self::assertSame([], $outcome->paths());
+        self::assertFalse($outcome->guardLimits()->expansionsReached());
+        self::assertFalse($outcome->guardLimits()->visitedStatesReached());
+    }
+
+    public function test_edge_supports_amount_swaps_inverted_bounds_before_clamping(): void
+    {
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
+        $edge = $this->createSellEdge();
+        $range = [
+            'min' => CurrencyScenarioFactory::money('EUR', '20.00', 2),
+            'max' => CurrencyScenarioFactory::money('EUR', '10.00', 2),
+        ];
+
+        $feasible = $this->invokeFinderMethod($finder, 'edgeSupportsAmount', [$edge, $range]);
+
+        self::assertNotNull($feasible);
+        self::assertSame('EUR', $feasible['min']->currency());
+        self::assertSame('10.00', $feasible['min']->amount());
+        self::assertSame('EUR', $feasible['max']->currency());
+        self::assertSame('20.00', $feasible['max']->amount());
+    }
+
+    public function test_edge_supports_amount_rejects_positive_minimum_when_capacity_zero(): void
+    {
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
+        $edge = $this->createSellEdge([
+            'segments' => [
+                [
+                    'isMandatory' => true,
+                    'base' => [
+                        'min' => CurrencyScenarioFactory::money('USD', '1.00', 2),
+                        'max' => Money::zero('USD', 2),
+                    ],
+                    'quote' => [
+                        'min' => CurrencyScenarioFactory::money('EUR', '5.00', 2),
+                        'max' => Money::zero('EUR', 2),
+                    ],
+                    'grossBase' => [
+                        'min' => CurrencyScenarioFactory::money('USD', '1.10', 2),
+                        'max' => Money::zero('USD', 2),
+                    ],
+                ],
+            ],
+        ]);
+        $range = [
+            'min' => CurrencyScenarioFactory::money('EUR', '2.00', 2),
+            'max' => CurrencyScenarioFactory::money('EUR', '4.00', 2),
+        ];
+
+        self::assertNull($this->invokeFinderMethod($finder, 'edgeSupportsAmount', [$edge, $range]));
+    }
+
+    public function test_convert_edge_amount_clamps_values_below_source_minimum(): void
+    {
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
+        $edge = $this->createSellEdge();
+
+        $converted = $this->invokeFinderMethod(
+            $finder,
+            'convertEdgeAmount',
+            [$edge, CurrencyScenarioFactory::money('EUR', '5.00', 2)],
+        );
+
+        self::assertSame('USD', $converted->currency());
+        self::assertSame('1.000000000000000000', $converted->amount());
+    }
+
     /**
      * @param array<string, mixed> $overrides
      *
