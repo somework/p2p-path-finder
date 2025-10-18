@@ -123,9 +123,21 @@ final class GraphBuilderPropertyTest extends TestCase
         $quoteTotal = $this->sumSegmentMax($segments, 'quote');
         $grossTotal = $this->sumSegmentMax($segments, 'grossBase');
 
-        self::assertTrue($baseTotal->equals($baseCapacity['max']));
-        self::assertTrue($quoteTotal->equals($quoteCapacity['max']));
-        self::assertTrue($grossTotal->equals($grossCapacity['max']));
+        $expectedBaseCoverage = [] !== $mandatorySegments
+            ? $baseCapacity['max']
+            : $baseCapacity['max']->subtract($baseCapacity['min']);
+
+        $expectedQuoteCoverage = [] !== $mandatorySegments
+            ? $quoteCapacity['max']
+            : $quoteCapacity['max']->subtract($quoteCapacity['min']);
+
+        $expectedGrossCoverage = [] !== $mandatorySegments
+            ? $grossCapacity['max']
+            : $grossCapacity['max']->subtract($grossCapacity['min']);
+
+        self::assertTrue($baseTotal->equals($expectedBaseCoverage));
+        self::assertTrue($quoteTotal->equals($expectedQuoteCoverage));
+        self::assertTrue($grossTotal->equals($expectedGrossCoverage));
     }
 
     /**
