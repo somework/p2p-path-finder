@@ -903,17 +903,18 @@ final class PathFinder
             throw new InvalidInput('Tolerance must be numeric.');
         }
 
-        BcMath::ensureNumeric($tolerance);
+        /** @var numeric-string $numericTolerance */
+        $numericTolerance = $tolerance;
 
-        if (-1 === BcMath::comp($tolerance, '0', self::SCALE)) {
+        if (-1 === BcMath::comp($numericTolerance, '0', self::SCALE)) {
             throw new InvalidInput('Tolerance must be non-negative.');
         }
 
-        if (BcMath::comp($tolerance, '1', self::SCALE) >= 0) {
+        if (BcMath::comp($numericTolerance, '1', self::SCALE) >= 0) {
             throw new InvalidInput('Tolerance must be less than one.');
         }
 
-        $normalized = BcMath::normalize($tolerance, self::SCALE);
+        $normalized = BcMath::normalize($numericTolerance, self::SCALE);
 
         /** @var numeric-string $upperBound */
         $upperBound = '0.'.str_repeat('9', self::SCALE);
