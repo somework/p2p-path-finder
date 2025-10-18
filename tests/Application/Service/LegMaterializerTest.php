@@ -198,6 +198,42 @@ final class LegMaterializerTest extends TestCase
         );
     }
 
+    public function test_materialize_consumes_tolerance_budget_on_initial_buy_leg(): void
+    {
+        $order = OrderFactory::buy(
+            base: 'USD',
+            quote: 'EUR',
+            minAmount: '10.000',
+            maxAmount: '200.000',
+            rate: '0.900',
+            amountScale: 3,
+            rateScale: 3,
+        );
+
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $graph['USD']['edges'][0];
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '40.000', 3))
+            ->withToleranceBounds('0.0', '0.20')
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $materializer = new LegMaterializer();
+        $analyzer = new OrderSpendAnalyzer(null, $materializer);
+
+        $initialSeed = $analyzer->determineInitialSpendAmount($config, $edge);
+        self::assertNotNull($initialSeed);
+
+        $materialized = $materializer->materialize([$edge], $config->spendAmount(), $initialSeed, 'EUR');
+        self::assertNotNull($materialized);
+
+        self::assertSame('USD', $materialized['totalSpent']->currency());
+        self::assertSame('USD', $materialized['toleranceSpent']->currency());
+        self::assertSame($materialized['totalSpent']->amount(), $materialized['toleranceSpent']->amount());
+        self::assertNotSame('0.000', $materialized['totalSpent']->amount());
+    }
+
     public function test_it_rejects_when_final_currency_does_not_match_target(): void
     {
         $orders = [
@@ -471,6 +507,64 @@ final class LegMaterializerTest extends TestCase
         self::assertNull(
             $materializer->materialize($edges, $config->spendAmount(), $initialSeed, 'JPY'),
         );
+    }
+
+    public function test_materialize_returns_null_when_buy_leg_cannot_fit_budget(): void
+    {
+        $order = OrderFactory::buy(
+            base: 'USD',
+            quote: 'EUR',
+            minAmount: '50.000',
+            maxAmount: '150.000',
+            rate: '0.900',
+            amountScale: 3,
+            rateScale: 3,
+            feePolicy: FeePolicyFactory::baseAndQuoteSurcharge('0.020', '0.015', 4),
+        );
+
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $graph['USD']['edges'][0];
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '80.000', 3))
+            ->withToleranceBounds('0.0', '0.10')
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $materializer = new LegMaterializer();
+        $analyzer = new OrderSpendAnalyzer(null, $materializer);
+
+        $initialSeed = $analyzer->determineInitialSpendAmount($config, $edge);
+        self::assertNotNull($initialSeed);
+
+        $insufficientSeed = $initialSeed;
+        $insufficientSeed['grossCeiling'] = Money::fromString(
+            $initialSeed['grossCeiling']->currency(),
+            '0.000',
+            $initialSeed['grossCeiling']->scale(),
+        );
+
+        self::assertNull(
+            $materializer->materialize([$edge], $config->spendAmount(), $insufficientSeed, 'EUR')
+        );
+    }
+
+    public function test_resolve_sell_leg_amounts_rejects_when_effective_quote_outside_bounds(): void
+    {
+        $order = OrderFactory::sell(
+            base: 'AAA',
+            quote: 'USD',
+            minAmount: '5.000',
+            maxAmount: '10.000',
+            rate: '1.250',
+            amountScale: 3,
+            rateScale: 3,
+        );
+
+        $materializer = new LegMaterializer();
+        $target = Money::fromString('USD', '20.001', 3);
+
+        self::assertNull($materializer->resolveSellLegAmounts($order, $target));
     }
 
     public function test_resolve_buy_fill_adjusts_candidate_to_budget_ceiling(): void

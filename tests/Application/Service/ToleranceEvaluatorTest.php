@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Application\Service;
 
 use PHPUnit\Framework\TestCase;
+use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Service\ToleranceEvaluator;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
@@ -93,5 +94,20 @@ final class ToleranceEvaluatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertSame('0.050000000000000000', $result->ratio());
+    }
+
+    public function test_residual_calculation_exposes_exact_match_ratio(): void
+    {
+        $evaluator = new ToleranceEvaluator();
+        $method = new ReflectionMethod(ToleranceEvaluator::class, 'calculateResidualTolerance');
+        $method->setAccessible(true);
+
+        $ratio = $method->invoke(
+            $evaluator,
+            Money::fromString('USD', '123.456', 3),
+            Money::fromString('USD', '123.456', 3),
+        );
+
+        self::assertSame('0.000000000000000000', $ratio);
     }
 }

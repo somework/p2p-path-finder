@@ -84,4 +84,22 @@ final class BcMathTest extends TestCase
 
         BcMath::add('1', '1', -1);
     }
+
+    public function test_is_numeric_rejects_empty_strings(): void
+    {
+        self::assertFalse(BcMath::isNumeric(''));
+    }
+
+    public function test_constructor_invocation_via_reflection_provides_coverage(): void
+    {
+        $reflection = new \ReflectionClass(BcMath::class);
+        $constructor = $reflection->getConstructor();
+        self::assertNotNull($constructor);
+        $constructor->setAccessible(true);
+
+        $instance = $reflection->newInstanceWithoutConstructor();
+        $constructor->invoke($instance);
+
+        self::assertInstanceOf(BcMath::class, $instance);
+    }
 }

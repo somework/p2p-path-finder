@@ -28,6 +28,79 @@ final class PathSearchConfigTest extends TestCase
         self::assertSame(2, $config->maximumSpendAmount()->scale());
     }
 
+    public function test_constructor_rejects_minimum_hops_below_one(): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Minimum hops must be at least one.');
+
+        new PathSearchConfig(
+            Money::fromString('EUR', '100.00', 2),
+            '0.0',
+            '0.1',
+            0,
+            1,
+        );
+    }
+
+    public function test_constructor_rejects_maximum_hops_below_minimum(): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Maximum hops must be greater than or equal to minimum hops.');
+
+        new PathSearchConfig(
+            Money::fromString('EUR', '100.00', 2),
+            '0.0',
+            '0.1',
+            3,
+            2,
+        );
+    }
+
+    public function test_constructor_rejects_result_limit_below_one(): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Result limit must be at least one.');
+
+        new PathSearchConfig(
+            Money::fromString('EUR', '50.00', 2),
+            '0.0',
+            '0.1',
+            1,
+            2,
+            resultLimit: 0,
+        );
+    }
+
+    public function test_constructor_rejects_max_expansions_below_one(): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Maximum expansions must be at least one.');
+
+        new PathSearchConfig(
+            Money::fromString('EUR', '50.00', 2),
+            '0.0',
+            '0.1',
+            1,
+            2,
+            pathFinderMaxExpansions: 0,
+        );
+    }
+
+    public function test_constructor_rejects_max_visited_states_below_one(): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Maximum visited states must be at least one.');
+
+        new PathSearchConfig(
+            Money::fromString('EUR', '50.00', 2),
+            '0.0',
+            '0.1',
+            1,
+            2,
+            pathFinderMaxVisitedStates: 0,
+        );
+    }
+
     public function test_path_finder_tolerance_prefers_larger_bound(): void
     {
         $config = PathSearchConfig::builder()

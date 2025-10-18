@@ -201,6 +201,26 @@ final class OrderTest extends TestCase
         $order->calculateEffectiveQuoteAmount(CurrencyScenarioFactory::money('BTC', '0.500', 3));
     }
 
+    public function test_calculate_effective_quote_amount_with_dual_fee_components(): void
+    {
+        $policy = new class implements FeePolicy {
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                return FeeBreakdown::of(
+                    Money::fromString($baseAmount->currency(), '0.010', $baseAmount->scale()),
+                    Money::fromString($quoteAmount->currency(), '5.000', $quoteAmount->scale()),
+                );
+            }
+        };
+
+        $order = OrderFactory::buy(feePolicy: $policy);
+        $baseAmount = CurrencyScenarioFactory::money('BTC', '0.500', 3);
+
+        $quote = $order->calculateEffectiveQuoteAmount($baseAmount);
+
+        self::assertTrue($quote->equals(CurrencyScenarioFactory::money('USD', '14995.000', 3)));
+    }
+
     public function test_calculate_gross_base_spend_uses_precomputed_fee_breakdown(): void
     {
         $order = OrderFactory::buy(feePolicy: $this->failOnCalculatePolicy());
@@ -240,6 +260,16 @@ final class OrderTest extends TestCase
         $this->expectExceptionMessage('Fee policy must return money in base asset currency.');
 
         $order->calculateGrossBaseSpend(CurrencyScenarioFactory::money('BTC', '0.500', 3));
+    }
+
+    public function test_calculate_gross_base_spend_without_fee_policy_returns_net_amount(): void
+    {
+        $order = OrderFactory::buy();
+        $baseAmount = CurrencyScenarioFactory::money('BTC', '0.750', 3);
+
+        $grossBase = $order->calculateGrossBaseSpend($baseAmount);
+
+        self::assertTrue($grossBase->equals($baseAmount));
     }
 
     public function test_calculate_effective_quote_amount_subtracts_fee_for_sell_order(): void
