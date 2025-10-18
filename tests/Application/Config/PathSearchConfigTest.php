@@ -50,6 +50,20 @@ final class PathSearchConfigTest extends TestCase
         self::assertSame('0.999999999999999999', $config->pathFinderTolerance());
     }
 
+    public function test_path_finder_tolerance_override_is_respected(): void
+    {
+        $config = new PathSearchConfig(
+            Money::fromString('EUR', '100.00', 2),
+            '0.1',
+            '0.2',
+            1,
+            3,
+            pathFinderToleranceOverride: '0.050000000000000000',
+        );
+
+        self::assertSame('0.050000000000000000', $config->pathFinderTolerance());
+    }
+
     public function test_string_tolerance_remains_below_float_cap(): void
     {
         $config = PathSearchConfig::builder()
@@ -142,6 +156,7 @@ final class PathSearchConfigTest extends TestCase
         $builder = PathSearchConfig::builder();
 
         $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Maximum tolerance must be in the [0, 1) range.');
         $builder->withToleranceBounds('0.1', '1.000000000000000000');
     }
 
@@ -171,6 +186,7 @@ final class PathSearchConfigTest extends TestCase
         $builder = PathSearchConfig::builder();
 
         $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessageMatches('/tolerance must be in the \[0, 1\) range\.$/');
         $builder->withToleranceBounds($minimum, $maximum);
     }
 
@@ -246,6 +262,7 @@ final class PathSearchConfigTest extends TestCase
     public function test_constructor_rejects_tolerance_equal_to_one(): void
     {
         $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Minimum tolerance must be in the [0, 1) range.');
 
         new PathSearchConfig(
             Money::fromString('EUR', '100.00', 2),
@@ -259,6 +276,7 @@ final class PathSearchConfigTest extends TestCase
     public function test_constructor_rejects_maximum_tolerance_equal_to_one(): void
     {
         $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Maximum tolerance must be in the [0, 1) range.');
 
         new PathSearchConfig(
             Money::fromString('EUR', '100.00', 2),
@@ -267,6 +285,17 @@ final class PathSearchConfigTest extends TestCase
             1,
             3,
         );
+    }
+
+    public function test_path_finder_tolerance_prefers_minimum_when_bounds_inverted(): void
+    {
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '200.00', 2))
+            ->withToleranceBounds('0.20', '0.05')
+            ->withHopLimits(1, 3)
+            ->build();
+
+        self::assertSame('0.200000000000000000', $config->pathFinderTolerance());
     }
 
     public function test_bounded_spend_calculation_maintains_scale_precision(): void

@@ -197,6 +197,9 @@ final class GraphBuilderTest extends TestCase
         $optional = $edge['segments'][1];
         self::assertFalse($optional['isMandatory']);
         self::assertTrue($optional['quote']['max']->equals(Money::fromString('EUR', '1.100', 3)));
+        self::assertArrayHasKey('grossBase', $optional);
+        self::assertInstanceOf(Money::class, $optional['grossBase']['min']);
+        self::assertInstanceOf(Money::class, $optional['grossBase']['max']);
     }
 
     public function test_build_reduces_base_capacity_for_sell_orders_with_base_fee(): void

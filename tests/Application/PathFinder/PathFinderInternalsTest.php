@@ -80,6 +80,86 @@ final class PathFinderInternalsTest extends TestCase
         self::assertSame(2, $registry['USD'][0]['hops']);
     }
 
+    public function test_record_state_preserves_existing_when_new_state_has_higher_hops(): void
+    {
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.0');
+        $range = [
+            'min' => CurrencyScenarioFactory::money('USD', '0.50', 2),
+            'max' => CurrencyScenarioFactory::money('USD', '3.00', 2),
+        ];
+        $signature = $this->invokeFinderMethod($finder, 'stateSignature', [$range, null]);
+        $registry = [
+            'USD' => [
+                ['cost' => BcMath::normalize('1.2', self::SCALE), 'hops' => 2, 'signature' => $signature],
+            ],
+        ];
+
+        $delta = $this->invokeFinderMethod(
+            $finder,
+            'recordState',
+            [&$registry, 'USD', BcMath::normalize('1.0', self::SCALE), 4, $range, null, $signature],
+        );
+
+        self::assertSame(1, $delta);
+        self::assertCount(2, $registry['USD']);
+        $costsByHops = array_column($registry['USD'], 'cost', 'hops');
+        self::assertArrayHasKey(2, $costsByHops);
+        self::assertArrayHasKey(4, $costsByHops);
+    }
+
+    public function test_record_state_preserves_existing_when_new_state_has_higher_cost(): void
+    {
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.0');
+        $range = [
+            'min' => CurrencyScenarioFactory::money('USD', '0.50', 2),
+            'max' => CurrencyScenarioFactory::money('USD', '3.00', 2),
+        ];
+        $signature = $this->invokeFinderMethod($finder, 'stateSignature', [$range, null]);
+        $registry = [
+            'USD' => [
+                ['cost' => BcMath::normalize('1.0', self::SCALE), 'hops' => 4, 'signature' => $signature],
+            ],
+        ];
+
+        $delta = $this->invokeFinderMethod(
+            $finder,
+            'recordState',
+            [&$registry, 'USD', BcMath::normalize('1.5', self::SCALE), 2, $range, null, $signature],
+        );
+
+        self::assertSame(1, $delta);
+        self::assertCount(2, $registry['USD']);
+        $costsByHops = array_column($registry['USD'], 'cost', 'hops');
+        self::assertSame(BcMath::normalize('1.0', self::SCALE), $costsByHops[4]);
+        self::assertSame(BcMath::normalize('1.5', self::SCALE), $costsByHops[2]);
+    }
+
+    public function test_record_state_replaces_state_with_equal_hops_and_lower_cost(): void
+    {
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
+        $range = [
+            'min' => CurrencyScenarioFactory::money('USD', '1.00', 2),
+            'max' => CurrencyScenarioFactory::money('USD', '2.00', 2),
+        ];
+        $signature = $this->invokeFinderMethod($finder, 'stateSignature', [$range, null]);
+        $registry = [
+            'USD' => [
+                ['cost' => BcMath::normalize('1.5', self::SCALE), 'hops' => 2, 'signature' => $signature],
+            ],
+        ];
+
+        $delta = $this->invokeFinderMethod(
+            $finder,
+            'recordState',
+            [&$registry, 'USD', BcMath::normalize('1.0', self::SCALE), 2, $range, null, $signature],
+        );
+
+        self::assertSame(0, $delta);
+        self::assertCount(1, $registry['USD']);
+        self::assertSame(BcMath::normalize('1.0', self::SCALE), $registry['USD'][0]['cost']);
+        self::assertSame(2, $registry['USD'][0]['hops']);
+    }
+
     public function test_is_dominated_detects_matching_signature(): void
     {
         $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
@@ -99,7 +179,7 @@ final class PathFinderInternalsTest extends TestCase
 
         self::assertTrue($dominated);
         self::assertFalse(
-            $this->invokeFinderMethod($finder, 'isDominated', [$existing, BcMath::normalize('0.8', self::SCALE), 1, 'other']),
+            $this->invokeFinderMethod($finder, 'isDominated', [$existing, BcMath::normalize('1.2', self::SCALE), 3, 'other']),
         );
     }
 
