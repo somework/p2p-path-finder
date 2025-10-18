@@ -14,6 +14,7 @@ use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function strtoupper;
 use function usort;
@@ -52,7 +53,8 @@ final class PathFinderService
     /**
      * Searches for the best conversion paths from the configured spend asset to the target asset.
      *
-     * @throws InvalidInput when the requested target asset identifier is empty
+     * @throws InvalidInput       when the requested target asset identifier is empty
+     * @throws PrecisionViolation when arbitrary precision operations required for cost ordering cannot be performed
      *
      * @return SearchOutcome<PathResult>
      */

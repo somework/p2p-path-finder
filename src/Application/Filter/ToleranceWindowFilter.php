@@ -8,6 +8,7 @@ use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 /**
  * Accepts orders whose effective rates fall within a tolerance window around a reference rate.
@@ -23,6 +24,8 @@ final class ToleranceWindowFilter implements OrderFilterInterface
 
     /**
      * @param numeric-string $tolerance
+     *
+     * @throws InvalidInput|PrecisionViolation when the tolerance cannot be normalized into a non-negative ratio
      */
     public function __construct(private readonly ExchangeRate $referenceRate, string $tolerance)
     {

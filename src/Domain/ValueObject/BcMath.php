@@ -74,6 +74,8 @@ final class BcMath
      *
      * @param numeric-string $value
      *
+     * @throws InvalidInput|PrecisionViolation when the provided value cannot be normalized at the requested scale
+     *
      * @return numeric-string
      */
     public static function normalize(string $value, int $scale): string
@@ -90,6 +92,8 @@ final class BcMath
      *
      * @param numeric-string $left
      * @param numeric-string $right
+     *
+     * @throws InvalidInput|PrecisionViolation when operands or the requested scale are invalid
      *
      * @return numeric-string
      */
@@ -112,6 +116,8 @@ final class BcMath
      * @param numeric-string $left
      * @param numeric-string $right
      *
+     * @throws InvalidInput|PrecisionViolation when operands or the requested scale are invalid
+     *
      * @return numeric-string
      */
     public static function sub(string $left, string $right, int $scale): string
@@ -132,6 +138,8 @@ final class BcMath
      *
      * @param numeric-string $left
      * @param numeric-string $right
+     *
+     * @throws InvalidInput|PrecisionViolation when operands or the requested scale are invalid
      *
      * @return numeric-string
      */
@@ -154,6 +162,8 @@ final class BcMath
      * @param numeric-string $left
      * @param numeric-string $right
      *
+     * @throws InvalidInput|PrecisionViolation when operands, scale or divisor are invalid
+     *
      * @return numeric-string
      */
     public static function div(string $left, string $right, int $scale): string
@@ -175,6 +185,8 @@ final class BcMath
      *
      * @param numeric-string $left
      * @param numeric-string $right
+     *
+     * @throws InvalidInput|PrecisionViolation when operands or scale validation fails
      */
     public static function comp(string $left, string $right, int $scale): int
     {
@@ -191,6 +203,8 @@ final class BcMath
      * Rounds a numeric string to the provided scale using half-up semantics.
      *
      * @param numeric-string $value
+     *
+     * @throws InvalidInput|PrecisionViolation when the provided value cannot be rounded at the requested scale
      *
      * @return numeric-string
      */
@@ -235,6 +249,8 @@ final class BcMath
      *
      * @param numeric-string $first
      * @param numeric-string $second
+     *
+     * @throws PrecisionViolation when the BCMath extension is unavailable
      */
     public static function scaleForComparison(string $first, string $second, int $fallbackScale = self::DEFAULT_SCALE): int
     {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 /**
  * Represents inclusive lower/upper bounds for the fillable base asset amount of an order.
@@ -19,6 +20,8 @@ final class OrderBounds
 
     /**
      * Constructs an order bounds instance after validating currency consistency.
+     *
+     * @throws InvalidInput|PrecisionViolation when the provided amounts are inconsistent or cannot be normalized
      */
     public static function from(Money $min, Money $max): self
     {
@@ -50,6 +53,8 @@ final class OrderBounds
 
     /**
      * Checks whether the provided amount falls within the configured bounds.
+     *
+     * @throws InvalidInput|PrecisionViolation when the amount currency or scale is incompatible with the bounds
      */
     public function contains(Money $amount): bool
     {
@@ -61,6 +66,8 @@ final class OrderBounds
 
     /**
      * Clamps the provided amount to the bounds and returns the adjusted value.
+     *
+     * @throws InvalidInput|PrecisionViolation when the amount currency or scale is incompatible with the bounds
      */
     public function clamp(Money $amount): Money
     {

@@ -19,6 +19,8 @@ final class AssetPair
 
     /**
      * Creates an asset pair ensuring the provided currencies are distinct and valid.
+     *
+     * @throws InvalidInput when either currency code is invalid or both represent the same asset
      */
     public static function fromString(string $base, string $quote): self
     {
@@ -48,6 +50,9 @@ final class AssetPair
         return $this->quote;
     }
 
+    /**
+     * @throws InvalidInput when the currency symbol does not conform to the expected format
+     */
     private static function assertCurrency(string $currency): string
     {
         $money = Money::fromString($currency, '0');

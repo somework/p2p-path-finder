@@ -8,6 +8,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function max;
 
@@ -29,6 +30,9 @@ final class PathSearchConfig
     /** @var numeric-string */
     private readonly string $pathFinderTolerance;
 
+    /**
+     * @throws InvalidInput|PrecisionViolation when one of the provided guard or tolerance constraints is invalid
+     */
     public function __construct(
         private readonly Money $spendAmount,
         string $minimumTolerance,
@@ -180,6 +184,8 @@ final class PathSearchConfig
     }
 
     /**
+     * @throws InvalidInput|PrecisionViolation when the tolerance does not represent a value in the [0, 1) range
+     *
      * @return numeric-string
      */
     private function assertTolerance(string $value, string $context): string
@@ -195,6 +201,8 @@ final class PathSearchConfig
     }
 
     /**
+     * @throws InvalidInput|PrecisionViolation when the override value does not represent a valid tolerance
+     *
      * @return numeric-string
      */
     private function resolvePathFinderTolerance(?string $override): string

@@ -12,6 +12,7 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 use SplPriorityQueue;
 
 use function array_key_exists;
@@ -822,6 +823,8 @@ final class PathFinder
 
     /**
      * @param SpendRange $range
+     *
+     * @throws PrecisionViolation when normalization fails due to missing BCMath support
      */
     private function clampToRange(Money $value, array $range): Money
     {
@@ -845,6 +848,8 @@ final class PathFinder
     /**
      * @param GraphEdge $edge
      *
+     * @throws PrecisionViolation when the edge ratio cannot be evaluated using BCMath
+     *
      * @return numeric-string
      */
     private function edgeEffectiveConversionRate(array $edge): string
@@ -863,6 +868,8 @@ final class PathFinder
 
     /**
      * @param GraphEdge $edge
+     *
+     * @throws PrecisionViolation when the edge capacity ratios cannot be evaluated using BCMath
      *
      * @return numeric-string
      */
@@ -886,6 +893,8 @@ final class PathFinder
     }
 
     /**
+     * @throws InvalidInput|PrecisionViolation when the tolerance value is malformed
+     *
      * @return numeric-string
      */
     private function normalizeTolerance(string $tolerance): string
@@ -917,6 +926,8 @@ final class PathFinder
 
     /**
      * @param numeric-string $tolerance
+     *
+     * @throws PrecisionViolation when BCMath operations required for amplification cannot be performed
      *
      * @return numeric-string
      */

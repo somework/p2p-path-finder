@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function sprintf;
 
@@ -33,6 +34,8 @@ final class Money
      * @param string         $currency ISO-like currency symbol comprised of 3-12 alphabetic characters
      * @param numeric-string $amount   numeric string compatible with BCMath functions
      * @param int            $scale    number of decimal digits to retain after normalization
+     *
+     * @throws InvalidInput|PrecisionViolation when the currency or amount fail validation
      */
     public static function fromString(string $currency, string $amount, int $scale = 2): self
     {
@@ -46,6 +49,8 @@ final class Money
 
     /**
      * Creates a zero-value amount for the provided currency and scale.
+     *
+     * @throws InvalidInput|PrecisionViolation when the currency or scale are invalid
      */
     public static function zero(string $currency, int $scale = 2): self
     {
@@ -54,6 +59,8 @@ final class Money
 
     /**
      * Returns a copy of the money instance rounded to the provided scale.
+     *
+     * @throws InvalidInput|PrecisionViolation when the requested scale is invalid
      */
     public function withScale(int $scale): self
     {
@@ -98,6 +105,8 @@ final class Money
      *
      * @param self     $other money value expressed in the same currency
      * @param int|null $scale optional explicit scale override
+     *
+     * @throws InvalidInput|PrecisionViolation when the currencies differ or the scale is invalid
      */
     public function add(self $other, ?int $scale = null): self
     {
@@ -114,6 +123,8 @@ final class Money
      *
      * @param self     $other money value expressed in the same currency
      * @param int|null $scale optional explicit scale override
+     *
+     * @throws InvalidInput|PrecisionViolation when the currencies differ or the scale is invalid
      */
     public function subtract(self $other, ?int $scale = null): self
     {
@@ -130,6 +141,8 @@ final class Money
      *
      * @param numeric-string $multiplier numeric multiplier compatible with BCMath
      * @param int|null       $scale      optional explicit scale override
+     *
+     * @throws InvalidInput|PrecisionViolation when the multiplier or scale are invalid
      */
     public function multiply(string $multiplier, ?int $scale = null): self
     {
@@ -146,6 +159,8 @@ final class Money
      *
      * @param numeric-string $divisor numeric divisor compatible with BCMath
      * @param int|null       $scale   optional explicit scale override
+     *
+     * @throws InvalidInput|PrecisionViolation when the divisor or scale are invalid
      */
     public function divide(string $divisor, ?int $scale = null): self
     {
@@ -162,6 +177,8 @@ final class Money
      * @param self     $other money value expressed in the same currency
      * @param int|null $scale optional explicit scale override
      *
+     * @throws InvalidInput|PrecisionViolation when the currencies differ or BCMath validation fails
+     *
      * @return int -1, 0 or 1 depending on the comparison result
      */
     public function compare(self $other, ?int $scale = null): int
@@ -174,6 +191,8 @@ final class Money
 
     /**
      * Determines whether two money values are equal.
+     *
+     * @throws InvalidInput|PrecisionViolation when comparison cannot be performed
      */
     public function equals(self $other): bool
     {
@@ -182,6 +201,8 @@ final class Money
 
     /**
      * Checks if the current amount is greater than the provided amount.
+     *
+     * @throws InvalidInput|PrecisionViolation when comparison cannot be performed
      */
     public function greaterThan(self $other): bool
     {
@@ -190,6 +211,8 @@ final class Money
 
     /**
      * Checks if the current amount is lower than the provided amount.
+     *
+     * @throws InvalidInput|PrecisionViolation when comparison cannot be performed
      */
     public function lessThan(self $other): bool
     {
@@ -198,6 +221,8 @@ final class Money
 
     /**
      * Indicates whether the amount equals zero at the stored scale.
+     *
+     * @throws PrecisionViolation when the BCMath extension is unavailable
      */
     public function isZero(): bool
     {
@@ -208,6 +233,8 @@ final class Money
      * @phpstan-assert non-empty-string $currency
      *
      * @psalm-assert non-empty-string $currency
+     *
+     * @throws InvalidInput when the currency symbol is empty or malformed
      */
     private static function assertCurrency(string $currency): void
     {
@@ -219,6 +246,9 @@ final class Money
         }
     }
 
+    /**
+     * @throws InvalidInput when the compared money values do not share the same currency
+     */
     private function assertSameCurrency(self $other): void
     {
         if ($this->currency !== $other->currency) {

@@ -9,6 +9,7 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 /**
  * Domain entity describing an order that can be traversed within a path search.
@@ -67,6 +68,8 @@ final class Order
 
     /**
      * Validates that the provided amount can be used to partially fill the order.
+     *
+     * @throws InvalidInput|PrecisionViolation when the amount currency is invalid or outside the allowed bounds
      */
     public function validatePartialFill(Money $baseAmount): void
     {
@@ -79,6 +82,8 @@ final class Order
 
     /**
      * Calculates the quote currency proceeds for the provided base amount.
+     *
+     * @throws InvalidInput|PrecisionViolation when the base amount does not use the order's base currency
      */
     public function calculateQuoteAmount(Money $baseAmount): Money
     {
@@ -91,6 +96,8 @@ final class Order
 
     /**
      * Calculates the quote amount adjusted by the fee policy when present.
+     *
+     * @throws InvalidInput|PrecisionViolation when the provided amounts or fee breakdown violate currency constraints
      */
     public function calculateEffectiveQuoteAmount(Money $baseAmount): Money
     {
@@ -126,6 +133,8 @@ final class Order
 
     /**
      * Calculates the total base asset required to fill the provided net amount.
+     *
+     * @throws InvalidInput|PrecisionViolation when the requested amount or fee breakdown uses inconsistent currencies
      */
     public function calculateGrossBaseSpend(Money $baseAmount, ?FeeBreakdown $feeBreakdown = null): Money
     {

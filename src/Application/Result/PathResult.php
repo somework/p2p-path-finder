@@ -8,6 +8,7 @@ use JsonSerializable;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function array_is_list;
 
@@ -83,6 +84,9 @@ final class PathResult implements JsonSerializable
         return $this->residualTolerance;
     }
 
+    /**
+     * @throws InvalidInput|PrecisionViolation when the tolerance percentage cannot be calculated at the requested scale
+     */
     public function residualTolerancePercentage(int $scale = 2): string
     {
         return $this->residualTolerance->percentage($scale);
@@ -130,6 +134,8 @@ final class PathResult implements JsonSerializable
 
     /**
      * @param array<string, Money> $feeBreakdown
+     *
+     * @throws InvalidInput|PrecisionViolation when fee entries are invalid or cannot be merged deterministically
      *
      * @return array<string, Money>
      */

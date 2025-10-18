@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 /**
  * Value object encapsulating an exchange rate between two assets.
@@ -30,6 +31,8 @@ final class ExchangeRate
      * @param non-empty-string $baseCurrency
      * @param non-empty-string $quoteCurrency
      * @param numeric-string   $rate
+     *
+     * @throws InvalidInput|PrecisionViolation when the provided currencies or rate are invalid
      */
     public static function fromString(string $baseCurrency, string $quoteCurrency, string $rate, int $scale = 8): self
     {
@@ -50,6 +53,8 @@ final class ExchangeRate
 
     /**
      * Converts a base currency amount into its quote currency representation.
+     *
+     * @throws InvalidInput|PrecisionViolation when the provided money cannot be converted using the rate
      */
     public function convert(Money $money, ?int $scale = null): Money
     {
@@ -66,6 +71,8 @@ final class ExchangeRate
 
     /**
      * Returns the inverted exchange rate (quote becomes base and vice versa).
+     *
+     * @throws PrecisionViolation when the BCMath extension is unavailable
      */
     public function invert(): self
     {

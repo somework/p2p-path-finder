@@ -8,6 +8,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function is_int;
 use function is_string;
@@ -50,6 +51,8 @@ final class PathSearchConfigBuilder
 
     /**
      * Configures the acceptable relative deviation from the desired spend amount.
+     *
+     * @throws InvalidInput|PrecisionViolation when tolerance bounds are not valid numeric ratios
      */
     public function withToleranceBounds(string $minimumTolerance, string $maximumTolerance): self
     {
@@ -65,6 +68,8 @@ final class PathSearchConfigBuilder
 
     /**
      * Configures the minimum and maximum allowed number of hops in a resulting path.
+     *
+     * @throws InvalidInput when the provided limits violate ordering constraints
      */
     public function withHopLimits(int $minimumHops, int $maximumHops): self
     {
@@ -84,6 +89,8 @@ final class PathSearchConfigBuilder
 
     /**
      * Limits how many paths should be returned by the search service.
+     *
+     * @throws InvalidInput when the limit is less than one
      */
     public function withResultLimit(int $limit): self
     {
@@ -98,6 +105,8 @@ final class PathSearchConfigBuilder
 
     /**
      * Configures limits that guard search explosion in dense graphs.
+     *
+     * @throws InvalidInput when either guard limit is less than one
      */
     public function withSearchGuards(int $maxVisitedStates, int $maxExpansions): self
     {
@@ -117,6 +126,8 @@ final class PathSearchConfigBuilder
 
     /**
      * Builds a validated {@see PathSearchConfig} instance.
+     *
+     * @throws InvalidInput when required configuration pieces are missing or inconsistent
      */
     public function build(): PathSearchConfig
     {
@@ -149,6 +160,8 @@ final class PathSearchConfigBuilder
     }
 
     /**
+     * @throws InvalidInput|PrecisionViolation when the tolerance value is not numeric or out of range
+     *
      * @return numeric-string
      */
     private function normalizeTolerance(string $value, string $context): string
@@ -167,6 +180,8 @@ final class PathSearchConfigBuilder
     /**
      * @param numeric-string $minimum
      * @param numeric-string $maximum
+     *
+     * @throws PrecisionViolation when the BCMath extension is unavailable
      *
      * @return numeric-string
      */

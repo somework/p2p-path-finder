@@ -7,6 +7,7 @@ namespace SomeWork\P2PPathFinder\Application\Result;
 use JsonSerializable;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function sprintf;
 use function strtoupper;
@@ -119,6 +120,8 @@ final class PathLeg implements JsonSerializable
 
     /**
      * @param array<array-key, Money> $fees
+     *
+     * @throws InvalidInput|PrecisionViolation when fee entries are invalid or cannot be merged deterministically
      *
      * @return array<string, Money>
      */

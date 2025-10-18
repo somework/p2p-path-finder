@@ -6,6 +6,7 @@ namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
 use JsonSerializable;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function max;
 
@@ -36,6 +37,8 @@ final class DecimalTolerance implements JsonSerializable
 
     /**
      * @param numeric-string $ratio
+     *
+     * @throws InvalidInput|PrecisionViolation when the ratio or scale fall outside the supported range
      */
     public static function fromNumericString(string $ratio, ?int $scale = null): self
     {
@@ -79,6 +82,8 @@ final class DecimalTolerance implements JsonSerializable
 
     /**
      * @param numeric-string $value
+     *
+     * @throws InvalidInput|PrecisionViolation when the value cannot be normalized for comparison
      */
     public function compare(string $value, ?int $scale = null): int
     {
@@ -95,6 +100,8 @@ final class DecimalTolerance implements JsonSerializable
 
     /**
      * @param numeric-string $value
+     *
+     * @throws InvalidInput|PrecisionViolation when the value cannot be compared using BCMath
      */
     public function isGreaterThanOrEqual(string $value, ?int $scale = null): bool
     {
@@ -103,6 +110,8 @@ final class DecimalTolerance implements JsonSerializable
 
     /**
      * @param numeric-string $value
+     *
+     * @throws InvalidInput|PrecisionViolation when the value cannot be compared using BCMath
      */
     public function isLessThanOrEqual(string $value, ?int $scale = null): bool
     {
@@ -110,6 +119,8 @@ final class DecimalTolerance implements JsonSerializable
     }
 
     /**
+     * @throws InvalidInput|PrecisionViolation when the tolerance cannot be converted to a percentage
+     *
      * @return numeric-string
      */
     public function percentage(int $scale = 2): string
