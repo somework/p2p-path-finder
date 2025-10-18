@@ -124,6 +124,37 @@ final class PathFinderScenarioGeneratorTest extends TestCase
         self::assertSame(1, preg_match('/^\\d+\\.\\d{3}$/', $positiveDecimal));
     }
 
+    public function test_generated_scenarios_respect_structural_invariants(): void
+    {
+        $generator = new PathFinderScenarioGenerator(new Randomizer(new Mt19937(42)));
+
+        for ($iteration = 0; $iteration < 25; ++$iteration) {
+            $scenario = $generator->scenario();
+
+            self::assertNotEmpty($scenario['orders']);
+            self::assertGreaterThanOrEqual(1, $scenario['maxHops']);
+            self::assertLessThanOrEqual(6, $scenario['maxHops']);
+            self::assertGreaterThanOrEqual(1, $scenario['topK']);
+            self::assertLessThanOrEqual(5, $scenario['topK']);
+
+            $referencesSource = false;
+            $referencesTarget = false;
+
+            foreach ($scenario['orders'] as $order) {
+                if ('SRC' === $order->assetPair()->base() || 'SRC' === $order->assetPair()->quote()) {
+                    $referencesSource = true;
+                }
+
+                if ('DST' === $order->assetPair()->base() || 'DST' === $order->assetPair()->quote()) {
+                    $referencesTarget = true;
+                }
+            }
+
+            self::assertTrue($referencesSource, 'Scenario must connect to the source asset.');
+            self::assertTrue($referencesTarget, 'Scenario must connect to the target asset.');
+        }
+    }
+
     private function invokePrivate(object $object, string $method, mixed ...$arguments)
     {
         $reflection = new ReflectionClass($object);
