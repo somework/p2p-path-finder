@@ -28,6 +28,18 @@ final class FeeBreakdownTest extends TestCase
     }
 
     /**
+     * Guards the convenience constructor that should collapse null components into the canonical none() instance.
+     */
+    public function test_of_without_components_devolves_to_none(): void
+    {
+        $fromNulls = FeeBreakdown::of(null, null);
+
+        self::assertNull($fromNulls->baseFee());
+        self::assertNull($fromNulls->quoteFee());
+        self::assertTrue($fromNulls->isZero());
+    }
+
+    /**
      * Demonstrates the none() constructor when order flows explicitly suppress both base and quote adjustments.
      */
     public function test_none_creates_fee_breakdown_without_base_or_quote_components(): void
@@ -142,5 +154,27 @@ final class FeeBreakdownTest extends TestCase
         self::assertTrue($merged->quoteFee()?->equals(Money::fromString('USD', '10.000', 3)) ?? false);
         self::assertTrue($merged->hasBaseFee());
         self::assertTrue($merged->hasQuoteFee());
+    }
+
+    public function test_merge_adopts_missing_base_fee_from_other_breakdown(): void
+    {
+        $initial = FeeBreakdown::forQuote(Money::fromString('USD', '2.500', 3));
+        $other = FeeBreakdown::forBase(Money::fromString('BTC', '0.010', 3));
+
+        $merged = $initial->merge($other);
+
+        self::assertTrue($merged->baseFee()?->equals(Money::fromString('BTC', '0.010', 3)) ?? false);
+        self::assertTrue($merged->quoteFee()?->equals(Money::fromString('USD', '2.500', 3)) ?? false);
+    }
+
+    public function test_merge_adopts_missing_quote_fee_from_other_breakdown(): void
+    {
+        $initial = FeeBreakdown::forBase(Money::fromString('BTC', '0.004', 3));
+        $other = FeeBreakdown::forQuote(Money::fromString('USD', '1.250', 3));
+
+        $merged = $initial->merge($other);
+
+        self::assertTrue($merged->baseFee()?->equals(Money::fromString('BTC', '0.004', 3)) ?? false);
+        self::assertTrue($merged->quoteFee()?->equals(Money::fromString('USD', '1.250', 3)) ?? false);
     }
 }

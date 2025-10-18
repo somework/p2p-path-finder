@@ -121,6 +121,27 @@ final class PathResultTest extends TestCase
         );
     }
 
+    public function test_path_legs_must_contain_only_path_leg_instances(): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Every path leg must be an instance of PathLeg.');
+
+        new PathResult(
+            Money::fromString('USD', '10', 2),
+            Money::fromString('BTC', '0.001', 6),
+            DecimalTolerance::fromNumericString('0.1'),
+            [
+                new PathLeg(
+                    'usd',
+                    'btc',
+                    Money::fromString('USD', '10', 2),
+                    Money::fromString('BTC', '0.001', 6),
+                ),
+                'invalid-leg',
+            ],
+        );
+    }
+
     public function test_fee_breakdown_merges_duplicate_currencies(): void
     {
         $leg = new PathLeg(
@@ -157,6 +178,27 @@ final class PathResultTest extends TestCase
                 'USD' => ['currency' => 'USD', 'amount' => '0.500', 'scale' => 3],
             ],
         ], array_intersect_key($result->jsonSerialize(), ['feeBreakdown' => true]));
+    }
+
+    public function test_fee_breakdown_requires_money_instances(): void
+    {
+        $leg = new PathLeg(
+            'usd',
+            'btc',
+            Money::fromString('USD', '10', 2),
+            Money::fromString('BTC', '0.001', 6),
+        );
+
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Fee breakdown must contain instances of Money.');
+
+        new PathResult(
+            Money::fromString('USD', '10', 2),
+            Money::fromString('BTC', '0.001', 6),
+            DecimalTolerance::fromNumericString('0.1'),
+            [$leg],
+            ['invalid-fee'],
+        );
     }
 
     public function test_empty_legs_and_fees_are_preserved(): void

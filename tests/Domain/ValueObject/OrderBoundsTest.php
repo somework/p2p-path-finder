@@ -45,4 +45,14 @@ final class OrderBoundsTest extends TestCase
         $this->expectException(InvalidInput::class);
         OrderBounds::from(Money::fromString('USD', '1.00'), Money::fromString('EUR', '2.00'));
     }
+
+    public function test_contains_rejects_mismatched_currency(): void
+    {
+        $bounds = OrderBounds::from(Money::fromString('USD', '10.00', 2), Money::fromString('USD', '20.00', 2));
+
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Money currency must match order bounds.');
+
+        $bounds->contains(Money::fromString('EUR', '15.00', 2));
+    }
 }

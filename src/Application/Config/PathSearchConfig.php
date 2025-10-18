@@ -30,6 +30,9 @@ final class PathSearchConfig
     /** @var numeric-string */
     private readonly string $pathFinderTolerance;
 
+    /** @var 'override'|'minimum'|'maximum' */
+    private readonly string $pathFinderToleranceSource;
+
     /**
      * @throws InvalidInput|PrecisionViolation when one of the provided guard or tolerance constraints is invalid
      */
@@ -67,7 +70,10 @@ final class PathSearchConfig
             throw new InvalidInput('Maximum visited states must be at least one.');
         }
 
-        $this->pathFinderTolerance = $this->resolvePathFinderTolerance($pathFinderToleranceOverride);
+        [$tolerance, $source] = $this->resolvePathFinderTolerance($pathFinderToleranceOverride);
+
+        $this->pathFinderTolerance = $tolerance;
+        $this->pathFinderToleranceSource = $source;
 
         $scale = max($this->spendAmount->scale(), self::BOUND_SCALE);
         $lowerMultiplier = BcMath::sub('1', $this->minimumTolerance, $scale);
@@ -184,6 +190,16 @@ final class PathSearchConfig
     }
 
     /**
+     * Returns the origin of the path finder tolerance value.
+     *
+     * @return 'override'|'minimum'|'maximum'
+     */
+    public function pathFinderToleranceSource(): string
+    {
+        return $this->pathFinderToleranceSource;
+    }
+
+    /**
      * @throws InvalidInput|PrecisionViolation when the tolerance does not represent a value in the [0, 1) range
      *
      * @return numeric-string
@@ -203,19 +219,21 @@ final class PathSearchConfig
     /**
      * @throws InvalidInput|PrecisionViolation when the override value does not represent a valid tolerance
      *
-     * @return numeric-string
+     * @return array{0: numeric-string, 1: 'override'|'minimum'|'maximum'}
      */
-    private function resolvePathFinderTolerance(?string $override): string
+    private function resolvePathFinderTolerance(?string $override): array
     {
         if (null !== $override) {
             $normalized = $this->assertTolerance($override, 'Path finder tolerance');
 
-            return $normalized;
+            return [$normalized, 'override'];
         }
 
-        return BcMath::comp($this->minimumTolerance, $this->maximumTolerance, self::TOLERANCE_SCALE) >= 0
-            ? $this->minimumTolerance
-            : $this->maximumTolerance;
+        if (BcMath::comp($this->minimumTolerance, $this->maximumTolerance, self::TOLERANCE_SCALE) >= 0) {
+            return [$this->minimumTolerance, 'minimum'];
+        }
+
+        return [$this->maximumTolerance, 'maximum'];
     }
 
     private const TOLERANCE_SCALE = 18;

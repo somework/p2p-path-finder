@@ -32,7 +32,7 @@
     },
     "scripts": {
         "php-cs-fixer": "vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php --allow-risky=yes",
-        "infection": "XDEBUG_MODE=coverage vendor/bin/infection --threads=4 --min-msi=80 --min-covered-msi=80",
+        "infection": "XDEBUG_MODE=coverage vendor/bin/infection --threads=4 --min-msi=80 --min-covered-msi=85",
         "phpstan": "vendor/bin/phpstan analyse",
         "phpunit": "vendor/bin/phpunit",
         "psalm": "vendor/bin/psalm --config=psalm.xml.dist --show-info=false",

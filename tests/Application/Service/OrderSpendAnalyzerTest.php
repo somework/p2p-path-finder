@@ -46,6 +46,33 @@ final class OrderSpendAnalyzerTest extends TestCase
         self::assertTrue($seed['grossCeiling']->equals(Money::fromString('EUR', '125.000', 3)));
     }
 
+    public function test_it_rejects_buy_seed_when_configured_window_does_not_overlap_order_bounds(): void
+    {
+        $order = OrderFactory::buy(
+            base: 'USD',
+            quote: 'EUR',
+            minAmount: '100.00',
+            maxAmount: '150.00',
+            rate: '0.9000',
+            amountScale: 2,
+            rateScale: 4,
+        );
+
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $graph['USD']['edges'][0];
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '50.00', 2))
+            ->withToleranceBounds('0.0', '0.0')
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $analyzer = new OrderSpendAnalyzer();
+        $seed = $analyzer->determineInitialSpendAmount($config, $edge);
+
+        self::assertNull($seed);
+    }
+
     public function test_it_rejects_buy_seed_when_minimum_gross_exceeds_upper_tolerance(): void
     {
         $order = OrderFactory::buy(
@@ -72,6 +99,37 @@ final class OrderSpendAnalyzerTest extends TestCase
         $seed = $analyzer->determineInitialSpendAmount($config, $edge);
 
         self::assertNull($seed);
+    }
+
+    public function test_it_trims_buy_seed_when_leg_resolution_consumes_tolerance_budget(): void
+    {
+        $order = OrderFactory::buy(
+            base: 'USD',
+            quote: 'EUR',
+            minAmount: '50.00',
+            maxAmount: '75.00',
+            rate: '0.9500',
+            amountScale: 2,
+            rateScale: 4,
+            feePolicy: FeePolicyFactory::baseAndQuoteSurcharge('0.060', '0.020', 3),
+        );
+
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $graph['USD']['edges'][0];
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '55.00', 2))
+            ->withToleranceBounds('0.0', '0.01')
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $analyzer = new OrderSpendAnalyzer();
+        $seed = $analyzer->determineInitialSpendAmount($config, $edge);
+
+        self::assertNotNull($seed);
+        self::assertTrue($seed['gross']->equals(Money::fromString('USD', '55.55', 2)));
+        self::assertTrue($seed['grossCeiling']->equals(Money::fromString('USD', '55.55', 2)));
+        self::assertTrue($seed['net']->equals(Money::fromString('USD', '52.41', 2)));
     }
 
     public function test_it_clamps_sell_seed_to_effective_bounds(): void
