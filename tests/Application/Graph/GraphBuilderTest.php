@@ -106,6 +106,36 @@ final class GraphBuilderTest extends TestCase
         self::assertSame($validOrder, $graph['BTC']['edges'][0]['order']);
     }
 
+    public function test_build_continues_processing_after_skipping_non_orders(): void
+    {
+        $firstOrder = $this->createOrder(
+            OrderSide::BUY,
+            'BTC',
+            'USD',
+            '0.100',
+            '0.400',
+            '30000',
+        );
+        $secondOrder = $this->createOrder(
+            OrderSide::BUY,
+            'ETH',
+            'USD',
+            '0.500',
+            '1.000',
+            '2000',
+        );
+
+        $graph = (new GraphBuilder())->build([
+            $firstOrder,
+            'skip-me',
+            $secondOrder,
+        ]);
+
+        self::assertArrayHasKey('ETH', $graph);
+        self::assertCount(1, $graph['ETH']['edges']);
+        self::assertSame($secondOrder, $graph['ETH']['edges'][0]['order']);
+    }
+
     public function test_build_creates_sell_edges_for_each_order(): void
     {
         [$graph, $orders] = $this->buildGraphFromSampleOrders();
@@ -137,6 +167,16 @@ final class GraphBuilderTest extends TestCase
         $property->setAccessible(true);
 
         self::assertSame($customEvaluator, $property->getValue($builder));
+    }
+
+    public function test_build_nodes_include_currency_metadata(): void
+    {
+        [$graph] = $this->buildGraphFromSampleOrders();
+
+        foreach ($graph as $currency => $node) {
+            self::assertArrayHasKey('currency', $node);
+            self::assertSame($currency, $node['currency']);
+        }
     }
 
     public function test_build_uses_net_quote_capacity_for_buy_orders_with_fee(): void
@@ -222,6 +262,32 @@ final class GraphBuilderTest extends TestCase
         self::assertArrayHasKey('grossBase', $optional);
         self::assertInstanceOf(Money::class, $optional['grossBase']['min']);
         self::assertInstanceOf(Money::class, $optional['grossBase']['max']);
+    }
+
+    public function test_build_provides_zero_gross_base_bounds_when_no_capacity_available(): void
+    {
+        $pointOrder = $this->createOrder(
+            OrderSide::BUY,
+            'BTC',
+            'USD',
+            '0.000',
+            '0.000',
+            '30000',
+        );
+
+        $graph = (new GraphBuilder())->build([$pointOrder]);
+
+        /** @var list<GraphEdge> $edges */
+        $edges = $graph['BTC']['edges'];
+        self::assertCount(1, $edges);
+
+        $segment = $edges[0]['segments'][0];
+
+        self::assertArrayHasKey('grossBase', $segment);
+        self::assertArrayHasKey('min', $segment['grossBase']);
+        self::assertArrayHasKey('max', $segment['grossBase']);
+        self::assertTrue($segment['grossBase']['min']->isZero());
+        self::assertTrue($segment['grossBase']['max']->isZero());
     }
 
     public function test_build_reduces_base_capacity_for_sell_orders_with_base_fee(): void

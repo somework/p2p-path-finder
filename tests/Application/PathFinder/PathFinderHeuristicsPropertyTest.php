@@ -67,9 +67,17 @@ final class PathFinderHeuristicsPropertyTest extends TestCase
                             $targetCapacity['max']
                         );
 
-                        $minTarget = $targetCapacity['min']->withScale($expected->scale());
-                        $maxTarget = $targetCapacity['max']->withScale($expected->scale());
-                        $convertedComparable = $converted->withScale($expected->scale());
+                        $comparisonScale = max(
+                            $expected->scale(),
+                            $converted->scale(),
+                            $targetCapacity['min']->scale(),
+                            $targetCapacity['max']->scale(),
+                        );
+
+                        $minTarget = $targetCapacity['min']->withScale($comparisonScale);
+                        $maxTarget = $targetCapacity['max']->withScale($comparisonScale);
+                        $convertedComparable = $converted->withScale($comparisonScale);
+                        $expectedComparable = $expected->withScale($comparisonScale);
 
                         self::assertFalse(
                             $convertedComparable->lessThan($minTarget),
@@ -81,7 +89,7 @@ final class PathFinderHeuristicsPropertyTest extends TestCase
                         );
 
                         self::assertSame(
-                            $expected->amount(),
+                            $expectedComparable->amount(),
                             $convertedComparable->amount(),
                             'Heuristic interpolation diverged from materialized capacity.'
                         );

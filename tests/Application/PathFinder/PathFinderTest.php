@@ -24,6 +24,7 @@ use function array_key_last;
 use function array_reverse;
 use function array_unique;
 use function count;
+use function in_array;
 
 final class PathFinderTest extends TestCase
 {
@@ -256,6 +257,34 @@ final class PathFinderTest extends TestCase
 
         self::assertSame([], self::extractPaths($finder->findBestPaths($graph, 'RUB', 'ZZZ')));
         self::assertSame([], self::extractPaths($finder->findBestPaths($graph, 'zzz', 'IDR')));
+    }
+
+    public function test_it_avoids_cycles_that_return_to_the_source(): void
+    {
+        $orders = [
+            OrderFactory::sell('EUR', 'USD', '1.000', '1.000', '1.000', 3, 3),
+            OrderFactory::sell('USD', 'EUR', '1.000', '1.000', '1.000', 3, 3),
+            OrderFactory::sell('JPY', 'EUR', '1.000', '1.000', '1.000', 3, 3),
+            OrderFactory::sell('JPY', 'USD', '1.000', '1.000', '1.000', 3, 3),
+        ];
+
+        $graph = (new GraphBuilder())->build($orders);
+        $finder = new PathFinder(maxHops: 4, tolerance: '0.0', topK: 4);
+
+        $paths = $finder->findBestPaths($graph, 'USD', 'JPY')->paths();
+
+        self::assertNotSame([], $paths);
+
+        foreach ($paths as $candidate) {
+            $visited = ['USD'];
+            foreach ($candidate['edges'] as $edge) {
+                self::assertFalse(
+                    in_array($edge['to'], $visited, true),
+                    'Path finder should not revisit previously seen nodes.'
+                );
+                $visited[] = $edge['to'];
+            }
+        }
     }
 
     public function test_it_continues_search_when_callback_rejects_initial_target_candidate(): void
