@@ -649,6 +649,116 @@ final class LegMaterializerTest extends TestCase
         self::assertSame('JPY', $materialized['legs'][1]->received()->currency());
     }
 
+    public function test_reduce_budget_handles_currency_mismatch_and_zero_clamp(): void
+    {
+        $materializer = new LegMaterializer();
+        $method = new ReflectionMethod(LegMaterializer::class, 'reduceBudget');
+        $method->setAccessible(true);
+
+        $budget = Money::fromString('USD', '100.000', 3);
+
+        $foreignSpend = Money::fromString('EUR', '25.000', 3);
+        /** @var Money $unchanged */
+        $unchanged = $method->invoke($materializer, $budget, $foreignSpend);
+        self::assertSame('USD', $unchanged->currency());
+        self::assertSame('100.000', $unchanged->amount());
+
+        $partialSpend = Money::fromString('USD', '40.000', 3);
+        /** @var Money $reduced */
+        $reduced = $method->invoke($materializer, $budget, $partialSpend);
+        self::assertSame('USD', $reduced->currency());
+        self::assertSame('60.000', $reduced->amount());
+
+        $overspend = Money::fromString('USD', '250.000', 3);
+        /** @var Money $depleted */
+        $depleted = $method->invoke($materializer, $budget, $overspend);
+        self::assertSame('USD', $depleted->currency());
+        self::assertSame('0.000', $depleted->amount());
+    }
+
+    public function test_resolve_buy_leg_amounts_returns_materialized_components(): void
+    {
+        $order = OrderFactory::buy(
+            base: 'USD',
+            quote: 'EUR',
+            minAmount: '95.000',
+            maxAmount: '150.000',
+            rate: '0.900',
+            amountScale: 3,
+            rateScale: 3,
+        );
+
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $graph['USD']['edges'][0];
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '120.000', 3))
+            ->withToleranceBounds('0.0', '0.10')
+            ->withHopLimits(1, 1)
+            ->build();
+
+        $materializer = new LegMaterializer();
+        $analyzer = new OrderSpendAnalyzer(null, $materializer);
+
+        $seed = $analyzer->determineInitialSpendAmount($config, $edge);
+        self::assertNotNull($seed);
+
+        $method = new ReflectionMethod(LegMaterializer::class, 'resolveBuyLegAmounts');
+        $method->setAccessible(true);
+
+        /** @var array{0: Money, 1: Money, 2: FeeBreakdown}|null $resolved */
+        $resolved = $method->invoke(
+            $materializer,
+            $order,
+            $seed['net'],
+            $seed['gross'],
+            $seed['grossCeiling'],
+        );
+
+        self::assertNotNull($resolved);
+
+        [$grossBase, $quoteAmount, $fees] = $resolved;
+        self::assertSame($seed['gross']->currency(), $grossBase->currency());
+        self::assertTrue($grossBase->greaterThan(Money::zero($grossBase->currency(), $grossBase->scale())));
+        self::assertSame($order->assetPair()->quote(), $quoteAmount->currency());
+        self::assertInstanceOf(FeeBreakdown::class, $fees);
+    }
+
+    public function test_calculate_sell_adjustment_ratio_handles_edge_cases(): void
+    {
+        $materializer = new LegMaterializer();
+        $method = new ReflectionMethod(LegMaterializer::class, 'calculateSellAdjustmentRatio');
+        $method->setAccessible(true);
+
+        $target = Money::fromString('USD', '100.000', 3);
+        $actual = Money::fromString('USD', '50.000', 3);
+        /** @var string|null $ratio */
+        $ratio = $method->invoke($materializer, $target, $actual, 3);
+        self::assertNotNull($ratio);
+        self::assertSame('2.000000000', $ratio);
+
+        $zeroActual = Money::fromString('USD', '0.000', 3);
+        self::assertNull($method->invoke($materializer, $target, $zeroActual, 3));
+
+        $oppositeSign = Money::fromString('USD', '-25.000', 3);
+        self::assertNull($method->invoke($materializer, $target, $oppositeSign, 3));
+    }
+
+    public function test_align_base_scale_respects_bounds_precision(): void
+    {
+        $materializer = new LegMaterializer();
+        $method = new ReflectionMethod(LegMaterializer::class, 'alignBaseScale');
+        $method->setAccessible(true);
+
+        $baseAmount = Money::fromString('USD', '1.2', 1);
+        /** @var Money $aligned */
+        $aligned = $method->invoke($materializer, 4, 5, $baseAmount);
+
+        self::assertSame(5, $aligned->scale());
+        self::assertSame('1.20000', $aligned->amount());
+        self::assertSame('USD', $aligned->currency());
+    }
+
     private function createOrder(OrderSide $side, string $base, string $quote, string $min, string $max, string $rate, int $rateScale): Order
     {
         $assetPair = AssetPair::fromString($base, $quote);

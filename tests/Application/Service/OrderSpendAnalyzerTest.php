@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Application\Service;
 
 use PHPUnit\Framework\TestCase;
+use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
@@ -423,5 +424,41 @@ final class OrderSpendAnalyzerTest extends TestCase
             $foreignSpendBuy,
             $withinBoundsBuy,
         ], $filtered);
+    }
+
+    public function test_determine_spend_currency_uses_base_for_buy_orders(): void
+    {
+        $method = new ReflectionMethod(OrderSpendAnalyzer::class, 'determineSpendCurrency');
+        $method->setAccessible(true);
+
+        $order = OrderFactory::buy(
+            base: 'EUR',
+            quote: 'USD',
+            minAmount: '50.00',
+            maxAmount: '150.00',
+            rate: '1.0500',
+            amountScale: 2,
+            rateScale: 4,
+        );
+
+        self::assertSame('EUR', $method->invoke(new OrderSpendAnalyzer(), $order));
+    }
+
+    public function test_determine_spend_currency_uses_quote_for_sell_orders(): void
+    {
+        $method = new ReflectionMethod(OrderSpendAnalyzer::class, 'determineSpendCurrency');
+        $method->setAccessible(true);
+
+        $order = OrderFactory::sell(
+            base: 'BTC',
+            quote: 'USDT',
+            minAmount: '0.010',
+            maxAmount: '0.500',
+            rate: '30000',
+            amountScale: 3,
+            rateScale: 4,
+        );
+
+        self::assertSame('USDT', $method->invoke(new OrderSpendAnalyzer(), $order));
     }
 }
