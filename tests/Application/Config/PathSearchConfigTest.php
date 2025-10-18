@@ -37,17 +37,21 @@ final class PathSearchConfigTest extends TestCase
             ->build();
 
         self::assertSame('0.150000000000000000', $config->pathFinderTolerance());
+        self::assertSame('override', $config->pathFinderToleranceSource());
     }
 
     public function test_path_finder_tolerance_preserves_high_precision_string(): void
     {
-        $config = PathSearchConfig::builder()
-            ->withSpendAmount(Money::fromString('USD', '250.00', 2))
-            ->withToleranceBounds('0.50', '0.999999999999999999')
-            ->withHopLimits(1, 4)
-            ->build();
+        $config = new PathSearchConfig(
+            Money::fromString('USD', '250.00', 2),
+            '0.50',
+            '0.999999999999999999',
+            1,
+            4,
+        );
 
         self::assertSame('0.999999999999999999', $config->pathFinderTolerance());
+        self::assertSame('maximum', $config->pathFinderToleranceSource());
     }
 
     public function test_path_finder_tolerance_override_is_respected(): void
@@ -62,17 +66,49 @@ final class PathSearchConfigTest extends TestCase
         );
 
         self::assertSame('0.050000000000000000', $config->pathFinderTolerance());
+        self::assertSame('override', $config->pathFinderToleranceSource());
     }
 
     public function test_path_finder_tolerance_prefers_minimum_when_bounds_are_equal(): void
     {
-        $config = PathSearchConfig::builder()
-            ->withSpendAmount(Money::fromString('USD', '75.00', 2))
-            ->withToleranceBounds('0.250000000000000000', '0.250000000000000000')
-            ->withHopLimits(1, 3)
-            ->build();
+        $config = new PathSearchConfig(
+            Money::fromString('USD', '75.00', 2),
+            '0.250000000000000000',
+            '0.250000000000000000',
+            1,
+            3,
+        );
 
         self::assertSame('0.250000000000000000', $config->pathFinderTolerance());
+        self::assertSame('minimum', $config->pathFinderToleranceSource());
+    }
+
+    public function test_path_finder_tolerance_defaults_to_maximum_without_override(): void
+    {
+        $config = new PathSearchConfig(
+            Money::fromString('USD', '100.00', 2),
+            '0.05',
+            '0.20',
+            1,
+            3,
+        );
+
+        self::assertSame('0.200000000000000000', $config->pathFinderTolerance());
+        self::assertSame('maximum', $config->pathFinderToleranceSource());
+    }
+
+    public function test_path_finder_tolerance_records_minimum_when_lower_bound_exceeds_upper(): void
+    {
+        $config = new PathSearchConfig(
+            Money::fromString('EUR', '42.00', 2),
+            '0.150000000000000000',
+            '0.050000000000000000',
+            1,
+            4,
+        );
+
+        self::assertSame('0.150000000000000000', $config->pathFinderTolerance());
+        self::assertSame('minimum', $config->pathFinderToleranceSource());
     }
 
     public function test_string_tolerance_remains_below_float_cap(): void

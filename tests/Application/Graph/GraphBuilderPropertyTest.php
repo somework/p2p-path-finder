@@ -9,6 +9,7 @@ use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Application\Support\Generator\GraphScenarioGenerator;
+use SomeWork\P2PPathFinder\Tests\Support\InfectionIterationLimiter;
 
 use function array_filter;
 use function array_key_first;
@@ -18,6 +19,8 @@ use function sort;
 
 final class GraphBuilderPropertyTest extends TestCase
 {
+    use InfectionIterationLimiter;
+
     private GraphScenarioGenerator $generator;
 
     protected function setUp(): void
@@ -31,7 +34,9 @@ final class GraphBuilderPropertyTest extends TestCase
     {
         $builder = new GraphBuilder();
 
-        for ($iteration = 0; $iteration < 25; ++$iteration) {
+        $limit = $this->iterationLimit(25, 5, 'P2P_GRAPH_BUILDER_PROPERTY_ITERATIONS');
+
+        for ($iteration = 0; $iteration < $limit; ++$iteration) {
             $orders = $this->generator->orders();
             $graph = $builder->build($orders);
 

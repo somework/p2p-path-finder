@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Tests\Application\Support\Generator\PathFinderScenarioGenerator;
+use SomeWork\P2PPathFinder\Tests\Support\InfectionIterationLimiter;
 
 use function array_reverse;
 use function array_unique;
@@ -16,6 +17,8 @@ use function spl_object_id;
 
 final class PathFinderPropertyTest extends TestCase
 {
+    use InfectionIterationLimiter;
+
     private PathFinderScenarioGenerator $generator;
 
     protected function setUp(): void
@@ -29,7 +32,9 @@ final class PathFinderPropertyTest extends TestCase
     {
         $graphBuilder = new GraphBuilder();
 
-        for ($iteration = 0; $iteration < 25; ++$iteration) {
+        $limit = $this->iterationLimit(25, 5, 'P2P_PATH_FINDER_PROPERTY_ITERATIONS');
+
+        for ($iteration = 0; $iteration < $limit; ++$iteration) {
             $scenario = $this->generator->scenario();
 
             $graph = $graphBuilder->build($scenario['orders']);

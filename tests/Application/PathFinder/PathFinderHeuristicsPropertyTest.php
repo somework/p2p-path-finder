@@ -13,11 +13,14 @@ use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Application\Support\Generator\GraphScenarioGenerator;
+use SomeWork\P2PPathFinder\Tests\Support\InfectionIterationLimiter;
 
 use function sprintf;
 
 final class PathFinderHeuristicsPropertyTest extends TestCase
 {
+    use InfectionIterationLimiter;
+
     private GraphScenarioGenerator $generator;
     private int $pathFinderScale;
     private int $ratioExtraScale;
@@ -41,7 +44,9 @@ final class PathFinderHeuristicsPropertyTest extends TestCase
         $convertMethod = new ReflectionMethod(PathFinder::class, 'convertEdgeAmount');
         $convertMethod->setAccessible(true);
 
-        for ($iteration = 0; $iteration < 15; ++$iteration) {
+        $limit = $this->iterationLimit(15, 5, 'P2P_PATH_FINDER_HEURISTIC_ITERATIONS');
+
+        for ($iteration = 0; $iteration < $limit; ++$iteration) {
             $orders = $this->generator->orders();
             $graph = (new GraphBuilder())->build($orders);
 

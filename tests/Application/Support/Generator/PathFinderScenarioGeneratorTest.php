@@ -10,11 +10,14 @@ use Random\Randomizer;
 use ReflectionClass;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Tests\Support\InfectionIterationLimiter;
 
 use function preg_match;
 
 final class PathFinderScenarioGeneratorTest extends TestCase
 {
+    use InfectionIterationLimiter;
+
     public function test_scenario_generation_is_reproducible_for_seeded_randomizer(): void
     {
         $generator = new PathFinderScenarioGenerator(new Randomizer(new Mt19937(1234)));
@@ -128,7 +131,9 @@ final class PathFinderScenarioGeneratorTest extends TestCase
     {
         $generator = new PathFinderScenarioGenerator(new Randomizer(new Mt19937(42)));
 
-        for ($iteration = 0; $iteration < 25; ++$iteration) {
+        $limit = $this->iterationLimit(25, 6, 'P2P_SCENARIO_GENERATOR_ITERATIONS');
+
+        for ($iteration = 0; $iteration < $limit; ++$iteration) {
             $scenario = $generator->scenario();
 
             self::assertNotEmpty($scenario['orders']);

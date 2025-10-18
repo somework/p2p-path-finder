@@ -11,5 +11,6 @@
     },
     "tmpDir": "var/cache/infection",
     "minMsi": 80,
-    "minCoveredMsi": 85
+    "minCoveredMsi": 85,
+    "timeout": 25
 }

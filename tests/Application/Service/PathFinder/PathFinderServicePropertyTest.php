@@ -14,6 +14,7 @@ use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Application\Support\Generator\PathFinderScenarioGenerator;
+use SomeWork\P2PPathFinder\Tests\Support\InfectionIterationLimiter;
 
 use function array_map;
 use function array_unique;
@@ -23,6 +24,8 @@ use function serialize;
 
 final class PathFinderServicePropertyTest extends TestCase
 {
+    use InfectionIterationLimiter;
+
     private PathFinderScenarioGenerator $generator;
     private GraphBuilder $graphBuilder;
     private PathFinderService $service;
@@ -38,7 +41,9 @@ final class PathFinderServicePropertyTest extends TestCase
 
     public function test_random_scenarios_produce_deterministic_unique_service_paths(): void
     {
-        for ($iteration = 0; $iteration < 20; ++$iteration) {
+        $limit = $this->iterationLimit(20, 5, 'P2P_PATH_FINDER_SERVICE_ITERATIONS');
+
+        for ($iteration = 0; $iteration < $limit; ++$iteration) {
             $scenario = $this->generator->scenario();
             $orders = $scenario['orders'];
             $orderBook = new OrderBook($orders);
