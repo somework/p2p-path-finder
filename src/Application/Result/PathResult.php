@@ -133,7 +133,7 @@ final class PathResult implements JsonSerializable
     }
 
     /**
-     * @param array<string, Money> $feeBreakdown
+     * @param array<array-key, Money> $feeBreakdown
      *
      * @throws InvalidInput|PrecisionViolation when fee entries are invalid or cannot be merged deterministically
      *

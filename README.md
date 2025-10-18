@@ -225,24 +225,6 @@ $payload = $formatter->formatMachineCollection($topTwo);
 echo $formatter->formatHumanCollection($topTwo);
 ```
 
-## Migration guide
-
-### Upgrading from 0.x to 0.y
-
-* Domain and application services now throw dedicated exceptions under the
-  `SomeWork\P2PPathFinder\Exception` namespace.
-  * Input validation failures raise `InvalidInput` instead of
-    `InvalidArgumentException`.
-  * Search guard overflows can be reported with `GuardLimitExceeded`.
-  * Attempts to materialise a path that violates residual constraints can raise
-    `InfeasiblePath`.
-  * Precision-related errors (for example a missing BCMath extension) map to
-    `PrecisionViolation`.
-  * All domain-specific exceptions implement `ExceptionInterface` so that
-    consumers can catch all library errors with a single type.
-* Update consumer code and tests that previously asserted against the SPL
-  exceptions to handle the new types.
-
 ## API documentation
 
 Docblocks are available throughout the public API. To generate browseable documentation
