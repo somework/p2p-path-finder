@@ -9,6 +9,6 @@ use RuntimeException;
 /**
  * Thrown when deterministic arithmetic guarantees cannot be upheld.
  */
-final class PrecisionViolation extends RuntimeException
+final class PrecisionViolation extends RuntimeException implements ExceptionInterface
 {
 }

@@ -9,6 +9,6 @@ use RuntimeException;
 /**
  * Thrown when search guard rails are exceeded before a path can be materialised.
  */
-final class GuardLimitExceeded extends RuntimeException
+final class GuardLimitExceeded extends RuntimeException implements ExceptionInterface
 {
 }

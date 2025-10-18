@@ -52,6 +52,8 @@ final class PathFinderService
     /**
      * Searches for the best conversion paths from the configured spend asset to the target asset.
      *
+     * @throws InvalidInput when the requested target asset identifier is empty
+     *
      * @return SearchOutcome<PathResult>
      */
     public function findBestPaths(OrderBook $orderBook, PathSearchConfig $config, string $targetAsset): SearchOutcome

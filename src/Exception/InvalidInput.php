@@ -9,6 +9,6 @@ use InvalidArgumentException as BaseInvalidArgumentException;
 /**
  * Thrown when a consumer supplies malformed or unsupported input.
  */
-final class InvalidInput extends BaseInvalidArgumentException
+final class InvalidInput extends BaseInvalidArgumentException implements ExceptionInterface
 {
 }

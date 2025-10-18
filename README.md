@@ -238,6 +238,8 @@ echo $formatter->formatHumanCollection($topTwo);
     `InfeasiblePath`.
   * Precision-related errors (for example a missing BCMath extension) map to
     `PrecisionViolation`.
+  * All domain-specific exceptions implement `ExceptionInterface` so that
+    consumers can catch all library errors with a single type.
 * Update consumer code and tests that previously asserted against the SPL
   exceptions to handle the new types.
 
