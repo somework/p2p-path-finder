@@ -115,6 +115,40 @@ using half-up rounding. Normalising via `BcMath::normalize()` ensures that tie-b
 values such as `0.5` and `-0.5` deterministically round away from zero, keeping matching
 behaviour stable across PHP versions and environments.
 
+## Exceptions
+
+The library ships with domain-specific exceptions under the
+`SomeWork\\P2PPathFinder\\Exception` namespace:
+
+* `ExceptionInterface` &mdash; a marker implemented by every custom exception so you can
+  catch all library-originated failures in one clause.
+* `InvalidInput` &mdash; emitted when configuration, path legs, or fee breakdowns fail
+  validation.
+* `PrecisionViolation` &mdash; signals arithmetic inputs that cannot be represented within the
+  configured BCMath scale.
+* `GuardLimitExceeded` &mdash; thrown when search guardrails (visited states or expansions)
+  are breached.
+* `InfeasiblePath` &mdash; indicates that no route satisfies the requested constraints.
+
+Consumers can mix coarse- and fine-grained handling strategies:
+
+```php
+use SomeWork\\P2PPathFinder\\Exception\\ExceptionInterface;
+use SomeWork\\P2PPathFinder\\Exception\\GuardLimitExceeded;
+use SomeWork\\P2PPathFinder\\Exception\\InvalidInput;
+use SomeWork\\P2PPathFinder\\Exception\\PrecisionViolation;
+
+try {
+    $outcome = $service->findBestPaths($orderBook, $config, 'USDT');
+} catch (InvalidInput|PrecisionViolation $validationError) {
+    // Alert callers that supplied data is malformed.
+} catch (GuardLimitExceeded $guardFailure) {
+    // Surface that the configured search guardrails were hit.
+} catch (ExceptionInterface $libraryError) {
+    // Catch-all for other library-specific exceptions (e.g. InfeasiblePath).
+}
+```
+
 ## Quick-start scenarios
 
 Below are two end-to-end examples that showcase the typical workflow. In both snippets the

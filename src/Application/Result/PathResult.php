@@ -28,8 +28,10 @@ final class PathResult implements JsonSerializable
     private readonly array $legs;
 
     /**
-     * @param list<PathLeg>        $legs
-     * @param array<string, Money> $feeBreakdown
+     * @param list<PathLeg>           $legs
+     * @param array<array-key, Money> $feeBreakdown
+     *
+     * @throws InvalidInput|PrecisionViolation when fee entries are invalid or cannot be merged deterministically
      */
     public function __construct(
         private readonly Money $totalSpent,
