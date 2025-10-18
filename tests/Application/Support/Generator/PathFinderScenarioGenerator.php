@@ -32,6 +32,11 @@ final class PathFinderScenarioGenerator
     private const AMOUNT_SCALE = 3;
     private const RATE_SCALE = 3;
 
+    /**
+     * @var non-empty-list<numeric-string>
+     */
+    private const TOLERANCE_CHOICES = ['0.0', '0.01', '0.05', '0.10', '0.20'];
+
     private Randomizer $randomizer;
 
     public function __construct(?Randomizer $randomizer = null)
@@ -69,6 +74,27 @@ final class PathFinderScenarioGenerator
             'topK' => $topK,
             'tolerance' => $this->randomTolerance(),
         ];
+    }
+
+    /**
+     * @return numeric-string
+     */
+    public function toleranceChoice(int $choice): string
+    {
+        $index = $choice % count(self::TOLERANCE_CHOICES);
+
+        return self::TOLERANCE_CHOICES[$index];
+    }
+
+    public function feePolicyForChoice(int $choice): ?FeePolicy
+    {
+        return match ($choice) {
+            0 => null,
+            1 => FeePolicyFactory::baseSurcharge('0.0005'),
+            2 => FeePolicyFactory::baseAndQuoteSurcharge('0.0004', '0.0006'),
+            3 => FeePolicyFactory::quotePercentageWithFixed('0.0005', '0.010'),
+            default => FeePolicyFactory::baseAndQuoteSurcharge('0.0002', '0.0003'),
+        };
     }
 
     /**
@@ -163,20 +189,12 @@ final class PathFinderScenarioGenerator
      */
     private function randomTolerance(): string
     {
-        $choices = ['0.0', '0.01', '0.05', '0.10', '0.20'];
-
-        return $choices[$this->randomizer->getInt(0, count($choices) - 1)];
+        return $this->toleranceChoice($this->randomizer->getInt(0, count(self::TOLERANCE_CHOICES) - 1));
     }
 
     private function maybeFeePolicy(): ?FeePolicy
     {
-        return match ($this->randomizer->getInt(0, 4)) {
-            0 => null,
-            1 => FeePolicyFactory::baseSurcharge('0.0005'),
-            2 => FeePolicyFactory::baseAndQuoteSurcharge('0.0004', '0.0006'),
-            3 => FeePolicyFactory::quotePercentageWithFixed('0.0005', '0.010'),
-            default => FeePolicyFactory::baseAndQuoteSurcharge('0.0002', '0.0003'),
-        };
+        return $this->feePolicyForChoice($this->randomizer->getInt(0, 4));
     }
 
     /**
