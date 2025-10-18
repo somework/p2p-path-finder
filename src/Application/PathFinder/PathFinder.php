@@ -153,6 +153,14 @@ use function usort;
 final class PathFinder
 {
     private const SCALE = 18;
+    /**
+     * Extra precision used when converting target and source deltas into a ratio to avoid premature rounding.
+     */
+    private const RATIO_EXTRA_SCALE = 4;
+    /**
+     * Extra precision used when applying the ratio to offsets before normalizing to the target scale.
+     */
+    private const SUM_EXTRA_SCALE = 2;
 
     public const DEFAULT_MAX_EXPANSIONS = 250000;
 
@@ -741,43 +749,75 @@ final class PathFinder
             return Money::zero($edge['to'], max($current->scale(), self::SCALE));
         }
 
-        [$sourceScale, $targetScale] = match ($edge['orderSide']) {
-            OrderSide::BUY => [
-                max(
-                    $edge['grossBaseCapacity']['max']->scale(),
-                    $edge['grossBaseCapacity']['min']->scale(),
-                    $current->scale(),
-                    self::SCALE,
-                ),
-                max(
-                    $edge['quoteCapacity']['max']->scale(),
-                    $edge['quoteCapacity']['min']->scale(),
-                    $current->scale(),
-                    self::SCALE,
-                ),
-            ],
-            OrderSide::SELL => [
-                max(
-                    $edge['quoteCapacity']['max']->scale(),
-                    $edge['quoteCapacity']['min']->scale(),
-                    $current->scale(),
-                    self::SCALE,
-                ),
-                max(
-                    $edge['baseCapacity']['max']->scale(),
-                    $edge['baseCapacity']['min']->scale(),
-                    $current->scale(),
-                    self::SCALE,
-                ),
-            ],
-        };
+        $sourceCapacity = OrderSide::BUY === $edge['orderSide']
+            ? $edge['grossBaseCapacity']
+            : $edge['quoteCapacity'];
+        $targetCapacity = OrderSide::BUY === $edge['orderSide']
+            ? $edge['quoteCapacity']
+            : $edge['baseCapacity'];
 
-        $operationScale = max($sourceScale, $targetScale, self::SCALE);
-        $normalizedCurrent = $current->withScale($operationScale)->amount();
-        $raw = BcMath::mul($normalizedCurrent, $conversionRate, $operationScale + 2);
-        $normalized = BcMath::normalize($raw, $targetScale);
+        $sourceScale = max(
+            $sourceCapacity['min']->scale(),
+            $sourceCapacity['max']->scale(),
+            $current->scale(),
+            self::SCALE,
+        );
+        $targetScale = max(
+            $targetCapacity['min']->scale(),
+            $targetCapacity['max']->scale(),
+            self::SCALE,
+        );
 
-        return Money::fromString($edge['to'], $normalized, $targetScale);
+        $sourceMin = $sourceCapacity['min']->withScale($sourceScale);
+        $sourceMax = $sourceCapacity['max']->withScale($sourceScale);
+        $clampedCurrent = $current->withScale($sourceScale);
+
+        if ($clampedCurrent->lessThan($sourceMin)) {
+            $clampedCurrent = $sourceMin;
+        }
+
+        if ($clampedCurrent->greaterThan($sourceMax)) {
+            $clampedCurrent = $sourceMax;
+        }
+
+        $sourceDelta = $sourceMax->subtract($sourceMin, $sourceScale);
+        $targetMin = $targetCapacity['min']->withScale($targetScale);
+        $targetMax = $targetCapacity['max']->withScale($targetScale);
+        $targetDelta = $targetMax->subtract($targetMin, $targetScale);
+
+        $ratioScale = max($sourceScale, $targetScale, self::SCALE);
+        $sourceDeltaAmount = $sourceDelta->withScale($ratioScale)->amount();
+        if (0 === BcMath::comp($sourceDeltaAmount, '0', $ratioScale)) {
+            return $targetMin->withScale($targetScale);
+        }
+        $targetDeltaAmount = $targetDelta->withScale($ratioScale)->amount();
+        $ratio = BcMath::div(
+            $targetDeltaAmount,
+            $sourceDeltaAmount,
+            $ratioScale + self::RATIO_EXTRA_SCALE,
+        );
+
+        $offset = $clampedCurrent->subtract($sourceMin, $sourceScale);
+        $offsetAmount = $offset->withScale($ratioScale)->amount();
+        $incrementAmount = BcMath::mul(
+            $offsetAmount,
+            $ratio,
+            $ratioScale + self::SUM_EXTRA_SCALE,
+        );
+        $baseAmount = BcMath::add(
+            $targetMin->withScale($ratioScale)->amount(),
+            $incrementAmount,
+            $ratioScale + self::SUM_EXTRA_SCALE,
+        );
+
+        $normalized = BcMath::normalize($baseAmount, $ratioScale + self::SUM_EXTRA_SCALE);
+        $result = Money::fromString(
+            $edge['to'],
+            $normalized,
+            $ratioScale + self::SUM_EXTRA_SCALE,
+        );
+
+        return $result->withScale($targetScale);
     }
 
     /**
