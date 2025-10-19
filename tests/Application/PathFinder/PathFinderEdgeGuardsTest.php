@@ -259,4 +259,64 @@ final class PathFinderEdgeGuardsTest extends TestCase
         );
     }
 
+    public function test_it_prunes_states_after_best_candidate_improves(): void
+    {
+        $orders = [
+            OrderFactory::buy(
+                base: 'AAA',
+                quote: 'BBB',
+                minAmount: '1.000',
+                maxAmount: '1.000',
+                rate: '2.000',
+                amountScale: 3,
+                rateScale: 3,
+            ),
+            OrderFactory::buy(
+                base: 'BBB',
+                quote: 'CCC',
+                minAmount: '1.000',
+                maxAmount: '1.000',
+                rate: '1.000',
+                amountScale: 3,
+                rateScale: 3,
+            ),
+            OrderFactory::buy(
+                base: 'CCC',
+                quote: 'ZZZ',
+                minAmount: '1.000',
+                maxAmount: '1.000',
+                rate: '1.000',
+                amountScale: 3,
+                rateScale: 3,
+            ),
+            OrderFactory::buy(
+                base: 'AAA',
+                quote: 'DDD',
+                minAmount: '1.000',
+                maxAmount: '1.000',
+                rate: '1.100',
+                amountScale: 3,
+                rateScale: 3,
+            ),
+            OrderFactory::buy(
+                base: 'DDD',
+                quote: 'ZZZ',
+                minAmount: '1.000',
+                maxAmount: '1.000',
+                rate: '1.000',
+                amountScale: 3,
+                rateScale: 3,
+            ),
+        ];
+
+        $graph = (new GraphBuilder())->build($orders);
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.0', topK: 3);
+
+        $paths = $finder->findBestPaths($graph, 'AAA', 'ZZZ')->paths();
+
+        self::assertSame(
+            ['0.500000000000000000'],
+            array_column($paths, 'cost'),
+        );
+    }
 }
