@@ -14,7 +14,6 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
@@ -25,6 +24,12 @@ use function usort;
  * High level facade orchestrating order filtering, graph building and path search.
  *
  * @phpstan-import-type Candidate from PathFinder
+ * @phpstan-import-type Graph from PathFinder
+ * @phpstan-import-type SpendConstraints from PathFinder
+ *
+ * @psalm-import-type Candidate from PathFinder
+ * @psalm-import-type Graph from PathFinder
+ * @psalm-import-type SpendConstraints from PathFinder
  */
 final class PathFinderService
 {
@@ -34,7 +39,7 @@ final class PathFinderService
     private readonly LegMaterializer $legMaterializer;
     private readonly ToleranceEvaluator $toleranceEvaluator;
     /**
-     * @var Closure(PathSearchConfig):Closure(array, string, string, array{min: Money, max: Money, desired: Money}, callable(array):bool): SearchOutcome
+     * @var Closure(PathSearchConfig):Closure(array, string, string, array, callable):SearchOutcome
      */
     private readonly Closure $pathFinderFactory;
 
@@ -56,7 +61,26 @@ final class PathFinderService
         $this->orderSpendAnalyzer = $orderSpendAnalyzer ?? new OrderSpendAnalyzer($fillEvaluator, $this->legMaterializer);
         $this->toleranceEvaluator = $toleranceEvaluator ?? new ToleranceEvaluator();
         $factory = $pathFinderFactory ?? static function (PathSearchConfig $config): Closure {
-            return static function (
+            /**
+             * @param Graph                    $graph
+             * @param SpendConstraints         $range
+             * @param callable(Candidate):bool $callback
+             *
+             * @phpstan-param Graph                    $graph
+             * @phpstan-param SpendConstraints         $range
+             * @phpstan-param callable(Candidate):bool $callback
+             *
+             * @psalm-param Graph                    $graph
+             * @psalm-param SpendConstraints         $range
+             * @psalm-param callable(Candidate):bool $callback
+             *
+             * @return SearchOutcome<Candidate>
+             *
+             * @phpstan-return SearchOutcome<Candidate>
+             *
+             * @psalm-return SearchOutcome<Candidate>
+             */
+            $runner = static function (
                 array $graph,
                 string $source,
                 string $target,
@@ -71,11 +95,27 @@ final class PathFinderService
                     $config->pathFinderMaxVisitedStates(),
                 );
 
+                /** @var Graph $graph */
+                $graph = $graph;
+
+                /** @var SpendConstraints $range */
+                $range = $range;
+
+                /** @var callable(Candidate):bool $callback */
+                $callback = $callback;
+
                 return $pathFinder->findBestPaths($graph, $source, $target, $range, $callback);
             };
+
+            return $runner;
         };
 
-        $this->pathFinderFactory = $factory instanceof Closure ? $factory : Closure::fromCallable($factory);
+        $factory = $factory instanceof Closure ? $factory : Closure::fromCallable($factory);
+
+        /** @var Closure(PathSearchConfig):Closure(array, string, string, array, callable):SearchOutcome $typedFactory */
+        $typedFactory = $factory;
+
+        $this->pathFinderFactory = $typedFactory;
     }
 
     /**
@@ -104,6 +144,7 @@ final class PathFinderService
             return $empty;
         }
 
+        /** @var Graph $graph */
         $graph = $this->graphBuilder->build($orders);
         if (!isset($graph[$sourceCurrency], $graph[$targetCurrency])) {
             /** @var SearchOutcome<PathResult> $empty */
@@ -113,6 +154,13 @@ final class PathFinderService
         }
 
         $runnerFactory = $this->pathFinderFactory;
+        /**
+         * @var Closure(Graph, string, string, SpendConstraints, callable(Candidate):bool):SearchOutcome<Candidate> $runner
+         *
+         * @phpstan-var Closure(Graph, string, string, SpendConstraints, callable(Candidate):bool):SearchOutcome<Candidate> $runner
+         *
+         * @psalm-var Closure(Graph, string, string, SpendConstraints, callable(Candidate):bool):SearchOutcome<Candidate> $runner
+         */
         $runner = $runnerFactory($config);
 
         /** @var list<array{cost: numeric-string, order: int, result: PathResult}> $materializedResults */

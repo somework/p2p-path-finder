@@ -33,6 +33,13 @@ final class BcMath
 
     private static bool $extensionVerified = false;
 
+    /**
+     * @var (Closure(string):bool)|null
+     *
+     * @phpstan-var (Closure(string):bool)|null
+     *
+     * @psalm-var (Closure(string):bool)|null
+     */
     private static ?Closure $extensionDetector = null;
 
     private function __construct()
@@ -309,7 +316,10 @@ final class BcMath
     private static function extensionLoaded(string $extension): bool
     {
         if (null !== self::$extensionDetector) {
-            return (self::$extensionDetector)($extension);
+            /** @var Closure(string):bool $detector */
+            $detector = self::$extensionDetector;
+
+            return $detector($extension);
         }
 
         return extension_loaded($extension);
