@@ -218,6 +218,41 @@ final class PathFinderTest extends TestCase
         self::assertSame('USD', $direct['edges'][0]['to']);
     }
 
+    public function test_it_skips_duplicate_states_with_identical_cost_and_hops(): void
+    {
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    self::manualEdge('SRC', 'MID', '1.500'),
+                    self::manualEdge('SRC', 'MID', '1.500'),
+                ],
+            ],
+            'MID' => [
+                'currency' => 'MID',
+                'edges' => [
+                    self::manualEdge('MID', 'TRG', '1.750'),
+                ],
+            ],
+            'TRG' => [
+                'currency' => 'TRG',
+                'edges' => [],
+            ],
+        ];
+
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.0', topK: 2);
+        $results = self::extractPaths($finder->findBestPaths($graph, 'SRC', 'TRG'));
+
+        self::assertCount(1, $results);
+        self::assertSame(2, $results[0]['hops']);
+
+        $path = $results[0]['edges'];
+        self::assertSame('SRC', $path[0]['from']);
+        self::assertSame('MID', $path[0]['to']);
+        self::assertSame('MID', $path[1]['from']);
+        self::assertSame('TRG', $path[1]['to']);
+    }
+
     public function test_it_returns_same_paths_when_order_book_is_permuted(): void
     {
         $orders = [
