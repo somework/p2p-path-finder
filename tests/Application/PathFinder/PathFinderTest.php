@@ -418,6 +418,45 @@ final class PathFinderTest extends TestCase
         self::assertSame(['SRC', 'TRG'], $nodes);
     }
 
+    public function test_it_ignores_non_positive_conversion_edges_without_aborting_neighbor_iteration(): void
+    {
+        $invalidEdge = self::manualEdge('SRC', 'NEG', '1.500');
+        $zeroSrc = Money::zero('SRC', 3);
+        $zeroNeg = Money::zero('NEG', 3);
+
+        $invalidEdge['grossBaseCapacity']['max'] = $zeroSrc;
+        $invalidEdge['baseCapacity']['max'] = $zeroSrc;
+        $invalidEdge['quoteCapacity']['max'] = $zeroNeg;
+        $invalidEdge['segments'][0]['grossBase']['max'] = $zeroSrc;
+        $invalidEdge['segments'][0]['base']['max'] = $zeroSrc;
+        $invalidEdge['segments'][0]['quote']['max'] = $zeroNeg;
+
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    $invalidEdge,
+                    self::manualEdge('SRC', 'TRG', '2.000'),
+                ],
+            ],
+            'NEG' => ['currency' => 'NEG', 'edges' => []],
+            'TRG' => ['currency' => 'TRG', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0', topK: 1);
+        $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
+        $paths = $outcome->paths();
+
+        self::assertCount(1, $paths);
+
+        $nodes = array_merge(
+            [$paths[0]['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $paths[0]['edges']),
+        );
+
+        self::assertSame(['SRC', 'TRG'], $nodes);
+    }
+
     public function test_it_continues_processing_queue_after_skipping_hop_limited_state(): void
     {
         $graph = [
