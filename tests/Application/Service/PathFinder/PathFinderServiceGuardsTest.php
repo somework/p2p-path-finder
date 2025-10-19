@@ -7,6 +7,8 @@ namespace SomeWork\P2PPathFinder\Tests\Application\Service\PathFinder;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
@@ -95,10 +97,131 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
         self::assertFalse($result->guardLimits()->visitedStatesReached());
     }
 
+    public function test_it_skips_candidates_without_edges(): void
+    {
+        $orderBook = $this->simpleEuroToUsdOrderBook();
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '50.00', 2))
+            ->withToleranceBounds('0.0', '0.10')
+            ->withHopLimits(1, 2)
+            ->build();
+
+        $factory = $this->pathFinderFactoryForCandidates([
+            [
+                'cost' => '1.000000000000000000',
+                'product' => '1.000000000000000000',
+                'hops' => 1,
+                'edges' => [],
+                'amountRange' => null,
+                'desiredAmount' => null,
+            ],
+        ]);
+
+        $service = $this->makeServiceWithFactory($factory);
+
+        $result = $service->findBestPaths($orderBook, $config, 'USD');
+
+        self::assertSame([], $result->paths());
+    }
+
+    public function test_it_ignores_candidates_with_mismatched_source_currency(): void
+    {
+        $orderBook = $this->simpleEuroToUsdOrderBook();
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '75.00', 2))
+            ->withToleranceBounds('0.0', '0.10')
+            ->withHopLimits(1, 2)
+            ->build();
+
+        $factory = $this->pathFinderFactoryForCandidates([
+            [
+                'cost' => '1.000000000000000000',
+                'product' => '1.000000000000000000',
+                'hops' => 1,
+                'edges' => [
+                    [
+                        'from' => 'USD',
+                        'to' => 'EUR',
+                    ],
+                ],
+                'amountRange' => null,
+                'desiredAmount' => null,
+            ],
+        ]);
+
+        $service = $this->makeServiceWithFactory($factory);
+
+        $result = $service->findBestPaths($orderBook, $config, 'USD');
+
+        self::assertSame([], $result->paths());
+    }
+
+    public function test_it_maintains_insertion_order_for_equal_cost_results(): void
+    {
+        $orders = [
+            OrderFactory::sell('USD', 'EUR', '10.000', '500.000', '0.950', 3, 3),
+            OrderFactory::sell('USD', 'EUR', '10.000', '500.000', '0.850', 3, 3),
+        ];
+
+        $graph = (new GraphBuilder())->build($orders);
+        $edgeA = $graph['EUR']['edges'][0];
+        $edgeB = $graph['EUR']['edges'][1];
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.000', 3))
+            ->withToleranceBounds('0.0', '0.10')
+            ->withHopLimits(1, 2)
+            ->build();
+
+        $factory = $this->pathFinderFactoryForCandidates([
+            [
+                'cost' => '1.000000000000000000',
+                'product' => '1.000000000000000000',
+                'hops' => 1,
+                'edges' => [$edgeA],
+                'amountRange' => null,
+                'desiredAmount' => null,
+            ],
+            [
+                'cost' => '1.000000000000000000',
+                'product' => '1.000000000000000000',
+                'hops' => 1,
+                'edges' => [$edgeB],
+                'amountRange' => null,
+                'desiredAmount' => null,
+            ],
+        ]);
+
+        $service = $this->makeServiceWithFactory($factory);
+
+        $result = $service->findBestPaths($this->orderBookFromArray($orders), $config, 'USD');
+
+        $paths = $result->paths();
+        self::assertCount(2, $paths);
+        self::assertSame('105.300', $paths[0]->totalReceived()->amount());
+        self::assertSame('117.700', $paths[1]->totalReceived()->amount());
+    }
+
     private function simpleEuroToUsdOrderBook(): OrderBook
     {
         return $this->orderBook(
             OrderFactory::sell('USD', 'EUR', '10.000', '200.000', '0.900', 3),
         );
+    }
+
+    /**
+     * @param list<array{cost: numeric-string, product: numeric-string, hops: int, edges: list<array>, amountRange: mixed, desiredAmount: mixed}> $candidates
+     */
+    private function pathFinderFactoryForCandidates(array $candidates, ?GuardLimitStatus $guardLimits = null): callable
+    {
+        return static function (PathSearchConfig $config) use ($candidates, $guardLimits): callable {
+            return static function (array $graph, string $source, string $target, array $range, callable $callback) use ($candidates, $guardLimits): SearchOutcome {
+                foreach ($candidates as $candidate) {
+                    $callback($candidate);
+                }
+
+                return new SearchOutcome([], $guardLimits ?? GuardLimitStatus::none());
+            };
+        };
     }
 }

@@ -70,7 +70,9 @@ final class ToleranceEvaluator
             $diff = substr($diff, 1);
         }
 
-        if ('' === $diff) {
+        BcMath::ensureNumeric($diff);
+
+        if (0 === BcMath::comp($diff, '0', $scale + 4)) {
             $diff = '0';
         }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Service;
 
+use Closure;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
@@ -13,6 +14,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
+use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
@@ -31,6 +33,10 @@ final class PathFinderService
     private readonly OrderSpendAnalyzer $orderSpendAnalyzer;
     private readonly LegMaterializer $legMaterializer;
     private readonly ToleranceEvaluator $toleranceEvaluator;
+    /**
+     * @var Closure(PathSearchConfig):Closure(array, string, string, array{min: Money, max: Money, desired: Money}, callable(array):bool): SearchOutcome
+     */
+    private readonly Closure $pathFinderFactory;
 
     public function __construct(
         private readonly GraphBuilder $graphBuilder,
@@ -38,6 +44,7 @@ final class PathFinderService
         ?LegMaterializer $legMaterializer = null,
         ?ToleranceEvaluator $toleranceEvaluator = null,
         ?OrderFillEvaluator $fillEvaluator = null,
+        ?callable $pathFinderFactory = null,
     ) {
         $fillEvaluator ??= new OrderFillEvaluator();
 
@@ -48,6 +55,27 @@ final class PathFinderService
         $this->legMaterializer = $legMaterializer;
         $this->orderSpendAnalyzer = $orderSpendAnalyzer ?? new OrderSpendAnalyzer($fillEvaluator, $this->legMaterializer);
         $this->toleranceEvaluator = $toleranceEvaluator ?? new ToleranceEvaluator();
+        $factory = $pathFinderFactory ?? static function (PathSearchConfig $config): Closure {
+            return static function (
+                array $graph,
+                string $source,
+                string $target,
+                array $range,
+                callable $callback,
+            ) use ($config): SearchOutcome {
+                $pathFinder = new PathFinder(
+                    $config->maximumHops(),
+                    $config->pathFinderTolerance(),
+                    $config->resultLimit(),
+                    $config->pathFinderMaxExpansions(),
+                    $config->pathFinderMaxVisitedStates(),
+                );
+
+                return $pathFinder->findBestPaths($graph, $source, $target, $range, $callback);
+            };
+        };
+
+        $this->pathFinderFactory = $factory instanceof Closure ? $factory : Closure::fromCallable($factory);
     }
 
     /**
@@ -84,18 +112,13 @@ final class PathFinderService
             return $empty;
         }
 
-        $pathFinder = new PathFinder(
-            $config->maximumHops(),
-            $config->pathFinderTolerance(),
-            $config->resultLimit(),
-            $config->pathFinderMaxExpansions(),
-            $config->pathFinderMaxVisitedStates(),
-        );
+        $runnerFactory = $this->pathFinderFactory;
+        $runner = $runnerFactory($config);
 
         /** @var list<array{cost: numeric-string, order: int, result: PathResult}> $materializedResults */
         $materializedResults = [];
         $resultOrder = 0;
-        $searchResult = $pathFinder->findBestPaths(
+        $searchResult = $runner(
             $graph,
             $sourceCurrency,
             $targetCurrency,

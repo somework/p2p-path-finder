@@ -6,8 +6,10 @@ namespace SomeWork\P2PPathFinder\Tests\Domain\ValueObject;
 
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
+use ReflectionProperty;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 final class BcMathTest extends TestCase
 {
@@ -131,5 +133,29 @@ final class BcMathTest extends TestCase
         $constructor->invoke($instance);
 
         self::assertInstanceOf(BcMath::class, $instance);
+    }
+
+    public function test_extension_check_throws_when_detector_reports_missing(): void
+    {
+        $detector = new ReflectionProperty(BcMath::class, 'extensionDetector');
+        $detector->setAccessible(true);
+        $verified = new ReflectionProperty(BcMath::class, 'extensionVerified');
+        $verified->setAccessible(true);
+
+        $previousDetector = $detector->getValue();
+        $previousVerified = $verified->getValue();
+
+        $detector->setValue(null, static fn (string $extension): bool => false);
+        $verified->setValue(null, false);
+
+        $this->expectException(PrecisionViolation::class);
+        $this->expectExceptionMessage('The BCMath extension (ext-bcmath) is required. Install it or require symfony/polyfill-bcmath when the extension cannot be loaded.');
+
+        try {
+            BcMath::add('1', '1', 2);
+        } finally {
+            $detector->setValue(null, $previousDetector);
+            $verified->setValue(null, $previousVerified);
+        }
     }
 }
