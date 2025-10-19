@@ -589,10 +589,14 @@ final class PathFinder
     }
 
     /**
+     * @param array{min: Money, max: Money}|null $range
+     *
      * @return array{SearchStateQueue, CandidateResultHeap, array<string, list<array{cost: numeric-string, hops: int, signature: string}>>, int, int, int}
      */
     private function initializeSearchStructures(string $source, ?array $range, ?Money $desiredSpend): array
     {
+        /** @var array{min: Money, max: Money}|null $range */
+        $range = $range;
         $queue = $this->createQueue();
         $results = $this->createResultHeap();
         $insertionOrder = 0;
