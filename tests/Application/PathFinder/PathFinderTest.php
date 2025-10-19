@@ -15,6 +15,7 @@ use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
+use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
@@ -235,6 +236,66 @@ final class PathFinderTest extends TestCase
         $permutedResults = self::extractPaths($permutedFinder->findBestPaths($permutedGraph, 'EUR', 'USD'));
 
         self::assertSame($originalResults, $permutedResults);
+    }
+
+    public function test_it_prunes_paths_that_exceed_updated_tolerance_threshold(): void
+    {
+        $graph = [
+            'RUB' => [
+                'currency' => 'RUB',
+                'edges' => [
+                    self::manualEdge('RUB', 'IDR', '20.000'),
+                    self::manualEdge('RUB', 'USD', '30.000'),
+                ],
+            ],
+            'USD' => [
+                'currency' => 'USD',
+                'edges' => [
+                    self::manualEdge('USD', 'JPY', '0.010'),
+                    self::manualEdge('USD', 'IDR', '8.000'),
+                    self::manualEdge('USD', 'CAD', '2.500'),
+                ],
+            ],
+            'CAD' => [
+                'currency' => 'CAD',
+                'edges' => [
+                    self::manualEdge('CAD', 'IDR', '1.000'),
+                ],
+            ],
+            'IDR' => ['currency' => 'IDR', 'edges' => []],
+            'JPY' => ['currency' => 'JPY', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 4, tolerance: '0.5', topK: 3);
+        $outcome = $finder->findBestPaths($graph, 'RUB', 'IDR');
+        $paths = $outcome->paths();
+
+        self::assertCount(2, $paths);
+
+        $first = $paths[0];
+        self::assertSame(2, $first['hops']);
+        $firstNodes = array_merge(
+            [$first['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $first['edges']),
+        );
+        self::assertSame(['RUB', 'USD', 'IDR'], $firstNodes);
+        $expectedTwoHopCost = BcMath::div('1', BcMath::mul('30', '8', self::SCALE), self::SCALE);
+        self::assertSame($expectedTwoHopCost, $first['cost']);
+
+        $second = $paths[1];
+        self::assertSame(1, $second['hops']);
+        $secondNodes = array_merge(
+            [$second['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $second['edges']),
+        );
+        self::assertSame(['RUB', 'IDR'], $secondNodes);
+        $expectedDirectCost = BcMath::div('1', '20', self::SCALE);
+        self::assertSame($expectedDirectCost, $second['cost']);
+
+        foreach ($paths as $path) {
+            $visited = array_map(static fn (array $edge): string => $edge['to'], $path['edges']);
+            self::assertNotContains('CAD', $visited);
+        }
     }
 
     public function test_it_normalizes_endpoint_case_inputs(): void
@@ -1394,6 +1455,60 @@ final class PathFinderTest extends TestCase
                 amountScale: 3,
                 rateScale: 4,
             ),
+        ];
+    }
+
+    /**
+     * @return array{
+     *     from: string,
+     *     to: string,
+     *     orderSide: OrderSide,
+     *     order: Order,
+     *     rate: ExchangeRate,
+     *     baseCapacity: array{min: Money, max: Money},
+     *     quoteCapacity: array{min: Money, max: Money},
+     *     grossBaseCapacity: array{min: Money, max: Money},
+     *     segments: list<array{
+     *         isMandatory: bool,
+     *         base: array{min: Money, max: Money},
+     *         quote: array{min: Money, max: Money},
+     *         grossBase: array{min: Money, max: Money},
+     *     }>,
+     * }
+     */
+    private static function manualEdge(string $from, string $to, string $rate, int $scale = 3): array
+    {
+        $order = OrderFactory::createOrder(
+            OrderSide::BUY,
+            $from,
+            $to,
+            '1.000',
+            '1.000',
+            $rate,
+            amountScale: $scale,
+            rateScale: $scale,
+        );
+
+        $baseMin = Money::zero($from, $scale);
+        $baseMax = Money::fromString($from, '1.000', $scale);
+        $quoteMin = Money::zero($to, $scale);
+        $quoteMax = Money::fromString($to, $rate, $scale);
+
+        return [
+            'from' => $from,
+            'to' => $to,
+            'orderSide' => OrderSide::BUY,
+            'order' => $order,
+            'rate' => ExchangeRate::fromString($from, $to, $rate, $scale),
+            'baseCapacity' => ['min' => $baseMin, 'max' => $baseMax],
+            'quoteCapacity' => ['min' => $quoteMin, 'max' => $quoteMax],
+            'grossBaseCapacity' => ['min' => $baseMin, 'max' => $baseMax],
+            'segments' => [[
+                'isMandatory' => false,
+                'base' => ['min' => $baseMin, 'max' => $baseMax],
+                'quote' => ['min' => $quoteMin, 'max' => $quoteMax],
+                'grossBase' => ['min' => $baseMin, 'max' => $baseMax],
+            ]],
         ];
     }
 
