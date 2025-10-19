@@ -535,6 +535,61 @@ final class PathFinderTest extends TestCase
         self::assertTrue($outcome->guardLimits()->visitedStatesReached());
     }
 
+    public function test_it_keeps_processing_guarded_states_with_matching_signatures(): void
+    {
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    self::manualEdge('SRC', 'ALT', '2.000'),
+                    self::manualEdge('SRC', 'MID', '1.000'),
+                ],
+            ],
+            'ALT' => [
+                'currency' => 'ALT',
+                'edges' => [
+                    self::manualEdge('ALT', 'AUX', '1.000'),
+                ],
+            ],
+            'AUX' => [
+                'currency' => 'AUX',
+                'edges' => [
+                    self::manualEdge('AUX', 'TRG', '1.000'),
+                ],
+            ],
+            'MID' => [
+                'currency' => 'MID',
+                'edges' => [
+                    self::manualEdge('MID', 'SKP', '1.000'),
+                    self::manualEdge('MID', 'TRG', '2.000'),
+                ],
+            ],
+            'SKP' => ['currency' => 'SKP', 'edges' => []],
+            'TRG' => ['currency' => 'TRG', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 4, tolerance: '0.0', topK: 2, maxVisitedStates: 5);
+        $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
+
+        $paths = $outcome->paths();
+
+        self::assertCount(2, $paths);
+
+        $firstNodes = array_merge(
+            [$paths[0]['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $paths[0]['edges']),
+        );
+        self::assertSame(['SRC', 'ALT', 'AUX', 'TRG'], $firstNodes);
+
+        $secondNodes = array_merge(
+            [$paths[1]['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $paths[1]['edges']),
+        );
+        self::assertSame(['SRC', 'MID', 'TRG'], $secondNodes);
+
+        self::assertTrue($outcome->guardLimits()->visitedStatesReached());
+    }
+
     public function test_it_does_not_accept_cycles_that_improve_conversion_costs(): void
     {
         $graph = [
