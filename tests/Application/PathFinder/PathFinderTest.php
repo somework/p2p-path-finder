@@ -298,6 +298,91 @@ final class PathFinderTest extends TestCase
         }
     }
 
+    public function test_it_updates_best_cost_after_discovering_a_better_candidate(): void
+    {
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    self::manualEdge('SRC', 'TRG', '2.000'),
+                    self::manualEdge('SRC', 'MOD', '1.500'),
+                    self::manualEdge('SRC', 'BST', '1.100'),
+                    self::manualEdge('SRC', 'LATE', '1.050'),
+                ],
+            ],
+            'MOD' => [
+                'currency' => 'MOD',
+                'edges' => [
+                    self::manualEdge('MOD', 'TRG', '2.000'),
+                ],
+            ],
+            'BST' => [
+                'currency' => 'BST',
+                'edges' => [
+                    self::manualEdge('BST', 'TRG', '10.000'),
+                ],
+            ],
+            'LATE' => [
+                'currency' => 'LATE',
+                'edges' => [
+                    self::manualEdge('LATE', 'TRG', '2.381'),
+                ],
+            ],
+            'TRG' => ['currency' => 'TRG', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 3);
+        $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
+        $paths = $outcome->paths();
+
+        self::assertCount(3, $paths);
+
+        $directPathFound = false;
+
+        foreach ($paths as $path) {
+            $nodes = array_merge(
+                [$path['edges'][0]['from']],
+                array_map(static fn (array $edge): string => $edge['to'], $path['edges']),
+            );
+
+            self::assertNotContains('LATE', $nodes);
+
+            if (1 === $path['hops']) {
+                $directPathFound = true;
+                self::assertSame(['SRC', 'TRG'], $nodes);
+            }
+        }
+
+        self::assertTrue($directPathFound);
+    }
+
+    public function test_it_continues_evaluating_edges_after_missing_neighbor(): void
+    {
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    self::manualEdge('SRC', 'MIA', '1.500'),
+                    self::manualEdge('SRC', 'TRG', '2.000'),
+                ],
+            ],
+            'TRG' => ['currency' => 'TRG', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0', topK: 1);
+        $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
+        $paths = $outcome->paths();
+
+        self::assertCount(1, $paths);
+
+        $nodes = array_merge(
+            [$paths[0]['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $paths[0]['edges']),
+        );
+
+        self::assertSame(['SRC', 'TRG'], $nodes);
+    }
+
     public function test_it_continues_processing_queue_after_skipping_hop_limited_state(): void
     {
         $graph = [
