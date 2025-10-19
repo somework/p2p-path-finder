@@ -418,6 +418,18 @@ final class PathSearchConfigTest extends TestCase
         self::assertSame('0.200000000000000000', $config->pathFinderTolerance());
     }
 
+    public function test_builder_preserves_minimum_tolerance_when_bounds_are_equal(): void
+    {
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '150.00', 2))
+            ->withToleranceBounds('0.150000000000000000', '0.150000000000000000')
+            ->withHopLimits(1, 3)
+            ->build();
+
+        self::assertSame('0.150000000000000000', $config->pathFinderTolerance());
+        self::assertSame('override', $config->pathFinderToleranceSource());
+    }
+
     public function test_bounded_spend_calculation_maintains_scale_precision(): void
     {
         $config = PathSearchConfig::builder()

@@ -50,4 +50,213 @@ final class PathFinderEdgeGuardsTest extends TestCase
         self::assertFalse($outcome->guardLimits()->expansionsReached());
         self::assertFalse($outcome->guardLimits()->visitedStatesReached());
     }
+
+    /**
+     * @dataProvider provideMissingEndpoints
+     */
+    public function test_it_returns_empty_outcome_when_source_or_target_missing(string $source, string $target): void
+    {
+        $order = OrderFactory::buy(
+            base: 'USD',
+            quote: 'EUR',
+            minAmount: '1.000',
+            maxAmount: '2.000',
+            rate: '0.900',
+            amountScale: 3,
+            rateScale: 3,
+        );
+
+        $graph = (new GraphBuilder())->build([$order]);
+        $finder = new PathFinder(2, '0.0');
+
+        $outcome = $finder->findBestPaths($graph, $source, $target);
+
+        self::assertSame([], $outcome->paths());
+        self::assertFalse($outcome->guardLimits()->expansionsReached());
+        self::assertFalse($outcome->guardLimits()->visitedStatesReached());
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function provideMissingEndpoints(): iterable
+    {
+        yield 'missing_source' => ['GBP', 'EUR'];
+        yield 'missing_target' => ['USD', 'JPY'];
+    }
+
+    public function test_missing_target_does_not_trigger_guard_limits(): void
+    {
+        $orders = [
+            OrderFactory::buy(
+                base: 'AAA',
+                quote: 'BBB',
+                minAmount: '1.000',
+                maxAmount: '1.000',
+                rate: '1.000',
+                amountScale: 3,
+                rateScale: 3,
+            ),
+        ];
+
+        $graph = (new GraphBuilder())->build($orders);
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 1, maxExpansions: 5, maxVisitedStates: 1);
+
+        $outcome = $finder->findBestPaths($graph, 'AAA', 'ZZZ');
+
+        self::assertSame([], $outcome->paths());
+        self::assertFalse($outcome->guardLimits()->expansionsReached());
+        self::assertFalse($outcome->guardLimits()->visitedStatesReached());
+    }
+
+    public function test_it_marks_expansion_guard_when_limit_reached(): void
+    {
+        $order = OrderFactory::buy(
+            base: 'AAA',
+            quote: 'BBB',
+            minAmount: '1.000',
+            maxAmount: '1.000',
+            rate: '1.000',
+            amountScale: 3,
+            rateScale: 3,
+        );
+
+        $graph = (new GraphBuilder())->build([$order]);
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 1, maxExpansions: 1, maxVisitedStates: 10);
+
+        $outcome = $finder->findBestPaths($graph, 'AAA', 'BBB');
+
+        self::assertSame([], $outcome->paths());
+        self::assertTrue($outcome->guardLimits()->expansionsReached());
+        self::assertFalse($outcome->guardLimits()->visitedStatesReached());
+    }
+
+    public function test_it_marks_visited_guard_when_limit_reached(): void
+    {
+        $order = OrderFactory::buy(
+            base: 'AAA',
+            quote: 'BBB',
+            minAmount: '1.000',
+            maxAmount: '1.000',
+            rate: '1.000',
+            amountScale: 3,
+            rateScale: 3,
+        );
+
+        $graph = (new GraphBuilder())->build([$order]);
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 1, maxExpansions: 5, maxVisitedStates: 1);
+
+        $outcome = $finder->findBestPaths($graph, 'AAA', 'BBB');
+
+        self::assertSame([], $outcome->paths());
+        self::assertFalse($outcome->guardLimits()->expansionsReached());
+        self::assertTrue($outcome->guardLimits()->visitedStatesReached());
+    }
+
+    public function test_it_prunes_candidates_exceeding_best_cost_without_tolerance(): void
+    {
+        $orders = [
+            OrderFactory::buy(
+                base: 'AAA',
+                quote: 'BBB',
+                minAmount: '1.000',
+                maxAmount: '1.000',
+                rate: '2.000',
+                amountScale: 3,
+                rateScale: 3,
+            ),
+            OrderFactory::buy(
+                base: 'AAA',
+                quote: 'CCC',
+                minAmount: '1.000',
+                maxAmount: '1.000',
+                rate: '0.500',
+                amountScale: 3,
+                rateScale: 3,
+            ),
+            OrderFactory::buy(
+                base: 'CCC',
+                quote: 'BBB',
+                minAmount: '1.000',
+                maxAmount: '1.000',
+                rate: '0.500',
+                amountScale: 3,
+                rateScale: 3,
+            ),
+        ];
+
+        $graph = (new GraphBuilder())->build($orders);
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.0', topK: 2);
+
+        $paths = $finder->findBestPaths($graph, 'AAA', 'BBB')->paths();
+
+        self::assertCount(1, $paths);
+        $firstPath = $paths[0];
+        self::assertCount(1, $firstPath['edges']);
+        self::assertSame('AAA', $firstPath['edges'][0]['from']);
+        self::assertSame('BBB', $firstPath['edges'][0]['to']);
+    }
+
+    public function test_it_does_not_relax_best_cost_after_worse_candidate(): void
+    {
+        $orders = [
+            OrderFactory::buy(
+                base: 'AAA',
+                quote: 'CCC',
+                minAmount: '1.000',
+                maxAmount: '1.000',
+                rate: '2.000',
+                amountScale: 3,
+                rateScale: 3,
+            ),
+            OrderFactory::buy(
+                base: 'CCC',
+                quote: 'BBB',
+                minAmount: '1.000',
+                maxAmount: '1.000',
+                rate: '2.000',
+                amountScale: 3,
+                rateScale: 3,
+            ),
+            OrderFactory::buy(
+                base: 'AAA',
+                quote: 'BBB',
+                minAmount: '1.000',
+                maxAmount: '1.000',
+                rate: '0.500',
+                amountScale: 3,
+                rateScale: 3,
+            ),
+            OrderFactory::buy(
+                base: 'AAA',
+                quote: 'DDD',
+                minAmount: '1.000',
+                maxAmount: '1.000',
+                rate: '0.200',
+                amountScale: 3,
+                rateScale: 3,
+            ),
+            OrderFactory::buy(
+                base: 'DDD',
+                quote: 'BBB',
+                minAmount: '1.000',
+                maxAmount: '1.000',
+                rate: '5.000',
+                amountScale: 3,
+                rateScale: 3,
+            ),
+        ];
+
+        $graph = (new GraphBuilder())->build($orders);
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.0', topK: 3);
+
+        $paths = $finder->findBestPaths($graph, 'AAA', 'BBB')->paths();
+
+        self::assertCount(2, $paths);
+        self::assertSame(
+            ['0.250000000000000000', '2.000000000000000000'],
+            array_column($paths, 'cost'),
+        );
+    }
+
 }
