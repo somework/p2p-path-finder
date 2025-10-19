@@ -253,36 +253,17 @@ final class PathFinder
             $desiredSpend = $spendConstraints['desired'] ?? null;
         }
 
-        $queue = $this->createQueue();
-        $results = $this->createResultHeap();
-        $insertionOrder = 0;
-        $resultInsertionOrder = 0;
-
-        $queue->insert([
-            'node' => $source,
-            'cost' => $this->unitValue,
-            'product' => $this->unitValue,
-            'hops' => 0,
-            'path' => [],
-            'amountRange' => $range,
-            'desiredAmount' => $desiredSpend,
-            'visited' => [$source => true],
-        ], ['cost' => $this->unitValue, 'order' => $insertionOrder++]);
-
-        /**
-         * @var array<string, list<array{cost: numeric-string, hops: int, signature: string}>> $bestPerNode
-         */
-        $bestPerNode = [
-            $source => [[
-                'cost' => $this->unitValue,
-                'hops' => 0,
-                'signature' => $this->stateSignature($range, $desiredSpend),
-            ]],
-        ];
+        [
+            $queue,
+            $results,
+            $bestPerNode,
+            $insertionOrder,
+            $resultInsertionOrder,
+            $visitedStates,
+        ] = $this->initializeSearchStructures($source, $range, $desiredSpend);
 
         $bestTargetCost = null;
         $expansions = 0;
-        $visitedStates = 1;
 
         $expansionGuardReached = false;
         $visitedGuardReached = false;
@@ -605,6 +586,47 @@ final class PathFinder
         if ($results->count() > $this->topK) {
             $results->extract();
         }
+    }
+
+    /**
+     * @param array{min: Money, max: Money}|null $range
+     *
+     * @return array{SearchStateQueue, CandidateResultHeap, array<string, list<array{cost: numeric-string, hops: int, signature: string}>>, int, int, int}
+     */
+    private function initializeSearchStructures(string $source, ?array $range, ?Money $desiredSpend): array
+    {
+        /** @var array{min: Money, max: Money}|null $range */
+        $range = $range;
+        $queue = $this->createQueue();
+        $results = $this->createResultHeap();
+        $insertionOrder = 0;
+        $resultInsertionOrder = 0;
+
+        $initialState = [
+            'node' => $source,
+            'cost' => $this->unitValue,
+            'product' => $this->unitValue,
+            'hops' => 0,
+            'path' => [],
+            'amountRange' => $range,
+            'desiredAmount' => $desiredSpend,
+            'visited' => [$source => true],
+        ];
+
+        $queue->insert($initialState, ['cost' => $this->unitValue, 'order' => $insertionOrder++]);
+
+        /**
+         * @var array<string, list<array{cost: numeric-string, hops: int, signature: string}>> $bestPerNode
+         */
+        $bestPerNode = [
+            $source => [[
+                'cost' => $this->unitValue,
+                'hops' => 0,
+                'signature' => $this->stateSignature($range, $desiredSpend),
+            ]],
+        ];
+
+        return [$queue, $results, $bestPerNode, $insertionOrder, $resultInsertionOrder, 1];
     }
 
     /**

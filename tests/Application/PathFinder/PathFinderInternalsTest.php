@@ -6,6 +6,7 @@ namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
+use ReflectionProperty;
 use SomeWork\P2PPathFinder\Application\PathFinder\CandidateResultHeap;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\SearchStateQueue;
@@ -132,6 +133,54 @@ final class PathFinderInternalsTest extends TestCase
         $costsByHops = array_column($registry['USD'], 'cost', 'hops');
         self::assertSame(BcMath::normalize('1.0', self::SCALE), $costsByHops[4]);
         self::assertSame(BcMath::normalize('1.5', self::SCALE), $costsByHops[2]);
+    }
+
+    public function test_initialize_search_structures_sets_expected_defaults(): void
+    {
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.0');
+        $range = [
+            'min' => CurrencyScenarioFactory::money('USD', '5.00', 2),
+            'max' => CurrencyScenarioFactory::money('USD', '10.00', 2),
+        ];
+        $desired = CurrencyScenarioFactory::money('USD', '7.50', 2);
+
+        [
+            $queue,
+            $results,
+            $bestPerNode,
+            $insertionOrder,
+            $resultInsertionOrder,
+            $visitedStates,
+        ] = $this->invokeFinderMethod($finder, 'initializeSearchStructures', ['SRC', $range, $desired]);
+
+        self::assertInstanceOf(SearchStateQueue::class, $queue);
+        self::assertInstanceOf(CandidateResultHeap::class, $results);
+        self::assertSame(1, $insertionOrder);
+        self::assertSame(0, $resultInsertionOrder);
+        self::assertSame(1, $visitedStates);
+
+        self::assertFalse($queue->isEmpty());
+        $state = $queue->extract();
+        self::assertSame('SRC', $state['node']);
+        self::assertSame(['SRC' => true], $state['visited']);
+
+        $signature = $this->invokeFinderMethod($finder, 'stateSignature', [$range, $desired]);
+        $unitValueProperty = new ReflectionProperty(PathFinder::class, 'unitValue');
+        $unitValueProperty->setAccessible(true);
+        /** @var numeric-string $unit */
+        $unit = $unitValueProperty->getValue($finder);
+
+        self::assertSame($unit, $state['cost']);
+        self::assertSame($unit, $state['product']);
+        self::assertSame([], $state['path']);
+        self::assertSame($range, $state['amountRange']);
+        self::assertSame($desired, $state['desiredAmount']);
+
+        self::assertArrayHasKey('SRC', $bestPerNode);
+        self::assertCount(1, $bestPerNode['SRC']);
+        self::assertSame($unit, $bestPerNode['SRC'][0]['cost']);
+        self::assertSame(0, $bestPerNode['SRC'][0]['hops']);
+        self::assertSame($signature, $bestPerNode['SRC'][0]['signature']);
     }
 
     public function test_record_state_replaces_state_with_equal_hops_and_lower_cost(): void
