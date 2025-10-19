@@ -333,6 +333,150 @@ final class PathFinderTest extends TestCase
         }
     }
 
+    public function test_it_continues_iterating_neighbors_after_tolerance_skip(): void
+    {
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    self::manualEdge('SRC', 'EAR', '2.000'),
+                    self::manualEdge('SRC', 'MID', '1.500'),
+                ],
+            ],
+            'EAR' => [
+                'currency' => 'EAR',
+                'edges' => [
+                    self::manualEdge('EAR', 'LNK', '2.000'),
+                ],
+            ],
+            'LNK' => [
+                'currency' => 'LNK',
+                'edges' => [
+                    self::manualEdge('LNK', 'TRG', '2.000'),
+                ],
+            ],
+            'MID' => [
+                'currency' => 'MID',
+                'edges' => [
+                    self::manualEdge('MID', 'BAD', '0.200'),
+                    self::manualEdge('MID', 'TRG', '1.200'),
+                    self::manualEdge('MID', 'LATE', '0.300'),
+                ],
+            ],
+            'BAD' => ['currency' => 'BAD', 'edges' => []],
+            'LATE' => [
+                'currency' => 'LATE',
+                'edges' => [
+                    self::manualEdge('LATE', 'TRG', '1.000'),
+                ],
+            ],
+            'TRG' => ['currency' => 'TRG', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 4, tolerance: '0.9', topK: 2);
+        $paths = $finder->findBestPaths($graph, 'SRC', 'TRG')->paths();
+
+        self::assertCount(2, $paths);
+
+        $firstNodes = array_merge(
+            [$paths[0]['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $paths[0]['edges']),
+        );
+        self::assertSame(['SRC', 'EAR', 'LNK', 'TRG'], $firstNodes);
+
+        $secondNodes = array_merge(
+            [$paths[1]['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $paths[1]['edges']),
+        );
+        self::assertSame(['SRC', 'MID', 'TRG'], $secondNodes);
+
+        $expectedFirstCost = BcMath::div('1', BcMath::mul('2.000', BcMath::mul('2.000', '2.000', self::SCALE), self::SCALE), self::SCALE);
+        self::assertSame($expectedFirstCost, $paths[0]['cost']);
+
+        $expectedSecondCost = BcMath::div('1', BcMath::mul('1.500', '1.200', self::SCALE), self::SCALE);
+        self::assertSame($expectedSecondCost, $paths[1]['cost']);
+
+        foreach ($paths as $path) {
+            $visitedNodes = array_merge(
+                [$path['edges'][0]['from']],
+                array_map(static fn (array $edge): string => $edge['to'], $path['edges']),
+            );
+            self::assertNotContains('LATE', $visitedNodes);
+        }
+    }
+
+    public function test_it_preserves_best_cost_after_accepting_tolerated_candidate(): void
+    {
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    self::manualEdge('SRC', 'EAR', '2.000'),
+                    self::manualEdge('SRC', 'MID', '1.500'),
+                ],
+            ],
+            'EAR' => [
+                'currency' => 'EAR',
+                'edges' => [
+                    self::manualEdge('EAR', 'LNK', '2.000'),
+                ],
+            ],
+            'LNK' => [
+                'currency' => 'LNK',
+                'edges' => [
+                    self::manualEdge('LNK', 'TRG', '2.000'),
+                ],
+            ],
+            'MID' => [
+                'currency' => 'MID',
+                'edges' => [
+                    self::manualEdge('MID', 'BAD', '0.200'),
+                    self::manualEdge('MID', 'TRG', '1.200'),
+                    self::manualEdge('MID', 'LATE', '0.300'),
+                ],
+            ],
+            'BAD' => ['currency' => 'BAD', 'edges' => []],
+            'LATE' => [
+                'currency' => 'LATE',
+                'edges' => [
+                    self::manualEdge('LATE', 'TRG', '1.000'),
+                ],
+            ],
+            'TRG' => ['currency' => 'TRG', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 4, tolerance: '0.9', topK: 3);
+        $paths = $finder->findBestPaths($graph, 'SRC', 'TRG')->paths();
+
+        self::assertCount(2, $paths);
+
+        $firstNodes = array_merge(
+            [$paths[0]['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $paths[0]['edges']),
+        );
+        self::assertSame(['SRC', 'EAR', 'LNK', 'TRG'], $firstNodes);
+
+        $secondNodes = array_merge(
+            [$paths[1]['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $paths[1]['edges']),
+        );
+        self::assertSame(['SRC', 'MID', 'TRG'], $secondNodes);
+
+        $expectedFirstCost = BcMath::div('1', BcMath::mul('2.000', BcMath::mul('2.000', '2.000', self::SCALE), self::SCALE), self::SCALE);
+        self::assertSame($expectedFirstCost, $paths[0]['cost']);
+
+        $expectedSecondCost = BcMath::div('1', BcMath::mul('1.500', '1.200', self::SCALE), self::SCALE);
+        self::assertSame($expectedSecondCost, $paths[1]['cost']);
+
+        foreach ($paths as $path) {
+            $visitedNodes = array_merge(
+                [$path['edges'][0]['from']],
+                array_map(static fn (array $edge): string => $edge['to'], $path['edges']),
+            );
+            self::assertNotContains('LATE', $visitedNodes);
+        }
+    }
+
     public function test_it_updates_best_cost_after_discovering_a_better_candidate(): void
     {
         $graph = [
