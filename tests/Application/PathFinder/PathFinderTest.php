@@ -298,6 +298,114 @@ final class PathFinderTest extends TestCase
         }
     }
 
+    public function test_it_continues_processing_queue_after_skipping_hop_limited_state(): void
+    {
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    self::manualEdge('SRC', 'BLK', '5.000'),
+                    self::manualEdge('SRC', 'HLP', '1.500'),
+                ],
+            ],
+            'BLK' => [
+                'currency' => 'BLK',
+                'edges' => [
+                    self::manualEdge('BLK', 'DED', '5.000'),
+                ],
+            ],
+            'HLP' => [
+                'currency' => 'HLP',
+                'edges' => [
+                    self::manualEdge('HLP', 'TRG', '1.100'),
+                ],
+            ],
+            'DED' => ['currency' => 'DED', 'edges' => []],
+            'TRG' => ['currency' => 'TRG', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 1);
+        $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
+
+        $paths = $outcome->paths();
+
+        self::assertCount(1, $paths);
+        $path = $paths[0];
+        self::assertSame(2, $path['hops']);
+
+        $nodes = array_merge(
+            [$path['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $path['edges']),
+        );
+
+        self::assertSame(['SRC', 'HLP', 'TRG'], $nodes);
+    }
+
+    public function test_it_respects_visited_state_guard_threshold(): void
+    {
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    self::manualEdge('SRC', 'TRG', '1.100'),
+                    self::manualEdge('SRC', 'ALP', '1.200'),
+                    self::manualEdge('SRC', 'BET', '1.300'),
+                ],
+            ],
+            'ALP' => [
+                'currency' => 'ALP',
+                'edges' => [
+                    self::manualEdge('ALP', 'LFK', '1.050'),
+                ],
+            ],
+            'BET' => [
+                'currency' => 'BET',
+                'edges' => [
+                    self::manualEdge('BET', 'LFK', '1.050'),
+                ],
+            ],
+            'LFK' => ['currency' => 'LFK', 'edges' => []],
+            'TRG' => ['currency' => 'TRG', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 1, maxVisitedStates: 2);
+        $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
+
+        $paths = $outcome->paths();
+        self::assertNotSame([], $paths);
+        self::assertTrue($outcome->guardLimits()->visitedStatesReached());
+    }
+
+    public function test_it_does_not_accept_cycles_that_improve_conversion_costs(): void
+    {
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    self::manualEdge('SRC', 'TRG', '2.000'),
+                    self::manualEdge('SRC', 'LOP', '2.000'),
+                ],
+            ],
+            'LOP' => [
+                'currency' => 'LOP',
+                'edges' => [
+                    self::manualEdge('LOP', 'SRC', '2.000'),
+                ],
+            ],
+            'TRG' => ['currency' => 'TRG', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 4, tolerance: '0.0', topK: 1);
+        $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
+
+        $paths = $outcome->paths();
+        self::assertCount(1, $paths);
+
+        $best = $paths[0];
+        self::assertSame(1, $best['hops']);
+        self::assertSame('TRG', $best['edges'][0]['to']);
+    }
+
     public function test_it_normalizes_endpoint_case_inputs(): void
     {
         $orders = self::buildComprehensiveOrderBook();
