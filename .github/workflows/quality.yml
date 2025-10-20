@@ -79,17 +79,17 @@ jobs:
         run: |
           mkdir -p coverage
           vendor/bin/phpunit --coverage-clover=coverage/quality-clover.xml
-      - name: Generate API documentation
-        run: composer phpdoc
-      - name: Package API documentation
-        run: |
-          tar -czf phpdoc.tar.gz -C docs api
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
           name: quality-coverage
           path: coverage/quality-clover.xml
           retention-days: 7
+      - name: Generate API documentation
+        run: composer phpdoc
+      - name: Package API documentation
+        run: |
+          tar -czf phpdoc.tar.gz -C docs api
       - name: Upload API documentation artifact
         uses: actions/upload-artifact@v4
         with:
