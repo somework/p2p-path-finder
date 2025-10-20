@@ -5,14 +5,18 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Application\Service\PathFinder;
 
 use PHPUnit\Framework\TestCase;
+use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
+use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Application\Support\Generator\PathFinderScenarioGenerator;
 use SomeWork\P2PPathFinder\Tests\Support\InfectionIterationLimiter;
@@ -108,6 +112,94 @@ final class PathFinderServicePropertyTest extends TestCase
                 'PathFinderService results must honour cost, hop and signature ordering.',
             );
         }
+    }
+
+    public function test_custom_ordering_strategy_applies_to_materialized_results(): void
+    {
+        $strategy = new class implements PathOrderStrategy {
+            public function compare(PathOrderKey $left, PathOrderKey $right): int
+            {
+                $comparison = $right->routeSignature() <=> $left->routeSignature();
+                if (0 !== $comparison) {
+                    return $comparison;
+                }
+
+                return $left->insertionOrder() <=> $right->insertionOrder();
+            }
+        };
+
+        $service = new PathFinderService($this->graphBuilder, orderingStrategy: $strategy);
+
+        $sorter = new ReflectionMethod(PathFinderService::class, 'sortMaterializedResults');
+        $sorter->setAccessible(true);
+
+        $firstResult = new PathResult(
+            Money::fromString('SRC', '1.0', 1),
+            Money::fromString('DST', '1.0', 1),
+            DecimalTolerance::zero(),
+        );
+        $secondResult = new PathResult(
+            Money::fromString('SRC', '1.0', 1),
+            Money::fromString('DST', '1.0', 1),
+            DecimalTolerance::zero(),
+        );
+        $thirdResult = new PathResult(
+            Money::fromString('SRC', '1.0', 1),
+            Money::fromString('DST', '1.0', 1),
+            DecimalTolerance::zero(),
+        );
+
+        $entries = [
+            [
+                'cost' => '0.100000000000000000',
+                'hops' => 2,
+                'routeSignature' => 'SRC->ALP->DST',
+                'order' => 0,
+                'result' => $firstResult,
+                'orderKey' => new PathOrderKey(
+                    '0.100000000000000000',
+                    2,
+                    'SRC->ALP->DST',
+                    0,
+                    ['pathResult' => $firstResult],
+                ),
+            ],
+            [
+                'cost' => '0.100000000000000000',
+                'hops' => 2,
+                'routeSignature' => 'SRC->BET->DST',
+                'order' => 1,
+                'result' => $secondResult,
+                'orderKey' => new PathOrderKey(
+                    '0.100000000000000000',
+                    2,
+                    'SRC->BET->DST',
+                    1,
+                    ['pathResult' => $secondResult],
+                ),
+            ],
+            [
+                'cost' => '0.100000000000000000',
+                'hops' => 2,
+                'routeSignature' => 'SRC->CHI->DST',
+                'order' => 2,
+                'result' => $thirdResult,
+                'orderKey' => new PathOrderKey(
+                    '0.100000000000000000',
+                    2,
+                    'SRC->CHI->DST',
+                    2,
+                    ['pathResult' => $thirdResult],
+                ),
+            ],
+        ];
+
+        $sorter->invokeArgs($service, [&$entries]);
+
+        self::assertSame(
+            ['SRC->CHI->DST', 'SRC->BET->DST', 'SRC->ALP->DST'],
+            array_map(static fn (array $entry): string => $entry['routeSignature'], $entries),
+        );
     }
 
     /**

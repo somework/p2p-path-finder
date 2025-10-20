@@ -10,10 +10,12 @@ use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
@@ -41,6 +43,7 @@ final class PathFinderService
     private readonly OrderSpendAnalyzer $orderSpendAnalyzer;
     private readonly LegMaterializer $legMaterializer;
     private readonly ToleranceEvaluator $toleranceEvaluator;
+    private readonly PathOrderStrategy $orderingStrategy;
     /**
      * @var Closure(PathSearchConfig):Closure(array, string, string, array, callable):SearchOutcome
      */
@@ -52,6 +55,7 @@ final class PathFinderService
         ?LegMaterializer $legMaterializer = null,
         ?ToleranceEvaluator $toleranceEvaluator = null,
         ?OrderFillEvaluator $fillEvaluator = null,
+        ?PathOrderStrategy $orderingStrategy = null,
         ?callable $pathFinderFactory = null,
     ) {
         $fillEvaluator ??= new OrderFillEvaluator();
@@ -63,7 +67,9 @@ final class PathFinderService
         $this->legMaterializer = $legMaterializer;
         $this->orderSpendAnalyzer = $orderSpendAnalyzer ?? new OrderSpendAnalyzer($fillEvaluator, $this->legMaterializer);
         $this->toleranceEvaluator = $toleranceEvaluator ?? new ToleranceEvaluator();
-        $factory = $pathFinderFactory ?? static function (PathSearchConfig $config): Closure {
+        $this->orderingStrategy = $orderingStrategy ?? new CostHopsSignatureOrderingStrategy(self::COST_SCALE);
+        $strategy = $this->orderingStrategy;
+        $factory = $pathFinderFactory ?? static function (PathSearchConfig $config) use ($strategy): Closure {
             /**
              * @param Graph                    $graph
              * @param SpendConstraints         $range
@@ -89,13 +95,14 @@ final class PathFinderService
                 string $target,
                 array $range,
                 callable $callback,
-            ) use ($config): SearchOutcome {
+            ) use ($config, $strategy): SearchOutcome {
                 $pathFinder = new PathFinder(
                     $config->maximumHops(),
                     $config->pathFinderTolerance(),
                     $config->resultLimit(),
                     $config->pathFinderMaxExpansions(),
                     $config->pathFinderMaxVisitedStates(),
+                    $strategy,
                 );
 
                 /** @var Graph $graph */
@@ -177,7 +184,8 @@ final class PathFinderService
          *     hops: int,
          *     routeSignature: string,
          *     order: int,
-         *     result: PathResult
+         *     result: PathResult,
+         *     orderKey: PathOrderKey,
          * }> $materializedResults
          */
         $materializedResults = [];
@@ -236,19 +244,35 @@ final class PathFinderService
                     return false;
                 }
 
+                $routeSignature = $this->routeSignature($candidate['edges']);
+                $result = new PathResult(
+                    $materialized['totalSpent'],
+                    $materialized['totalReceived'],
+                    $residual,
+                    $materialized['legs'],
+                    $materialized['feeBreakdown'],
+                );
+
                 $materializedResults[] = [
                     'cost' => $candidate['cost'],
                     'hops' => $candidate['hops'],
-                    'routeSignature' => $this->routeSignature($candidate['edges']),
-                    'order' => $resultOrder++,
-                    'result' => new PathResult(
-                        $materialized['totalSpent'],
-                        $materialized['totalReceived'],
-                        $residual,
-                        $materialized['legs'],
-                        $materialized['feeBreakdown'],
+                    'routeSignature' => $routeSignature,
+                    'order' => $resultOrder,
+                    'result' => $result,
+                    'orderKey' => new PathOrderKey(
+                        $candidate['cost'],
+                        $candidate['hops'],
+                        $routeSignature,
+                        $resultOrder,
+                        [
+                            'candidate' => $candidate,
+                            'materialized' => $materialized,
+                            'pathResult' => $result,
+                        ],
                     ),
                 ];
+
+                ++$resultOrder;
 
                 return true;
             }
@@ -322,37 +346,16 @@ final class PathFinderService
     }
 
     /**
-     * @param list<array{cost: numeric-string, hops: int, routeSignature: string, order: int, result: PathResult}> $materializedResults
+     * @param list<array{cost: numeric-string, hops: int, routeSignature: string, order: int, result: PathResult, orderKey: PathOrderKey}> $materializedResults
      */
     private function sortMaterializedResults(array &$materializedResults): void
     {
-        usort($materializedResults, [$this, 'compareMaterializedResults']);
-    }
+        $strategy = $this->orderingStrategy;
 
-    /**
-     * @param array{cost: numeric-string, hops: int, routeSignature: string, order: int, result: PathResult} $left
-     * @param array{cost: numeric-string, hops: int, routeSignature: string, order: int, result: PathResult} $right
-     */
-    private function compareMaterializedResults(array $left, array $right): int
-    {
-        BcMath::ensureNumeric($left['cost'], $right['cost']);
-
-        $comparison = BcMath::comp($left['cost'], $right['cost'], self::COST_SCALE);
-        if (0 !== $comparison) {
-            return $comparison;
-        }
-
-        $hopComparison = $left['hops'] <=> $right['hops'];
-        if (0 !== $hopComparison) {
-            return $hopComparison;
-        }
-
-        $signatureComparison = $left['routeSignature'] <=> $right['routeSignature'];
-        if (0 !== $signatureComparison) {
-            return $signatureComparison;
-        }
-
-        return $left['order'] <=> $right['order'];
+        usort(
+            $materializedResults,
+            fn (array $left, array $right): int => $strategy->compare($left['orderKey'], $right['orderKey'])
+        );
     }
 
     /**

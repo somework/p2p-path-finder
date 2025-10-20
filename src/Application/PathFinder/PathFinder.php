@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Application\PathFinder;
 
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
@@ -175,6 +178,7 @@ final class PathFinder
     /** @var numeric-string */
     private readonly string $toleranceAmplifier;
     private readonly bool $hasTolerance;
+    private readonly PathOrderStrategy $orderingStrategy;
 
     /**
      * @param int    $maxHops   maximum number of edges a path may contain
@@ -186,6 +190,7 @@ final class PathFinder
         private readonly int $topK = 1,
         private readonly int $maxExpansions = self::DEFAULT_MAX_EXPANSIONS,
         private readonly int $maxVisitedStates = self::DEFAULT_MAX_VISITED_STATES,
+        ?PathOrderStrategy $orderingStrategy = null,
     ) {
         if ($maxHops < 1) {
             throw new InvalidInput('Maximum hops must be at least one.');
@@ -211,6 +216,7 @@ final class PathFinder
         $amplifier = $this->calculateToleranceAmplifier($normalizedTolerance);
         $this->toleranceAmplifier = $amplifier;
         $this->hasTolerance = 1 === BcMath::comp($normalizedTolerance, '0', self::SCALE);
+        $this->orderingStrategy = $orderingStrategy ?? new CostHopsSignatureOrderingStrategy(self::SCALE);
     }
 
     /**
@@ -642,7 +648,7 @@ final class PathFinder
         /** @var list<Candidate> $finalized */
         $finalized = array_map(
             /**
-             * @param array{candidate: Candidate, order: int, cost: numeric-string, routeSignature: string} $entry
+             * @param array{candidate: Candidate, order: int, cost: numeric-string, routeSignature: string, orderKey: PathOrderKey} $entry
              */
             static fn (array $entry): array => $entry['candidate'],
             $entries,
@@ -656,7 +662,15 @@ final class PathFinder
      */
     private function collectResultEntries(CandidateResultHeap $results): array
     {
-        /** @var list<array{candidate: Candidate, order: int, cost: numeric-string, routeSignature: string}> $collected */
+        /**
+         * @var list<array{
+         *     candidate: Candidate,
+         *     order: int,
+         *     cost: numeric-string,
+         *     routeSignature: string,
+         *     orderKey: PathOrderKey,
+         * }> $collected
+         */
         $collected = [];
         $clone = clone $results;
 
@@ -664,6 +678,13 @@ final class PathFinder
             /** @var CandidateHeapEntry $entry */
             $entry = $clone->extract();
             $entry['routeSignature'] = $this->routeSignature($entry['candidate']['edges']);
+            $entry['orderKey'] = new PathOrderKey(
+                $entry['cost'],
+                $entry['candidate']['hops'],
+                $entry['routeSignature'],
+                $entry['order'],
+                ['candidate' => $entry['candidate']],
+            );
             $collected[] = $entry;
         }
 
@@ -671,35 +692,16 @@ final class PathFinder
     }
 
     /**
-     * @param list<array{candidate: Candidate, order: int, cost: numeric-string, routeSignature: string}> $entries
+     * @param list<array{candidate: Candidate, order: int, cost: numeric-string, routeSignature: string, orderKey: PathOrderKey}> $entries
      */
     private function sortResultEntries(array &$entries): void
     {
-        usort($entries, [$this, 'compareCandidateEntries']);
-    }
+        $strategy = $this->orderingStrategy;
 
-    /**
-     * @param array{candidate: Candidate, order: int, cost: numeric-string, routeSignature: string} $left
-     * @param array{candidate: Candidate, order: int, cost: numeric-string, routeSignature: string} $right
-     */
-    private function compareCandidateEntries(array $left, array $right): int
-    {
-        $comparison = BcMath::comp($left['cost'], $right['cost'], self::SCALE);
-        if (0 !== $comparison) {
-            return $comparison;
-        }
-
-        $hopComparison = $left['candidate']['hops'] <=> $right['candidate']['hops'];
-        if (0 !== $hopComparison) {
-            return $hopComparison;
-        }
-
-        $signatureComparison = $left['routeSignature'] <=> $right['routeSignature'];
-        if (0 !== $signatureComparison) {
-            return $signatureComparison;
-        }
-
-        return $left['order'] <=> $right['order'];
+        usort(
+            $entries,
+            fn (array $left, array $right): int => $strategy->compare($left['orderKey'], $right['orderKey'])
+        );
     }
 
     /**
