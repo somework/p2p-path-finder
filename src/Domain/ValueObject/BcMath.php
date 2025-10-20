@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
+use Closure;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
@@ -31,6 +32,15 @@ final class BcMath
     private const DEFAULT_SCALE = 8;
 
     private static bool $extensionVerified = false;
+
+    /**
+     * @var (Closure(string):bool)|null
+     *
+     * @phpstan-var (Closure(string):bool)|null
+     *
+     * @psalm-var (Closure(string):bool)|null
+     */
+    private static ?Closure $extensionDetector = null;
 
     private function __construct()
     {
@@ -296,11 +306,23 @@ final class BcMath
             return;
         }
 
-        if (!extension_loaded('bcmath')) {
+        if (!self::extensionLoaded('bcmath')) {
             throw new PrecisionViolation('The BCMath extension (ext-bcmath) is required. Install it or require symfony/polyfill-bcmath when the extension cannot be loaded.');
         }
 
         self::$extensionVerified = true;
+    }
+
+    private static function extensionLoaded(string $extension): bool
+    {
+        if (null !== self::$extensionDetector) {
+            /** @var Closure(string):bool $detector */
+            $detector = self::$extensionDetector;
+
+            return $detector($extension);
+        }
+
+        return extension_loaded($extension);
     }
 
     private static function workingScaleForAddition(string $left, string $right, int $scale): int

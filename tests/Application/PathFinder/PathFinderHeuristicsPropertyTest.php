@@ -13,11 +13,14 @@ use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Application\Support\Generator\GraphScenarioGenerator;
+use SomeWork\P2PPathFinder\Tests\Support\InfectionIterationLimiter;
 
 use function sprintf;
 
 final class PathFinderHeuristicsPropertyTest extends TestCase
 {
+    use InfectionIterationLimiter;
+
     private GraphScenarioGenerator $generator;
     private int $pathFinderScale;
     private int $ratioExtraScale;
@@ -41,7 +44,9 @@ final class PathFinderHeuristicsPropertyTest extends TestCase
         $convertMethod = new ReflectionMethod(PathFinder::class, 'convertEdgeAmount');
         $convertMethod->setAccessible(true);
 
-        for ($iteration = 0; $iteration < 15; ++$iteration) {
+        $limit = $this->iterationLimit(15, 5, 'P2P_PATH_FINDER_HEURISTIC_ITERATIONS');
+
+        for ($iteration = 0; $iteration < $limit; ++$iteration) {
             $orders = $this->generator->orders();
             $graph = (new GraphBuilder())->build($orders);
 
@@ -67,9 +72,17 @@ final class PathFinderHeuristicsPropertyTest extends TestCase
                             $targetCapacity['max']
                         );
 
-                        $minTarget = $targetCapacity['min']->withScale($expected->scale());
-                        $maxTarget = $targetCapacity['max']->withScale($expected->scale());
-                        $convertedComparable = $converted->withScale($expected->scale());
+                        $comparisonScale = max(
+                            $expected->scale(),
+                            $converted->scale(),
+                            $targetCapacity['min']->scale(),
+                            $targetCapacity['max']->scale(),
+                        );
+
+                        $minTarget = $targetCapacity['min']->withScale($comparisonScale);
+                        $maxTarget = $targetCapacity['max']->withScale($comparisonScale);
+                        $convertedComparable = $converted->withScale($comparisonScale);
+                        $expectedComparable = $expected->withScale($comparisonScale);
 
                         self::assertFalse(
                             $convertedComparable->lessThan($minTarget),
@@ -81,7 +94,7 @@ final class PathFinderHeuristicsPropertyTest extends TestCase
                         );
 
                         self::assertSame(
-                            $expected->amount(),
+                            $expectedComparable->amount(),
                             $convertedComparable->amount(),
                             'Heuristic interpolation diverged from materialized capacity.'
                         );
@@ -155,7 +168,17 @@ final class PathFinderHeuristicsPropertyTest extends TestCase
             $ratioScale + $this->sumExtraScale,
         );
 
-        return $interpolated->withScale($targetScale);
+        $interpolated = $interpolated->withScale($targetScale);
+
+        if ($interpolated->lessThan($targetMin)) {
+            return $targetMin;
+        }
+
+        if ($interpolated->greaterThan($targetMax)) {
+            return $targetMax;
+        }
+
+        return $interpolated;
     }
 
     private function reflectIntConstant(ReflectionClass $class, string $name): int

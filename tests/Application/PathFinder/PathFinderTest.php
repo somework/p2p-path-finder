@@ -15,14 +15,17 @@ use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
+use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
 use function array_key_last;
+use function array_reverse;
 use function array_unique;
 use function count;
+use function in_array;
 
 final class PathFinderTest extends TestCase
 {
@@ -194,6 +197,680 @@ final class PathFinderTest extends TestCase
         self::assertGreaterThan(2, count($extendedPaths));
     }
 
+    public function test_it_preserves_discovery_order_for_equal_cost_candidates(): void
+    {
+        $orders = [
+            OrderFactory::sell('USD', 'EUR', '1.000', '1.000', '2.000', 3, 3),
+            OrderFactory::sell('GBP', 'EUR', '1.000', '1.000', '4.000', 3, 3),
+            OrderFactory::buy('GBP', 'USD', '1.000', '1.000', '2.000', 3, 3),
+        ];
+
+        $graph = (new GraphBuilder())->build($orders);
+
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.0', topK: 2);
+        $results = self::extractPaths($finder->findBestPaths($graph, 'EUR', 'USD'));
+
+        self::assertCount(1, $results);
+        self::assertSame(1, $results[0]['hops']);
+
+        $direct = $results[0];
+        self::assertSame('EUR', $direct['edges'][0]['from']);
+        self::assertSame('USD', $direct['edges'][0]['to']);
+    }
+
+    public function test_it_skips_duplicate_states_with_identical_cost_and_hops(): void
+    {
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    self::manualEdge('SRC', 'MID', '1.500'),
+                    self::manualEdge('SRC', 'MID', '1.500'),
+                ],
+            ],
+            'MID' => [
+                'currency' => 'MID',
+                'edges' => [
+                    self::manualEdge('MID', 'TRG', '1.750'),
+                ],
+            ],
+            'TRG' => [
+                'currency' => 'TRG',
+                'edges' => [],
+            ],
+        ];
+
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.0', topK: 2);
+        $results = self::extractPaths($finder->findBestPaths($graph, 'SRC', 'TRG'));
+
+        self::assertCount(1, $results);
+        self::assertSame(2, $results[0]['hops']);
+
+        $path = $results[0]['edges'];
+        self::assertSame('SRC', $path[0]['from']);
+        self::assertSame('MID', $path[0]['to']);
+        self::assertSame('MID', $path[1]['from']);
+        self::assertSame('TRG', $path[1]['to']);
+    }
+
+    public function test_it_returns_same_paths_when_order_book_is_permuted(): void
+    {
+        $orders = [
+            OrderFactory::sell('USD', 'EUR', '1.000', '1.000', '2.000', 3, 3),
+            OrderFactory::sell('GBP', 'EUR', '1.000', '1.000', '4.000', 3, 3),
+            OrderFactory::buy('GBP', 'USD', '1.000', '1.000', '2.000', 3, 3),
+        ];
+
+        $graph = (new GraphBuilder())->build($orders);
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.0', topK: 3);
+
+        $originalResults = self::extractPaths($finder->findBestPaths($graph, 'EUR', 'USD'));
+
+        $permutedGraph = (new GraphBuilder())->build(array_reverse($orders));
+        $permutedFinder = new PathFinder(maxHops: 3, tolerance: '0.0', topK: 3);
+        $permutedResults = self::extractPaths($permutedFinder->findBestPaths($permutedGraph, 'EUR', 'USD'));
+
+        self::assertSame($originalResults, $permutedResults);
+    }
+
+    public function test_it_prunes_paths_that_exceed_updated_tolerance_threshold(): void
+    {
+        $graph = [
+            'RUB' => [
+                'currency' => 'RUB',
+                'edges' => [
+                    self::manualEdge('RUB', 'IDR', '20.000'),
+                    self::manualEdge('RUB', 'USD', '30.000'),
+                ],
+            ],
+            'USD' => [
+                'currency' => 'USD',
+                'edges' => [
+                    self::manualEdge('USD', 'JPY', '0.010'),
+                    self::manualEdge('USD', 'IDR', '8.000'),
+                    self::manualEdge('USD', 'CAD', '2.500'),
+                ],
+            ],
+            'CAD' => [
+                'currency' => 'CAD',
+                'edges' => [
+                    self::manualEdge('CAD', 'IDR', '1.000'),
+                ],
+            ],
+            'IDR' => ['currency' => 'IDR', 'edges' => []],
+            'JPY' => ['currency' => 'JPY', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 4, tolerance: '0.5', topK: 3);
+        $outcome = $finder->findBestPaths($graph, 'RUB', 'IDR');
+        $paths = $outcome->paths();
+
+        self::assertCount(2, $paths);
+
+        $first = $paths[0];
+        self::assertSame(2, $first['hops']);
+        $firstNodes = array_merge(
+            [$first['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $first['edges']),
+        );
+        self::assertSame(['RUB', 'USD', 'IDR'], $firstNodes);
+        $expectedTwoHopCost = BcMath::div('1', BcMath::mul('30', '8', self::SCALE), self::SCALE);
+        self::assertSame($expectedTwoHopCost, $first['cost']);
+
+        $second = $paths[1];
+        self::assertSame(1, $second['hops']);
+        $secondNodes = array_merge(
+            [$second['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $second['edges']),
+        );
+        self::assertSame(['RUB', 'IDR'], $secondNodes);
+        $expectedDirectCost = BcMath::div('1', '20', self::SCALE);
+        self::assertSame($expectedDirectCost, $second['cost']);
+
+        foreach ($paths as $path) {
+            $visited = array_map(static fn (array $edge): string => $edge['to'], $path['edges']);
+            self::assertNotContains('CAD', $visited);
+        }
+    }
+
+    public function test_it_tightens_best_cost_and_blocks_looser_candidates(): void
+    {
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    self::manualEdge('SRC', 'TRG', '2.000'),
+                    self::manualEdge('SRC', 'DEEP', '1.923'),
+                    self::manualEdge('SRC', 'LOOSE', '1.887'),
+                ],
+            ],
+            'DEEP' => [
+                'currency' => 'DEEP',
+                'edges' => [
+                    self::manualEdge('DEEP', 'HIDDEN', '1.050'),
+                ],
+            ],
+            'HIDDEN' => [
+                'currency' => 'HIDDEN',
+                'edges' => [
+                    self::manualEdge('HIDDEN', 'TRG', '2.000'),
+                ],
+            ],
+            'LOOSE' => [
+                'currency' => 'LOOSE',
+                'edges' => [
+                    self::manualEdge('LOOSE', 'TRG', '1.500'),
+                ],
+            ],
+            'TRG' => ['currency' => 'TRG', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 4, tolerance: '0.1', topK: 3);
+        $evaluatedCandidates = [];
+        $outcome = $finder->findBestPaths(
+            $graph,
+            'SRC',
+            'TRG',
+            null,
+            static function (array $candidate) use (&$evaluatedCandidates): bool {
+                $nodes = array_merge(
+                    [$candidate['edges'][0]['from']],
+                    array_map(static fn (array $edge): string => $edge['to'], $candidate['edges']),
+                );
+
+                $evaluatedCandidates[] = ['nodes' => $nodes, 'cost' => $candidate['cost']];
+
+                return true;
+            }
+        );
+
+        self::assertCount(2, $evaluatedCandidates);
+
+        $paths = $outcome->paths();
+
+        self::assertCount(2, $paths);
+
+        $directFound = false;
+        $tightFound = false;
+        $collectedNodes = [];
+
+        foreach ($paths as $path) {
+            $nodes = array_merge(
+                [$path['edges'][0]['from']],
+                array_map(static fn (array $edge): string => $edge['to'], $path['edges']),
+            );
+
+            $collectedNodes[] = $nodes;
+
+            if (['SRC', 'TRG'] === $nodes) {
+                $directFound = true;
+                $expectedDirectCost = BcMath::div('1', '2', self::SCALE);
+                self::assertSame($expectedDirectCost, $path['cost']);
+            }
+
+            if (['SRC', 'DEEP', 'HIDDEN', 'TRG'] === $nodes) {
+                $tightFound = true;
+                $firstLegCost = BcMath::div('1', '1.923', self::SCALE);
+                $secondLegCost = BcMath::div($firstLegCost, '1.050', self::SCALE);
+                $expectedHiddenCost = BcMath::div($secondLegCost, '2.000', self::SCALE);
+                self::assertSame($expectedHiddenCost, $path['cost']);
+            }
+        }
+
+        self::assertTrue($directFound);
+        self::assertTrue($tightFound);
+
+        foreach ($collectedNodes as $nodes) {
+            self::assertNotContains('LOOSE', $nodes);
+        }
+
+        $candidateSignatures = array_map(
+            static fn (array $candidate): array => $candidate['nodes'],
+            $evaluatedCandidates,
+        );
+
+        self::assertSame([
+            ['SRC', 'TRG'],
+            ['SRC', 'DEEP', 'HIDDEN', 'TRG'],
+        ], $candidateSignatures);
+
+        self::assertSame([
+            ['SRC', 'DEEP', 'HIDDEN', 'TRG'],
+            ['SRC', 'TRG'],
+        ], $collectedNodes);
+    }
+
+    public function test_it_continues_iterating_neighbors_after_tolerance_skip(): void
+    {
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    self::manualEdge('SRC', 'EAR', '2.000'),
+                    self::manualEdge('SRC', 'MID', '1.500'),
+                ],
+            ],
+            'EAR' => [
+                'currency' => 'EAR',
+                'edges' => [
+                    self::manualEdge('EAR', 'LNK', '2.000'),
+                ],
+            ],
+            'LNK' => [
+                'currency' => 'LNK',
+                'edges' => [
+                    self::manualEdge('LNK', 'TRG', '2.000'),
+                ],
+            ],
+            'MID' => [
+                'currency' => 'MID',
+                'edges' => [
+                    self::manualEdge('MID', 'BAD', '0.200'),
+                    self::manualEdge('MID', 'TRG', '1.200'),
+                    self::manualEdge('MID', 'LATE', '0.300'),
+                ],
+            ],
+            'BAD' => ['currency' => 'BAD', 'edges' => []],
+            'LATE' => [
+                'currency' => 'LATE',
+                'edges' => [
+                    self::manualEdge('LATE', 'TRG', '1.000'),
+                ],
+            ],
+            'TRG' => ['currency' => 'TRG', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 4, tolerance: '0.9', topK: 2);
+        $paths = $finder->findBestPaths($graph, 'SRC', 'TRG')->paths();
+
+        self::assertCount(2, $paths);
+
+        $firstNodes = array_merge(
+            [$paths[0]['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $paths[0]['edges']),
+        );
+        self::assertSame(['SRC', 'EAR', 'LNK', 'TRG'], $firstNodes);
+
+        $secondNodes = array_merge(
+            [$paths[1]['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $paths[1]['edges']),
+        );
+        self::assertSame(['SRC', 'MID', 'TRG'], $secondNodes);
+
+        $expectedFirstCost = BcMath::div('1', BcMath::mul('2.000', BcMath::mul('2.000', '2.000', self::SCALE), self::SCALE), self::SCALE);
+        self::assertSame($expectedFirstCost, $paths[0]['cost']);
+
+        $expectedSecondCost = BcMath::div('1', BcMath::mul('1.500', '1.200', self::SCALE), self::SCALE);
+        self::assertSame($expectedSecondCost, $paths[1]['cost']);
+
+        foreach ($paths as $path) {
+            $visitedNodes = array_merge(
+                [$path['edges'][0]['from']],
+                array_map(static fn (array $edge): string => $edge['to'], $path['edges']),
+            );
+            self::assertNotContains('LATE', $visitedNodes);
+        }
+    }
+
+    public function test_it_preserves_best_cost_after_accepting_tolerated_candidate(): void
+    {
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    self::manualEdge('SRC', 'EAR', '2.000'),
+                    self::manualEdge('SRC', 'MID', '1.500'),
+                ],
+            ],
+            'EAR' => [
+                'currency' => 'EAR',
+                'edges' => [
+                    self::manualEdge('EAR', 'LNK', '2.000'),
+                ],
+            ],
+            'LNK' => [
+                'currency' => 'LNK',
+                'edges' => [
+                    self::manualEdge('LNK', 'TRG', '2.000'),
+                ],
+            ],
+            'MID' => [
+                'currency' => 'MID',
+                'edges' => [
+                    self::manualEdge('MID', 'BAD', '0.200'),
+                    self::manualEdge('MID', 'TRG', '1.200'),
+                    self::manualEdge('MID', 'LATE', '0.300'),
+                ],
+            ],
+            'BAD' => ['currency' => 'BAD', 'edges' => []],
+            'LATE' => [
+                'currency' => 'LATE',
+                'edges' => [
+                    self::manualEdge('LATE', 'TRG', '1.000'),
+                ],
+            ],
+            'TRG' => ['currency' => 'TRG', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 4, tolerance: '0.9', topK: 3);
+        $paths = $finder->findBestPaths($graph, 'SRC', 'TRG')->paths();
+
+        self::assertCount(2, $paths);
+
+        $firstNodes = array_merge(
+            [$paths[0]['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $paths[0]['edges']),
+        );
+        self::assertSame(['SRC', 'EAR', 'LNK', 'TRG'], $firstNodes);
+
+        $secondNodes = array_merge(
+            [$paths[1]['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $paths[1]['edges']),
+        );
+        self::assertSame(['SRC', 'MID', 'TRG'], $secondNodes);
+
+        $expectedFirstCost = BcMath::div('1', BcMath::mul('2.000', BcMath::mul('2.000', '2.000', self::SCALE), self::SCALE), self::SCALE);
+        self::assertSame($expectedFirstCost, $paths[0]['cost']);
+
+        $expectedSecondCost = BcMath::div('1', BcMath::mul('1.500', '1.200', self::SCALE), self::SCALE);
+        self::assertSame($expectedSecondCost, $paths[1]['cost']);
+
+        foreach ($paths as $path) {
+            $visitedNodes = array_merge(
+                [$path['edges'][0]['from']],
+                array_map(static fn (array $edge): string => $edge['to'], $path['edges']),
+            );
+            self::assertNotContains('LATE', $visitedNodes);
+        }
+    }
+
+    public function test_it_updates_best_cost_after_discovering_a_better_candidate(): void
+    {
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    self::manualEdge('SRC', 'TRG', '2.000'),
+                    self::manualEdge('SRC', 'MOD', '1.500'),
+                    self::manualEdge('SRC', 'BST', '1.100'),
+                    self::manualEdge('SRC', 'LATE', '1.050'),
+                ],
+            ],
+            'MOD' => [
+                'currency' => 'MOD',
+                'edges' => [
+                    self::manualEdge('MOD', 'TRG', '2.000'),
+                ],
+            ],
+            'BST' => [
+                'currency' => 'BST',
+                'edges' => [
+                    self::manualEdge('BST', 'TRG', '10.000'),
+                ],
+            ],
+            'LATE' => [
+                'currency' => 'LATE',
+                'edges' => [
+                    self::manualEdge('LATE', 'TRG', '2.381'),
+                ],
+            ],
+            'TRG' => ['currency' => 'TRG', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 3);
+        $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
+        $paths = $outcome->paths();
+
+        self::assertCount(3, $paths);
+
+        $directPathFound = false;
+
+        foreach ($paths as $path) {
+            $nodes = array_merge(
+                [$path['edges'][0]['from']],
+                array_map(static fn (array $edge): string => $edge['to'], $path['edges']),
+            );
+
+            self::assertNotContains('LATE', $nodes);
+
+            if (1 === $path['hops']) {
+                $directPathFound = true;
+                self::assertSame(['SRC', 'TRG'], $nodes);
+            }
+        }
+
+        self::assertTrue($directPathFound);
+    }
+
+    public function test_it_continues_evaluating_edges_after_missing_neighbor(): void
+    {
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    self::manualEdge('SRC', 'MIA', '1.500'),
+                    self::manualEdge('SRC', 'TRG', '2.000'),
+                ],
+            ],
+            'TRG' => ['currency' => 'TRG', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0', topK: 1);
+        $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
+        $paths = $outcome->paths();
+
+        self::assertCount(1, $paths);
+
+        $nodes = array_merge(
+            [$paths[0]['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $paths[0]['edges']),
+        );
+
+        self::assertSame(['SRC', 'TRG'], $nodes);
+    }
+
+    public function test_it_ignores_non_positive_conversion_edges_without_aborting_neighbor_iteration(): void
+    {
+        $invalidEdge = self::manualEdge('SRC', 'NEG', '1.500');
+        $zeroSrc = Money::zero('SRC', 3);
+        $zeroNeg = Money::zero('NEG', 3);
+
+        $invalidEdge['grossBaseCapacity']['max'] = $zeroSrc;
+        $invalidEdge['baseCapacity']['max'] = $zeroSrc;
+        $invalidEdge['quoteCapacity']['max'] = $zeroNeg;
+        $invalidEdge['segments'][0]['grossBase']['max'] = $zeroSrc;
+        $invalidEdge['segments'][0]['base']['max'] = $zeroSrc;
+        $invalidEdge['segments'][0]['quote']['max'] = $zeroNeg;
+
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    $invalidEdge,
+                    self::manualEdge('SRC', 'TRG', '2.000'),
+                ],
+            ],
+            'NEG' => ['currency' => 'NEG', 'edges' => []],
+            'TRG' => ['currency' => 'TRG', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0', topK: 1);
+        $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
+        $paths = $outcome->paths();
+
+        self::assertCount(1, $paths);
+
+        $nodes = array_merge(
+            [$paths[0]['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $paths[0]['edges']),
+        );
+
+        self::assertSame(['SRC', 'TRG'], $nodes);
+    }
+
+    public function test_it_continues_processing_queue_after_skipping_hop_limited_state(): void
+    {
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    self::manualEdge('SRC', 'BLK', '5.000'),
+                    self::manualEdge('SRC', 'HLP', '1.500'),
+                ],
+            ],
+            'BLK' => [
+                'currency' => 'BLK',
+                'edges' => [
+                    self::manualEdge('BLK', 'DED', '5.000'),
+                ],
+            ],
+            'HLP' => [
+                'currency' => 'HLP',
+                'edges' => [
+                    self::manualEdge('HLP', 'TRG', '1.100'),
+                ],
+            ],
+            'DED' => ['currency' => 'DED', 'edges' => []],
+            'TRG' => ['currency' => 'TRG', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 1);
+        $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
+
+        $paths = $outcome->paths();
+
+        self::assertCount(1, $paths);
+        $path = $paths[0];
+        self::assertSame(2, $path['hops']);
+
+        $nodes = array_merge(
+            [$path['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $path['edges']),
+        );
+
+        self::assertSame(['SRC', 'HLP', 'TRG'], $nodes);
+    }
+
+    public function test_it_respects_visited_state_guard_threshold(): void
+    {
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    self::manualEdge('SRC', 'TRG', '1.100'),
+                    self::manualEdge('SRC', 'ALP', '1.200'),
+                    self::manualEdge('SRC', 'BET', '1.300'),
+                ],
+            ],
+            'ALP' => [
+                'currency' => 'ALP',
+                'edges' => [
+                    self::manualEdge('ALP', 'LFK', '1.050'),
+                ],
+            ],
+            'BET' => [
+                'currency' => 'BET',
+                'edges' => [
+                    self::manualEdge('BET', 'LFK', '1.050'),
+                ],
+            ],
+            'LFK' => ['currency' => 'LFK', 'edges' => []],
+            'TRG' => ['currency' => 'TRG', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 1, maxVisitedStates: 2);
+        $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
+
+        $paths = $outcome->paths();
+        self::assertNotSame([], $paths);
+        self::assertTrue($outcome->guardLimits()->visitedStatesReached());
+    }
+
+    public function test_it_keeps_processing_guarded_states_with_matching_signatures(): void
+    {
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    self::manualEdge('SRC', 'ALT', '2.000'),
+                    self::manualEdge('SRC', 'MID', '1.000'),
+                ],
+            ],
+            'ALT' => [
+                'currency' => 'ALT',
+                'edges' => [
+                    self::manualEdge('ALT', 'AUX', '1.000'),
+                ],
+            ],
+            'AUX' => [
+                'currency' => 'AUX',
+                'edges' => [
+                    self::manualEdge('AUX', 'TRG', '1.000'),
+                ],
+            ],
+            'MID' => [
+                'currency' => 'MID',
+                'edges' => [
+                    self::manualEdge('MID', 'SKP', '1.000'),
+                    self::manualEdge('MID', 'TRG', '2.000'),
+                ],
+            ],
+            'SKP' => ['currency' => 'SKP', 'edges' => []],
+            'TRG' => ['currency' => 'TRG', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 4, tolerance: '0.0', topK: 2, maxVisitedStates: 5);
+        $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
+
+        $paths = $outcome->paths();
+
+        self::assertCount(2, $paths);
+
+        $firstNodes = array_merge(
+            [$paths[0]['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $paths[0]['edges']),
+        );
+        self::assertSame(['SRC', 'ALT', 'AUX', 'TRG'], $firstNodes);
+
+        $secondNodes = array_merge(
+            [$paths[1]['edges'][0]['from']],
+            array_map(static fn (array $edge): string => $edge['to'], $paths[1]['edges']),
+        );
+        self::assertSame(['SRC', 'MID', 'TRG'], $secondNodes);
+
+        self::assertTrue($outcome->guardLimits()->visitedStatesReached());
+    }
+
+    public function test_it_does_not_accept_cycles_that_improve_conversion_costs(): void
+    {
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    self::manualEdge('SRC', 'TRG', '2.000'),
+                    self::manualEdge('SRC', 'LOP', '2.000'),
+                ],
+            ],
+            'LOP' => [
+                'currency' => 'LOP',
+                'edges' => [
+                    self::manualEdge('LOP', 'SRC', '2.000'),
+                ],
+            ],
+            'TRG' => ['currency' => 'TRG', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 4, tolerance: '0.0', topK: 1);
+        $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
+
+        $paths = $outcome->paths();
+        self::assertCount(1, $paths);
+
+        $best = $paths[0];
+        self::assertSame(1, $best['hops']);
+        self::assertSame('TRG', $best['edges'][0]['to']);
+    }
+
     public function test_it_normalizes_endpoint_case_inputs(): void
     {
         $orders = self::buildComprehensiveOrderBook();
@@ -214,6 +891,34 @@ final class PathFinderTest extends TestCase
 
         self::assertSame([], self::extractPaths($finder->findBestPaths($graph, 'RUB', 'ZZZ')));
         self::assertSame([], self::extractPaths($finder->findBestPaths($graph, 'zzz', 'IDR')));
+    }
+
+    public function test_it_avoids_cycles_that_return_to_the_source(): void
+    {
+        $orders = [
+            OrderFactory::sell('EUR', 'USD', '1.000', '1.000', '1.000', 3, 3),
+            OrderFactory::sell('USD', 'EUR', '1.000', '1.000', '1.000', 3, 3),
+            OrderFactory::sell('JPY', 'EUR', '1.000', '1.000', '1.000', 3, 3),
+            OrderFactory::sell('JPY', 'USD', '1.000', '1.000', '1.000', 3, 3),
+        ];
+
+        $graph = (new GraphBuilder())->build($orders);
+        $finder = new PathFinder(maxHops: 4, tolerance: '0.0', topK: 4);
+
+        $paths = $finder->findBestPaths($graph, 'USD', 'JPY')->paths();
+
+        self::assertNotSame([], $paths);
+
+        foreach ($paths as $candidate) {
+            $visited = ['USD'];
+            foreach ($candidate['edges'] as $edge) {
+                self::assertFalse(
+                    in_array($edge['to'], $visited, true),
+                    'Path finder should not revisit previously seen nodes.'
+                );
+                $visited[] = $edge['to'];
+            }
+        }
     }
 
     public function test_it_continues_search_when_callback_rejects_initial_target_candidate(): void
@@ -1323,6 +2028,60 @@ final class PathFinderTest extends TestCase
                 amountScale: 3,
                 rateScale: 4,
             ),
+        ];
+    }
+
+    /**
+     * @return array{
+     *     from: string,
+     *     to: string,
+     *     orderSide: OrderSide,
+     *     order: Order,
+     *     rate: ExchangeRate,
+     *     baseCapacity: array{min: Money, max: Money},
+     *     quoteCapacity: array{min: Money, max: Money},
+     *     grossBaseCapacity: array{min: Money, max: Money},
+     *     segments: list<array{
+     *         isMandatory: bool,
+     *         base: array{min: Money, max: Money},
+     *         quote: array{min: Money, max: Money},
+     *         grossBase: array{min: Money, max: Money},
+     *     }>,
+     * }
+     */
+    private static function manualEdge(string $from, string $to, string $rate, int $scale = 3): array
+    {
+        $order = OrderFactory::createOrder(
+            OrderSide::BUY,
+            $from,
+            $to,
+            '1.000',
+            '1.000',
+            $rate,
+            amountScale: $scale,
+            rateScale: $scale,
+        );
+
+        $baseMin = Money::zero($from, $scale);
+        $baseMax = Money::fromString($from, '1.000', $scale);
+        $quoteMin = Money::zero($to, $scale);
+        $quoteMax = Money::fromString($to, $rate, $scale);
+
+        return [
+            'from' => $from,
+            'to' => $to,
+            'orderSide' => OrderSide::BUY,
+            'order' => $order,
+            'rate' => ExchangeRate::fromString($from, $to, $rate, $scale),
+            'baseCapacity' => ['min' => $baseMin, 'max' => $baseMax],
+            'quoteCapacity' => ['min' => $quoteMin, 'max' => $quoteMax],
+            'grossBaseCapacity' => ['min' => $baseMin, 'max' => $baseMax],
+            'segments' => [[
+                'isMandatory' => false,
+                'base' => ['min' => $baseMin, 'max' => $baseMax],
+                'quote' => ['min' => $quoteMin, 'max' => $quoteMax],
+                'grossBase' => ['min' => $baseMin, 'max' => $baseMax],
+            ]],
         ];
     }
 

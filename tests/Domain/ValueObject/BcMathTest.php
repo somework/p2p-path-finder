@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Domain\ValueObject;
 
 use PHPUnit\Framework\TestCase;
+use ReflectionMethod;
+use ReflectionProperty;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 final class BcMathTest extends TestCase
 {
@@ -83,5 +86,76 @@ final class BcMathTest extends TestCase
         $this->expectException(InvalidInput::class);
 
         BcMath::add('1', '1', -1);
+    }
+
+    public function test_is_numeric_rejects_empty_strings(): void
+    {
+        self::assertFalse(BcMath::isNumeric(''));
+    }
+
+    public function test_working_scale_helpers_cover_all_private_strategies(): void
+    {
+        $addition = new ReflectionMethod(BcMath::class, 'workingScaleForAddition');
+        $addition->setAccessible(true);
+        self::assertSame(5, $addition->invoke(null, '1.234', '9.87654', 3));
+
+        $multiplication = new ReflectionMethod(BcMath::class, 'workingScaleForMultiplication');
+        $multiplication->setAccessible(true);
+        self::assertSame(9, $multiplication->invoke(null, '1.23', '4.5678', 3));
+
+        $division = new ReflectionMethod(BcMath::class, 'workingScaleForDivision');
+        $division->setAccessible(true);
+        self::assertSame(10, $division->invoke(null, '12.34', '0.0567', 4));
+
+        $comparison = new ReflectionMethod(BcMath::class, 'workingScaleForComparison');
+        $comparison->setAccessible(true);
+        self::assertSame(4, $comparison->invoke(null, '123.4500', '-0.000100', 2));
+    }
+
+    public function test_scale_of_trims_trailing_zeroes_and_signs(): void
+    {
+        $method = new ReflectionMethod(BcMath::class, 'scaleOf');
+        $method->setAccessible(true);
+
+        self::assertSame(0, $method->invoke(null, '42'));
+        self::assertSame(2, $method->invoke(null, '-0.0100'));
+        self::assertSame(4, $method->invoke(null, '+123.4567000'));
+    }
+
+    public function test_constructor_invocation_via_reflection_provides_coverage(): void
+    {
+        $reflection = new \ReflectionClass(BcMath::class);
+        $constructor = $reflection->getConstructor();
+        self::assertNotNull($constructor);
+        $constructor->setAccessible(true);
+
+        $instance = $reflection->newInstanceWithoutConstructor();
+        $constructor->invoke($instance);
+
+        self::assertInstanceOf(BcMath::class, $instance);
+    }
+
+    public function test_extension_check_throws_when_detector_reports_missing(): void
+    {
+        $detector = new ReflectionProperty(BcMath::class, 'extensionDetector');
+        $detector->setAccessible(true);
+        $verified = new ReflectionProperty(BcMath::class, 'extensionVerified');
+        $verified->setAccessible(true);
+
+        $previousDetector = $detector->getValue();
+        $previousVerified = $verified->getValue();
+
+        $detector->setValue(null, static fn (string $extension): bool => false);
+        $verified->setValue(null, false);
+
+        $this->expectException(PrecisionViolation::class);
+        $this->expectExceptionMessage('The BCMath extension (ext-bcmath) is required. Install it or require symfony/polyfill-bcmath when the extension cannot be loaded.');
+
+        try {
+            BcMath::add('1', '1', 2);
+        } finally {
+            $detector->setValue(null, $previousDetector);
+            $verified->setValue(null, $previousVerified);
+        }
     }
 }

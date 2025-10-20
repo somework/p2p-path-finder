@@ -76,7 +76,7 @@ jobs:
           composer-options: --prefer-dist --no-interaction --no-progress
           custom-cache-suffix: ${{ hashFiles('composer.json') }}
       - name: Run Infection with coverage thresholds
-        run: composer infection -- --log-verbosity=none
+        run: composer infection -- --min-msi=80 --min-covered-msi=85 --log-verbosity=none
 
   phpbench:
     name: PhpBench

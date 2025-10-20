@@ -9,5 +9,8 @@
         "configDir": ".",
         "customPath": "vendor/bin/phpunit"
     },
-    "tmpDir": "var/cache/infection"
+    "tmpDir": "var/cache/infection",
+    "minMsi": 80,
+    "minCoveredMsi": 85,
+    "timeout": 25
 }

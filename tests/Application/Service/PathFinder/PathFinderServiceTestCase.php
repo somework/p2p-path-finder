@@ -29,6 +29,11 @@ abstract class PathFinderServiceTestCase extends TestCase
         return new PathFinderService(new GraphBuilder());
     }
 
+    protected function makeServiceWithFactory(callable $factory): PathFinderService
+    {
+        return new PathFinderService(new GraphBuilder(), pathFinderFactory: $factory);
+    }
+
     protected function createOrder(
         OrderSide $side,
         string $base,
