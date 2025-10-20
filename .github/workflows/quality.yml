@@ -60,45 +60,6 @@ jobs:
       - name: Run php-cs-fixer dry-run
         run: vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php --dry-run --diff
 
-  reports:
-    name: Reports
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.3'
-          coverage: xdebug
-          extensions: bcmath
-          ini-values: memory_limit=-1
-      - uses: ramsey/composer-install@v3
-        with:
-          composer-options: --prefer-dist --no-interaction --no-progress
-          custom-cache-suffix: ${{ hashFiles('composer.json') }}
-      - name: Run PHPUnit with coverage for reports
-        run: |
-          mkdir -p coverage
-          vendor/bin/phpunit --coverage-clover=coverage/quality-clover.xml
-      - name: Upload quality coverage artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: quality-coverage
-          path: coverage/quality-clover.xml
-          if-no-files-found: error
-          retention-days: 7
-      - name: Generate API documentation
-        run: composer phpdoc
-      - name: Package API documentation
-        run: |
-          tar -czf phpdoc.tar.gz -C docs api
-      - name: Upload API documentation artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: phpdoc-api
-          path: phpdoc.tar.gz
-          if-no-files-found: error
-          retention-days: 7
-
   infection:
     name: Infection
     runs-on: ubuntu-latest
