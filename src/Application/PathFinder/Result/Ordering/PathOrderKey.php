@@ -13,6 +13,10 @@ final class PathOrderKey
 {
     /**
      * @param Payload $payload
+     *
+     * @phpstan-param string $cost
+     *
+     * @psalm-param numeric-string $cost
      */
     public function __construct(
         private readonly string $cost,
@@ -23,6 +27,11 @@ final class PathOrderKey
     ) {
     }
 
+    /**
+     * @phpstan-return string
+     *
+     * @psalm-return numeric-string
+     */
     public function cost(): string
     {
         return $this->cost;

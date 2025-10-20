@@ -124,6 +124,22 @@ use function usort;
  *     cost: numeric-string,
  * }
  *
+ * @psalm-type CandidateResultEntry = array{
+ *     candidate: Candidate,
+ *     order: int,
+ *     cost: numeric-string,
+ *     routeSignature: string,
+ *     orderKey: PathOrderKey,
+ * }
+ *
+ * @phpstan-type CandidateResultEntry array{
+ *     candidate: Candidate,
+ *     order: int,
+ *     cost: string,
+ *     routeSignature: string,
+ *     orderKey: PathOrderKey,
+ * }
+ *
  * @psalm-type SearchQueueEntry = array{
  *     state: SearchState,
  *     priority: array{cost: numeric-string, order: int},
@@ -642,13 +658,14 @@ final class PathFinder
      */
     private function finalizeResults(CandidateResultHeap $results): array
     {
+        /** @var list<CandidateResultEntry> $entries */
         $entries = $this->collectResultEntries($results);
         $this->sortResultEntries($entries);
 
         /** @var list<Candidate> $finalized */
         $finalized = array_map(
             /**
-             * @param array{candidate: Candidate, order: int, cost: numeric-string, routeSignature: string, orderKey: PathOrderKey} $entry
+             * @param CandidateResultEntry $entry
              */
             static fn (array $entry): array => $entry['candidate'],
             $entries,
@@ -658,18 +675,12 @@ final class PathFinder
     }
 
     /**
-     * @return list<array{candidate: Candidate, order: int, cost: numeric-string, routeSignature: string}>
+     * @return list<CandidateResultEntry>
      */
     private function collectResultEntries(CandidateResultHeap $results): array
     {
         /**
-         * @var list<array{
-         *     candidate: Candidate,
-         *     order: int,
-         *     cost: numeric-string,
-         *     routeSignature: string,
-         *     orderKey: PathOrderKey,
-         * }> $collected
+         * @var list<CandidateResultEntry> $collected
          */
         $collected = [];
         $clone = clone $results;
@@ -692,16 +703,20 @@ final class PathFinder
     }
 
     /**
-     * @param list<array{candidate: Candidate, order: int, cost: numeric-string, routeSignature: string, orderKey: PathOrderKey}> $entries
+     * @param list<CandidateResultEntry> $entries
      */
     private function sortResultEntries(array &$entries): void
     {
-        $strategy = $this->orderingStrategy;
+        usort($entries, [$this, 'compareCandidateEntries']);
+    }
 
-        usort(
-            $entries,
-            fn (array $left, array $right): int => $strategy->compare($left['orderKey'], $right['orderKey'])
-        );
+    /**
+     * @param CandidateResultEntry $left
+     * @param CandidateResultEntry $right
+     */
+    private function compareCandidateEntries(array $left, array $right): int
+    {
+        return $this->orderingStrategy->compare($left['orderKey'], $right['orderKey']);
     }
 
     /**

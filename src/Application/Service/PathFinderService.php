@@ -35,6 +35,24 @@ use function usort;
  * @psalm-import-type Candidate from PathFinder
  * @psalm-import-type Graph from PathFinder
  * @psalm-import-type SpendConstraints from PathFinder
+ *
+ * @psalm-type MaterializedResultEntry = array{
+ *     cost: numeric-string,
+ *     hops: int,
+ *     routeSignature: string,
+ *     order: int,
+ *     result: PathResult,
+ *     orderKey: PathOrderKey,
+ * }
+ *
+ * @phpstan-type MaterializedResultEntry array{
+ *     cost: string,
+ *     hops: int,
+ *     routeSignature: string,
+ *     order: int,
+ *     result: PathResult,
+ *     orderKey: PathOrderKey,
+ * }
  */
 final class PathFinderService
 {
@@ -179,14 +197,7 @@ final class PathFinderService
         $runner = $runnerFactory($config);
 
         /**
-         * @var list<array{
-         *     cost: numeric-string,
-         *     hops: int,
-         *     routeSignature: string,
-         *     order: int,
-         *     result: PathResult,
-         *     orderKey: PathOrderKey,
-         * }> $materializedResults
+         * @var list<MaterializedResultEntry> $materializedResults
          */
         $materializedResults = [];
         $resultOrder = 0;
@@ -328,7 +339,9 @@ final class PathFinderService
     }
 
     /**
-     * @param list<array{from: string, to: string}> $edges
+     * @phpstan-param list<array{from: string, to: string}> $edges
+     *
+     * @psalm-param list<array{from: string, to: string, ...}> $edges
      */
     private function routeSignature(array $edges): string
     {
@@ -346,16 +359,20 @@ final class PathFinderService
     }
 
     /**
-     * @param list<array{cost: numeric-string, hops: int, routeSignature: string, order: int, result: PathResult, orderKey: PathOrderKey}> $materializedResults
+     * @param list<MaterializedResultEntry> $materializedResults
      */
     private function sortMaterializedResults(array &$materializedResults): void
     {
-        $strategy = $this->orderingStrategy;
+        usort($materializedResults, [$this, 'compareMaterializedEntries']);
+    }
 
-        usort(
-            $materializedResults,
-            fn (array $left, array $right): int => $strategy->compare($left['orderKey'], $right['orderKey'])
-        );
+    /**
+     * @param MaterializedResultEntry $left
+     * @param MaterializedResultEntry $right
+     */
+    private function compareMaterializedEntries(array $left, array $right): int
+    {
+        return $this->orderingStrategy->compare($left['orderKey'], $right['orderKey']);
     }
 
     /**
