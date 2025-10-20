@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathFinder;
 
+use SomeWork\P2PPathFinder\Application\PathFinder\Guard\SearchGuards;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
@@ -22,7 +23,6 @@ use function array_key_exists;
 use function array_map;
 use function array_values;
 use function implode;
-use function microtime;
 use function sprintf;
 use function str_repeat;
 use function strtoupper;
@@ -293,32 +293,18 @@ final class PathFinder
         ] = $this->initializeSearchStructures($source, $range, $desiredSpend);
 
         $bestTargetCost = null;
-        $expansions = 0;
 
-        $expansionGuardReached = false;
+        $guards = new SearchGuards($this->maxExpansions, $this->timeBudgetMs);
         $visitedGuardReached = false;
-        $timeGuardReached = false;
-
-        $searchStartedAt = microtime(true);
 
         while (!$queue->isEmpty()) {
-            if (null !== $this->timeBudgetMs) {
-                $elapsedMilliseconds = (microtime(true) - $searchStartedAt) * 1000.0;
-
-                if ($elapsedMilliseconds >= (float) $this->timeBudgetMs) {
-                    $timeGuardReached = true;
-                    break;
-                }
-            }
-
-            if ($expansions >= $this->maxExpansions) {
-                $expansionGuardReached = true;
+            if (!$guards->canExpand()) {
                 break;
             }
 
             /** @var SearchState $state */
             $state = $queue->extract();
-            ++$expansions;
+            $guards->recordExpansion();
 
             if ($state['node'] === $target) {
                 /** @var numeric-string $candidateCost */
@@ -466,7 +452,7 @@ final class PathFinder
             }
         }
 
-        $guardLimits = new GuardLimitStatus($expansionGuardReached, $visitedGuardReached, $timeGuardReached);
+        $guardLimits = $guards->finalize($visitedGuardReached);
 
         if (0 === $results->count()) {
             /** @var SearchOutcome<Candidate> $empty */
