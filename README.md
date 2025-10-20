@@ -126,27 +126,37 @@ The library ships with domain-specific exceptions under the
   validation.
 * `PrecisionViolation` &mdash; signals arithmetic inputs that cannot be represented within the
   configured BCMath scale.
-* `GuardLimitExceeded` &mdash; thrown when search guardrails (visited states or expansions)
-  are breached.
+* `GuardLimitExceeded` &mdash; reserved for future escalation paths when search guardrails
+  (visited states or expansions) should raise instead of returning guard metadata.
 * `InfeasiblePath` &mdash; indicates that no route satisfies the requested constraints.
+
+Search guardrails (expansion/visited-state limits) currently surface through the
+`SearchOutcome::guardLimits()` method. The returned `GuardLimitStatus` aggregate exposes
+helpers such as `anyLimitReached()` so callers can inspect whether searches exhausted their
+configured protections without relying on exceptions.
 
 Consumers can mix coarse- and fine-grained handling strategies:
 
 ```php
 use SomeWork\\P2PPathFinder\\Exception\\ExceptionInterface;
-use SomeWork\\P2PPathFinder\\Exception\\GuardLimitExceeded;
 use SomeWork\\P2PPathFinder\\Exception\\InvalidInput;
 use SomeWork\\P2PPathFinder\\Exception\\PrecisionViolation;
 
 try {
     $outcome = $service->findBestPaths($orderBook, $config, 'USDT');
+
+    $guardStatus = $outcome->guardLimits();
+    if ($guardStatus->anyLimitReached()) {
+        // Surface that the configured search guardrails were hit without halting execution.
+    }
 } catch (InvalidInput|PrecisionViolation $validationError) {
     // Alert callers that supplied data is malformed.
-} catch (GuardLimitExceeded $guardFailure) {
-    // Surface that the configured search guardrails were hit.
 } catch (ExceptionInterface $libraryError) {
     // Catch-all for other library-specific exceptions (e.g. InfeasiblePath).
 }
+
+// The GuardLimitExceeded exception remains available for future releases that elect to throw
+// instead of returning guard metadata via SearchOutcome::guardLimits().
 ```
 
 ## Quick-start scenarios
