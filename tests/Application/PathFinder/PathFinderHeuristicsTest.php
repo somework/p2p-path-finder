@@ -53,6 +53,37 @@ final class PathFinderHeuristicsTest extends TestCase
         self::assertTrue($result);
     }
 
+    public function test_dominated_state_search_skips_mismatched_signatures(): void
+    {
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
+
+        $method = new ReflectionMethod(PathFinder::class, 'isDominated');
+        $method->setAccessible(true);
+
+        $existing = [
+            [
+                'cost' => BcMath::normalize('0.750', 18),
+                'hops' => 1,
+                'signature' => 'signature-alpha',
+            ],
+            [
+                'cost' => BcMath::normalize('0.800', 18),
+                'hops' => 2,
+                'signature' => 'signature-beta',
+            ],
+        ];
+
+        $result = $method->invoke(
+            $finder,
+            $existing,
+            BcMath::normalize('0.900', 18),
+            2,
+            'signature-beta',
+        );
+
+        self::assertTrue($result);
+    }
+
     public function test_record_state_replaces_inferior_entries(): void
     {
         $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
@@ -99,6 +130,55 @@ final class PathFinderHeuristicsTest extends TestCase
         self::assertSame($signature, $newEntry['signature']);
         self::assertSame(BcMath::normalize('1.500', 18), $newEntry['cost']);
         self::assertSame(1, $newEntry['hops']);
+    }
+
+    public function test_record_state_removes_matching_entry_after_skipping_mismatched_signatures(): void
+    {
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
+
+        $signatureMethod = new ReflectionMethod(PathFinder::class, 'stateSignature');
+        $signatureMethod->setAccessible(true);
+        $primarySignature = $signatureMethod->invoke($finder, null, null);
+        $alternateSignature = $primarySignature.'-alt';
+
+        $registry = [
+            'USD' => [
+                [
+                    'cost' => BcMath::normalize('4.000', 18),
+                    'hops' => 5,
+                    'signature' => $alternateSignature,
+                ],
+                [
+                    'cost' => BcMath::normalize('2.750', 18),
+                    'hops' => 3,
+                    'signature' => $primarySignature,
+                ],
+            ],
+        ];
+
+        $method = new ReflectionMethod(PathFinder::class, 'recordState');
+        $method->setAccessible(true);
+
+        $args = [
+            &$registry,
+            'USD',
+            BcMath::normalize('1.250', 18),
+            2,
+            null,
+            null,
+            $primarySignature,
+        ];
+
+        $netChange = $method->invokeArgs($finder, $args);
+
+        self::assertSame(0, $netChange);
+        self::assertCount(2, $registry['USD']);
+        self::assertSame($alternateSignature, $registry['USD'][0]['signature']);
+
+        $replacement = $registry['USD'][1];
+        self::assertSame($primarySignature, $replacement['signature']);
+        self::assertSame(BcMath::normalize('1.250', 18), $replacement['cost']);
+        self::assertSame(2, $replacement['hops']);
     }
 
     public function test_money_signature_formats_null_and_scaled_amounts(): void

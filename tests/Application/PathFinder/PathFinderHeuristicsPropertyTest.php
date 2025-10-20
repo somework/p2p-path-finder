@@ -168,7 +168,17 @@ final class PathFinderHeuristicsPropertyTest extends TestCase
             $ratioScale + $this->sumExtraScale,
         );
 
-        return $interpolated->withScale($targetScale);
+        $interpolated = $interpolated->withScale($targetScale);
+
+        if ($interpolated->lessThan($targetMin)) {
+            return $targetMin;
+        }
+
+        if ($interpolated->greaterThan($targetMax)) {
+            return $targetMax;
+        }
+
+        return $interpolated;
     }
 
     private function reflectIntConstant(ReflectionClass $class, string $name): int
