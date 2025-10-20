@@ -37,6 +37,17 @@ final class PathFinderScenarioGenerator
      */
     private const TOLERANCE_CHOICES = ['0.0', '0.01', '0.05', '0.10', '0.20'];
 
+    /**
+     * @var non-empty-list<numeric-string>
+     */
+    private const SCALE_CHOICES = [
+        '1',
+        '10',
+        '1000',
+        '1000000',
+        '1000000000000000000000000000000000000',
+    ];
+
     private Randomizer $randomizer;
 
     public function __construct(?Randomizer $randomizer = null)
@@ -52,6 +63,7 @@ final class PathFinderScenarioGenerator
      *     maxHops: positive-int,
      *     topK: positive-int,
      *     tolerance: numeric-string,
+     *     scaleBy: numeric-string,
      * }
      */
     public function scenario(): array
@@ -73,6 +85,7 @@ final class PathFinderScenarioGenerator
             'maxHops' => $maxHops,
             'topK' => $topK,
             'tolerance' => $this->randomTolerance(),
+            'scaleBy' => $this->deterministicScaleFactor($orders, $maxHops, $topK),
         ];
     }
 
@@ -190,6 +203,19 @@ final class PathFinderScenarioGenerator
     private function randomTolerance(): string
     {
         return $this->toleranceChoice($this->randomizer->getInt(0, count(self::TOLERANCE_CHOICES) - 1));
+    }
+
+    /**
+     * @param list<Order> $orders
+     *
+     * @return numeric-string
+     */
+    private function deterministicScaleFactor(array $orders, int $maxHops, int $topK): string
+    {
+        $indexSeed = count($orders) + $maxHops + $topK;
+        $index = $indexSeed % count(self::SCALE_CHOICES);
+
+        return self::SCALE_CHOICES[$index];
     }
 
     private function maybeFeePolicy(): ?FeePolicy
