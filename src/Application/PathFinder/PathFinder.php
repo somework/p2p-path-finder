@@ -302,9 +302,13 @@ final class PathFinder
         $searchStartedAt = microtime(true);
 
         while (!$queue->isEmpty()) {
-            if (null !== $this->timeBudgetMs && (microtime(true) - $searchStartedAt) * 1000 >= $this->timeBudgetMs) {
-                $timeGuardReached = true;
-                break;
+            if (null !== $this->timeBudgetMs) {
+                $elapsedMilliseconds = (microtime(true) - $searchStartedAt) * 1000.0;
+
+                if ($elapsedMilliseconds >= (float) $this->timeBudgetMs) {
+                    $timeGuardReached = true;
+                    break;
+                }
             }
 
             if ($expansions >= $this->maxExpansions) {
