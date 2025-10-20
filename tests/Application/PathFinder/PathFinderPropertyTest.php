@@ -226,12 +226,10 @@ final class PathFinderPropertyTest extends TestCase
         $minimum = $bounds->min()->multiply($scaleFactor);
         $maximum = $bounds->max()->multiply($scaleFactor);
 
-        $rate = BcMath::mul(
+        $normalizedRate = BcMath::normalize(
             $order->effectiveRate()->rate(),
-            $scaleFactor,
             $order->effectiveRate()->scale(),
         );
-        $normalizedRate = BcMath::normalize($rate, $order->effectiveRate()->scale());
 
         return OrderFactory::createOrder(
             $order->side(),
