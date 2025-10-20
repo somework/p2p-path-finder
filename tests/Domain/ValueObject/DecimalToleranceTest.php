@@ -5,8 +5,14 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Domain\ValueObject;
 
 use PHPUnit\Framework\TestCase;
+use ReflectionProperty;
+use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
+
+use function max;
+use function sprintf;
 
 final class DecimalToleranceTest extends TestCase
 {
@@ -25,6 +31,21 @@ final class DecimalToleranceTest extends TestCase
 
         self::assertSame('0.12345678901234567890', $tolerance->ratio());
         self::assertSame(20, $tolerance->scale());
+    }
+
+    /**
+     * @dataProvider provideToleranceRatios
+     */
+    public function test_normalized_ratio_stays_within_bounds(string $ratio, int $scale): void
+    {
+        $tolerance = DecimalTolerance::fromNumericString($ratio, $scale);
+        $comparisonScale = max($scale, 18);
+        $normalizedInput = BcMath::normalize($ratio, $scale);
+
+        self::assertSame($normalizedInput, $tolerance->ratio());
+        self::assertSame($tolerance->ratio(), BcMath::normalize($tolerance->ratio(), $scale));
+        self::assertGreaterThanOrEqual(0, BcMath::comp($tolerance->ratio(), '0', $comparisonScale));
+        self::assertLessThanOrEqual(0, BcMath::comp($tolerance->ratio(), '1', $comparisonScale));
     }
 
     public function test_zero_factory_provides_normalized_ratio(): void
@@ -115,6 +136,30 @@ final class DecimalToleranceTest extends TestCase
         DecimalTolerance::fromNumericString('0.5', -1);
     }
 
+    public function test_from_numeric_string_requires_bcmath_extension(): void
+    {
+        $detector = new ReflectionProperty(BcMath::class, 'extensionDetector');
+        $detector->setAccessible(true);
+        $verified = new ReflectionProperty(BcMath::class, 'extensionVerified');
+        $verified->setAccessible(true);
+
+        $previousDetector = $detector->getValue();
+        $previousVerified = $verified->getValue();
+
+        $detector->setValue(null, static fn (string $extension): bool => false);
+        $verified->setValue(null, false);
+
+        $this->expectException(PrecisionViolation::class);
+        $this->expectExceptionMessage('The BCMath extension (ext-bcmath) is required. Install it or require symfony/polyfill-bcmath when the extension cannot be loaded.');
+
+        try {
+            DecimalTolerance::fromNumericString('0.1');
+        } finally {
+            $detector->setValue(null, $previousDetector);
+            $verified->setValue(null, $previousVerified);
+        }
+    }
+
     public function test_comparison_helpers_cover_both_directions(): void
     {
         $tolerance = DecimalTolerance::fromNumericString('0.25');
@@ -123,5 +168,17 @@ final class DecimalToleranceTest extends TestCase
         self::assertTrue($tolerance->isLessThanOrEqual('0.25'));
         self::assertFalse($tolerance->isLessThanOrEqual('0.249'));
         self::assertFalse($tolerance->isGreaterThanOrEqual('0.251'));
+    }
+
+    /**
+     * @return iterable<string, array{numeric-string, int}>
+     */
+    public static function provideToleranceRatios(): iterable
+    {
+        $case = 0;
+
+        foreach (NumericStringGenerator::toleranceRatios() as [$ratio, $scale]) {
+            yield sprintf('ratio-%d', $case++) => [$ratio, $scale];
+        }
     }
 }
