@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 
 use PHPUnit\Framework\TestCase;
+use ReflectionMethod;
 use ReflectionProperty;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\PathFinder\CandidateResultHeap;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
@@ -25,6 +29,7 @@ use function array_key_last;
 use function array_reverse;
 use function array_unique;
 use function count;
+use function implode;
 use function in_array;
 
 final class PathFinderTest extends TestCase
@@ -216,6 +221,178 @@ final class PathFinderTest extends TestCase
         $direct = $results[0];
         self::assertSame('EUR', $direct['edges'][0]['from']);
         self::assertSame('USD', $direct['edges'][0]['to']);
+    }
+
+    public function test_finalize_results_orders_candidates_by_cost_hops_and_signature(): void
+    {
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.0', topK: 3);
+
+        $heapFactory = new ReflectionMethod(PathFinder::class, 'createResultHeap');
+        $heapFactory->setAccessible(true);
+        /** @var CandidateResultHeap $heap */
+        $heap = $heapFactory->invoke($finder);
+
+        $recordResult = new ReflectionMethod(PathFinder::class, 'recordResult');
+        $recordResult->setAccessible(true);
+
+        $candidates = [
+            [
+                'cost' => '0.100000000000000000',
+                'product' => '10.000000000000000000',
+                'hops' => 2,
+                'edges' => [
+                    ['from' => 'SRC', 'to' => 'BET'],
+                    ['from' => 'BET', 'to' => 'TRG'],
+                ],
+                'amountRange' => null,
+                'desiredAmount' => null,
+            ],
+            [
+                'cost' => '0.100000000000000000',
+                'product' => '10.000000000000000000',
+                'hops' => 2,
+                'edges' => [
+                    ['from' => 'SRC', 'to' => 'ALP'],
+                    ['from' => 'ALP', 'to' => 'TRG'],
+                ],
+                'amountRange' => null,
+                'desiredAmount' => null,
+            ],
+            [
+                'cost' => '0.100000000000000000',
+                'product' => '10.000000000000000000',
+                'hops' => 1,
+                'edges' => [
+                    ['from' => 'SRC', 'to' => 'TRG'],
+                ],
+                'amountRange' => null,
+                'desiredAmount' => null,
+            ],
+        ];
+
+        foreach ($candidates as $index => $candidate) {
+            $recordResult->invoke($finder, $heap, $candidate, $index);
+        }
+
+        $finalize = new ReflectionMethod(PathFinder::class, 'finalizeResults');
+        $finalize->setAccessible(true);
+        /** @var list<array> $finalized */
+        $finalized = $finalize->invoke($finder, $heap);
+
+        self::assertCount(3, $finalized);
+
+        $expectedHops = [1, 2, 2];
+        foreach ($finalized as $index => $candidate) {
+            self::assertSame($expectedHops[$index], $candidate['hops']);
+            self::assertSame('0.100000000000000000', $candidate['cost']);
+        }
+
+        $signatures = array_map(
+            static fn (array $candidate): string => self::routeSignatureFromEdges($candidate['edges']),
+            $finalized,
+        );
+
+        self::assertSame(
+            ['SRC->TRG', 'SRC->ALP->TRG', 'SRC->BET->TRG'],
+            $signatures,
+        );
+    }
+
+    public function test_finalize_results_honours_custom_ordering_strategy(): void
+    {
+        $strategy = new class implements PathOrderStrategy {
+            public function compare(PathOrderKey $left, PathOrderKey $right): int
+            {
+                $comparison = $right->routeSignature() <=> $left->routeSignature();
+                if (0 !== $comparison) {
+                    return $comparison;
+                }
+
+                return $right->insertionOrder() <=> $left->insertionOrder();
+            }
+        };
+
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.0', topK: 3, orderingStrategy: $strategy);
+
+        $heapFactory = new ReflectionMethod(PathFinder::class, 'createResultHeap');
+        $heapFactory->setAccessible(true);
+        /** @var CandidateResultHeap $heap */
+        $heap = $heapFactory->invoke($finder);
+
+        $recordResult = new ReflectionMethod(PathFinder::class, 'recordResult');
+        $recordResult->setAccessible(true);
+
+        $candidates = [
+            [
+                'cost' => '0.100000000000000000',
+                'product' => '10.000000000000000000',
+                'hops' => 2,
+                'edges' => [
+                    ['from' => 'SRC', 'to' => 'BET'],
+                    ['from' => 'BET', 'to' => 'TRG'],
+                ],
+                'amountRange' => null,
+                'desiredAmount' => null,
+            ],
+            [
+                'cost' => '0.100000000000000000',
+                'product' => '10.000000000000000000',
+                'hops' => 2,
+                'edges' => [
+                    ['from' => 'SRC', 'to' => 'ALP'],
+                    ['from' => 'ALP', 'to' => 'TRG'],
+                ],
+                'amountRange' => null,
+                'desiredAmount' => null,
+            ],
+            [
+                'cost' => '0.100000000000000000',
+                'product' => '10.000000000000000000',
+                'hops' => 1,
+                'edges' => [
+                    ['from' => 'SRC', 'to' => 'TRG'],
+                ],
+                'amountRange' => null,
+                'desiredAmount' => null,
+            ],
+        ];
+
+        foreach ($candidates as $index => $candidate) {
+            $recordResult->invoke($finder, $heap, $candidate, $index);
+        }
+
+        $finalize = new ReflectionMethod(PathFinder::class, 'finalizeResults');
+        $finalize->setAccessible(true);
+        /** @var list<array> $finalized */
+        $finalized = $finalize->invoke($finder, $heap);
+
+        $signatures = array_map(
+            static fn (array $candidate): string => self::routeSignatureFromEdges($candidate['edges']),
+            $finalized,
+        );
+
+        self::assertSame(
+            ['SRC->TRG', 'SRC->BET->TRG', 'SRC->ALP->TRG'],
+            $signatures,
+        );
+    }
+
+    /**
+     * @param list<array{from: string, to: string}> $edges
+     */
+    private static function routeSignatureFromEdges(array $edges): string
+    {
+        if ([] === $edges) {
+            return '';
+        }
+
+        $nodes = [$edges[0]['from']];
+
+        foreach ($edges as $edge) {
+            $nodes[] = $edge['to'];
+        }
+
+        return implode('->', $nodes);
     }
 
     public function test_it_skips_duplicate_states_with_identical_cost_and_hops(): void
@@ -830,13 +1007,13 @@ final class PathFinderTest extends TestCase
             [$paths[0]['edges'][0]['from']],
             array_map(static fn (array $edge): string => $edge['to'], $paths[0]['edges']),
         );
-        self::assertSame(['SRC', 'ALT', 'AUX', 'TRG'], $firstNodes);
+        self::assertSame(['SRC', 'MID', 'TRG'], $firstNodes);
 
         $secondNodes = array_merge(
             [$paths[1]['edges'][0]['from']],
             array_map(static fn (array $edge): string => $edge['to'], $paths[1]['edges']),
         );
-        self::assertSame(['SRC', 'MID', 'TRG'], $secondNodes);
+        self::assertSame(['SRC', 'ALT', 'AUX', 'TRG'], $secondNodes);
 
         self::assertTrue($outcome->guardLimits()->visitedStatesReached());
     }
@@ -1363,7 +1540,7 @@ final class PathFinderTest extends TestCase
         self::assertNotNull($result['desiredAmount']);
 
         $edge = $graph['EUR']['edges'][0];
-        $convertMethod = new \ReflectionMethod(PathFinder::class, 'convertEdgeAmount');
+        $convertMethod = new ReflectionMethod(PathFinder::class, 'convertEdgeAmount');
         $convertMethod->setAccessible(true);
         $expectedDesired = $convertMethod->invoke($finder, $edge, $maximum);
 

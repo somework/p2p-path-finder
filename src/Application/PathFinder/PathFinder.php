@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Application\PathFinder;
 
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
@@ -16,7 +19,9 @@ use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 use SplPriorityQueue;
 
 use function array_key_exists;
+use function array_map;
 use function array_values;
+use function implode;
 use function sprintf;
 use function str_repeat;
 use function strtoupper;
@@ -119,6 +124,22 @@ use function usort;
  *     cost: numeric-string,
  * }
  *
+ * @psalm-type CandidateResultEntry = array{
+ *     candidate: Candidate,
+ *     order: int,
+ *     cost: numeric-string,
+ *     routeSignature: string,
+ *     orderKey: PathOrderKey,
+ * }
+ *
+ * @phpstan-type CandidateResultEntry array{
+ *     candidate: Candidate,
+ *     order: int,
+ *     cost: string,
+ *     routeSignature: string,
+ *     orderKey: PathOrderKey,
+ * }
+ *
  * @psalm-type SearchQueueEntry = array{
  *     state: SearchState,
  *     priority: array{cost: numeric-string, order: int},
@@ -173,6 +194,7 @@ final class PathFinder
     /** @var numeric-string */
     private readonly string $toleranceAmplifier;
     private readonly bool $hasTolerance;
+    private readonly PathOrderStrategy $orderingStrategy;
 
     /**
      * @param int    $maxHops   maximum number of edges a path may contain
@@ -184,6 +206,7 @@ final class PathFinder
         private readonly int $topK = 1,
         private readonly int $maxExpansions = self::DEFAULT_MAX_EXPANSIONS,
         private readonly int $maxVisitedStates = self::DEFAULT_MAX_VISITED_STATES,
+        ?PathOrderStrategy $orderingStrategy = null,
     ) {
         if ($maxHops < 1) {
             throw new InvalidInput('Maximum hops must be at least one.');
@@ -209,6 +232,7 @@ final class PathFinder
         $amplifier = $this->calculateToleranceAmplifier($normalizedTolerance);
         $this->toleranceAmplifier = $amplifier;
         $this->hasTolerance = 1 === BcMath::comp($normalizedTolerance, '0', self::SCALE);
+        $this->orderingStrategy = $orderingStrategy ?? new CostHopsSignatureOrderingStrategy(self::SCALE);
     }
 
     /**
@@ -634,53 +658,83 @@ final class PathFinder
      */
     private function finalizeResults(CandidateResultHeap $results): array
     {
-        /** @var list<CandidateHeapEntry> $collected */
+        /** @var list<CandidateResultEntry> $entries */
+        $entries = $this->collectResultEntries($results);
+        $this->sortResultEntries($entries);
+
+        /** @var list<Candidate> $finalized */
+        $finalized = array_map(
+            /**
+             * @param CandidateResultEntry $entry
+             */
+            static fn (array $entry): array => $entry['candidate'],
+            $entries,
+        );
+
+        return $finalized;
+    }
+
+    /**
+     * @return list<CandidateResultEntry>
+     */
+    private function collectResultEntries(CandidateResultHeap $results): array
+    {
+        /**
+         * @var list<CandidateResultEntry> $collected
+         */
         $collected = [];
         $clone = clone $results;
 
         while (!$clone->isEmpty()) {
             /** @var CandidateHeapEntry $entry */
             $entry = $clone->extract();
+            $entry['routeSignature'] = $this->routeSignature($entry['candidate']['edges']);
+            $entry['orderKey'] = new PathOrderKey(
+                $entry['cost'],
+                $entry['candidate']['hops'],
+                $entry['routeSignature'],
+                $entry['order'],
+                ['candidate' => $entry['candidate']],
+            );
             $collected[] = $entry;
         }
 
-        usort(
-            $collected,
-            /**
-             * @phpstan-param array{candidate: Candidate, order: int, cost: numeric-string} $left
-             * @phpstan-param array{candidate: Candidate, order: int, cost: numeric-string} $right
-             *
-             * @psalm-param array{candidate: Candidate, order: int, cost: numeric-string} $left
-             * @psalm-param array{candidate: Candidate, order: int, cost: numeric-string} $right
-             */
-            function (array $left, array $right): int {
-                $leftCost = $left['cost'];
-                /** @var numeric-string $leftCost */
-                $leftCost = $leftCost;
-                $rightCost = $right['cost'];
-                /** @var numeric-string $rightCost */
-                $rightCost = $rightCost;
+        return $collected;
+    }
 
-                $comparison = BcMath::comp($leftCost, $rightCost, self::SCALE);
-                if (0 !== $comparison) {
-                    return $comparison;
-                }
+    /**
+     * @param list<CandidateResultEntry> $entries
+     */
+    private function sortResultEntries(array &$entries): void
+    {
+        usort($entries, [$this, 'compareCandidateEntries']);
+    }
 
-                return $left['order'] <=> $right['order'];
-            },
-        );
+    /**
+     * @param CandidateResultEntry $left
+     * @param CandidateResultEntry $right
+     */
+    private function compareCandidateEntries(array $left, array $right): int
+    {
+        return $this->orderingStrategy->compare($left['orderKey'], $right['orderKey']);
+    }
 
-        $finalized = [];
-
-        /** @var CandidateHeapEntry $entry */
-        foreach ($collected as $entry) {
-            /** @var Candidate $candidate */
-            $candidate = $entry['candidate'];
-
-            $finalized[] = $candidate;
+    /**
+     * @param list<PathEdge> $edges
+     */
+    private function routeSignature(array $edges): string
+    {
+        if ([] === $edges) {
+            return '';
         }
 
-        return $finalized;
+        $nodes = [$edges[0]['from']];
+
+        foreach ($edges as $edge) {
+            $nodes[] = $edge['to'];
+        }
+
+        return implode('->', $nodes);
     }
 
     /**

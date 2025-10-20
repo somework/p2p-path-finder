@@ -741,8 +741,16 @@ final class PathFinderHeuristicsTest extends TestCase
 
         $cost = BcMath::normalize('1.750000000000000000', 18);
 
-        $first = $this->buildCandidate($cost, [['label' => 'first']]);
-        $second = $this->buildCandidate($cost, [['label' => 'second']]);
+        $first = $this->buildCandidate($cost, [[
+            'from' => 'SRC',
+            'to' => 'MID',
+            'label' => 'first',
+        ]]);
+        $second = $this->buildCandidate($cost, [[
+            'from' => 'SRC',
+            'to' => 'MID',
+            'label' => 'second',
+        ]]);
 
         $recordResult->invokeArgs($finder, [$heap, $first, 0]);
         $recordResult->invokeArgs($finder, [$heap, $second, 1]);
@@ -752,8 +760,8 @@ final class PathFinderHeuristicsTest extends TestCase
 
         $results = $finalize->invoke($finder, $heap);
 
-        self::assertSame([['label' => 'first']], $results[0]['edges']);
-        self::assertSame([['label' => 'second']], $results[1]['edges']);
+        self::assertSame('first', $results[0]['edges'][0]['label']);
+        self::assertSame('second', $results[1]['edges'][0]['label']);
     }
 
     /**

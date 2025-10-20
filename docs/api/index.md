@@ -335,12 +335,16 @@ visited: array<string, bool>,
 ### Public methods
 
 ### __construct
-`PathFinder::__construct(int $maxHops = 4, string $tolerance = '0', int $topK = 1, int $maxExpansions = 250000, int $maxVisitedStates = 250000)`
+`PathFinder::__construct(int $maxHops = 4, string $tolerance = '0', int $topK = 1, int $maxExpansions = 250000, int $maxVisitedStates = 250000, ?SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy $orderingStrategy = null)`
 
 ### findBestPaths
 `PathFinder::findBestPaths(array $graph, string $source, string $target, ?array $spendConstraints = null, ?callable $acceptCandidate = null): SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome`
 
 Returns: SearchOutcome<Candidate>
+
+The finder orders candidates using the configured `PathOrderStrategy`. The built-in
+`CostHopsSignatureOrderingStrategy` compares cost first, then hop count, route signature and finally
+discovery order to guarantee deterministic tie-breaking.
 
 ## SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus
 
@@ -591,7 +595,7 @@ High level facade orchestrating order filtering, graph building and path search.
 ### Public methods
 
 ### __construct
-`PathFinderService::__construct(SomeWork\P2PPathFinder\Application\Graph\GraphBuilder $graphBuilder, ?SomeWork\P2PPathFinder\Application\Service\OrderSpendAnalyzer $orderSpendAnalyzer = null, ?SomeWork\P2PPathFinder\Application\Service\LegMaterializer $legMaterializer = null, ?SomeWork\P2PPathFinder\Application\Service\ToleranceEvaluator $toleranceEvaluator = null, ?SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator $fillEvaluator = null)`
+`PathFinderService::__construct(SomeWork\P2PPathFinder\Application\Graph\GraphBuilder $graphBuilder, ?SomeWork\P2PPathFinder\Application\Service\OrderSpendAnalyzer $orderSpendAnalyzer = null, ?SomeWork\P2PPathFinder\Application\Service\LegMaterializer $legMaterializer = null, ?SomeWork\P2PPathFinder\Application\Service\ToleranceEvaluator $toleranceEvaluator = null, ?SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator $fillEvaluator = null, ?SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy $orderingStrategy = null, ?callable $pathFinderFactory = null)`
 
 ### findBestPaths
 `PathFinderService::findBestPaths(SomeWork\P2PPathFinder\Application\OrderBook\OrderBook $orderBook, SomeWork\P2PPathFinder\Application\Config\PathSearchConfig $config, string $targetAsset): SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome`
@@ -599,6 +603,9 @@ High level facade orchestrating order filtering, graph building and path search.
 Searches for the best conversion paths from the configured spend asset to the target asset.
 
 Returns: SearchOutcome<PathResult>
+
+Materialized results inherit the same `PathOrderStrategy` as the underlying finder so service-level
+sorting stays consistent with raw candidate evaluation.
 
 ### findBestPath
 `PathFinderService::findBestPath(SomeWork\P2PPathFinder\Application\OrderBook\OrderBook $orderBook, SomeWork\P2PPathFinder\Application\Config\PathSearchConfig $config, string $targetAsset): ?SomeWork\P2PPathFinder\Application\Result\PathResult`

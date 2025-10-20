@@ -41,9 +41,9 @@ or swap in a different search algorithm) without leaking implementation details.
 ## Design Notes
 
 * **Stable priority queue semantics.** The internal `SearchStateQueue` always prefers
-  lower cumulative costs and falls back to first-in-first-out ordering when costs tie,
-  keeping traversal deterministic even when multiple candidates share identical
-  priorities.【F:src/Application/PathFinder/PathFinder.php†L983-L1049】【F:tests/Application/PathFinder/SearchStateQueueTest.php†L31-L58】
+  lower cumulative costs. Finalized path lists extend that determinism by comparing
+  candidates using cost, hop count, a lexicographical route signature (e.g.
+  `EUR->USD->...`) and finally discovery order when all other keys match.【F:src/Application/PathFinder/PathFinder.php†L635-L708】【F:src/Application/Service/PathFinderService.php†L170-L264】【F:tests/Application/PathFinder/PathFinderTest.php†L205-L255】
 * **Mandatory segment pruning.** Each edge carries a list of mandatory and optional
   liquidity segments. During expansion the path finder aggregates the mandatory portion of
   the relevant amounts (gross base for buys, quote for sells) and discards candidates that
@@ -255,6 +255,38 @@ $result = $resultOutcome->paths()[0];
 ```
 
 The resulting `SearchOutcome` contains `PathResult` objects ordered from lowest to highest cost.
+When multiple candidates share the same cost the default strategy breaks ties by preferring fewer
+hops, then lexicographically smaller route signatures (for example `EUR->USD->GBP`), and finally
+the discovery order reported by the search. This deterministic cascade keeps results stable across
+processes.
+
+Both `PathFinder` and `PathFinderService` accept a configurable ordering strategy via their
+constructors. Implement `PathOrderStrategy::compare()` to inject your own prioritisation logic and
+pass it to the constructor when instantiating either component:
+
+```php
+use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
+
+$ordering = new class implements PathOrderStrategy {
+    public function compare(PathOrderKey $left, PathOrderKey $right): int
+    {
+        return $left->routeSignature() <=> $right->routeSignature();
+    }
+};
+
+$finder = new PathFinder(orderingStrategy: $ordering);
+```
+
+Custom strategies receive lightweight `PathOrderKey` value objects that expose the computed cost,
+hop count, route signature and discovery order (plus any payload provided by the caller). Returning
+a negative value favours the left operand, positive favours the right, and zero defers to the next
+tie-breaker.
+
+To reuse the bundled behaviour elsewhere instantiate `CostHopsSignatureOrderingStrategy` with the
+desired cost scale and pass it to either constructor.
+
 In this example the first entry contains a single `PathLeg` reflecting the direct USD→USDT
 conversion.
 
