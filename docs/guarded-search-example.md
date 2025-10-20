@@ -24,7 +24,7 @@ $orderBook = new OrderBook([
             Money::fromString('USD', '10.00', 2),
             Money::fromString('USD', '2500.00', 2),
         ),
-        ExchangeRate::fromString('1.0001', 6),
+        ExchangeRate::fromString('USD', 'USDT', '1.0001', 6),
     ),
     new Order(
         OrderSide::SELL,
@@ -33,7 +33,7 @@ $orderBook = new OrderBook([
             Money::fromString('USDT', '100.00', 2),
             Money::fromString('USDT', '10000.00', 2),
         ),
-        ExchangeRate::fromString('0.000031', 8),
+        ExchangeRate::fromString('USDT', 'BTC', '0.000031', 8),
     ),
 ]);
 
@@ -44,8 +44,8 @@ $config = PathSearchConfig::builder()
     ->withSearchGuards(20000, 50000) // visited states, expansions
     ->build();
 
-$service = new PathFinderService(new GraphBuilder(), $orderBook);
-$result = $service->findBestPaths($config, 'USD', 'BTC');
+$service = new PathFinderService(new GraphBuilder());
+$result = $service->findBestPaths($orderBook, $config, 'BTC');
 
 foreach ($result->paths() as $path) {
     printf("Found path with residual tolerance %s and %d segments\n", $path->residualTolerance(), count($path->legs()));
