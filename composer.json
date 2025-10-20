@@ -1,6 +1,26 @@
 {
     "name": "somework/p2p-path-finder",
     "type": "library",
+    "keywords": [
+        "path-finding",
+        "p2p",
+        "exchange",
+        "graph",
+        "routing"
+    ],
+    "homepage": "https://github.com/somework/p2p-path-finder",
+    "support": {
+        "issues": "https://github.com/somework/p2p-path-finder/issues",
+        "source": "https://github.com/somework/p2p-path-finder",
+        "docs": "https://github.com/somework/p2p-path-finder/tree/main/docs",
+        "security": "mailto:i.pinchuk.work@gmail.com"
+    },
+    "funding": [
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/somework"
+        }
+    ],
     "authors": [
         {
             "name": "Igor Pinchuk",

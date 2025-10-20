@@ -140,6 +140,14 @@ $config = PathSearchConfig::builder()
 See [docs/guarded-search-example.md](docs/guarded-search-example.md) for a complete,
 ready-to-run integration walkthrough that demonstrates these guard limits in context.
 
+## Community and project health
+
+- Read the [Contributing guide](CONTRIBUTING.md) before opening issues or pull requests.
+- Review our [Code of Conduct](CODE_OF_CONDUCT.md) to understand the expectations for
+  participating in the community.
+- Follow the [Security policy](SECURITY.md) for responsible vulnerability disclosure.
+- Track progress toward the `1.0.0-rc` milestone in the [Changelog](CHANGELOG.md).
+
 ### Choosing search guard limits
 
 The defaults (`250000` visited states and expansions) work well for moderately dense
