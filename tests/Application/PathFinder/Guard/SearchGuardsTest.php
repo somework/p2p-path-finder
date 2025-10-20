@@ -57,4 +57,21 @@ final class SearchGuardsTest extends TestCase
         self::assertTrue($status->timeBudgetReached());
         self::assertTrue($status->visitedStatesReached());
     }
+
+    public function test_time_budget_is_exhausted_when_elapsed_equals_limit(): void
+    {
+        $now = 0.0;
+        $clock = static function () use (&$now): float {
+            return $now;
+        };
+
+        $guards = new SearchGuards(10, 5, $clock);
+
+        self::assertTrue($guards->canExpand());
+
+        $now = 0.005; // exactly 5 milliseconds since start.
+
+        self::assertFalse($guards->canExpand());
+        self::assertTrue($guards->finalize(false)->timeBudgetReached());
+    }
 }
