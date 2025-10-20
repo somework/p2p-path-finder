@@ -244,6 +244,27 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
         $service->findBestPaths($orderBook, $config, 'USD');
     }
 
+    public function test_it_describes_single_guard_limit_breach_when_throwing_exception(): void
+    {
+        $orderBook = $this->simpleEuroToUsdOrderBook();
+        $guardStatus = new GuardLimitStatus(true, false);
+        $factory = $this->pathFinderFactoryForCandidates([], $guardStatus);
+        $service = $this->makeServiceWithFactory($factory);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds('0.0', '0.10')
+            ->withHopLimits(1, 2)
+            ->withSearchGuards(50, 200)
+            ->withGuardLimitException()
+            ->build();
+
+        $this->expectException(GuardLimitExceeded::class);
+        $this->expectExceptionMessage('Search guard limit exceeded: expansions limit of 200.');
+
+        $service->findBestPaths($orderBook, $config, 'USD');
+    }
+
     private function simpleEuroToUsdOrderBook(): OrderBook
     {
         return $this->orderBook(

@@ -245,23 +245,7 @@ final class PathFinderService
         );
 
         $guardLimits = $searchResult->guardLimits();
-        if ($config->throwOnGuardLimit() && $guardLimits->anyLimitReached()) {
-            $breaches = [];
-            if ($guardLimits->expansionsReached()) {
-                $breaches[] = sprintf('expansions limit of %d', $config->pathFinderMaxExpansions());
-            }
-
-            if ($guardLimits->visitedStatesReached()) {
-                $breaches[] = sprintf('visited states limit of %d', $config->pathFinderMaxVisitedStates());
-            }
-
-            $message = 'Search guard limit exceeded';
-            if ([] !== $breaches) {
-                $message .= ': '.implode(' and ', $breaches);
-            }
-
-            throw new GuardLimitExceeded($message.'.');
-        }
+        $this->assertGuardLimits($config, $guardLimits);
 
         if ([] === $materializedResults) {
             /** @var SearchOutcome<PathResult> $empty */
@@ -300,6 +284,34 @@ final class PathFinderService
             ),
             $guardLimits,
         );
+    }
+
+    private function assertGuardLimits(PathSearchConfig $config, GuardLimitStatus $guardLimits): void
+    {
+        if (!$config->throwOnGuardLimit() || !$guardLimits->anyLimitReached()) {
+            return;
+        }
+
+        throw new GuardLimitExceeded($this->formatGuardLimitMessage($config, $guardLimits));
+    }
+
+    private function formatGuardLimitMessage(PathSearchConfig $config, GuardLimitStatus $guardLimits): string
+    {
+        $breaches = [];
+
+        if ($guardLimits->expansionsReached()) {
+            $breaches[] = sprintf('expansions limit of %d', $config->pathFinderMaxExpansions());
+        }
+
+        if ($guardLimits->visitedStatesReached()) {
+            $breaches[] = sprintf('visited states limit of %d', $config->pathFinderMaxVisitedStates());
+        }
+
+        if ([] === $breaches) {
+            return 'Search guard limit exceeded.';
+        }
+
+        return 'Search guard limit exceeded: '.implode(' and ', $breaches).'.';
     }
 
     /**
