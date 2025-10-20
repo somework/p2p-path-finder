@@ -20,6 +20,8 @@ use function substr;
 /**
  * Resolves concrete path legs from abstract graph edges.
  *
+ * @internal
+ *
  * @psalm-import-type GraphEdge from PathFinder
  * @psalm-import-type PathEdge from PathFinder
  */

@@ -38,6 +38,26 @@ search heuristic.
 The separation allows you to extend or replace either layer (e.g. load orders from an API
 or swap in a different search algorithm) without leaking implementation details.
 
+## Public API surface
+
+The package intentionally keeps its entry points compact:
+
+* `PathFinderService` orchestrates filtering, graph construction and search. It is the
+  primary façade exposed to consumers integrating the library into their own
+  applications.【F:src/Application/Service/PathFinderService.php†L41-L165】
+* `PathSearchConfig` represents the declarative inputs accepted by the search engine. The
+  builder surfaced via `PathSearchConfig::builder()` is part of the supported API and
+  allows consumers to construct validated configurations fluently.【F:src/Application/Config/PathSearchConfig.php†L35-L266】
+* Result aggregates under `SomeWork\P2PPathFinder\Application\Result` (such as `PathResult`
+  and `PathLeg`) are designed to be consumed directly by callers processing search
+  outcomes.【F:src/Application/Result/PathResult.php†L17-L120】【F:src/Application/Result/PathLeg.php†L17-L80】
+
+Support services that exist only to back the façade&mdash;for example
+`OrderSpendAnalyzer`, `LegMaterializer` and `ToleranceEvaluator`&mdash;are marked with
+`@internal` annotations and should not be depended upon directly by userland code. They
+are omitted from the generated API reference to reinforce that they may change without
+notice.【F:src/Application/Service/OrderSpendAnalyzer.php†L17-L23】【F:src/Application/Service/LegMaterializer.php†L19-L25】【F:src/Application/Service/ToleranceEvaluator.php†L16-L23】
+
 ## Design Notes
 
 * **Stable priority queue semantics.** The internal `SearchStateQueue` always prefers

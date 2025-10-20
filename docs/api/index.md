@@ -8,7 +8,7 @@ Immutable configuration carrying constraints used by {@see PathFinderService}.
 ### Public methods
 
 ### __construct
-`PathSearchConfig::__construct(SomeWork\P2PPathFinder\Domain\ValueObject\Money $spendAmount, string $minimumTolerance, string $maximumTolerance, int $minimumHops, int $maximumHops, int $resultLimit = 1, int $pathFinderMaxExpansions = 250000, int $pathFinderMaxVisitedStates = 250000, ?string $pathFinderToleranceOverride = null)`
+`PathSearchConfig::__construct(SomeWork\P2PPathFinder\Domain\ValueObject\Money $spendAmount, string $minimumTolerance, string $maximumTolerance, int $minimumHops, int $maximumHops, int $resultLimit = 1, int $pathFinderMaxExpansions = 250000, int $pathFinderMaxVisitedStates = 250000, ?string $pathFinderToleranceOverride = null, bool $throwOnGuardLimit = false)`
 
 ### builder
 `PathSearchConfig::builder(): SomeWork\P2PPathFinder\Application\Config\PathSearchConfigBuilder`
@@ -76,6 +76,16 @@ Returns the tolerance value used by the graph search heuristic.
 
 Returns: numeric-string
 
+### pathFinderToleranceSource
+`PathSearchConfig::pathFinderToleranceSource(): string`
+
+Returns the origin of the path finder tolerance value.
+
+Returns: 'override'|'minimum'|'maximum'
+
+### throwOnGuardLimit
+`PathSearchConfig::throwOnGuardLimit(): bool`
+
 ## SomeWork\P2PPathFinder\Application\Config\PathSearchConfigBuilder
 Fluent builder used to construct {@see PathSearchConfig} instances.
 
@@ -105,6 +115,9 @@ Limits how many paths should be returned by the search service.
 `PathSearchConfigBuilder::withSearchGuards(int $maxVisitedStates, int $maxExpansions): self`
 
 Configures limits that guard search explosion in dense graphs.
+
+### withGuardLimitException
+`PathSearchConfigBuilder::withGuardLimitException(bool $shouldThrow = true): self`
 
 ### build
 `PathSearchConfigBuilder::build(): SomeWork\P2PPathFinder\Application\Config\PathSearchConfig`
@@ -300,6 +313,22 @@ order: int,
 cost: numeric-string,
 }
 
+psalm-type CandidateResultEntry = array{
+candidate: Candidate,
+order: int,
+cost: numeric-string,
+routeSignature: string,
+orderKey: PathOrderKey,
+}
+
+phpstan-type CandidateResultEntry array{
+candidate: Candidate,
+order: int,
+cost: string,
+routeSignature: string,
+orderKey: PathOrderKey,
+}
+
 psalm-type SearchQueueEntry = array{
 state: SearchState,
 priority: array{cost: numeric-string, order: int},
@@ -342,10 +371,6 @@ visited: array<string, bool>,
 
 Returns: SearchOutcome<Candidate>
 
-The finder orders candidates using the configured `PathOrderStrategy`. The built-in
-`CostHopsSignatureOrderingStrategy` compares cost first, then hop count, route signature and finally
-discovery order to guarantee deterministic tie-breaking.
-
 ## SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus
 
 ### Public methods
@@ -364,6 +389,50 @@ discovery order to guarantee deterministic tie-breaking.
 
 ### anyLimitReached
 `GuardLimitStatus::anyLimitReached(): bool`
+
+## SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy
+
+### Public methods
+
+### __construct
+`CostHopsSignatureOrderingStrategy::__construct(int $costScale)`
+
+### compare
+`CostHopsSignatureOrderingStrategy::compare(SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey $left, SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey $right): int`
+
+## SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey
+psalm-type Payload = array<string, mixed>
+
+phpstan-type Payload array<string, mixed>
+
+### Public methods
+
+### __construct
+`PathOrderKey::__construct(string $cost, int $hops, string $routeSignature, int $insertionOrder, array $payload = [])`
+
+### cost
+`PathOrderKey::cost(): string`
+
+### hops
+`PathOrderKey::hops(): int`
+
+### routeSignature
+`PathOrderKey::routeSignature(): string`
+
+### insertionOrder
+`PathOrderKey::insertionOrder(): int`
+
+### payload
+`PathOrderKey::payload(): array`
+
+Returns: Payload
+
+## SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy
+
+### Public methods
+
+### compare
+`PathOrderStrategy::compare(SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey $left, SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey $right): int`
 
 ## SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome
 
@@ -532,65 +601,28 @@ Produces a multi-line human readable summary of the conversion path.
 ### formatHumanCollection
 `PathResultFormatter::formatHumanCollection(array $results): string`
 
-## SomeWork\P2PPathFinder\Application\Service\LegMaterializer
-Resolves concrete path legs from abstract graph edges.
-
-### Public methods
-
-### __construct
-`LegMaterializer::__construct(?SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator $fillEvaluator = null)`
-
-### materialize
-`LegMaterializer::materialize(array $edges, SomeWork\P2PPathFinder\Domain\ValueObject\Money $requestedSpend, array $initialSeed, string $targetCurrency): ?array`
-
-Returns: array{
-totalSpent: Money,
-totalReceived: Money,
-toleranceSpent: Money,
-legs: list<PathLeg>,
-feeBreakdown: array<string, Money>,
-}|null
-
-### resolveSellLegAmounts
-`LegMaterializer::resolveSellLegAmounts(SomeWork\P2PPathFinder\Domain\Order\Order $order, SomeWork\P2PPathFinder\Domain\ValueObject\Money $targetEffectiveQuote, ?SomeWork\P2PPathFinder\Domain\ValueObject\Money $availableQuoteBudget = null): ?array`
-
-Returns: array{0: Money, 1: Money, 2: FeeBreakdown}|null
-
-### resolveBuyFill
-`LegMaterializer::resolveBuyFill(SomeWork\P2PPathFinder\Domain\Order\Order $order, SomeWork\P2PPathFinder\Domain\ValueObject\Money $netSeed, SomeWork\P2PPathFinder\Domain\ValueObject\Money $grossSeed, SomeWork\P2PPathFinder\Domain\ValueObject\Money $grossCeiling): ?array`
-
-Returns: array{gross: Money, quote: Money, fees: FeeBreakdown, net: Money}|null
-
-### evaluateSellQuote
-`LegMaterializer::evaluateSellQuote(SomeWork\P2PPathFinder\Domain\Order\Order $order, SomeWork\P2PPathFinder\Domain\ValueObject\Money $baseAmount): array`
-
-Returns: array{
-grossQuote: Money,
-fees: FeeBreakdown,
-effectiveQuote: Money,
-netBase: Money,
-}
-
-## SomeWork\P2PPathFinder\Application\Service\OrderSpendAnalyzer
-Encapsulates filtering orders and determining spend bounds.
-
-### Public methods
-
-### __construct
-`OrderSpendAnalyzer::__construct(?SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator $fillEvaluator = null, ?SomeWork\P2PPathFinder\Application\Service\LegMaterializer $legMaterializer = null)`
-
-### filterOrders
-`OrderSpendAnalyzer::filterOrders(SomeWork\P2PPathFinder\Application\OrderBook\OrderBook $orderBook, SomeWork\P2PPathFinder\Application\Config\PathSearchConfig $config): array`
-
-Returns: list<Order>
-
-### determineInitialSpendAmount
-`OrderSpendAnalyzer::determineInitialSpendAmount(SomeWork\P2PPathFinder\Application\Config\PathSearchConfig $config, array $edge): ?array`
-
-Returns: array{net: Money, gross: Money, grossCeiling: Money}|null
-
 ## SomeWork\P2PPathFinder\Application\Service\PathFinderService
 High level facade orchestrating order filtering, graph building and path search.
+
+
+
+psalm-type MaterializedResultEntry = array{
+cost: numeric-string,
+hops: int,
+routeSignature: string,
+order: int,
+result: PathResult,
+orderKey: PathOrderKey,
+}
+
+phpstan-type MaterializedResultEntry array{
+cost: string,
+hops: int,
+routeSignature: string,
+order: int,
+result: PathResult,
+orderKey: PathOrderKey,
+}
 
 ### Public methods
 
@@ -602,26 +634,16 @@ High level facade orchestrating order filtering, graph building and path search.
 
 Searches for the best conversion paths from the configured spend asset to the target asset.
 
-Returns: SearchOutcome<PathResult>
+Guard limit breaches are reported through the returned {@see SearchOutcome::guardLimits()}
+metadata. Inspect the {@see GuardLimitStatus} via helpers like
+{@see GuardLimitStatus::anyLimitReached()} to determine whether the search exhausted its
+configured protections.
 
-Materialized results inherit the same `PathOrderStrategy` as the underlying finder so service-level
-sorting stays consistent with raw candidate evaluation.
+
+Returns: SearchOutcome<PathResult>
 
 ### findBestPath
 `PathFinderService::findBestPath(SomeWork\P2PPathFinder\Application\OrderBook\OrderBook $orderBook, SomeWork\P2PPathFinder\Application\Config\PathSearchConfig $config, string $targetAsset): ?SomeWork\P2PPathFinder\Application\Result\PathResult`
-
-## SomeWork\P2PPathFinder\Application\Service\ToleranceEvaluator
-Validates materialized paths against configured tolerance bounds.
-
-The evaluator derives a residual ratio between the requested and actual spend
-and compares it directly to the configured tolerance window using a common
-scale. This keeps comparisons deterministic and eliminates the need for
-hard-coded guard epsilons that could otherwise mask meaningful overshoot.
-
-### Public methods
-
-### evaluate
-`ToleranceEvaluator::evaluate(SomeWork\P2PPathFinder\Application\Config\PathSearchConfig $config, SomeWork\P2PPathFinder\Domain\ValueObject\Money $requestedSpend, SomeWork\P2PPathFinder\Domain\ValueObject\Money $actualSpend): ?SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance`
 
 ## SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator
 Helper responsible for evaluating fills while accounting for order fees.
@@ -794,12 +816,14 @@ The path finder normalizes tolerances and costs to 18 decimal places by default,
 so half-up rounding keeps deterministic behaviour even for tie-breaking cases.
 
 
+
 Returns: numeric-string
 
 ### add
 `BcMath::add(string $left, string $right, int $scale): string`
 
 Adds two numeric strings while maintaining deterministic scale handling.
+
 
 
 Returns: numeric-string
@@ -810,6 +834,7 @@ Returns: numeric-string
 Subtracts the right operand from the left operand while preserving scale.
 
 
+
 Returns: numeric-string
 
 ### mul
@@ -818,12 +843,14 @@ Returns: numeric-string
 Multiplies two numeric strings with deterministic rounding behaviour.
 
 
+
 Returns: numeric-string
 
 ### div
 `BcMath::div(string $left, string $right, int $scale): string`
 
 Divides the left operand by the right operand while guarding against division by zero.
+
 
 
 Returns: numeric-string
@@ -837,6 +864,7 @@ Compares two numeric strings at the requested precision level.
 `BcMath::round(string $value, int $scale): string`
 
 Rounds a numeric string to the provided scale using half-up semantics.
+
 
 
 Returns: numeric-string
@@ -992,6 +1020,7 @@ Divides the amount by a scalar numeric divisor.
 Compares two money values using the provided or derived scale.
 
 
+
 Returns: int -1, 0 or 1 depending on the comparison result
 
 ### equals
@@ -1043,3 +1072,18 @@ Checks whether the provided amount falls within the configured bounds.
 `OrderBounds::clamp(SomeWork\P2PPathFinder\Domain\ValueObject\Money $amount): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
 
 Clamps the provided amount to the bounds and returns the adjusted value.
+
+## SomeWork\P2PPathFinder\Exception\ExceptionInterface
+Marker interface implemented by all library-specific exceptions.
+
+## SomeWork\P2PPathFinder\Exception\GuardLimitExceeded
+Thrown when search guard rails are exceeded before a path can be materialised.
+
+## SomeWork\P2PPathFinder\Exception\InfeasiblePath
+Thrown when path materialisation fails due to unmet constraints.
+
+## SomeWork\P2PPathFinder\Exception\InvalidInput
+Thrown when a consumer supplies malformed or unsupported input.
+
+## SomeWork\P2PPathFinder\Exception\PrecisionViolation
+Thrown when deterministic arithmetic guarantees cannot be upheld.

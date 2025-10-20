@@ -17,6 +17,8 @@ use function max;
 /**
  * Encapsulates filtering orders and determining spend bounds.
  *
+ * @internal
+ *
  * @psalm-import-type GraphEdge from PathFinder
  * @psalm-import-type PathEdge from PathFinder
  */
