@@ -1,6 +1,9 @@
 {
     "$schema": "https://phpbench.github.io/schema/config.json",
     "runner.bootstrap": "vendor/autoload.php",
-    "runner.path": ["benchmarks"],
-    "runner.retry_threshold": 5
+    "runner.path": [
+        "benchmarks"
+    ],
+    "runner.retry_threshold": 5,
+    "runner.subject_pattern": "benchFind.*"
 }

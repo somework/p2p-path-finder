@@ -22,6 +22,7 @@ use function strlen;
 
 use PhpBench\Attributes\BeforeMethods;
 use PhpBench\Attributes\ParamProviders;
+use SomeWork\P2PPathFinder\Tests\Fixture\BottleneckOrderBookFactory;
 
 #[BeforeMethods('setUp')]
 class PathFinderBench
@@ -92,6 +93,23 @@ class PathFinderBench
     }
 
     /**
+     * @param array{spend:string,minHop:int,maxHop:int,resultLimit:int} $params
+     */
+    #[ParamProviders('provideBottleneckMandatoryMinima')]
+    public function benchFindBottleneckMandatoryMinima(array $params): void
+    {
+        $orderBook = BottleneckOrderBookFactory::create();
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('SRC', $params['spend'], 2))
+            ->withToleranceBounds('0.00', '0.00')
+            ->withHopLimits($params['minHop'], $params['maxHop'])
+            ->withResultLimit($params['resultLimit'])
+            ->build();
+
+        $this->service->findBestPaths($orderBook, $config, 'DST');
+    }
+
+    /**
      * @return iterable<string, array{orderSetRepeats:int,minHop:int,maxHop:int}>
      */
     public function provideMarketDepthScenarios(): iterable
@@ -147,6 +165,19 @@ class PathFinderBench
         yield 'k-best-n1e4' => [
             'orderCount' => 10000,
             'resultLimit' => 16,
+        ];
+    }
+
+    /**
+     * @return iterable<string, array{spend:string,minHop:int,maxHop:int,resultLimit:int}>
+     */
+    public function provideBottleneckMandatoryMinima(): iterable
+    {
+        yield 'bottleneck-hop-3' => [
+            'spend' => '120.00',
+            'minHop' => 3,
+            'maxHop' => 3,
+            'resultLimit' => 3,
         ];
     }
 
