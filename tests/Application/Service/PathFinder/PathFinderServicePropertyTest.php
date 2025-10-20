@@ -22,6 +22,7 @@ use SomeWork\P2PPathFinder\Tests\Application\Support\Generator\PathFinderScenari
 use SomeWork\P2PPathFinder\Tests\Support\InfectionIterationLimiter;
 
 use function array_map;
+use function array_reverse;
 use function array_unique;
 use function count;
 use function implode;
@@ -110,6 +111,62 @@ final class PathFinderServicePropertyTest extends TestCase
                 $sortedKeys,
                 $keys,
                 'PathFinderService results must honour cost, hop and signature ordering.',
+            );
+        }
+    }
+
+    /**
+     * Invariant: PathFinderService::findBestPaths must yield identical encoded paths and guard metadata
+     *            regardless of the iteration order of source orders.
+     */
+    public function test_permuted_order_books_produce_identical_results(): void
+    {
+        $limit = $this->iterationLimit(20, 5, 'P2P_PATH_FINDER_SERVICE_ITERATIONS');
+
+        for ($iteration = 0; $iteration < $limit; ++$iteration) {
+            $scenario = $this->generator->scenario();
+            $orders = $scenario['orders'];
+            $orderBook = new OrderBook($orders);
+            $permutedOrders = array_reverse($orders);
+            $permutedOrderBook = new OrderBook($permutedOrders);
+
+            $graph = $this->graphBuilder->build($orders);
+
+            $source = $scenario['source'];
+            $edges = $graph[$source]['edges'] ?? [];
+            if ([] === $edges) {
+                self::fail('Generated scenario must expose at least one outgoing edge from the source node.');
+            }
+
+            $spendAmount = $this->deriveSpendAmount($edges[0]);
+            $config = PathSearchConfig::builder()
+                ->withSpendAmount($spendAmount)
+                ->withToleranceBounds('0.0', $scenario['tolerance'])
+                ->withHopLimits(1, $scenario['maxHops'])
+                ->withResultLimit($scenario['topK'])
+                ->build();
+
+            $original = $this->service->findBestPaths($orderBook, $config, $scenario['target']);
+            $permuted = $this->service->findBestPaths($permutedOrderBook, $config, $scenario['target']);
+
+            $encoder = $this->encodeResult();
+            $originalEncoded = array_map($encoder, $original->paths());
+            $permutedEncoded = array_map($encoder, $permuted->paths());
+
+            self::assertSame(
+                $originalEncoded,
+                $permutedEncoded,
+                'Resulting path collections must be invariant to input order permutations.',
+            );
+            self::assertSame(
+                $original->guardLimits()->expansionsReached(),
+                $permuted->guardLimits()->expansionsReached(),
+                'Expansion guard metadata must be invariant to input order permutations.',
+            );
+            self::assertSame(
+                $original->guardLimits()->visitedStatesReached(),
+                $permuted->guardLimits()->visitedStatesReached(),
+                'Visited state guard metadata must be invariant to input order permutations.',
             );
         }
     }
