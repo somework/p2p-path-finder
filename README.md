@@ -55,7 +55,8 @@ or swap in a different search algorithm) without leaking implementation details.
   the tolerance validation performed by `PathFinder`.【F:src/Domain/ValueObject/BcMath.php†L79-L121】【F:src/Application/PathFinder/PathFinder.php†L166-L212】
 
 See [docs/guarded-search-example.md](docs/guarded-search-example.md) for a guided example
-that combines these invariants with guard-rail configuration.
+that combines these invariants with guard-rail configuration and demonstrates the
+`PathFinderService::findBestPaths($orderBook, $config, 'BTC')` invocation flow.
 
 ## Configuring a path search
 
