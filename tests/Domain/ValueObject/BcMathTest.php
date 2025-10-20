@@ -11,6 +11,8 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
+use function sprintf;
+
 final class BcMathTest extends TestCase
 {
     public function test_arithmetic_operations_preserve_large_precision(): void
@@ -18,6 +20,33 @@ final class BcMathTest extends TestCase
         self::assertSame('1234567890.12345677', BcMath::add('1234567890.12345678', '-0.00000001', 8));
         self::assertSame('-51.000', BcMath::sub('-50.005', '0.995', 3));
         self::assertSame('97.408019', BcMath::mul('-12.3456', '-7.8901', 6));
+    }
+
+    /**
+     * @dataProvider provideExtremeDecimals
+     */
+    public function test_normalize_is_idempotent_for_extreme_values(string $value, int $scale): void
+    {
+        $normalized = BcMath::normalize($value, $scale);
+
+        self::assertSame($normalized, BcMath::normalize($normalized, $scale));
+    }
+
+    /**
+     * @dataProvider provideArithmeticPairs
+     */
+    public function test_arithmetic_operations_remain_closed_under_normalization(string $left, string $right, int $scale): void
+    {
+        $operations = [
+            BcMath::add($left, $right, $scale),
+            BcMath::sub($left, $right, $scale),
+            BcMath::mul($left, $right, $scale),
+            BcMath::div($left, $right, $scale),
+        ];
+
+        foreach ($operations as $result) {
+            self::assertSame($result, BcMath::normalize($result, $scale));
+        }
     }
 
     public function test_division_handles_negative_numbers_and_high_scale(): void
@@ -86,6 +115,37 @@ final class BcMathTest extends TestCase
         $this->expectException(InvalidInput::class);
 
         BcMath::add('1', '1', -1);
+    }
+
+    public function test_normalize_rejects_negative_scale(): void
+    {
+        $this->expectException(InvalidInput::class);
+
+        BcMath::normalize('1.0', -1);
+    }
+
+    /**
+     * @return iterable<string, array{numeric-string, int}>
+     */
+    public static function provideExtremeDecimals(): iterable
+    {
+        $case = 0;
+
+        foreach (NumericStringGenerator::decimals() as [$value, $scale]) {
+            yield sprintf('value-%d', $case++) => [$value, $scale];
+        }
+    }
+
+    /**
+     * @return iterable<string, array{numeric-string, numeric-string, int}>
+     */
+    public static function provideArithmeticPairs(): iterable
+    {
+        $case = 0;
+
+        foreach (NumericStringGenerator::decimalPairs() as [$left, $right, $scale]) {
+            yield sprintf('pair-%d', $case++) => [$left, $right, $scale];
+        }
     }
 
     public function test_is_numeric_rejects_empty_strings(): void
