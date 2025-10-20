@@ -6,7 +6,8 @@ namespace SomeWork\P2PPathFinder\Tests\Fixture;
 
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 
-use function sprintf;
+use function chr;
+use function ord;
 
 final class BottleneckOrderBookFactory
 {
@@ -46,12 +47,14 @@ final class BottleneckOrderBookFactory
         foreach ($levelOneHubs as $levelOneHub) {
             $orders[] = OrderFactory::sell('SRC', $levelOneHub, '250.000', '252.000', '1.000', 3, 3);
 
-            for ($levelTwoIndex = 1; $levelTwoIndex <= 3; ++$levelTwoIndex) {
-                $levelTwoHub = sprintf('%s-%d', $levelOneHub, $levelTwoIndex);
+            for ($levelTwoIndex = 0; $levelTwoIndex < 3; ++$levelTwoIndex) {
+                $levelTwoSuffix = chr(ord('A') + $levelTwoIndex);
+                $levelTwoHub = $levelOneHub.$levelTwoSuffix;
                 $orders[] = OrderFactory::sell($levelOneHub, $levelTwoHub, '220.000', '225.000', '1.000', 3, 3);
 
-                for ($levelThreeIndex = 1; $levelThreeIndex <= 2; ++$levelThreeIndex) {
-                    $levelThreeHub = sprintf('%s-%d', $levelTwoHub, $levelThreeIndex);
+                for ($levelThreeIndex = 0; $levelThreeIndex < 2; ++$levelThreeIndex) {
+                    $levelThreeSuffix = chr(ord('A') + $levelThreeIndex);
+                    $levelThreeHub = $levelTwoHub.$levelThreeSuffix;
                     $levelThreeNodes[$levelThreeHub] = true;
                     $orders[] = OrderFactory::sell($levelTwoHub, $levelThreeHub, '180.000', '182.000', '1.000', 3, 3);
                 }

@@ -28,18 +28,24 @@
             ]
         },
         "p2p_bottleneck_breakdown": {
-            "extends": "table",
+            "generator": "component",
             "title": "Bottleneck mandatory minima scenarios",
-            "cols": [
-                "set",
-                "mode",
-                "mean",
-                "rstdev",
-                "mem_peak"
-            ],
-            "filter": {
-                "subject": "benchFindBottleneckMandatoryMinima"
-            }
+            "filter": "subject_name = 'benchFindBottleneckMandatoryMinima'",
+            "components": [
+                {
+                    "component": "table_aggregate",
+                    "partition": [
+                        "variant_name"
+                    ],
+                    "row": {
+                        "set": "first(partition['variant_name'])",
+                        "mode": "mode(partition['result_time_avg']) as time",
+                        "mean": "mean(partition['result_time_avg']) as time",
+                        "rstdev": "rstdev(partition['result_time_avg'])",
+                        "mem_peak": "max(partition['result_mem_peak']) as memory"
+                    }
+                }
+            ]
         }
     }
 }
