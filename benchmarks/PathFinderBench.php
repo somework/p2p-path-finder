@@ -93,12 +93,13 @@ class PathFinderBench
     }
 
     /**
-     * @param array{spend:string,minHop:int,maxHop:int,resultLimit:int} $params
+     * @param array{spend:string,minHop:int,maxHop:int,resultLimit:int,factory:non-empty-string} $params
      */
     #[ParamProviders('provideBottleneckMandatoryMinima')]
     public function benchFindBottleneckMandatoryMinima(array $params): void
     {
-        $orderBook = BottleneckOrderBookFactory::create();
+        $factory = $params['factory'];
+        $orderBook = BottleneckOrderBookFactory::$factory();
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('SRC', $params['spend'], 2))
             ->withToleranceBounds('0.00', '0.00')
@@ -169,7 +170,7 @@ class PathFinderBench
     }
 
     /**
-     * @return iterable<string, array{spend:string,minHop:int,maxHop:int,resultLimit:int}>
+     * @return iterable<string, array{spend:string,minHop:int,maxHop:int,resultLimit:int,factory:non-empty-string}>
      */
     public function provideBottleneckMandatoryMinima(): iterable
     {
@@ -178,6 +179,15 @@ class PathFinderBench
             'minHop' => 3,
             'maxHop' => 3,
             'resultLimit' => 3,
+            'factory' => 'create',
+        ];
+
+        yield 'bottleneck-high-fanout-hop-4' => [
+            'spend' => '260.00',
+            'minHop' => 3,
+            'maxHop' => 4,
+            'resultLimit' => 5,
+            'factory' => 'createHighFanOut',
         ];
     }
 

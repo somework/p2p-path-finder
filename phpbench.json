@@ -26,6 +26,20 @@
                 "rstdev",
                 "mem_peak"
             ]
+        },
+        "p2p_bottleneck_breakdown": {
+            "extends": "table",
+            "title": "Bottleneck mandatory minima scenarios",
+            "cols": [
+                "set",
+                "mode",
+                "mean",
+                "rstdev",
+                "mem_peak"
+            ],
+            "filter": {
+                "subject": "benchFindBottleneckMandatoryMinima"
+            }
         }
     }
 }
