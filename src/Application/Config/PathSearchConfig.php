@@ -33,6 +33,8 @@ final class PathSearchConfig
     /** @var 'override'|'minimum'|'maximum' */
     private readonly string $pathFinderToleranceSource;
 
+    private readonly bool $throwOnGuardLimit;
+
     /**
      * @throws InvalidInput|PrecisionViolation when one of the provided guard or tolerance constraints is invalid
      */
@@ -46,6 +48,7 @@ final class PathSearchConfig
         private readonly int $pathFinderMaxExpansions = PathFinder::DEFAULT_MAX_EXPANSIONS,
         private readonly int $pathFinderMaxVisitedStates = PathFinder::DEFAULT_MAX_VISITED_STATES,
         ?string $pathFinderToleranceOverride = null,
+        bool $throwOnGuardLimit = false,
     ) {
         $this->minimumTolerance = $this->assertTolerance($minimumTolerance, 'Minimum tolerance');
         $this->maximumTolerance = $this->assertTolerance($maximumTolerance, 'Maximum tolerance');
@@ -74,6 +77,7 @@ final class PathSearchConfig
 
         $this->pathFinderTolerance = $tolerance;
         $this->pathFinderToleranceSource = $source;
+        $this->throwOnGuardLimit = $throwOnGuardLimit;
 
         $scale = max($this->spendAmount->scale(), self::BOUND_SCALE);
         $lowerMultiplier = BcMath::sub('1', $this->minimumTolerance, $scale);
@@ -197,6 +201,11 @@ final class PathSearchConfig
     public function pathFinderToleranceSource(): string
     {
         return $this->pathFinderToleranceSource;
+    }
+
+    public function throwOnGuardLimit(): bool
+    {
+        return $this->throwOnGuardLimit;
     }
 
     /**

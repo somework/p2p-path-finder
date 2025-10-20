@@ -205,6 +205,7 @@ final class PathSearchConfigTest extends TestCase
 
         self::assertSame(PathFinder::DEFAULT_MAX_EXPANSIONS, $config->pathFinderMaxExpansions());
         self::assertSame(PathFinder::DEFAULT_MAX_VISITED_STATES, $config->pathFinderMaxVisitedStates());
+        self::assertFalse($config->throwOnGuardLimit());
     }
 
     public function test_builder_defaults_to_single_result_limit(): void
@@ -377,6 +378,30 @@ final class PathSearchConfigTest extends TestCase
         self::assertSame(1, $config->resultLimit());
         self::assertSame(PathFinder::DEFAULT_MAX_EXPANSIONS, $config->pathFinderMaxExpansions());
         self::assertSame(PathFinder::DEFAULT_MAX_VISITED_STATES, $config->pathFinderMaxVisitedStates());
+    }
+
+    public function test_builder_can_enable_guard_limit_exception(): void
+    {
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '25.00', 2))
+            ->withToleranceBounds('0.05', '0.10')
+            ->withHopLimits(1, 2)
+            ->withGuardLimitException()
+            ->build();
+
+        self::assertTrue($config->throwOnGuardLimit());
+    }
+
+    public function test_builder_can_disable_guard_limit_exception(): void
+    {
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '25.00', 2))
+            ->withToleranceBounds('0.05', '0.10')
+            ->withHopLimits(1, 2)
+            ->withGuardLimitException(false)
+            ->build();
+
+        self::assertFalse($config->throwOnGuardLimit());
     }
 
     public function test_constructor_rejects_tolerance_equal_to_one(): void
