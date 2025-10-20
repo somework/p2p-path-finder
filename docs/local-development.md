@@ -6,3 +6,7 @@ Composer enforces the `ext-bcmath` requirement during installation. When the nat
 2. Temporarily require [`symfony/polyfill-bcmath`](https://github.com/symfony/polyfill-bcmath) to emulate the functions during local development.
 
 The polyfill provides correctness but not the same performance characteristics as the PHP extension. Keep it out of production and CI environments so their behaviour mirrors real-world deployments.
+
+For guard-rail tuning tips (visited-state and expansion limits) see the
+["Choosing search guard limits"](../README.md#choosing-search-guard-limits) section of the
+README, which summarises heuristics taken from dense-graph tests and benchmarks.

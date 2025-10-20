@@ -38,6 +38,25 @@ search heuristic.
 The separation allows you to extend or replace either layer (e.g. load orders from an API
 or swap in a different search algorithm) without leaking implementation details.
 
+## Design Notes
+
+* **Stable priority queue semantics.** The internal `SearchStateQueue` always prefers
+  lower cumulative costs and falls back to first-in-first-out ordering when costs tie,
+  keeping traversal deterministic even when multiple candidates share identical
+  priorities.【F:src/Application/PathFinder/PathFinder.php†L983-L1049】【F:tests/Application/PathFinder/SearchStateQueueTest.php†L31-L58】
+* **Mandatory segment pruning.** Each edge carries a list of mandatory and optional
+  liquidity segments. During expansion the path finder aggregates the mandatory portion of
+  the relevant amounts (gross base for buys, quote for sells) and discards candidates that
+  cannot cover that floor before considering optional capacity, preventing undersized
+  requests from progressing further into the search.【F:src/Application/PathFinder/PathFinder.php†L692-L745】
+* **Deterministic decimal policy.** All tolerances, costs and search ratios are normalized
+  to 18 decimal places using half-up rounding so the same input produces identical routing
+  decisions across environments. The `BcMath` helper centralises this behaviour and backs
+  the tolerance validation performed by `PathFinder`.【F:src/Domain/ValueObject/BcMath.php†L79-L121】【F:src/Application/PathFinder/PathFinder.php†L166-L212】
+
+See [docs/guarded-search-example.md](docs/guarded-search-example.md) for a guided example
+that combines these invariants with guard-rail configuration.
+
 ## Configuring a path search
 
 `PathSearchConfig` captures the parameters used during graph exploration. You can build it
@@ -84,6 +103,18 @@ $config = PathSearchConfig::builder()
 
 See [docs/guarded-search-example.md](docs/guarded-search-example.md) for a complete,
 ready-to-run integration walkthrough that demonstrates these guard limits in context.
+
+### Choosing search guard limits
+
+The defaults (`250000` visited states and expansions) work well for moderately dense
+markets while still short-circuiting pathologically broad graphs.【F:src/Application/PathFinder/PathFinder.php†L166-L212】 Use
+smaller bounds when exploring adversarial inputs: the dense-graph test suite demonstrates
+that a 3-layer graph with fan-out 3 exhausts a single-expansion guard immediately, whereas
+raising both guards to `20000` allows the same topology to converge.【F:tests/Application/PathFinder/PathFinderTest.php†L1782-L1813】 Likewise, limiting
+visited states to `1` halts a 2-layer × 4-fan-out graph instantly, but relaxing the guard
+to `10000` lets it produce viable paths.【F:tests/Application/PathFinder/PathFinderTest.php†L1815-L1845】 Benchmarks reuse
+search guards in the `20000–30000` range to keep synthetic dense graphs under control,
+which is a good starting point when profiling locally.【F:benchmarks/PathFinderBench.php†L61-L148】
 
 The builder enforces presence and validity of each piece of configuration. Internally the
 configuration pre-computes minimum/maximum spend amounts derived from the tolerance window,
