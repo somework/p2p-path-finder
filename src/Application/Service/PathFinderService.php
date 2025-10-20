@@ -121,6 +121,7 @@ final class PathFinderService
                     $config->pathFinderMaxExpansions(),
                     $config->pathFinderMaxVisitedStates(),
                     $strategy,
+                    $config->pathFinderTimeBudgetMs(),
                 );
 
                 /** @var Graph $graph */
@@ -329,6 +330,13 @@ final class PathFinderService
 
         if ($guardLimits->visitedStatesReached()) {
             $breaches[] = sprintf('visited states limit of %d', $config->pathFinderMaxVisitedStates());
+        }
+
+        if ($guardLimits->timeBudgetReached()) {
+            $timeBudget = $config->pathFinderTimeBudgetMs();
+            $breaches[] = null === $timeBudget
+                ? 'time budget'
+                : sprintf('time budget of %dms', $timeBudget);
         }
 
         if ([] === $breaches) {

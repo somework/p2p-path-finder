@@ -1956,6 +1956,27 @@ final class PathFinderTest extends TestCase
         self::assertSame($assetTrail, array_unique($assetTrail), 'Paths should not revisit identical assets.');
     }
 
+    public function test_it_enforces_time_budget_guard_on_dense_graph(): void
+    {
+        $orders = self::createDenseLayeredOrders(4, 5);
+        $graph = (new GraphBuilder())->build($orders);
+
+        $guardedFinder = new PathFinder(
+            maxHops: 6,
+            tolerance: '0.0',
+            topK: 1,
+            maxExpansions: PathFinder::DEFAULT_MAX_EXPANSIONS,
+            maxVisitedStates: PathFinder::DEFAULT_MAX_VISITED_STATES,
+            orderingStrategy: null,
+            timeBudgetMs: 1,
+        );
+
+        $guardedResult = $guardedFinder->findBestPaths($graph, 'SRC', 'DST');
+
+        self::assertTrue($guardedResult->guardLimits()->timeBudgetReached());
+        self::assertTrue($guardedResult->guardLimits()->anyLimitReached());
+    }
+
     public function test_it_enforces_expansion_guard_on_dense_graph(): void
     {
         $orders = self::createDenseLayeredOrders(3, 3);

@@ -73,6 +73,11 @@ notice.【F:src/Application/Service/OrderSpendAnalyzer.php†L17-L23】【F:src/
   to 18 decimal places using half-up rounding so the same input produces identical routing
   decisions across environments. The `BcMath` helper centralises this behaviour and backs
   the tolerance validation performed by `PathFinder`.【F:src/Domain/ValueObject/BcMath.php†L79-L121】【F:src/Application/PathFinder/PathFinder.php†L166-L212】
+* **Wall-clock guard rails.** `PathSearchConfig::withSearchTimeBudget()` injects a
+  millisecond budget directly into the search loop so that runaway expansions halt even when
+  structural guardrails are relaxed. The resulting status is surfaced via
+  `GuardLimitStatus::timeBudgetReached()` and participates in the same metadata/exception
+  pathways as the other guard knobs.【F:src/Application/Config/PathSearchConfigBuilder.php†L89-L129】【F:src/Application/PathFinder/PathFinder.php†L206-L297】【F:tests/Application/Service/PathFinder/PathFinderServiceGuardsTest.php†L296-L332】
 
 See [docs/guarded-search-example.md](docs/guarded-search-example.md) for a guided example
 that combines these invariants with guard-rail configuration and demonstrates the
@@ -109,7 +114,8 @@ $config = PathSearchConfig::builder()
 ```
 
 You can also guard against runaway searches by configuring the optional search guard
-limits. These guardrails are applied directly to the underlying `PathFinder` instance:
+limits and wall-clock budget. These guardrails are applied directly to the underlying
+`PathFinder` instance:
 
 ```php
 $config = PathSearchConfig::builder()
@@ -117,6 +123,7 @@ $config = PathSearchConfig::builder()
     ->withToleranceBounds('0.02', '0.10')
     ->withHopLimits(1, 4)
     ->withSearchGuards(10000, 25000) // visited states, expansions
+    ->withSearchTimeBudget(50) // optional 50ms wall-clock budget
     ->build();
 
 // The search honours the configured guard thresholds.
@@ -131,10 +138,11 @@ $config = PathSearchConfig::builder()
     ->withToleranceBounds('0.02', '0.10')
     ->withHopLimits(1, 4)
     ->withSearchGuards(10000, 25000)
+    ->withSearchTimeBudget(50)
     ->withGuardLimitException()
     ->build();
 
-// GuardLimitExceeded is thrown when either guard threshold is hit.
+// GuardLimitExceeded is thrown when any guard threshold is hit.
 ```
 
 See [docs/guarded-search-example.md](docs/guarded-search-example.md) for a complete,
@@ -159,6 +167,12 @@ visited states to `1` halts a 2-layer × 4-fan-out graph instantly, but relaxing
 to `10000` lets it produce viable paths.【F:tests/Application/PathFinder/PathFinderTest.php†L1815-L1845】 Benchmarks reuse
 search guards in the `20000–30000` range to keep synthetic dense graphs under control,
 which is a good starting point when profiling locally.【F:benchmarks/PathFinderBench.php†L61-L148】
+
+For scenarios where those structural limits are insufficient, pair them with
+`PathSearchConfig::withSearchTimeBudget()` to enforce a wall-clock cap on the search. Tiny
+budgets (1–2ms) are ideal for tests that need to observe guard metadata or forced
+exceptions, while looser budgets in the tens of milliseconds tame bursty workloads without
+impacting typical queries.【F:tests/Application/PathFinder/PathFinderTest.php†L1951-L1965】【F:tests/Application/Service/PathFinder/PathFinderServiceGuardsTest.php†L296-L332】
 
 The builder enforces presence and validity of each piece of configuration. Internally the
 configuration pre-computes minimum/maximum spend amounts derived from the tolerance window,
@@ -202,10 +216,11 @@ The library ships with domain-specific exceptions under the
 * `PrecisionViolation` &mdash; signals arithmetic inputs that cannot be represented within the
   configured BCMath scale.
 * `GuardLimitExceeded` &mdash; thrown when `PathSearchConfig::withGuardLimitException()` is used
-  and the configured search guardrails (visited states or expansions) are reached.
+  and the configured search guardrails (visited states, expansions, or time budget) are
+  reached.
 * `InfeasiblePath` &mdash; indicates that no route satisfies the requested constraints.
 
-Search guardrails (expansion/visited-state limits) surface through the
+Search guardrails (expansion/visited-state/time-budget limits) surface through the
 `SearchOutcome::guardLimits()` method. The returned `GuardLimitStatus` aggregate exposes
 helpers such as `anyLimitReached()` so callers can inspect whether searches exhausted their
 configured protections without relying on exceptions. Opt-in escalation via

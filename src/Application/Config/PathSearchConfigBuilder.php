@@ -39,6 +39,8 @@ final class PathSearchConfigBuilder
 
     private ?int $maxExpansions = null;
 
+    private ?int $timeBudgetMs = null;
+
     private bool $throwOnGuardLimit = false;
 
     /**
@@ -110,7 +112,7 @@ final class PathSearchConfigBuilder
      *
      * @throws InvalidInput when either guard limit is less than one
      */
-    public function withSearchGuards(int $maxVisitedStates, int $maxExpansions): self
+    public function withSearchGuards(int $maxVisitedStates, int $maxExpansions, ?int $timeBudgetMs = null): self
     {
         if ($maxVisitedStates < 1) {
             throw new InvalidInput('Maximum visited states must be at least one.');
@@ -122,6 +124,26 @@ final class PathSearchConfigBuilder
 
         $this->maxVisitedStates = $maxVisitedStates;
         $this->maxExpansions = $maxExpansions;
+
+        if (null !== $timeBudgetMs) {
+            $this->withSearchTimeBudget($timeBudgetMs);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Configures an optional wall-clock budget (in milliseconds) for the path finder search.
+     *
+     * @throws InvalidInput when the provided budget is not positive
+     */
+    public function withSearchTimeBudget(?int $timeBudgetMs): self
+    {
+        if (null !== $timeBudgetMs && $timeBudgetMs < 1) {
+            throw new InvalidInput('Time budget must be at least one millisecond.');
+        }
+
+        $this->timeBudgetMs = $timeBudgetMs;
 
         return $this;
     }
@@ -164,6 +186,7 @@ final class PathSearchConfigBuilder
             $this->resultLimit,
             $maxExpansions,
             $maxVisitedStates,
+            $this->timeBudgetMs,
             $this->pathFinderToleranceOverride,
             $this->throwOnGuardLimit,
         );

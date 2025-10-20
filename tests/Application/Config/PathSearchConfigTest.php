@@ -244,6 +244,47 @@ final class PathSearchConfigTest extends TestCase
         self::assertSame(42, $config->pathFinderMaxVisitedStates());
     }
 
+    public function test_constructor_accepts_time_budget_of_one_millisecond(): void
+    {
+        $config = new PathSearchConfig(
+            Money::fromString('EUR', '50.00', 2),
+            '0.0',
+            '0.1',
+            1,
+            2,
+            pathFinderTimeBudgetMs: 1,
+        );
+
+        self::assertSame(1, $config->pathFinderTimeBudgetMs());
+    }
+
+    public function test_constructor_rejects_time_budget_below_one_millisecond(): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Time budget must be at least one millisecond.');
+
+        new PathSearchConfig(
+            Money::fromString('EUR', '50.00', 2),
+            '0.0',
+            '0.1',
+            1,
+            2,
+            pathFinderTimeBudgetMs: 0,
+        );
+    }
+
+    public function test_builder_applies_time_budget_configured_via_search_guards(): void
+    {
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '50.00', 2))
+            ->withToleranceBounds('0.0', '0.1')
+            ->withHopLimits(1, 2)
+            ->withSearchGuards(42, 64, 15)
+            ->build();
+
+        self::assertSame(15, $config->pathFinderTimeBudgetMs());
+    }
+
     public function test_builder_requires_spend_amount(): void
     {
         $builder = PathSearchConfig::builder()
@@ -363,6 +404,19 @@ final class PathSearchConfigTest extends TestCase
     {
         yield 'visited zero' => [0, 10];
         yield 'expansions zero' => [10, 0];
+    }
+
+    public function test_builder_rejects_time_budget_below_one_millisecond(): void
+    {
+        $builder = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '10.00', 2))
+            ->withToleranceBounds('0.0', '0.1')
+            ->withHopLimits(1, 2);
+
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Time budget must be at least one millisecond.');
+
+        $builder->withSearchTimeBudget(0);
     }
 
     public function test_constructor_enforces_default_limits_and_bounds(): void

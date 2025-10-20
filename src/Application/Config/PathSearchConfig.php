@@ -47,6 +47,7 @@ final class PathSearchConfig
         private readonly int $resultLimit = 1,
         private readonly int $pathFinderMaxExpansions = PathFinder::DEFAULT_MAX_EXPANSIONS,
         private readonly int $pathFinderMaxVisitedStates = PathFinder::DEFAULT_MAX_VISITED_STATES,
+        private readonly ?int $pathFinderTimeBudgetMs = null,
         ?string $pathFinderToleranceOverride = null,
         bool $throwOnGuardLimit = false,
     ) {
@@ -71,6 +72,10 @@ final class PathSearchConfig
 
         if ($pathFinderMaxVisitedStates < 1) {
             throw new InvalidInput('Maximum visited states must be at least one.');
+        }
+
+        if (null !== $pathFinderTimeBudgetMs && $pathFinderTimeBudgetMs < 1) {
+            throw new InvalidInput('Time budget must be at least one millisecond.');
         }
 
         [$tolerance, $source] = $this->resolvePathFinderTolerance($pathFinderToleranceOverride);
@@ -165,6 +170,11 @@ final class PathSearchConfig
     public function pathFinderMaxVisitedStates(): int
     {
         return $this->pathFinderMaxVisitedStates;
+    }
+
+    public function pathFinderTimeBudgetMs(): ?int
+    {
+        return $this->pathFinderTimeBudgetMs;
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathFinder;
 
+use SomeWork\P2PPathFinder\Application\PathFinder\Guard\SearchGuards;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
@@ -207,6 +208,7 @@ final class PathFinder
         private readonly int $maxExpansions = self::DEFAULT_MAX_EXPANSIONS,
         private readonly int $maxVisitedStates = self::DEFAULT_MAX_VISITED_STATES,
         ?PathOrderStrategy $orderingStrategy = null,
+        private readonly ?int $timeBudgetMs = null,
     ) {
         if ($maxHops < 1) {
             throw new InvalidInput('Maximum hops must be at least one.');
@@ -222,6 +224,10 @@ final class PathFinder
 
         if ($this->maxVisitedStates < 1) {
             throw new InvalidInput('Maximum visited states must be at least one.');
+        }
+
+        if (null !== $this->timeBudgetMs && $this->timeBudgetMs < 1) {
+            throw new InvalidInput('Time budget must be at least one millisecond.');
         }
 
         /** @var numeric-string $unit */
@@ -287,20 +293,18 @@ final class PathFinder
         ] = $this->initializeSearchStructures($source, $range, $desiredSpend);
 
         $bestTargetCost = null;
-        $expansions = 0;
 
-        $expansionGuardReached = false;
+        $guards = new SearchGuards($this->maxExpansions, $this->timeBudgetMs);
         $visitedGuardReached = false;
 
         while (!$queue->isEmpty()) {
-            if ($expansions >= $this->maxExpansions) {
-                $expansionGuardReached = true;
+            if (!$guards->canExpand()) {
                 break;
             }
 
             /** @var SearchState $state */
             $state = $queue->extract();
-            ++$expansions;
+            $guards->recordExpansion();
 
             if ($state['node'] === $target) {
                 /** @var numeric-string $candidateCost */
@@ -448,7 +452,7 @@ final class PathFinder
             }
         }
 
-        $guardLimits = new GuardLimitStatus($expansionGuardReached, $visitedGuardReached);
+        $guardLimits = $guards->finalize($visitedGuardReached);
 
         if (0 === $results->count()) {
             /** @var SearchOutcome<Candidate> $empty */
