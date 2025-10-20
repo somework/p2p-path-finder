@@ -101,6 +101,21 @@ $config = PathSearchConfig::builder()
 // The search honours the configured guard thresholds.
 ```
 
+Guard-limit breaches are reported via `SearchOutcome::guardLimits()` metadata by default. To
+escalate those breaches to exceptions instead, call `withGuardLimitException()`:
+
+```php
+$config = PathSearchConfig::builder()
+    ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+    ->withToleranceBounds('0.02', '0.10')
+    ->withHopLimits(1, 4)
+    ->withSearchGuards(10000, 25000)
+    ->withGuardLimitException()
+    ->build();
+
+// GuardLimitExceeded is thrown when either guard threshold is hit.
+```
+
 See [docs/guarded-search-example.md](docs/guarded-search-example.md) for a complete,
 ready-to-run integration walkthrough that demonstrates these guard limits in context.
 
@@ -157,14 +172,16 @@ The library ships with domain-specific exceptions under the
   validation.
 * `PrecisionViolation` &mdash; signals arithmetic inputs that cannot be represented within the
   configured BCMath scale.
-* `GuardLimitExceeded` &mdash; reserved for future escalation paths when search guardrails
-  (visited states or expansions) should raise instead of returning guard metadata.
+* `GuardLimitExceeded` &mdash; thrown when `PathSearchConfig::withGuardLimitException()` is used
+  and the configured search guardrails (visited states or expansions) are reached.
 * `InfeasiblePath` &mdash; indicates that no route satisfies the requested constraints.
 
-Search guardrails (expansion/visited-state limits) currently surface through the
+Search guardrails (expansion/visited-state limits) surface through the
 `SearchOutcome::guardLimits()` method. The returned `GuardLimitStatus` aggregate exposes
 helpers such as `anyLimitReached()` so callers can inspect whether searches exhausted their
-configured protections without relying on exceptions.
+configured protections without relying on exceptions. Opt-in escalation via
+`withGuardLimitException()` converts those guard-limit breaches into a `GuardLimitExceeded`
+throwable instead of metadata.
 
 Consumers can mix coarse- and fine-grained handling strategies:
 
@@ -186,8 +203,7 @@ try {
     // Catch-all for other library-specific exceptions (e.g. InfeasiblePath).
 }
 
-// The GuardLimitExceeded exception remains available for future releases that elect to throw
-// instead of returning guard metadata via SearchOutcome::guardLimits().
+// Enable PathSearchConfig::withGuardLimitException() to escalate guard-limit breaches.
 ```
 
 ## Quick-start scenarios

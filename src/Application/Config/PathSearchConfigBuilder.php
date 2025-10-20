@@ -39,6 +39,8 @@ final class PathSearchConfigBuilder
 
     private ?int $maxExpansions = null;
 
+    private bool $throwOnGuardLimit = false;
+
     /**
      * Sets the amount of the source asset that will be spent during path search.
      */
@@ -124,6 +126,13 @@ final class PathSearchConfigBuilder
         return $this;
     }
 
+    public function withGuardLimitException(bool $shouldThrow = true): self
+    {
+        $this->throwOnGuardLimit = $shouldThrow;
+
+        return $this;
+    }
+
     /**
      * Builds a validated {@see PathSearchConfig} instance.
      *
@@ -156,6 +165,7 @@ final class PathSearchConfigBuilder
             $maxExpansions,
             $maxVisitedStates,
             $this->pathFinderToleranceOverride,
+            $this->throwOnGuardLimit,
         );
     }
 

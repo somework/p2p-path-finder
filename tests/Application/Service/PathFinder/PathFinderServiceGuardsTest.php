@@ -12,6 +12,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 use SomeWork\P2PPathFinder\Tests\Fixture\FeePolicyFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
@@ -200,6 +201,47 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
         self::assertCount(2, $paths);
         self::assertSame('105.300', $paths[0]->totalReceived()->amount());
         self::assertSame('117.700', $paths[1]->totalReceived()->amount());
+    }
+
+    public function test_it_reports_guard_limits_via_metadata_by_default(): void
+    {
+        $orderBook = $this->simpleEuroToUsdOrderBook();
+        $guardStatus = new GuardLimitStatus(true, false);
+        $factory = $this->pathFinderFactoryForCandidates([], $guardStatus);
+        $service = $this->makeServiceWithFactory($factory);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds('0.0', '0.10')
+            ->withHopLimits(1, 2)
+            ->build();
+
+        $outcome = $service->findBestPaths($orderBook, $config, 'USD');
+
+        self::assertSame([], $outcome->paths());
+        self::assertTrue($outcome->guardLimits()->expansionsReached());
+        self::assertFalse($outcome->guardLimits()->visitedStatesReached());
+    }
+
+    public function test_it_can_escalate_guard_limit_breaches_to_exception(): void
+    {
+        $orderBook = $this->simpleEuroToUsdOrderBook();
+        $guardStatus = new GuardLimitStatus(true, true);
+        $factory = $this->pathFinderFactoryForCandidates([], $guardStatus);
+        $service = $this->makeServiceWithFactory($factory);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
+            ->withToleranceBounds('0.0', '0.10')
+            ->withHopLimits(1, 2)
+            ->withSearchGuards(100, 200)
+            ->withGuardLimitException()
+            ->build();
+
+        $this->expectException(GuardLimitExceeded::class);
+        $this->expectExceptionMessage('Search guard limit exceeded: expansions limit of 200 and visited states limit of 100.');
+
+        $service->findBestPaths($orderBook, $config, 'USD');
     }
 
     private function simpleEuroToUsdOrderBook(): OrderBook

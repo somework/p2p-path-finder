@@ -14,9 +14,12 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
+use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
+use function implode;
+use function sprintf;
 use function strtoupper;
 use function usort;
 
@@ -241,9 +244,28 @@ final class PathFinderService
             }
         );
 
+        $guardLimits = $searchResult->guardLimits();
+        if ($config->throwOnGuardLimit() && $guardLimits->anyLimitReached()) {
+            $breaches = [];
+            if ($guardLimits->expansionsReached()) {
+                $breaches[] = sprintf('expansions limit of %d', $config->pathFinderMaxExpansions());
+            }
+
+            if ($guardLimits->visitedStatesReached()) {
+                $breaches[] = sprintf('visited states limit of %d', $config->pathFinderMaxVisitedStates());
+            }
+
+            $message = 'Search guard limit exceeded';
+            if ([] !== $breaches) {
+                $message .= ': '.implode(' and ', $breaches);
+            }
+
+            throw new GuardLimitExceeded($message.'.');
+        }
+
         if ([] === $materializedResults) {
             /** @var SearchOutcome<PathResult> $empty */
-            $empty = SearchOutcome::empty($searchResult->guardLimits());
+            $empty = SearchOutcome::empty($guardLimits);
 
             return $empty;
         }
@@ -276,7 +298,7 @@ final class PathFinderService
                 static fn (array $entry): PathResult => $entry['result'],
                 $materializedResults,
             ),
-            $searchResult->guardLimits(),
+            $guardLimits,
         );
     }
 
