@@ -45,4 +45,5 @@ jobs:
         with:
           name: coverage-php${{ matrix.php-version }}
           path: coverage/clover.xml
+          if-no-files-found: error
           retention-days: 7

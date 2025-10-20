@@ -84,6 +84,7 @@ jobs:
         with:
           name: quality-coverage
           path: coverage/quality-clover.xml
+          if-no-files-found: error
           retention-days: 7
       - name: Generate API documentation
         run: composer phpdoc
@@ -95,6 +96,7 @@ jobs:
         with:
           name: phpdoc-api
           path: phpdoc.tar.gz
+          if-no-files-found: error
           retention-days: 7
 
   infection:
