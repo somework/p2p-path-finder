@@ -165,6 +165,11 @@ foreach ($classes as $class) {
         continue;
     }
 
+    $classDocComment = $reflection->getDocComment();
+    if (false !== $classDocComment && str_contains($classDocComment, '@internal')) {
+        continue;
+    }
+
     $buffer[] = '## '.$reflection->getName();
     $classDoc = normalizeDocComment($reflection->getDocComment());
     if ('' !== $classDoc) {

@@ -19,6 +19,8 @@ use function substr;
  * and compares it directly to the configured tolerance window using a common
  * scale. This keeps comparisons deterministic and eliminates the need for
  * hard-coded guard epsilons that could otherwise mask meaningful overshoot.
+ *
+ * @internal
  */
 final class ToleranceEvaluator
 {
