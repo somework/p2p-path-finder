@@ -79,7 +79,7 @@ jobs:
         run: |
           mkdir -p coverage
           vendor/bin/phpunit --coverage-clover=coverage/quality-clover.xml
-      - name: Upload coverage artifact
+      - name: Upload quality coverage artifact
         uses: actions/upload-artifact@v4
         with:
           name: quality-coverage
