@@ -209,6 +209,60 @@ final class PathFinderInternalsTest extends TestCase
         self::assertSame(2, $registry['USD'][0]['hops']);
     }
 
+    public function test_record_state_respects_explicit_signature_override(): void
+    {
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
+        $range = [
+            'min' => CurrencyScenarioFactory::money('USD', '1.00', 2),
+            'max' => CurrencyScenarioFactory::money('USD', '3.00', 2),
+        ];
+        $providedSignature = 'provided-signature';
+        $registry = [
+            'USD' => [
+                ['cost' => BcMath::normalize('1.8', self::SCALE), 'hops' => 3, 'signature' => $providedSignature],
+            ],
+        ];
+
+        $delta = $this->invokeFinderMethod(
+            $finder,
+            'recordState',
+            [&$registry, 'USD', BcMath::normalize('1.2', self::SCALE), 2, $range, null, $providedSignature],
+        );
+
+        self::assertSame(0, $delta);
+        self::assertCount(1, $registry['USD']);
+        self::assertSame($providedSignature, $registry['USD'][0]['signature']);
+        self::assertSame(BcMath::normalize('1.2', self::SCALE), $registry['USD'][0]['cost']);
+        self::assertSame(2, $registry['USD'][0]['hops']);
+    }
+
+    public function test_record_state_replaces_equal_cost_with_fewer_hops(): void
+    {
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
+        $range = [
+            'min' => CurrencyScenarioFactory::money('USD', '1.00', 2),
+            'max' => CurrencyScenarioFactory::money('USD', '3.00', 2),
+        ];
+        $signature = $this->invokeFinderMethod($finder, 'stateSignature', [$range, null]);
+        $cost = BcMath::normalize('1.750', self::SCALE);
+        $registry = [
+            'USD' => [
+                ['cost' => $cost, 'hops' => 4, 'signature' => $signature],
+            ],
+        ];
+
+        $delta = $this->invokeFinderMethod(
+            $finder,
+            'recordState',
+            [&$registry, 'USD', $cost, 2, $range, null, $signature],
+        );
+
+        self::assertSame(0, $delta);
+        self::assertCount(1, $registry['USD']);
+        self::assertSame($cost, $registry['USD'][0]['cost']);
+        self::assertSame(2, $registry['USD'][0]['hops']);
+    }
+
     public function test_is_dominated_detects_matching_signature(): void
     {
         $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
