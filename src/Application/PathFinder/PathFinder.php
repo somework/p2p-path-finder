@@ -840,7 +840,9 @@ final class PathFinder
             $ratioScale + self::SUM_EXTRA_SCALE,
         );
 
-        return $result->withScale($targetScale);
+        $converted = $result->withScale($targetScale);
+
+        return $this->clampToRange($converted, ['min' => $targetMin, 'max' => $targetMax]);
     }
 
     /**
