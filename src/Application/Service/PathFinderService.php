@@ -171,7 +171,15 @@ final class PathFinderService
          */
         $runner = $runnerFactory($config);
 
-        /** @var list<array{cost: numeric-string, order: int, result: PathResult}> $materializedResults */
+        /**
+         * @var list<array{
+         *     cost: numeric-string,
+         *     hops: int,
+         *     routeSignature: string,
+         *     order: int,
+         *     result: PathResult
+         * }> $materializedResults
+         */
         $materializedResults = [];
         $resultOrder = 0;
         $searchResult = $runner(
@@ -230,6 +238,8 @@ final class PathFinderService
 
                 $materializedResults[] = [
                     'cost' => $candidate['cost'],
+                    'hops' => $candidate['hops'],
+                    'routeSignature' => $this->routeSignature($candidate['edges']),
                     'order' => $resultOrder++,
                     'result' => new PathResult(
                         $materialized['totalSpent'],
@@ -254,28 +264,7 @@ final class PathFinderService
             return $empty;
         }
 
-        usort(
-            $materializedResults,
-            /**
-             * @phpstan-param array{cost: numeric-string, order: int, result: PathResult} $left
-             * @phpstan-param array{cost: numeric-string, order: int, result: PathResult} $right
-             *
-             * @psalm-param array{cost: numeric-string, order: int, result: PathResult} $left
-             * @psalm-param array{cost: numeric-string, order: int, result: PathResult} $right
-             */
-            static function (array $left, array $right): int {
-                $leftCost = $left['cost'];
-                $rightCost = $right['cost'];
-                BcMath::ensureNumeric($leftCost, $rightCost);
-
-                $comparison = BcMath::comp($leftCost, $rightCost, self::COST_SCALE);
-                if (0 !== $comparison) {
-                    return $comparison;
-                }
-
-                return $left['order'] <=> $right['order'];
-            },
-        );
+        $this->sortMaterializedResults($materializedResults);
 
         return new SearchOutcome(
             array_map(
@@ -312,6 +301,58 @@ final class PathFinderService
         }
 
         return 'Search guard limit exceeded: '.implode(' and ', $breaches).'.';
+    }
+
+    /**
+     * @param list<array{from: string, to: string}> $edges
+     */
+    private function routeSignature(array $edges): string
+    {
+        if ([] === $edges) {
+            return '';
+        }
+
+        $nodes = [$edges[0]['from']];
+
+        foreach ($edges as $edge) {
+            $nodes[] = $edge['to'];
+        }
+
+        return implode('->', $nodes);
+    }
+
+    /**
+     * @param list<array{cost: numeric-string, hops: int, routeSignature: string, order: int, result: PathResult}> $materializedResults
+     */
+    private function sortMaterializedResults(array &$materializedResults): void
+    {
+        usort($materializedResults, [$this, 'compareMaterializedResults']);
+    }
+
+    /**
+     * @param array{cost: numeric-string, hops: int, routeSignature: string, order: int, result: PathResult} $left
+     * @param array{cost: numeric-string, hops: int, routeSignature: string, order: int, result: PathResult} $right
+     */
+    private function compareMaterializedResults(array $left, array $right): int
+    {
+        BcMath::ensureNumeric($left['cost'], $right['cost']);
+
+        $comparison = BcMath::comp($left['cost'], $right['cost'], self::COST_SCALE);
+        if (0 !== $comparison) {
+            return $comparison;
+        }
+
+        $hopComparison = $left['hops'] <=> $right['hops'];
+        if (0 !== $hopComparison) {
+            return $hopComparison;
+        }
+
+        $signatureComparison = $left['routeSignature'] <=> $right['routeSignature'];
+        if (0 !== $signatureComparison) {
+            return $signatureComparison;
+        }
+
+        return $left['order'] <=> $right['order'];
     }
 
     /**

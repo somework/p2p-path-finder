@@ -16,7 +16,9 @@ use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 use SplPriorityQueue;
 
 use function array_key_exists;
+use function array_map;
 use function array_values;
+use function implode;
 use function sprintf;
 use function str_repeat;
 use function strtoupper;
@@ -634,53 +636,88 @@ final class PathFinder
      */
     private function finalizeResults(CandidateResultHeap $results): array
     {
-        /** @var list<CandidateHeapEntry> $collected */
+        $entries = $this->collectResultEntries($results);
+        $this->sortResultEntries($entries);
+
+        /** @var list<Candidate> $finalized */
+        $finalized = array_map(
+            /**
+             * @param array{candidate: Candidate, order: int, cost: numeric-string, routeSignature: string} $entry
+             */
+            static fn (array $entry): array => $entry['candidate'],
+            $entries,
+        );
+
+        return $finalized;
+    }
+
+    /**
+     * @return list<array{candidate: Candidate, order: int, cost: numeric-string, routeSignature: string}>
+     */
+    private function collectResultEntries(CandidateResultHeap $results): array
+    {
+        /** @var list<array{candidate: Candidate, order: int, cost: numeric-string, routeSignature: string}> $collected */
         $collected = [];
         $clone = clone $results;
 
         while (!$clone->isEmpty()) {
             /** @var CandidateHeapEntry $entry */
             $entry = $clone->extract();
+            $entry['routeSignature'] = $this->routeSignature($entry['candidate']['edges']);
             $collected[] = $entry;
         }
 
-        usort(
-            $collected,
-            /**
-             * @phpstan-param array{candidate: Candidate, order: int, cost: numeric-string} $left
-             * @phpstan-param array{candidate: Candidate, order: int, cost: numeric-string} $right
-             *
-             * @psalm-param array{candidate: Candidate, order: int, cost: numeric-string} $left
-             * @psalm-param array{candidate: Candidate, order: int, cost: numeric-string} $right
-             */
-            function (array $left, array $right): int {
-                $leftCost = $left['cost'];
-                /** @var numeric-string $leftCost */
-                $leftCost = $leftCost;
-                $rightCost = $right['cost'];
-                /** @var numeric-string $rightCost */
-                $rightCost = $rightCost;
+        return $collected;
+    }
 
-                $comparison = BcMath::comp($leftCost, $rightCost, self::SCALE);
-                if (0 !== $comparison) {
-                    return $comparison;
-                }
+    /**
+     * @param list<array{candidate: Candidate, order: int, cost: numeric-string, routeSignature: string}> $entries
+     */
+    private function sortResultEntries(array &$entries): void
+    {
+        usort($entries, [$this, 'compareCandidateEntries']);
+    }
 
-                return $left['order'] <=> $right['order'];
-            },
-        );
-
-        $finalized = [];
-
-        /** @var CandidateHeapEntry $entry */
-        foreach ($collected as $entry) {
-            /** @var Candidate $candidate */
-            $candidate = $entry['candidate'];
-
-            $finalized[] = $candidate;
+    /**
+     * @param array{candidate: Candidate, order: int, cost: numeric-string, routeSignature: string} $left
+     * @param array{candidate: Candidate, order: int, cost: numeric-string, routeSignature: string} $right
+     */
+    private function compareCandidateEntries(array $left, array $right): int
+    {
+        $comparison = BcMath::comp($left['cost'], $right['cost'], self::SCALE);
+        if (0 !== $comparison) {
+            return $comparison;
         }
 
-        return $finalized;
+        $hopComparison = $left['candidate']['hops'] <=> $right['candidate']['hops'];
+        if (0 !== $hopComparison) {
+            return $hopComparison;
+        }
+
+        $signatureComparison = $left['routeSignature'] <=> $right['routeSignature'];
+        if (0 !== $signatureComparison) {
+            return $signatureComparison;
+        }
+
+        return $left['order'] <=> $right['order'];
+    }
+
+    /**
+     * @param list<PathEdge> $edges
+     */
+    private function routeSignature(array $edges): string
+    {
+        if ([] === $edges) {
+            return '';
+        }
+
+        $nodes = [$edges[0]['from']];
+
+        foreach ($edges as $edge) {
+            $nodes[] = $edge['to'];
+        }
+
+        return implode('->', $nodes);
     }
 
     /**

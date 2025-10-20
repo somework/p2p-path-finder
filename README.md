@@ -41,9 +41,9 @@ or swap in a different search algorithm) without leaking implementation details.
 ## Design Notes
 
 * **Stable priority queue semantics.** The internal `SearchStateQueue` always prefers
-  lower cumulative costs and falls back to first-in-first-out ordering when costs tie,
-  keeping traversal deterministic even when multiple candidates share identical
-  priorities.【F:src/Application/PathFinder/PathFinder.php†L983-L1049】【F:tests/Application/PathFinder/SearchStateQueueTest.php†L31-L58】
+  lower cumulative costs. Finalized path lists extend that determinism by comparing
+  candidates using cost, hop count, a lexicographical route signature (e.g.
+  `EUR->USD->...`) and finally discovery order when all other keys match.【F:src/Application/PathFinder/PathFinder.php†L635-L708】【F:src/Application/Service/PathFinderService.php†L170-L264】【F:tests/Application/PathFinder/PathFinderTest.php†L205-L255】
 * **Mandatory segment pruning.** Each edge carries a list of mandatory and optional
   liquidity segments. During expansion the path finder aggregates the mandatory portion of
   the relevant amounts (gross base for buys, quote for sells) and discards candidates that
