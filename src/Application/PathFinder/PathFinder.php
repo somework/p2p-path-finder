@@ -22,6 +22,7 @@ use function array_key_exists;
 use function array_map;
 use function array_values;
 use function implode;
+use function microtime;
 use function sprintf;
 use function str_repeat;
 use function strtoupper;
@@ -207,6 +208,7 @@ final class PathFinder
         private readonly int $maxExpansions = self::DEFAULT_MAX_EXPANSIONS,
         private readonly int $maxVisitedStates = self::DEFAULT_MAX_VISITED_STATES,
         ?PathOrderStrategy $orderingStrategy = null,
+        private readonly ?int $timeBudgetMs = null,
     ) {
         if ($maxHops < 1) {
             throw new InvalidInput('Maximum hops must be at least one.');
@@ -222,6 +224,10 @@ final class PathFinder
 
         if ($this->maxVisitedStates < 1) {
             throw new InvalidInput('Maximum visited states must be at least one.');
+        }
+
+        if (null !== $this->timeBudgetMs && $this->timeBudgetMs < 1) {
+            throw new InvalidInput('Time budget must be at least one millisecond.');
         }
 
         /** @var numeric-string $unit */
@@ -291,8 +297,16 @@ final class PathFinder
 
         $expansionGuardReached = false;
         $visitedGuardReached = false;
+        $timeGuardReached = false;
+
+        $searchStartedAt = microtime(true);
 
         while (!$queue->isEmpty()) {
+            if (null !== $this->timeBudgetMs && (microtime(true) - $searchStartedAt) * 1000 >= $this->timeBudgetMs) {
+                $timeGuardReached = true;
+                break;
+            }
+
             if ($expansions >= $this->maxExpansions) {
                 $expansionGuardReached = true;
                 break;
@@ -448,7 +462,7 @@ final class PathFinder
             }
         }
 
-        $guardLimits = new GuardLimitStatus($expansionGuardReached, $visitedGuardReached);
+        $guardLimits = new GuardLimitStatus($expansionGuardReached, $visitedGuardReached, $timeGuardReached);
 
         if (0 === $results->count()) {
             /** @var SearchOutcome<Candidate> $empty */

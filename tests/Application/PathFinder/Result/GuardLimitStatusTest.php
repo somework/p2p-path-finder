@@ -15,23 +15,32 @@ final class GuardLimitStatusTest extends TestCase
 
         self::assertFalse($status->expansionsReached());
         self::assertFalse($status->visitedStatesReached());
+        self::assertFalse($status->timeBudgetReached());
         self::assertFalse($status->anyLimitReached());
     }
 
     public function test_any_limit_reports_true_when_either_guard_triggers(): void
     {
-        $expansionsReached = new GuardLimitStatus(true, false);
-        $visitedReached = new GuardLimitStatus(false, true);
-        $bothReached = new GuardLimitStatus(true, true);
+        $expansionsReached = new GuardLimitStatus(true, false, false);
+        $visitedReached = new GuardLimitStatus(false, true, false);
+        $timeReached = new GuardLimitStatus(false, false, true);
+        $allReached = new GuardLimitStatus(true, true, true);
 
         self::assertTrue($expansionsReached->anyLimitReached());
         self::assertTrue($visitedReached->anyLimitReached());
-        self::assertTrue($bothReached->anyLimitReached());
+        self::assertTrue($timeReached->anyLimitReached());
+        self::assertTrue($allReached->anyLimitReached());
 
         self::assertTrue($expansionsReached->expansionsReached());
         self::assertFalse($expansionsReached->visitedStatesReached());
+        self::assertFalse($expansionsReached->timeBudgetReached());
 
         self::assertFalse($visitedReached->expansionsReached());
         self::assertTrue($visitedReached->visitedStatesReached());
+        self::assertFalse($visitedReached->timeBudgetReached());
+
+        self::assertFalse($timeReached->expansionsReached());
+        self::assertFalse($timeReached->visitedStatesReached());
+        self::assertTrue($timeReached->timeBudgetReached());
     }
 }

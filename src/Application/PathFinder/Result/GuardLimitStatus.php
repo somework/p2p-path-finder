@@ -8,16 +8,18 @@ final class GuardLimitStatus
 {
     private readonly bool $expansionsReached;
     private readonly bool $visitedStatesReached;
+    private readonly bool $timeBudgetReached;
 
-    public function __construct(bool $expansionsReached, bool $visitedStatesReached)
+    public function __construct(bool $expansionsReached, bool $visitedStatesReached, bool $timeBudgetReached)
     {
         $this->expansionsReached = $expansionsReached;
         $this->visitedStatesReached = $visitedStatesReached;
+        $this->timeBudgetReached = $timeBudgetReached;
     }
 
     public static function none(): self
     {
-        return new self(false, false);
+        return new self(false, false, false);
     }
 
     public function expansionsReached(): bool
@@ -30,8 +32,13 @@ final class GuardLimitStatus
         return $this->visitedStatesReached;
     }
 
+    public function timeBudgetReached(): bool
+    {
+        return $this->timeBudgetReached;
+    }
+
     public function anyLimitReached(): bool
     {
-        return $this->expansionsReached || $this->visitedStatesReached;
+        return $this->expansionsReached || $this->visitedStatesReached || $this->timeBudgetReached;
     }
 }
