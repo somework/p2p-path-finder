@@ -333,6 +333,113 @@ final class PathFinderTest extends TestCase
         }
     }
 
+    public function test_it_tightens_best_cost_and_blocks_looser_candidates(): void
+    {
+        $graph = [
+            'SRC' => [
+                'currency' => 'SRC',
+                'edges' => [
+                    self::manualEdge('SRC', 'TRG', '2.000'),
+                    self::manualEdge('SRC', 'DEEP', '1.923'),
+                    self::manualEdge('SRC', 'LOOSE', '1.887'),
+                ],
+            ],
+            'DEEP' => [
+                'currency' => 'DEEP',
+                'edges' => [
+                    self::manualEdge('DEEP', 'HIDDEN', '1.050'),
+                ],
+            ],
+            'HIDDEN' => [
+                'currency' => 'HIDDEN',
+                'edges' => [
+                    self::manualEdge('HIDDEN', 'TRG', '2.000'),
+                ],
+            ],
+            'LOOSE' => [
+                'currency' => 'LOOSE',
+                'edges' => [
+                    self::manualEdge('LOOSE', 'TRG', '1.500'),
+                ],
+            ],
+            'TRG' => ['currency' => 'TRG', 'edges' => []],
+        ];
+
+        $finder = new PathFinder(maxHops: 4, tolerance: '0.1', topK: 3);
+        $evaluatedCandidates = [];
+        $outcome = $finder->findBestPaths(
+            $graph,
+            'SRC',
+            'TRG',
+            null,
+            static function (array $candidate) use (&$evaluatedCandidates): bool {
+                $nodes = array_merge(
+                    [$candidate['edges'][0]['from']],
+                    array_map(static fn (array $edge): string => $edge['to'], $candidate['edges']),
+                );
+
+                $evaluatedCandidates[] = ['nodes' => $nodes, 'cost' => $candidate['cost']];
+
+                return true;
+            }
+        );
+
+        self::assertCount(2, $evaluatedCandidates);
+
+        $paths = $outcome->paths();
+
+        self::assertCount(2, $paths);
+
+        $directFound = false;
+        $tightFound = false;
+        $collectedNodes = [];
+
+        foreach ($paths as $path) {
+            $nodes = array_merge(
+                [$path['edges'][0]['from']],
+                array_map(static fn (array $edge): string => $edge['to'], $path['edges']),
+            );
+
+            $collectedNodes[] = $nodes;
+
+            if (['SRC', 'TRG'] === $nodes) {
+                $directFound = true;
+                $expectedDirectCost = BcMath::div('1', '2', self::SCALE);
+                self::assertSame($expectedDirectCost, $path['cost']);
+            }
+
+            if (['SRC', 'DEEP', 'HIDDEN', 'TRG'] === $nodes) {
+                $tightFound = true;
+                $firstLegCost = BcMath::div('1', '1.923', self::SCALE);
+                $secondLegCost = BcMath::div($firstLegCost, '1.050', self::SCALE);
+                $expectedHiddenCost = BcMath::div($secondLegCost, '2.000', self::SCALE);
+                self::assertSame($expectedHiddenCost, $path['cost']);
+            }
+        }
+
+        self::assertTrue($directFound);
+        self::assertTrue($tightFound);
+
+        foreach ($collectedNodes as $nodes) {
+            self::assertNotContains('LOOSE', $nodes);
+        }
+
+        $candidateSignatures = array_map(
+            static fn (array $candidate): array => $candidate['nodes'],
+            $evaluatedCandidates,
+        );
+
+        self::assertSame([
+            ['SRC', 'TRG'],
+            ['SRC', 'DEEP', 'HIDDEN', 'TRG'],
+        ], $candidateSignatures);
+
+        self::assertSame([
+            ['SRC', 'DEEP', 'HIDDEN', 'TRG'],
+            ['SRC', 'TRG'],
+        ], $collectedNodes);
+    }
+
     public function test_it_continues_iterating_neighbors_after_tolerance_skip(): void
     {
         $graph = [
