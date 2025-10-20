@@ -121,6 +121,11 @@ final class PathFinderService
     /**
      * Searches for the best conversion paths from the configured spend asset to the target asset.
      *
+     * Guard limit breaches are reported through the returned {@see SearchOutcome::guardLimits()}
+     * metadata. Inspect the {@see GuardLimitStatus} via helpers like
+     * {@see GuardLimitStatus::anyLimitReached()} to determine whether the search exhausted its
+     * configured protections.
+     *
      * @throws InvalidInput       when the requested target asset identifier is empty
      * @throws PrecisionViolation when arbitrary precision operations required for cost ordering cannot be performed
      *
