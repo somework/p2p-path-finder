@@ -55,3 +55,20 @@ foreach ($result->paths() as $path) {
 The `withSearchGuards()` call ensures the traversal halts if either the visited-state or
 expansion thresholds are exceeded, providing predictable runtime characteristics even on
 dense graphs.
+
+## Regression edge cases
+
+The PHPUnit suite exercises a set of deterministic fixtures that capture the sharpest guard
+scenarios we have encountered in production. They live in
+`tests/Fixture/PathFinderEdgeCaseFixtures.php` and are consumed by
+`PathFinderServiceEdgeCaseTest`. The fixtures cover:
+
+- `PathFinderEdgeCaseFixtures::emptyOrderBook()` – asserts that empty books propagate a
+  pristine `GuardLimitStatus` without leaking partial paths.
+- `PathFinderEdgeCaseFixtures::incompatibleBounds()` – models min/max conflicts between hops
+  so the service returns an empty result set with untouched guard metadata.
+- `PathFinderEdgeCaseFixtures::longGuardLimitedChain()` – forces expansion guard breaches and
+  validates both the emitted metadata and the `GuardLimitExceeded` exception pathway.
+
+They run automatically in CI through data providers, ensuring the regression coverage remains
+representative as the search heuristics evolve.
