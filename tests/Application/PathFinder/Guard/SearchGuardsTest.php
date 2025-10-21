@@ -74,4 +74,23 @@ final class SearchGuardsTest extends TestCase
         self::assertFalse($guards->canExpand());
         self::assertTrue($guards->finalize(false)->timeBudgetReached());
     }
+
+    public function test_time_budget_measures_elapsed_relative_to_start_time(): void
+    {
+        $now = 17.5;
+        $clock = static function () use (&$now): float {
+            return $now;
+        };
+
+        $guards = new SearchGuards(10, 5, $clock);
+
+        self::assertTrue($guards->canExpand());
+
+        $now = 17.504; // 4 milliseconds since start.
+        self::assertTrue($guards->canExpand());
+
+        $now = 17.506; // 6 milliseconds since start.
+        self::assertFalse($guards->canExpand());
+        self::assertTrue($guards->finalize(false)->timeBudgetReached());
+    }
 }

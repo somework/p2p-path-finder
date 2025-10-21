@@ -53,6 +53,26 @@ final class PathLegTest extends TestCase
         $this->assertSame('1.50', $leg->fees()['USD']->amount());
     }
 
+    public function test_zero_fee_entries_do_not_interrupt_later_fees(): void
+    {
+        $leg = new PathLeg(
+            'usd',
+            'eur',
+            Money::fromString('USD', '5', 2),
+            Money::fromString('EUR', '4.5', 2),
+            [
+                Money::fromString('USD', '0.00', 2),
+                Money::fromString('EUR', '0.25', 2),
+                Money::fromString('USD', '0.75', 2),
+            ],
+        );
+
+        $fees = $leg->fees();
+        $this->assertSame(['EUR', 'USD'], array_keys($fees));
+        $this->assertSame('0.25', $fees['EUR']->amount());
+        $this->assertSame('0.75', $fees['USD']->amount());
+    }
+
     public function test_empty_asset_symbol_throws_exception(): void
     {
         $this->expectException(InvalidInput::class);

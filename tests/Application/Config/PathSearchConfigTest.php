@@ -419,6 +419,18 @@ final class PathSearchConfigTest extends TestCase
         $builder->withSearchTimeBudget(0);
     }
 
+    public function test_builder_accepts_single_millisecond_time_budget(): void
+    {
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '25.00', 2))
+            ->withToleranceBounds('0.0', '0.1')
+            ->withHopLimits(1, 2)
+            ->withSearchTimeBudget(1)
+            ->build();
+
+        self::assertSame(1, $config->pathFinderTimeBudgetMs());
+    }
+
     public function test_constructor_enforces_default_limits_and_bounds(): void
     {
         $config = new PathSearchConfig(

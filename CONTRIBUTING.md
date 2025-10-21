@@ -25,6 +25,23 @@ confidence.
 - Update the [CHANGELOG](CHANGELOG.md) for user-visible changes, especially when a new
   feature advances the path toward the `1.0.0-rc` milestone.
 
+### Mutation testing
+
+- Mutation testing is powered by [Infection](https://infection.github.io/) to ensure guard
+  rails such as guard escalation, tie-break comparators and property helpers stay
+  well-tested.
+- Run it locally with:
+  ```bash
+  INFECTION=1 XDEBUG_MODE=coverage vendor/bin/infection --no-progress
+  ```
+  The command honours the thresholds defined in `infection.json.dist` (MSI ≥80, covered MSI
+  ≥85). Expect the run to take roughly five minutes on a quad-core machine.
+- Property-based suites detect the `INFECTION` environment variable and automatically dial
+  back iteration counts to keep the feedback loop reasonable.
+- A convenient alias is available via Composer: `composer infection` mirrors the CI
+  configuration and is a good candidate for inclusion in custom Git hooks or lightweight
+  automation jobs.
+
 ## Submitting a pull request
 
 1. Ensure your branch is rebased on the latest `main`.
