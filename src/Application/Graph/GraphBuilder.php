@@ -37,14 +37,19 @@ final class GraphBuilder
     /**
      * @param iterable<Order> $orders
      *
+     * @psalm-param iterable<Order> $orders
+     *
      * @return Graph
      *
      * @psalm-return Graph
      */
     public function build(iterable $orders): array
     {
-        /** @var Graph $graph */
-        /** @psalm-var Graph $graph */
+        /**
+         * @var Graph $graph
+         *
+         * @psalm-var Graph $graph
+         */
         $graph = [];
 
         foreach ($orders as $order) {
@@ -69,9 +74,9 @@ final class GraphBuilder
     }
 
     /**
-     * @param Graph $graph
+     * @param array<string, array{currency: string, edges: list<GraphEdge>}> $graph
      *
-     * @psalm-param Graph $graph
+     * @psalm-param array<string, array{currency: string, edges: list<GraphEdge>}> &$graph
      */
     private function initializeNode(array &$graph, string $currency): void
     {
