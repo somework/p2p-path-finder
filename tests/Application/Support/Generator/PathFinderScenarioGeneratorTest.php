@@ -9,6 +9,7 @@ use Random\Engine\Mt19937;
 use Random\Randomizer;
 use ReflectionClass;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
+use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Support\InfectionIterationLimiter;
 
@@ -26,24 +27,27 @@ final class PathFinderScenarioGeneratorTest extends TestCase
 
         self::assertSame('SRC', $scenario['source']);
         self::assertSame('DST', $scenario['target']);
-        self::assertCount(5, $scenario['orders']);
-        self::assertSame(4, $scenario['maxHops']);
-        self::assertSame(1, $scenario['topK']);
-        self::assertSame('0.01', $scenario['tolerance']);
+        self::assertCount(109, $scenario['orders']);
+        self::assertSame(5, $scenario['maxHops']);
+        self::assertSame(3, $scenario['topK']);
+        self::assertSame('0.0', $scenario['tolerance']);
 
         $firstOrder = $scenario['orders'][0];
-        self::assertSame(OrderSide::BUY, $firstOrder->side());
-        self::assertSame('SRC', $firstOrder->assetPair()->base());
-        self::assertSame('AAA', $firstOrder->assetPair()->quote());
-        self::assertSame('1.773', $firstOrder->bounds()->min()->amount());
-        self::assertSame('6.206', $firstOrder->bounds()->max()->amount());
-        self::assertSame('196.978', $firstOrder->effectiveRate()->rate());
-        self::assertNull($firstOrder->feePolicy());
+        self::assertSame(OrderSide::SELL, $firstOrder->side());
+        self::assertSame('AAA', $firstOrder->assetPair()->base());
+        self::assertSame('SRC', $firstOrder->assetPair()->quote());
+        self::assertSame('3.893', $firstOrder->bounds()->min()->amount());
+        self::assertSame('3.893', $firstOrder->bounds()->max()->amount());
+        self::assertSame('64.869', $firstOrder->effectiveRate()->rate());
+        self::assertNotNull($firstOrder->feePolicy());
 
-        $lastOrder = $scenario['orders'][4];
+        $lastOrder = $scenario['orders'][108];
         self::assertSame(OrderSide::BUY, $lastOrder->side());
-        self::assertSame('AAD', $lastOrder->assetPair()->base());
+        self::assertSame('ACK', $lastOrder->assetPair()->base());
         self::assertSame('DST', $lastOrder->assetPair()->quote());
+        self::assertSame('1.628', $lastOrder->bounds()->min()->amount());
+        self::assertSame('1.694', $lastOrder->bounds()->max()->amount());
+        self::assertSame('116.408', $lastOrder->effectiveRate()->rate());
         self::assertNotNull($lastOrder->feePolicy());
     }
 
@@ -99,8 +103,8 @@ final class PathFinderScenarioGeneratorTest extends TestCase
         $generator = new PathFinderScenarioGenerator();
 
         self::assertSame('0.0', $generator->toleranceChoice(0));
-        self::assertSame('0.20', $generator->toleranceChoice(4));
-        self::assertSame('0.05', $generator->toleranceChoice(7));
+        self::assertSame('0.050', $generator->toleranceChoice(4));
+        self::assertSame('0.010', $generator->toleranceChoice(7));
     }
 
     public function test_numeric_helpers_cover_edge_cases(): void
@@ -131,7 +135,7 @@ final class PathFinderScenarioGeneratorTest extends TestCase
     {
         $generator = new PathFinderScenarioGenerator(new Randomizer(new Mt19937(42)));
 
-        $limit = $this->iterationLimit(25, 6, 'P2P_SCENARIO_GENERATOR_ITERATIONS');
+        $limit = $this->iterationLimit(18, 4, 'P2P_SCENARIO_GENERATOR_ITERATIONS');
 
         for ($iteration = 0; $iteration < $limit; ++$iteration) {
             $scenario = $generator->scenario();
@@ -142,21 +146,55 @@ final class PathFinderScenarioGeneratorTest extends TestCase
             self::assertGreaterThanOrEqual(1, $scenario['topK']);
             self::assertLessThanOrEqual(5, $scenario['topK']);
 
+            self::assertLessThanOrEqual(
+                0,
+                BcMath::comp($scenario['tolerance'], '0.050', 3),
+                'Tolerance budget should remain tight to stress guard rails.',
+            );
+
             $referencesSource = false;
             $referencesTarget = false;
+            $sourceEdgeCount = 0;
+            $mandatoryCount = 0;
 
             foreach ($scenario['orders'] as $order) {
                 if ('SRC' === $order->assetPair()->base() || 'SRC' === $order->assetPair()->quote()) {
                     $referencesSource = true;
+                    ++$sourceEdgeCount;
                 }
 
                 if ('DST' === $order->assetPair()->base() || 'DST' === $order->assetPair()->quote()) {
                     $referencesTarget = true;
                 }
+
+                if ($order->bounds()->min()->equals($order->bounds()->max())) {
+                    ++$mandatoryCount;
+                }
             }
 
             self::assertTrue($referencesSource, 'Scenario must connect to the source asset.');
             self::assertTrue($referencesTarget, 'Scenario must connect to the target asset.');
+            self::assertGreaterThanOrEqual(3, $sourceEdgeCount, 'Scenarios should expose wide branching from the source.');
+            self::assertGreaterThanOrEqual(1, $mandatoryCount, 'Scenarios should include mandatory minimum fills.');
+        }
+    }
+
+    public function test_dataset_covers_each_template_deterministically(): void
+    {
+        $scenarios = PathFinderScenarioGenerator::dataset();
+
+        self::assertCount(3, $scenarios);
+
+        foreach ($scenarios as $scenario) {
+            $mandatoryOrders = 0;
+
+            foreach ($scenario['orders'] as $order) {
+                if ($order->bounds()->min()->equals($order->bounds()->max())) {
+                    ++$mandatoryOrders;
+                }
+            }
+
+            self::assertGreaterThanOrEqual(1, $mandatoryOrders);
         }
     }
 

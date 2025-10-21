@@ -9,6 +9,7 @@ use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
@@ -49,7 +50,7 @@ final class PathFinderServicePropertyTest extends TestCase
 
     public function test_random_scenarios_produce_deterministic_unique_service_paths(): void
     {
-        $limit = $this->iterationLimit(20, 5, 'P2P_PATH_FINDER_SERVICE_ITERATIONS');
+        $limit = $this->iterationLimit(15, 5, 'P2P_PATH_FINDER_SERVICE_ITERATIONS');
 
         for ($iteration = 0; $iteration < $limit; ++$iteration) {
             $scenario = $this->generator->scenario();
@@ -84,14 +85,7 @@ final class PathFinderServicePropertyTest extends TestCase
                 $firstEncoded,
                 'Materialized paths should be unique across the result set.'
             );
-            self::assertSame(
-                $first->guardLimits()->expansionsReached(),
-                $second->guardLimits()->expansionsReached()
-            );
-            self::assertSame(
-                $first->guardLimits()->visitedStatesReached(),
-                $second->guardLimits()->visitedStatesReached()
-            );
+            $this->assertGuardStatusEquals($first->guardLimits(), $second->guardLimits());
 
             $maximumTolerance = BcMath::normalize($scenario['tolerance'], 18);
             foreach ($first->paths() as $result) {
@@ -121,7 +115,7 @@ final class PathFinderServicePropertyTest extends TestCase
      */
     public function test_permuted_order_books_produce_identical_results(): void
     {
-        $limit = $this->iterationLimit(20, 5, 'P2P_PATH_FINDER_SERVICE_ITERATIONS');
+        $limit = $this->iterationLimit(15, 5, 'P2P_PATH_FINDER_SERVICE_ITERATIONS');
 
         for ($iteration = 0; $iteration < $limit; ++$iteration) {
             $scenario = $this->generator->scenario();
@@ -158,15 +152,10 @@ final class PathFinderServicePropertyTest extends TestCase
                 $permutedEncoded,
                 'Resulting path collections must be invariant to input order permutations.',
             );
-            self::assertSame(
-                $original->guardLimits()->expansionsReached(),
-                $permuted->guardLimits()->expansionsReached(),
-                'Expansion guard metadata must be invariant to input order permutations.',
-            );
-            self::assertSame(
-                $original->guardLimits()->visitedStatesReached(),
-                $permuted->guardLimits()->visitedStatesReached(),
-                'Visited state guard metadata must be invariant to input order permutations.',
+            $this->assertGuardStatusEquals(
+                $original->guardLimits(),
+                $permuted->guardLimits(),
+                'Permutation guard metadata mismatch.',
             );
         }
     }
@@ -257,6 +246,36 @@ final class PathFinderServicePropertyTest extends TestCase
             ['SRC->CHI->DST', 'SRC->BET->DST', 'SRC->ALP->DST'],
             array_map(static fn (array $entry): string => $entry['routeSignature'], $entries),
         );
+    }
+
+    public function test_dataset_scenarios_remain_deterministic(): void
+    {
+        foreach (PathFinderScenarioGenerator::dataset() as $scenario) {
+            $orders = $scenario['orders'];
+            $orderBook = new OrderBook($orders);
+            $graph = $this->graphBuilder->build($orders);
+            $edges = $graph[$scenario['source']]['edges'] ?? [];
+
+            self::assertNotSame([], $edges, 'Dataset scenario should expose source edges.');
+
+            $config = PathSearchConfig::builder()
+                ->withSpendAmount($this->deriveSpendAmount($edges[0]))
+                ->withToleranceBounds('0.0', $scenario['tolerance'])
+                ->withHopLimits(1, $scenario['maxHops'])
+                ->withResultLimit($scenario['topK'])
+                ->build();
+
+            $first = $this->service->findBestPaths($orderBook, $config, $scenario['target']);
+            $second = $this->service->findBestPaths($orderBook, $config, $scenario['target']);
+
+            $encoder = $this->encodeResult();
+            self::assertSame(array_map($encoder, $first->paths()), array_map($encoder, $second->paths()));
+            $this->assertGuardStatusEquals(
+                $first->guardLimits(),
+                $second->guardLimits(),
+                'Dataset guard metadata mismatch.',
+            );
+        }
     }
 
     /**
@@ -367,5 +386,27 @@ final class PathFinderServicePropertyTest extends TestCase
         }
 
         return $left['order'] <=> $right['order'];
+    }
+
+    private function assertGuardStatusEquals(
+        GuardLimitStatus $expected,
+        GuardLimitStatus $actual,
+        string $message = 'Guard metadata should be identical'
+    ): void {
+        self::assertSame(
+            $expected->expansionsReached(),
+            $actual->expansionsReached(),
+            $message.' (expansions)',
+        );
+        self::assertSame(
+            $expected->visitedStatesReached(),
+            $actual->visitedStatesReached(),
+            $message.' (visited states)',
+        );
+        self::assertSame(
+            $expected->timeBudgetReached(),
+            $actual->timeBudgetReached(),
+            $message.' (time budget)',
+        );
     }
 }
