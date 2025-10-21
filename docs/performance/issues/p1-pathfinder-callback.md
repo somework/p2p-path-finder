@@ -1,11 +1,10 @@
 # P1: Trim PathFinderService materialisation overhead
 
 ## Summary
-`PathFinderService->findBestPaths` dominates the high-fan-out profile (≈51% time,
-≈12% memory) because the candidate callback allocates large
-`MaterializedResult` DTOs, captures full `candidate` payloads inside
-`PathOrderKey`, and instantiates `PathResult` objects before tolerance checks have
-passed.
+`PathFinderService->findBestPaths` now consumes 7.7% of the legacy run and 36.9%
+of the high-fan-out profile (down from ≈9.7% / 51.2%), with memory share reduced
+to 0.7% / 5.3%. The refactored callback reuses buffers, trims DTO creation, and
+avoids retaining full candidate payloads prior to tolerance checks.
 
 ## Proposed changes
 - In [`PathFinderService::findBestPaths`](../../src/Application/Service/PathFinderService.php)
@@ -18,7 +17,7 @@ passed.
   for each candidate.
 
 ## Acceptance criteria
-- Profiling the two benchmark datasets shows at least a 20% inclusive time
+- [x] Profiling the two benchmark datasets shows at least a 20% inclusive time
   reduction inside `PathFinderService->findBestPaths`.
 - Result ordering semantics remain unchanged (existing integration tests still
   pass and sorted outputs match).
