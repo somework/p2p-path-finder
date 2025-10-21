@@ -742,10 +742,12 @@ final class PathFinder
     }
 
     /**
-     * @param GraphEdge  $edge
-     * @param SpendRange $range
+     * Determines whether the given edge can satisfy the requested spend range and, if so,
+     * returns the portion of that range that is feasible within the edge's capacity and segments.
      *
-     * @return SpendRange|null
+     * @param array $edge GraphEdge-like array containing orderSide, capacity fields and segments used to evaluate feasibility.
+     * @param array $range SpendRange-like array with keys 'min' and 'max' containing Money values for the requested range.
+     * @return array|null A SpendRange-like array with keys 'min' and 'max' (Money values adjusted to the computed scale) when feasible, or `null` if the requested range cannot be supported by the edge.
      */
     private function edgeSupportsAmount(array $edge, array $range): ?array
     {

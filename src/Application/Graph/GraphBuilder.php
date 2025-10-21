@@ -29,17 +29,27 @@ final class GraphBuilder
      */
     private array $zeroMoneyCache = [];
 
+    /**
+     * Constructs the GraphBuilder and sets the OrderFillEvaluator used for evaluating order fills.
+     *
+     * @param OrderFillEvaluator|null $fillEvaluator Optional evaluator to use; when `null`, a new OrderFillEvaluator is created and used.
+     */
     public function __construct(?OrderFillEvaluator $fillEvaluator = null)
     {
         $this->fillEvaluator = $fillEvaluator ?? new OrderFillEvaluator();
     }
 
     /**
-     * @param iterable<Order> $orders
+     * Build a weighted directed graph representation from a collection of orders.
+     *
+     * Each node represents a currency and contains outgoing edges derived from orders.
+     * Non-Order values in the iterable are ignored.
+     *
+     * @param iterable<Order> $orders Iterable of Order objects to convert into graph edges.
      *
      * @psalm-param iterable<Order> $orders
      *
-     * @return Graph
+     * @return Graph Mapping of currency code to node data (`'currency'` and `'edges'`).
      *
      * @psalm-return Graph
      */
@@ -74,10 +84,17 @@ final class GraphBuilder
     }
 
     /**
-     * @param array<string, array{currency: string, edges: list<GraphEdge>}> &$graph
-     *
-     * @psalm-param array<string, array{currency: string, edges: list<GraphEdge>}> &$graph
-     */
+         * Ensure a graph node for the given currency exists in the provided graph.
+         *
+         * If a node for $currency is already present this function does nothing;
+         * otherwise it adds an entry with keys `currency` (the currency code) and
+         * `edges` (an empty list).
+         *
+         * @param array<string, array{currency: string, edges: list<GraphEdge>}> &$graph Graph map keyed by currency; will be modified in place.
+         *
+         * @psalm-param array<string, array{currency: string, edges: list<GraphEdge>}> &$graph
+         * @param string $currency Currency code for the node to ensure
+         */
     private function initializeNode(array &$graph, string $currency): void
     {
         if (array_key_exists($currency, $graph)) {
@@ -94,8 +111,9 @@ final class GraphBuilder
     }
 
     /**
-     * @return GraphEdge
+     * Build a graph edge representing the provided order between two currencies, including capacity ranges, effective rate, and fee-aware segments.
      *
+     * @return GraphEdge
      * @psalm-return GraphEdge
      */
     private function createEdge(Order $order, string $fromCurrency, string $toCurrency): array
@@ -143,13 +161,27 @@ final class GraphBuilder
     }
 
     /**
-     * @return list<array{
-     *     isMandatory: bool,
-     *     base: array{min: Money, max: Money},
-     *     quote: array{min: Money, max: Money},
-     *     grossBase: array{min: Money, max: Money},
-     * }>
-     */
+         * Builds capacity segments for an edge when order fees are present.
+         *
+         * Each returned segment describes a capacity range for base, quote and gross base amounts.
+         * - `isMandatory`: whether the segment is a required (fixed) allocation.
+         * - `base`, `quote`, `grossBase`: each an array with `min` and `max` Money values defining the segment bounds.
+         *
+         * @param Money $minBase Minimum net base amount for the edge.
+         * @param Money $maxBase Maximum net base amount for the edge.
+         * @param Money $minQuote Minimum quote amount corresponding to $minBase.
+         * @param Money $maxQuote Maximum quote amount corresponding to $maxBase.
+         * @param Money $minGrossBase Minimum gross base amount for the edge.
+         * @param Money $maxGrossBase Maximum gross base amount for the edge.
+         * @param bool $hasFees Whether the order has fees; when false an empty list is returned.
+         *
+         * @return list<array{
+         *     isMandatory: bool,
+         *     base: array{min: Money, max: Money},
+         *     quote: array{min: Money, max: Money},
+         *     grossBase: array{min: Money, max: Money},
+         * }>
+         */
     private function buildSegments(
         Money $minBase,
         Money $maxBase,
@@ -226,6 +258,13 @@ final class GraphBuilder
         return $segments;
     }
 
+    /**
+     * Return a zero-valued Money instance for the given currency and scale, reusing a cached instance if available.
+     *
+     * @param string $currency ISO currency code.
+     * @param int $scale Decimal scale (number of fraction digits) for the Money instance.
+     * @return Money A zero Money object for the specified currency and scale.
+     */
     private function zeroMoney(string $currency, int $scale): Money
     {
         $key = $currency.':'.$scale;
