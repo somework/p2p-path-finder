@@ -654,6 +654,52 @@ final class PathFinderInternalsTest extends TestCase
         self::assertNull($this->invokeFinderMethod($finder, 'edgeSupportsAmount', [$edge, $range]));
     }
 
+    public function test_edge_supports_amount_returns_zero_range_when_capacity_exhausted(): void
+    {
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
+        $edge = $this->createSellEdge([
+            'segments' => [
+                [
+                    'isMandatory' => false,
+                    'base' => [
+                        'min' => Money::zero('USD', 2),
+                        'max' => Money::zero('USD', 2),
+                    ],
+                    'quote' => [
+                        'min' => Money::zero('EUR', 2),
+                        'max' => Money::zero('EUR', 2),
+                    ],
+                    'grossBase' => [
+                        'min' => Money::zero('USD', 2),
+                        'max' => Money::zero('USD', 2),
+                    ],
+                ],
+            ],
+            'baseCapacity' => [
+                'min' => Money::zero('USD', 2),
+                'max' => Money::zero('USD', 2),
+            ],
+            'quoteCapacity' => [
+                'min' => Money::zero('EUR', 2),
+                'max' => Money::zero('EUR', 2),
+            ],
+            'grossBaseCapacity' => [
+                'min' => Money::zero('USD', 2),
+                'max' => Money::zero('USD', 2),
+            ],
+        ]);
+        $range = [
+            'min' => Money::zero('EUR', 2),
+            'max' => Money::zero('EUR', 2),
+        ];
+
+        $feasible = $this->invokeFinderMethod($finder, 'edgeSupportsAmount', [$edge, $range]);
+
+        self::assertNotNull($feasible);
+        self::assertTrue($feasible['min']->isZero());
+        self::assertTrue($feasible['max']->isZero());
+    }
+
     public function test_convert_edge_amount_clamps_values_below_source_minimum(): void
     {
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
