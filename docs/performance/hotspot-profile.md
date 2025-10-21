@@ -45,26 +45,26 @@ work attributable to this component” rather than a disjoint partition.
 
 | Component | Time % | Memory % | Notes | Suggested mitigation |
 | --- | ---:| ---:| --- | --- |
-| `PathFinderBench->benchFindBottleneckMandatoryMinima` | 20.0 | 7.9 | Harness cost for invoking the service across both datasets. | N/A (benchmark scaffolding). |
-| `GraphBuilder->build` | 4.4 | 4.9 | Repeatedly reinitialises the graph array and produces `Money::zero()` clones while wiring each order. | **P1.** Mutate the graph in-place (pass by reference) and cache zero-valued `Money` instances per currency/scale to cut copy churn. See [tracking issue](./issues/p1-graph-builder.md). |
-| `PathFinderService->findBestPaths` | 9.7 | 1.1 | Candidate callback allocates `MaterializedResult` DTOs, `PathOrderKey` objects, and performs tolerance checks even when results are discarded. | **P1.** Streamline materialisation by reusing buffers and only instantiating `PathOrderKey` once the candidate passes tolerance. See [tracking issue](./issues/p1-pathfinder-callback.md). |
-| `ExchangeRate` value-object creation in `setUp()` | 8.0 | 5.6 | Dataset bootstrap repeatedly hydrates immutable exchange rates for fixtures. | P2. Consider caching fixture `ExchangeRate` instances across runs or sharing the base order set between benchmarks. |
-| `FeeBreakdown` helpers (via `GraphBuilder->build`) | 8.2 | 0.9 | Populates fee breakdown arrays for every edge even when orders do not charge fees. | P2. Defer fee-segment construction until fees are present to shrink allocations. |
+| `PathFinderBench->benchFindBottleneckMandatoryMinima` | 19.6 | 8.0 | Harness cost for invoking the service across both datasets. | N/A (benchmark scaffolding). |
+| `GraphBuilder->build` | 5.9 | 0.4 | Mutating the graph by reference and reusing zero `Money` instances removes the copy-on-write churn from the old implementation. | **P1.** Confirmed fixed – see [issue](./issues/p1-graph-builder.md) for follow-up tweaks. |
+| `PathFinderService->findBestPaths` | 7.7 | 0.7 | Reworked materialisation keeps candidate DTOs on stack and defers allocations until tolerance checks pass. | **P1.** Acceptance criteria met – see [issue](./issues/p1-pathfinder-callback.md). |
+| `ExchangeRate` value-object creation in `setUp()` | 2.0 | <0.1 | Fixture bootstrap still hydrates immutable exchange rates for every run, though the absolute cost dropped after the service optimisations. | P2. Consider caching fixture `ExchangeRate` instances across runs or sharing the base order set between benchmarks. |
+| `FeeBreakdown` helpers (via `GraphBuilder->build`) | 0.5 | 0.2 | Fee resolution now short-circuits the zero-fee path, so the remaining cost comes from the handful of orders that still charge fees. | P3. Keep an eye on this if fee-heavy datasets are introduced. |
 
-Queue operations (`SearchStateQueue->insert` / `extract`) consumed <0.01% of the time
-on this dataset, confirming that the search frontier is tiny once guard rails prune
-most states.
+Queue operations (`SearchStateQueue->insert` / `extract`) consumed roughly 0.01% of
+the time on this dataset, confirming that the search frontier is tiny once guard
+rails prune most states.
 
 ### `bottleneck-high-fanout-hop-4`
 
 | Component | Time % | Memory % | Notes | Suggested mitigation |
 | --- | ---:| ---:| --- | --- |
-| `GraphBuilder->build` | 49.9 | 13.5 | Dominant cost. The combination of array copy-on-write and Money clones amplifies with the dense order book. | **P1.** Same optimisation as legacy dataset – mutate the graph structure by reference and reuse zero-valued `Money` instances. [Issue](./issues/p1-graph-builder.md). |
-| `PathFinderService->findBestPaths` | 51.2 | 12.4 | Candidate callback performs heavy array/object churn for every feasible path, and retains large `MaterializedResult` payloads until the final sort. | **P1.** Apply the materialisation refactor captured in [issue](./issues/p1-pathfinder-callback.md) to reuse buffers, drop unneeded candidate payloads, and avoid storing entire `candidate` arrays in the `PathOrderKey`. |
-| `BottleneckOrderBookFactory::createHighFanOut` | 20.1 | 1.6 | Fixture factory eagerly allocates the dense order book for each iteration. | P2. Provide a shared, memoised fixture in the benchmark to avoid rebuilding identical order books. |
-| `ExchangeRate` hydration | 2.9 | 5.1 | Same pressure as legacy dataset, amplified by the larger fixture set. | P2. Cache fixture exchange rates alongside the shared order book. |
-| `OrderSpendAnalyzer->filterOrders` | 0.3 | 0.0 | Minor cost compared to graph and materialisation but still scales with order count. | P3. Monitor after the P1 items land; not currently a bottleneck. |
-| `SearchStateQueue` operations | <0.01 | <0.01 | Queue push/pop remain negligible even under the fan-out stress test. | No action required; re-evaluate after other changes. |
+| `GraphBuilder->build` | 35.3 | 5.0 | In-place graph mutation and cached zero `Money` values cut runtime by ~30% and trimmed allocations substantially, but the dense order book still stresses this stage. | **P1.** Mitigation landed – see [issue](./issues/p1-graph-builder.md) for remaining nice-to-haves. |
+| `PathFinderService->findBestPaths` | 36.9 | 5.3 | The rewritten candidate callback now reuses buffers and skips premature DTO creation, halving the previous memory pressure. | **P1.** Acceptance criteria satisfied – see [issue](./issues/p1-pathfinder-callback.md). |
+| `BottleneckOrderBookFactory::createHighFanOut` | 26.0 | 1.7 | Fixture factory still rebuilds the dense order book every run; relative share grew now that search/materialisation are cheaper. | P2. Provide a shared, memoised fixture in the benchmark to avoid rebuilding identical order books. |
+| `ExchangeRate` hydration | 9.0 | 0.3 | Exchange-rate hydration now shows up because the dominant hotspots were reduced. | P2. Cache fixture exchange rates alongside the shared order book. |
+| `OrderSpendAnalyzer->filterOrders` | 0.4 | 0.0 | Remains a minor contributor even with higher fan-out. | P3. Monitor after the P1 items land; not currently a bottleneck. |
+| `SearchStateQueue` operations | <0.02 | <0.01 | Queue push/pop still register at the noise floor after the refactors. | No action required; re-evaluate after other changes. |
 
 ## Proposed mitigation backlog
 
