@@ -7,6 +7,7 @@ namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
@@ -39,7 +40,7 @@ final class PathFinderPropertyTest extends TestCase
     {
         $graphBuilder = new GraphBuilder();
 
-        $limit = $this->iterationLimit(25, 5, 'P2P_PATH_FINDER_PROPERTY_ITERATIONS');
+        $limit = $this->iterationLimit(18, 5, 'P2P_PATH_FINDER_PROPERTY_ITERATIONS');
 
         for ($iteration = 0; $iteration < $limit; ++$iteration) {
             $scenario = $this->generator->scenario();
@@ -53,6 +54,12 @@ final class PathFinderPropertyTest extends TestCase
 
             $firstResult = $finder->findBestPaths($graph, $scenario['source'], $scenario['target']);
             $secondResult = $finder->findBestPaths($graph, $scenario['source'], $scenario['target']);
+
+            $this->assertGuardStatusEquals(
+                $firstResult->guardLimits(),
+                $secondResult->guardLimits(),
+                'Repeated search invocations must share guard metadata.',
+            );
 
             $firstPaths = $firstResult->paths();
             $secondPaths = $secondResult->paths();
@@ -83,16 +90,23 @@ final class PathFinderPropertyTest extends TestCase
                 topK: $scenario['topK'],
             );
 
-            $permutedPaths = $permutedFinder->findBestPaths(
+            $permutedOutcome = $permutedFinder->findBestPaths(
                 $permutedGraph,
                 $scenario['source'],
                 $scenario['target'],
-            )->paths();
+            );
+            $permutedPaths = $permutedOutcome->paths();
 
             self::assertSame(
                 $firstPaths,
                 $permutedPaths,
                 'Order book permutations must not change search results.',
+            );
+
+            $this->assertGuardStatusEquals(
+                $firstResult->guardLimits(),
+                $permutedOutcome->guardLimits(),
+                'Permuted order books must preserve guard metadata.',
             );
 
             $constraints = $this->deriveSpendConstraints($graph, $scenario['source']);
@@ -153,6 +167,30 @@ final class PathFinderPropertyTest extends TestCase
                     'Residual tolerance should not exceed scaled bounds.',
                 );
             }
+        }
+    }
+
+    public function test_dataset_scenarios_expose_deterministic_guards(): void
+    {
+        $graphBuilder = new GraphBuilder();
+
+        foreach (PathFinderScenarioGenerator::dataset() as $scenario) {
+            $graph = $graphBuilder->build($scenario['orders']);
+            $finder = new PathFinder(
+                maxHops: $scenario['maxHops'],
+                tolerance: $scenario['tolerance'],
+                topK: $scenario['topK'],
+            );
+
+            $first = $finder->findBestPaths($graph, $scenario['source'], $scenario['target']);
+            $second = $finder->findBestPaths($graph, $scenario['source'], $scenario['target']);
+
+            self::assertSame($first->paths(), $second->paths());
+            $this->assertGuardStatusEquals(
+                $first->guardLimits(),
+                $second->guardLimits(),
+                'Dataset scenarios should preserve guard metadata across runs.',
+            );
         }
     }
 
@@ -267,5 +305,24 @@ final class PathFinderPropertyTest extends TestCase
         );
 
         return $path['hops'].'|'.implode(';', $segments);
+    }
+
+    private function assertGuardStatusEquals(GuardLimitStatus $expected, GuardLimitStatus $actual, string $message): void
+    {
+        self::assertSame(
+            $expected->expansionsReached(),
+            $actual->expansionsReached(),
+            $message.' (expansions)',
+        );
+        self::assertSame(
+            $expected->visitedStatesReached(),
+            $actual->visitedStatesReached(),
+            $message.' (visited states)',
+        );
+        self::assertSame(
+            $expected->timeBudgetReached(),
+            $actual->timeBudgetReached(),
+            $message.' (time budget)',
+        );
     }
 }

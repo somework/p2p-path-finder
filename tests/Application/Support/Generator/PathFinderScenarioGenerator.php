@@ -18,6 +18,7 @@ use function array_values;
 use function count;
 use function explode;
 use function max;
+use function min;
 use function range;
 use function str_pad;
 use function substr;
@@ -26,6 +27,10 @@ use const STR_PAD_LEFT;
 
 /**
  * Generates layered trading graphs to exercise PathFinder end-to-end behaviour.
+ *
+ * The generator favours dense graphs with tight tolerance windows and explicit
+ * mandatory minima so that property tests continuously exercise the guard rails
+ * around minimum fills and branching heuristics.
  */
 final class PathFinderScenarioGenerator
 {
@@ -35,7 +40,53 @@ final class PathFinderScenarioGenerator
     /**
      * @var non-empty-list<numeric-string>
      */
-    private const TOLERANCE_CHOICES = ['0.0', '0.01', '0.05', '0.10', '0.20'];
+    private const TOLERANCE_CHOICES = ['0.0', '0.005', '0.010', '0.020', '0.050'];
+
+    private const HEADROOM_DIVISOR = 12;
+
+    /**
+     * Scenario templates used by property tests to guarantee coverage of
+     * mandatory minima, tight tolerances and wide branching.
+     *
+     * @var non-empty-list<array{
+     *     label: non-empty-string,
+     *     depth: positive-int,
+     *     branching: array{min: positive-int, max: positive-int},
+     *     mandatoryCount: positive-int,
+     *     toleranceChoices: non-empty-list<numeric-string>,
+     *     topKRange: array{min: positive-int, max: positive-int},
+     *     seed: positive-int,
+     * }>
+     */
+    private const SCENARIO_TEMPLATES = [
+        [
+            'label' => 'fanout-4-hop-3',
+            'depth' => 3,
+            'branching' => ['min' => 3, 'max' => 4],
+            'mandatoryCount' => 3,
+            'toleranceChoices' => ['0.0', '0.005', '0.010'],
+            'topKRange' => ['min' => 2, 'max' => 4],
+            'seed' => 17,
+        ],
+        [
+            'label' => 'mandatory-hop-4',
+            'depth' => 4,
+            'branching' => ['min' => 3, 'max' => 3],
+            'mandatoryCount' => 4,
+            'toleranceChoices' => ['0.0', '0.005', '0.010', '0.015'],
+            'topKRange' => ['min' => 2, 'max' => 5],
+            'seed' => 29,
+        ],
+        [
+            'label' => 'wide-fanout-bounded-headroom',
+            'depth' => 3,
+            'branching' => ['min' => 3, 'max' => 5],
+            'mandatoryCount' => 2,
+            'toleranceChoices' => ['0.0', '0.010', '0.020', '0.050'],
+            'topKRange' => ['min' => 3, 'max' => 5],
+            'seed' => 41,
+        ],
+    ];
 
     /**
      * @var non-empty-list<numeric-string>
@@ -68,25 +119,34 @@ final class PathFinderScenarioGenerator
      */
     public function scenario(): array
     {
-        $depth = $this->randomizer->getInt(1, 4);
-        $fanout = $this->randomizer->getInt(1, 3);
-
-        $orders = $this->buildLayeredOrders($depth, $fanout);
-        $maxPathLength = $depth + 1;
-
-        $maxHops = $this->randomizer->getInt(1, $maxPathLength + 1);
-        $maxPaths = max(1, $fanout ** $depth);
-        $topK = $this->randomizer->getInt(1, min(5, $maxPaths));
-
-        return [
-            'orders' => $orders,
-            'source' => 'SRC',
-            'target' => 'DST',
-            'maxHops' => $maxHops,
-            'topK' => $topK,
-            'tolerance' => $this->randomTolerance(),
-            'scaleBy' => $this->deterministicScaleFactor($orders, $maxHops, $topK),
+        $template = self::SCENARIO_TEMPLATES[
+            $this->randomizer->getInt(0, count(self::SCENARIO_TEMPLATES) - 1)
         ];
+
+        return $this->scenarioFromTemplate($template);
+    }
+
+    /**
+     * @return list<array{
+     *     orders: list<Order>,
+     *     source: non-empty-string,
+     *     target: non-empty-string,
+     *     maxHops: positive-int,
+     *     topK: positive-int,
+     *     tolerance: numeric-string,
+     *     scaleBy: numeric-string,
+     * }>
+     */
+    public static function dataset(): array
+    {
+        $scenarios = [];
+
+        foreach (self::SCENARIO_TEMPLATES as $template) {
+            $generator = new self(new Randomizer(new Mt19937($template['seed'])));
+            $scenarios[] = $generator->scenarioFromTemplate($template);
+        }
+
+        return $scenarios;
     }
 
     /**
@@ -113,7 +173,7 @@ final class PathFinderScenarioGenerator
     /**
      * @return list<Order>
      */
-    private function buildLayeredOrders(int $depth, int $fanout): array
+    private function buildLayeredOrders(int $depth, array $branching, int $mandatoryQuota): array
     {
         $orders = [];
         $currentLayer = ['SRC'];
@@ -123,12 +183,11 @@ final class PathFinderScenarioGenerator
             $nextLayer = [];
 
             foreach ($currentLayer as $currency) {
-                $branches = $this->randomizer->getInt(1, $fanout);
+                $branches = $this->randomizer->getInt($branching['min'], $branching['max']);
 
                 for ($branch = 0; $branch < $branches; ++$branch) {
                     $nextCurrency = $this->syntheticCurrency($cursor++);
-                    $minAmount = $this->randomAmount(self::AMOUNT_SCALE, false);
-                    $maxAmount = $this->randomAmountGreaterThan(self::AMOUNT_SCALE, $minAmount);
+                    [$minAmount, $maxAmount, $mandatoryQuota] = $this->boundsForEdge($mandatoryQuota);
                     $rate = $this->randomPositiveDecimal(self::RATE_SCALE);
                     $feePolicy = $this->maybeFeePolicy();
 
@@ -164,8 +223,7 @@ final class PathFinderScenarioGenerator
         }
 
         foreach ($currentLayer as $currency) {
-            $minAmount = $this->randomAmount(self::AMOUNT_SCALE, false);
-            $maxAmount = $this->randomAmountGreaterThan(self::AMOUNT_SCALE, $minAmount);
+            [$minAmount, $maxAmount, $mandatoryQuota] = $this->boundsForEdge($mandatoryQuota);
             $rate = $this->randomPositiveDecimal(self::RATE_SCALE);
             $feePolicy = $this->maybeFeePolicy();
 
@@ -198,11 +256,65 @@ final class PathFinderScenarioGenerator
     }
 
     /**
-     * @return non-empty-string
+     * @param array{
+     *     label: non-empty-string,
+     *     depth: positive-int,
+     *     branching: array{min: positive-int, max: positive-int},
+     *     mandatoryCount: positive-int,
+     *     toleranceChoices: non-empty-list<numeric-string>,
+     *     topKRange: array{min: positive-int, max: positive-int},
+     *     seed: positive-int,
+     * } $template
+     *
+     * @return array{
+     *     orders: list<Order>,
+     *     source: non-empty-string,
+     *     target: non-empty-string,
+     *     maxHops: positive-int,
+     *     topK: positive-int,
+     *     tolerance: numeric-string,
+     *     scaleBy: numeric-string,
+     * }
      */
-    private function randomTolerance(): string
+    private function scenarioFromTemplate(array $template): array
     {
-        return $this->toleranceChoice($this->randomizer->getInt(0, count(self::TOLERANCE_CHOICES) - 1));
+        $orders = $this->buildLayeredOrders(
+            $template['depth'],
+            $template['branching'],
+            $template['mandatoryCount'],
+        );
+
+        $maxPathLength = $template['depth'] + 1;
+        $upperHopLimit = max($maxPathLength + 1, 2);
+        $lowerHopLimit = min(2, $upperHopLimit);
+        $maxHops = $this->randomizer->getInt($lowerHopLimit, $upperHopLimit);
+
+        $maxPaths = max(1, $template['branching']['max'] ** $template['depth']);
+        $topKUpperBound = min($template['topKRange']['max'], $maxPaths);
+        $topKLowerBound = min($template['topKRange']['min'], $topKUpperBound);
+        $topK = $this->randomizer->getInt($topKLowerBound, $topKUpperBound);
+
+        $tolerance = $this->randomTolerance($template['toleranceChoices']);
+
+        return [
+            'orders' => $orders,
+            'source' => 'SRC',
+            'target' => 'DST',
+            'maxHops' => $maxHops,
+            'topK' => $topK,
+            'tolerance' => $tolerance,
+            'scaleBy' => $this->deterministicScaleFactor($orders, $maxHops, $topK),
+        ];
+    }
+
+    /**
+     * @return numeric-string
+     */
+    private function randomTolerance(array $choices): string
+    {
+        $index = $this->randomizer->getInt(0, count($choices) - 1);
+
+        return $choices[$index];
     }
 
     /**
@@ -221,6 +333,39 @@ final class PathFinderScenarioGenerator
     private function maybeFeePolicy(): ?FeePolicy
     {
         return $this->feePolicyForChoice($this->randomizer->getInt(0, 4));
+    }
+
+    /**
+     * @return array{0: numeric-string, 1: numeric-string, 2: int}
+     */
+    private function boundsForEdge(int $mandatoryQuota): array
+    {
+        $forceMandatory = $mandatoryQuota > 0;
+        [$minAmount, $maxAmount] = $this->randomBounds(self::AMOUNT_SCALE, $forceMandatory);
+
+        if ($forceMandatory) {
+            --$mandatoryQuota;
+        }
+
+        return [$minAmount, $maxAmount, $mandatoryQuota];
+    }
+
+    /**
+     * @return array{0: numeric-string, 1: numeric-string}
+     */
+    private function randomBounds(int $scale, bool $forceMandatory): array
+    {
+        $minAmount = $this->randomAmount($scale, false);
+
+        if ($forceMandatory) {
+            return [$minAmount, $minAmount];
+        }
+
+        $minUnits = $this->parseUnits($minAmount, $scale);
+        $headroomUnits = $this->randomizer->getInt(1, max(1, intdiv($minUnits, self::HEADROOM_DIVISOR)));
+        $maxAmount = $this->formatUnits($minUnits + $headroomUnits, $scale);
+
+        return [$minAmount, $maxAmount];
     }
 
     /**
