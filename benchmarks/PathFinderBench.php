@@ -34,10 +34,19 @@ class PathFinderBench
      */
     private array $baseOrders;
 
+    /**
+     * @var array<string, OrderBook>
+     */
+    private array $bottleneckOrderBooks = [];
+
     public function setUp(): void
     {
         $this->service = new PathFinderService(new GraphBuilder());
         $this->baseOrders = $this->createBaseOrderSet();
+        $this->bottleneckOrderBooks = [
+            'create' => BottleneckOrderBookFactory::create(),
+            'createHighFanOut' => BottleneckOrderBookFactory::createHighFanOut(),
+        ];
     }
 
     /**
@@ -99,7 +108,7 @@ class PathFinderBench
     public function benchFindBottleneckMandatoryMinima(array $params): void
     {
         $factory = $params['factory'];
-        $orderBook = BottleneckOrderBookFactory::$factory();
+        $orderBook = clone $this->bottleneckOrderBooks[$factory];
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('SRC', $params['spend'], 2))
             ->withToleranceBounds('0.00', '0.00')
