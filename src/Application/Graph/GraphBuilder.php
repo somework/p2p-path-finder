@@ -24,6 +24,10 @@ use function array_key_exists;
 final class GraphBuilder
 {
     private OrderFillEvaluator $fillEvaluator;
+    /**
+     * @var array<string, Money>
+     */
+    private array $zeroMoneyCache = [];
 
     public function __construct(?OrderFillEvaluator $fillEvaluator = null)
     {
@@ -55,13 +59,10 @@ final class GraphBuilder
                 OrderSide::SELL => [$pair->quote(), $pair->base()],
             };
 
-            $graph = $this->initializeNode($graph, $fromCurrency);
-            $graph = $this->initializeNode($graph, $toCurrency);
+            $this->initializeNode($graph, $fromCurrency);
+            $this->initializeNode($graph, $toCurrency);
 
-            /** @var array{currency: string, edges: list<GraphEdge>} $fromNode */
-            $fromNode = $graph[$fromCurrency];
-            $fromNode['edges'][] = $this->createEdge($order, $fromCurrency, $toCurrency);
-            $graph[$fromCurrency] = $fromNode;
+            $graph[$fromCurrency]['edges'][] = $this->createEdge($order, $fromCurrency, $toCurrency);
         }
 
         return $graph;
@@ -71,15 +72,11 @@ final class GraphBuilder
      * @param Graph $graph
      *
      * @psalm-param Graph $graph
-     *
-     * @return Graph
-     *
-     * @psalm-return Graph
      */
-    private function initializeNode(array $graph, string $currency): array
+    private function initializeNode(array &$graph, string $currency): void
     {
         if (array_key_exists($currency, $graph)) {
-            return $graph;
+            return;
         }
 
         /** @psalm-var list<GraphEdge> $edges */
@@ -89,8 +86,6 @@ final class GraphBuilder
             'currency' => $currency,
             'edges' => $edges,
         ];
-
-        return $graph;
     }
 
     /**
@@ -107,6 +102,10 @@ final class GraphBuilder
 
         $minFill = $this->fillEvaluator->evaluate($order, $minBase);
         $maxFill = $this->fillEvaluator->evaluate($order, $maxBase);
+
+        $minFees = $minFill['fees'];
+        $maxFees = $maxFill['fees'];
+        $hasFees = !$minFees->isZero() || !$maxFees->isZero();
 
         return [
             'from' => $fromCurrency,
@@ -133,6 +132,7 @@ final class GraphBuilder
                 $maxFill['quote'],
                 $minFill['grossBase'],
                 $maxFill['grossBase'],
+                $hasFees,
             ),
         ];
     }
@@ -151,8 +151,13 @@ final class GraphBuilder
         Money $minQuote,
         Money $maxQuote,
         Money $minGrossBase,
-        Money $maxGrossBase
+        Money $maxGrossBase,
+        bool $hasFees
     ): array {
+        if (!$hasFees) {
+            return [];
+        }
+
         $segments = [];
 
         if (!$minBase->isZero()) {
@@ -181,15 +186,15 @@ final class GraphBuilder
             $segments[] = [
                 'isMandatory' => false,
                 'base' => [
-                    'min' => Money::zero($baseRemainder->currency(), $baseRemainder->scale()),
+                    'min' => $this->zeroMoney($baseRemainder->currency(), $baseRemainder->scale()),
                     'max' => $baseRemainder,
                 ],
                 'quote' => [
-                    'min' => Money::zero($quoteRemainder->currency(), $quoteRemainder->scale()),
+                    'min' => $this->zeroMoney($quoteRemainder->currency(), $quoteRemainder->scale()),
                     'max' => $quoteRemainder,
                 ],
                 'grossBase' => [
-                    'min' => Money::zero($grossBaseRemainder->currency(), $grossBaseRemainder->scale()),
+                    'min' => $this->zeroMoney($grossBaseRemainder->currency(), $grossBaseRemainder->scale()),
                     'max' => $grossBaseRemainder,
                 ],
             ];
@@ -199,21 +204,32 @@ final class GraphBuilder
             $segments[] = [
                 'isMandatory' => false,
                 'base' => [
-                    'min' => Money::zero($minBase->currency(), $minBase->scale()),
-                    'max' => Money::zero($maxBase->currency(), $maxBase->scale()),
+                    'min' => $this->zeroMoney($minBase->currency(), $minBase->scale()),
+                    'max' => $this->zeroMoney($maxBase->currency(), $maxBase->scale()),
                 ],
                 'quote' => [
-                    'min' => Money::zero($minQuote->currency(), $minQuote->scale()),
-                    'max' => Money::zero($maxQuote->currency(), $maxQuote->scale()),
+                    'min' => $this->zeroMoney($minQuote->currency(), $minQuote->scale()),
+                    'max' => $this->zeroMoney($maxQuote->currency(), $maxQuote->scale()),
                 ],
                 'grossBase' => [
-                    'min' => Money::zero($minGrossBase->currency(), $minGrossBase->scale()),
-                    'max' => Money::zero($maxGrossBase->currency(), $maxGrossBase->scale()),
+                    'min' => $this->zeroMoney($minGrossBase->currency(), $minGrossBase->scale()),
+                    'max' => $this->zeroMoney($maxGrossBase->currency(), $maxGrossBase->scale()),
                 ],
             ];
         }
 
         return $segments;
+    }
+
+    private function zeroMoney(string $currency, int $scale): Money
+    {
+        $key = $currency.':'.$scale;
+
+        if (!isset($this->zeroMoneyCache[$key])) {
+            $this->zeroMoneyCache[$key] = Money::zero($currency, $scale);
+        }
+
+        return $this->zeroMoneyCache[$key];
     }
 
     /**
