@@ -750,8 +750,17 @@ final class PathFinder
     private function edgeSupportsAmount(array $edge, array $range): ?array
     {
         $key = OrderSide::BUY === $edge['orderSide'] ? 'grossBase' : 'quote';
+        $capacity = OrderSide::BUY === $edge['orderSide']
+            ? $edge['grossBaseCapacity']
+            : $edge['quoteCapacity'];
 
-        $scale = max($range['min']->scale(), $range['max']->scale());
+        $scale = max(
+            $range['min']->scale(),
+            $range['max']->scale(),
+            $capacity['min']->scale(),
+            $capacity['max']->scale(),
+        );
+
         foreach ($edge['segments'] as $segment) {
             $scale = max(
                 $scale,
@@ -767,15 +776,20 @@ final class PathFinder
             [$requestedMin, $requestedMax] = [$requestedMax, $requestedMin];
         }
 
-        $minimum = Money::zero($requestedMin->currency(), $scale);
-        $maximum = Money::zero($requestedMin->currency(), $scale);
+        if ([] === $edge['segments']) {
+            $minimum = $capacity['min']->withScale($scale);
+            $maximum = $capacity['max']->withScale($scale);
+        } else {
+            $minimum = Money::zero($requestedMin->currency(), $scale);
+            $maximum = Money::zero($requestedMin->currency(), $scale);
 
-        foreach ($edge['segments'] as $segment) {
-            if ($segment['isMandatory']) {
-                $minimum = $minimum->add($segment[$key]['min']->withScale($scale));
+            foreach ($edge['segments'] as $segment) {
+                if ($segment['isMandatory']) {
+                    $minimum = $minimum->add($segment[$key]['min']->withScale($scale));
+                }
+
+                $maximum = $maximum->add($segment[$key]['max']->withScale($scale));
             }
-
-            $maximum = $maximum->add($segment[$key]['max']->withScale($scale));
         }
 
         if ($maximum->isZero()) {

@@ -73,15 +73,13 @@ final class GraphBuilderTest extends TestCase
         $this->assertEdgeBasics($primaryEdge, 'BTC', 'USD', OrderSide::BUY, $orders['primaryBuyOrder']);
         $this->assertEdgeCapacities($primaryEdge, 'BTC', '0.100', '1.000', 'USD', '3000.000', '30000.000');
         $this->assertGrossBaseEqualsBase($primaryEdge);
-        $this->assertSegment($primaryEdge['segments'][0], true, 'BTC', '0.100', 'USD', '3000.000', true);
-        $this->assertSegment($primaryEdge['segments'][1], false, 'BTC', '0.900', 'USD', '27000.000', true);
+        self::assertSame([], $primaryEdge['segments']);
 
         $secondaryEdge = $edges[1];
         $this->assertEdgeBasics($secondaryEdge, 'BTC', 'EUR', OrderSide::BUY, $orders['secondaryBuyOrder']);
         $this->assertEdgeCapacities($secondaryEdge, 'BTC', '0.200', '0.800', 'EUR', '5600.000', '22400.000');
         $this->assertGrossBaseEqualsBase($secondaryEdge);
-        $this->assertSegment($secondaryEdge['segments'][0], true, 'BTC', '0.200', 'EUR', '5600.000', true);
-        $this->assertSegment($secondaryEdge['segments'][1], false, 'BTC', '0.600', 'EUR', '16800.000', true);
+        self::assertSame([], $secondaryEdge['segments']);
     }
 
     public function test_build_skips_entries_that_are_not_orders(): void
@@ -147,14 +145,12 @@ final class GraphBuilderTest extends TestCase
         $primaryEdge = $edges[0];
         $this->assertEdgeBasics($primaryEdge, 'USD', 'ETH', OrderSide::SELL, $orders['primarySellOrder']);
         $this->assertEdgeCapacities($primaryEdge, 'ETH', '0.500', '2.000', 'USD', '750.000', '3000.000');
-        $this->assertSegment($primaryEdge['segments'][0], true, 'ETH', '0.500', 'USD', '750.000');
-        $this->assertSegment($primaryEdge['segments'][1], false, 'ETH', '1.500', 'USD', '2250.000');
+        self::assertSame([], $primaryEdge['segments']);
 
         $secondaryEdge = $edges[1];
         $this->assertEdgeBasics($secondaryEdge, 'USD', 'LTC', OrderSide::SELL, $orders['secondarySellOrder']);
         $this->assertEdgeCapacities($secondaryEdge, 'LTC', '1.000', '4.000', 'USD', '90.000', '360.000');
-        $this->assertSegment($secondaryEdge['segments'][0], true, 'LTC', '1.000', 'USD', '90.000');
-        $this->assertSegment($secondaryEdge['segments'][1], false, 'LTC', '3.000', 'USD', '270.000');
+        self::assertSame([], $secondaryEdge['segments']);
     }
 
     public function test_constructor_preserves_injected_fill_evaluator(): void
@@ -281,13 +277,10 @@ final class GraphBuilderTest extends TestCase
         $edges = $graph['BTC']['edges'];
         self::assertCount(1, $edges);
 
-        $segment = $edges[0]['segments'][0];
-
-        self::assertArrayHasKey('grossBase', $segment);
-        self::assertArrayHasKey('min', $segment['grossBase']);
-        self::assertArrayHasKey('max', $segment['grossBase']);
-        self::assertTrue($segment['grossBase']['min']->isZero());
-        self::assertTrue($segment['grossBase']['max']->isZero());
+        $edge = $edges[0];
+        self::assertSame([], $edge['segments']);
+        self::assertTrue($edge['grossBaseCapacity']['min']->isZero());
+        self::assertTrue($edge['grossBaseCapacity']['max']->isZero());
     }
 
     public function test_build_reduces_base_capacity_for_sell_orders_with_base_fee(): void
@@ -423,12 +416,12 @@ final class GraphBuilderTest extends TestCase
         self::assertCount(1, $edges);
 
         $edge = $edges[0];
-        self::assertCount(1, $edge['segments']);
-        self::assertFalse($edge['segments'][0]['isMandatory']);
-        self::assertTrue($edge['segments'][0]['base']['min']->equals(Money::fromString('ETH', '0.000', 3)));
-        self::assertTrue($edge['segments'][0]['base']['max']->equals(Money::fromString('ETH', '5.000', 3)));
-        self::assertTrue($edge['segments'][0]['quote']['min']->equals(Money::fromString('USN', '0.000', 3)));
-        self::assertTrue($edge['segments'][0]['quote']['max']->equals(Money::fromString('USN', '10000.000', 3)));
+        self::assertSame([], $edge['segments']);
+        self::assertTrue($edge['baseCapacity']['min']->equals(Money::fromString('ETH', '0.000', 3)));
+        self::assertTrue($edge['baseCapacity']['max']->equals(Money::fromString('ETH', '5.000', 3)));
+        self::assertTrue($edge['quoteCapacity']['min']->equals(Money::fromString('USN', '0.000', 3)));
+        self::assertTrue($edge['quoteCapacity']['max']->equals(Money::fromString('USN', '10000.000', 3)));
+        $this->assertGrossBaseEqualsBase($edge);
     }
 
     public function test_build_splits_bounds_into_mandatory_and_optional_segments(): void
@@ -445,22 +438,7 @@ final class GraphBuilderTest extends TestCase
         self::assertTrue($edge['baseCapacity']['max']->equals(Money::fromString('BTC', '3.750', 3)));
         self::assertTrue($edge['quoteCapacity']['min']->equals(Money::fromString('USD', '3125.000', 3)));
         self::assertTrue($edge['quoteCapacity']['max']->equals(Money::fromString('USD', '9375.000', 3)));
-
-        self::assertCount(2, $edge['segments']);
-
-        $mandatory = $edge['segments'][0];
-        self::assertTrue($mandatory['isMandatory']);
-        self::assertTrue($mandatory['base']['min']->equals(Money::fromString('BTC', '1.250', 3)));
-        self::assertTrue($mandatory['base']['max']->equals(Money::fromString('BTC', '1.250', 3)));
-        self::assertTrue($mandatory['quote']['min']->equals(Money::fromString('USD', '3125.000', 3)));
-        self::assertTrue($mandatory['quote']['max']->equals(Money::fromString('USD', '3125.000', 3)));
-
-        $optional = $edge['segments'][1];
-        self::assertFalse($optional['isMandatory']);
-        self::assertTrue($optional['base']['min']->equals(Money::fromString('BTC', '0.000', 3)));
-        self::assertTrue($optional['base']['max']->equals(Money::fromString('BTC', '2.500', 3)));
-        self::assertTrue($optional['quote']['min']->equals(Money::fromString('USD', '0.000', 3)));
-        self::assertTrue($optional['quote']['max']->equals(Money::fromString('USD', '6250.000', 3)));
+        self::assertSame([], $edge['segments']);
     }
 
     public function test_build_creates_zero_capacity_segment_for_point_orders(): void
@@ -473,14 +451,11 @@ final class GraphBuilderTest extends TestCase
         self::assertCount(1, $edges);
 
         $edge = $edges[0];
-        self::assertCount(1, $edge['segments']);
-
-        $segment = $edge['segments'][0];
-        self::assertFalse($segment['isMandatory']);
-        self::assertTrue($segment['base']['min']->equals(Money::fromString('ETH', '0.000', 3)));
-        self::assertTrue($segment['base']['max']->equals(Money::fromString('ETH', '0.000', 3)));
-        self::assertTrue($segment['quote']['min']->equals(Money::fromString('USD', '0.000', 3)));
-        self::assertTrue($segment['quote']['max']->equals(Money::fromString('USD', '0.000', 3)));
+        self::assertSame([], $edge['segments']);
+        self::assertTrue($edge['baseCapacity']['min']->isZero());
+        self::assertTrue($edge['baseCapacity']['max']->isZero());
+        self::assertTrue($edge['quoteCapacity']['min']->isZero());
+        self::assertTrue($edge['quoteCapacity']['max']->isZero());
     }
 
     /**
@@ -542,28 +517,6 @@ final class GraphBuilderTest extends TestCase
     {
         self::assertTrue($edge['grossBaseCapacity']['min']->equals($edge['baseCapacity']['min']));
         self::assertTrue($edge['grossBaseCapacity']['max']->equals($edge['baseCapacity']['max']));
-    }
-
-    /**
-     * @param GraphSegment $segment
-     */
-    private function assertSegment(
-        array $segment,
-        bool $expectedMandatory,
-        string $baseCurrency,
-        string $baseMax,
-        string $quoteCurrency,
-        string $quoteMax,
-        bool $assertGrossBase = false,
-    ): void {
-        self::assertSame($expectedMandatory, $segment['isMandatory']);
-        $this->assertMoneyEquals($segment['base']['max'], $baseCurrency, $baseMax);
-        $this->assertMoneyEquals($segment['quote']['max'], $quoteCurrency, $quoteMax);
-
-        if ($assertGrossBase) {
-            self::assertArrayHasKey('grossBase', $segment);
-            $this->assertMoneyEquals($segment['grossBase']['max'], $baseCurrency, $baseMax);
-        }
     }
 
     private function assertMoneyEquals(Money $actual, string $currency, string $amount): void

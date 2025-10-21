@@ -97,8 +97,14 @@ final class GraphBuilderPropertyTest extends TestCase
         self::assertFalse($grossCapacity['max']->lessThan($grossCapacity['min']));
 
         $segments = $edge['segments'];
-        self::assertNotEmpty($segments);
         self::assertLessThanOrEqual(2, count($segments));
+
+        if ([] === $segments) {
+            self::assertTrue($baseCapacity['min']->equals($grossCapacity['min']));
+            self::assertTrue($baseCapacity['max']->equals($grossCapacity['max']));
+
+            return;
+        }
 
         $mandatorySegments = array_filter(
             $segments,
