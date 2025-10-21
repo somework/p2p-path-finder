@@ -11,12 +11,41 @@ use function ord;
 
 final class BottleneckOrderBookFactory
 {
+    private static ?OrderBook $bottleneckOrderBook = null;
+
+    private static ?OrderBook $highFanOutOrderBook = null;
+
     /**
      * Builds a deterministic order book where every hop has tight bounds around
      * a large mandatory minimum. The optional headroom is intentionally
      * constrained to stress capacity checks in the path finder.
      */
     public static function create(): OrderBook
+    {
+        if (null === self::$bottleneckOrderBook) {
+            self::$bottleneckOrderBook = self::buildBottleneckOrderBook();
+        }
+
+        return clone self::$bottleneckOrderBook;
+    }
+
+    /**
+     * Builds a wider mandatory-minimum stress graph where each branch enforces
+     * a high minimum and only a narrow amount of headroom. The topology
+     * contains three layers of fan-out so the path finder must aggregate the
+     * tight minima across long branches and choose between similarly
+     * constrained alternatives.
+     */
+    public static function createHighFanOut(): OrderBook
+    {
+        if (null === self::$highFanOutOrderBook) {
+            self::$highFanOutOrderBook = self::buildHighFanOutOrderBook();
+        }
+
+        return clone self::$highFanOutOrderBook;
+    }
+
+    private static function buildBottleneckOrderBook(): OrderBook
     {
         $orders = [
             OrderFactory::sell('SRC', 'HUBA', '120.000', '122.000', '1.000', 3, 3),
@@ -30,14 +59,7 @@ final class BottleneckOrderBookFactory
         return new OrderBook($orders);
     }
 
-    /**
-     * Builds a wider mandatory-minimum stress graph where each branch enforces
-     * a high minimum and only a narrow amount of headroom. The topology
-     * contains three layers of fan-out so the path finder must aggregate the
-     * tight minima across long branches and choose between similarly
-     * constrained alternatives.
-     */
-    public static function createHighFanOut(): OrderBook
+    private static function buildHighFanOutOrderBook(): OrderBook
     {
         $orders = [];
 
