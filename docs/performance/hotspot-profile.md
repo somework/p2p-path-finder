@@ -17,7 +17,7 @@ scenario defined in [`benchmarks/PathFinderBench.php`](../../benchmarks/PathFind
 with the aggregate report and force Xdebug's profiler so that inclusive time and
 allocation data is written into Cachegrind files under `.xdebug/`:
 
-```
+```bash
 php -d xdebug.mode=profile \
     -d xdebug.start_with_request=yes \
     -d xdebug.output_dir=.xdebug \
