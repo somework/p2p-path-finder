@@ -14,6 +14,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
+use SomeWork\P2PPathFinder\Application\Service\MaterializedResult;
 use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
@@ -196,56 +197,33 @@ final class PathFinderServicePropertyTest extends TestCase
         );
 
         $entries = [
-            [
-                'cost' => '0.100000000000000000',
-                'hops' => 2,
-                'routeSignature' => 'SRC->ALP->DST',
-                'order' => 0,
-                'result' => $firstResult,
-                'orderKey' => new PathOrderKey(
-                    '0.100000000000000000',
-                    2,
-                    'SRC->ALP->DST',
-                    0,
-                    ['pathResult' => $firstResult],
-                ),
-            ],
-            [
-                'cost' => '0.100000000000000000',
-                'hops' => 2,
-                'routeSignature' => 'SRC->BET->DST',
-                'order' => 1,
-                'result' => $secondResult,
-                'orderKey' => new PathOrderKey(
-                    '0.100000000000000000',
-                    2,
-                    'SRC->BET->DST',
-                    1,
-                    ['pathResult' => $secondResult],
-                ),
-            ],
-            [
-                'cost' => '0.100000000000000000',
-                'hops' => 2,
-                'routeSignature' => 'SRC->CHI->DST',
-                'order' => 2,
-                'result' => $thirdResult,
-                'orderKey' => new PathOrderKey(
-                    '0.100000000000000000',
-                    2,
-                    'SRC->CHI->DST',
-                    2,
-                    ['pathResult' => $thirdResult],
-                ),
-            ],
+            new MaterializedResult(
+                $firstResult,
+                new PathOrderKey('0.100000000000000000', 2, 'SRC->ALP->DST', 0),
+            ),
+            new MaterializedResult(
+                $secondResult,
+                new PathOrderKey('0.100000000000000000', 2, 'SRC->BET->DST', 1),
+            ),
+            new MaterializedResult(
+                $thirdResult,
+                new PathOrderKey('0.100000000000000000', 2, 'SRC->CHI->DST', 2),
+            ),
         ];
 
         $sorter->invokeArgs($service, [&$entries]);
 
         self::assertSame(
             ['SRC->CHI->DST', 'SRC->BET->DST', 'SRC->ALP->DST'],
-            array_map(static fn (array $entry): string => $entry['routeSignature'], $entries),
+            array_map(
+                static fn (MaterializedResult $entry): string => $entry->orderKey()->routeSignature(),
+                $entries,
+            ),
         );
+
+        foreach ($entries as $entry) {
+            self::assertSame([], $entry->orderKey()->payload(), 'Order key payload should remain empty.');
+        }
     }
 
     public function test_dataset_scenarios_remain_deterministic(): void

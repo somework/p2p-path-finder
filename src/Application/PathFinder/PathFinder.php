@@ -698,7 +698,6 @@ final class PathFinder
                 $entry['candidate']['hops'],
                 $entry['routeSignature'],
                 $entry['order'],
-                ['candidate' => $entry['candidate']],
             );
             $collected[] = $entry;
         }

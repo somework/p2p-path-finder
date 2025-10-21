@@ -20,6 +20,7 @@ use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
+use function array_map;
 use function implode;
 use function sprintf;
 use function strtoupper;
@@ -35,24 +36,6 @@ use function usort;
  * @psalm-import-type Candidate from PathFinder
  * @psalm-import-type Graph from PathFinder
  * @psalm-import-type SpendConstraints from PathFinder
- *
- * @psalm-type MaterializedResultEntry = array{
- *     cost: numeric-string,
- *     hops: int,
- *     routeSignature: string,
- *     order: int,
- *     result: PathResult,
- *     orderKey: PathOrderKey,
- * }
- *
- * @phpstan-type MaterializedResultEntry array{
- *     cost: string,
- *     hops: int,
- *     routeSignature: string,
- *     order: int,
- *     result: PathResult,
- *     orderKey: PathOrderKey,
- * }
  */
 final class PathFinderService
 {
@@ -198,7 +181,7 @@ final class PathFinderService
         $runner = $runnerFactory($config);
 
         /**
-         * @var list<MaterializedResultEntry> $materializedResults
+         * @var list<MaterializedResult> $materializedResults
          */
         $materializedResults = [];
         $resultOrder = 0;
@@ -265,24 +248,14 @@ final class PathFinderService
                     $materialized['feeBreakdown'],
                 );
 
-                $materializedResults[] = [
-                    'cost' => $candidate['cost'],
-                    'hops' => $candidate['hops'],
-                    'routeSignature' => $routeSignature,
-                    'order' => $resultOrder,
-                    'result' => $result,
-                    'orderKey' => new PathOrderKey(
-                        $candidate['cost'],
-                        $candidate['hops'],
-                        $routeSignature,
-                        $resultOrder,
-                        [
-                            'candidate' => $candidate,
-                            'materialized' => $materialized,
-                            'pathResult' => $result,
-                        ],
-                    ),
-                ];
+                $orderKey = new PathOrderKey(
+                    $candidate['cost'],
+                    $candidate['hops'],
+                    $routeSignature,
+                    $resultOrder,
+                );
+
+                $materializedResults[] = new MaterializedResult($result, $orderKey);
 
                 ++$resultOrder;
 
@@ -304,7 +277,7 @@ final class PathFinderService
 
         return new SearchOutcome(
             array_map(
-                static fn (array $entry): PathResult => $entry['result'],
+                static fn (MaterializedResult $entry): PathResult => $entry->result(),
                 $materializedResults,
             ),
             $guardLimits,
@@ -367,20 +340,17 @@ final class PathFinderService
     }
 
     /**
-     * @param list<MaterializedResultEntry> $materializedResults
+     * @param list<MaterializedResult> $materializedResults
      */
     private function sortMaterializedResults(array &$materializedResults): void
     {
-        usort($materializedResults, [$this, 'compareMaterializedEntries']);
-    }
-
-    /**
-     * @param MaterializedResultEntry $left
-     * @param MaterializedResultEntry $right
-     */
-    private function compareMaterializedEntries(array $left, array $right): int
-    {
-        return $this->orderingStrategy->compare($left['orderKey'], $right['orderKey']);
+        usort(
+            $materializedResults,
+            fn (MaterializedResult $left, MaterializedResult $right): int => $this->orderingStrategy->compare(
+                $left->orderKey(),
+                $right->orderKey(),
+            ),
+        );
     }
 
     /**
