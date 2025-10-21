@@ -74,7 +74,7 @@ final class GraphBuilder
     }
 
     /**
-     * @param array<string, array{currency: string, edges: list<GraphEdge>}> $graph
+     * @param array<string, array{currency: string, edges: list<GraphEdge>}> &$graph
      *
      * @psalm-param array<string, array{currency: string, edges: list<GraphEdge>}> &$graph
      */
