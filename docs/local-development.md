@@ -25,3 +25,6 @@ pull request description so the assertion thresholds can be tuned:
 
 Once baseline numbers exist, wire them into `phpbench.json` assertions or CI guard-rails so the
 metrics fail fast when regressions exceed the agreed envelope.
+
+For flamegraph-style breakdowns of those datasets (including allocation hotspots and
+proposed mitigations) see the [hotspot profiling notes](performance/hotspot-profile.md).
