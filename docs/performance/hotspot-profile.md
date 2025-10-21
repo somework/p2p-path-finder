@@ -2,6 +2,15 @@
 
 ## Methodology
 
+### Prerequisites
+
+* Ensure the Xdebug PHP extension is installed locally. We do not pin it via `composer.json`,
+  so install it through your PHP runtime manager or package manager as needed.
+* Use Xdebug **3.x** – legacy 2.x builds do not support the `xdebug.mode` flags required below.
+* Create the profiler output directory ahead of time: `mkdir -p .xdebug`. Xdebug will not
+  create it automatically, and runs will fail if the directory is missing. The folder is
+  gitignored so that Cachegrind artefacts are not committed.
+
 The baseline profile targets the PhpBench subject `PathFinderBench::benchFindBottleneckMandatoryMinima`
 so that we exercise both the legacy bottleneck workload and the newer high-fan-out
 scenario defined in [`benchmarks/PathFinderBench.php`](../../benchmarks/PathFinderBench.php). For each run we execute PhpBench
