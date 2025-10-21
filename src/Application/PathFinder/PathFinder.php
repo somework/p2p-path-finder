@@ -741,11 +741,14 @@ final class PathFinder
         return implode('->', $nodes);
     }
 
-    /**
-     * @param GraphEdge  $edge
-     * @param SpendRange $range
+    / **
+     * Determine whether the edge can support any amount within the requested spend range and return the feasible sub-range.
      *
-     * @return SpendRange|null
+     * Computes the intersection between the requested SpendRange and the edge's available capacity (taking per-segment minima for mandatory segments and per-segment maxima or the capacity bounds when segments are empty). If no feasible amount exists the function returns `null`.
+     *
+     * @param array $edge GraphEdge-like array containing at least `orderSide`, capacity (`grossBaseCapacity` or `quoteCapacity`) and `segments` with per-segment min/max Money values.
+     * @param array $range SpendRange array with `min` and `max` Money values describing the requested amount range.
+     * @return array|null SpendRange (`['min' => Money, 'max' => Money]`) representing the feasible intersection, or `null` if the edge cannot support any amount in the requested range.
      */
     private function edgeSupportsAmount(array $edge, array $range): ?array
     {
