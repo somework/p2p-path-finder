@@ -606,23 +606,9 @@ High level facade orchestrating order filtering, graph building and path search.
 
 
 
-psalm-type MaterializedResultEntry = array{
-cost: numeric-string,
-hops: int,
-routeSignature: string,
-order: int,
-result: PathResult,
-orderKey: PathOrderKey,
-}
+psalm-type MaterializedResult = SomeWork\\P2PPathFinder\\Application\\Service\\MaterializedResult
 
-phpstan-type MaterializedResultEntry array{
-cost: string,
-hops: int,
-routeSignature: string,
-order: int,
-result: PathResult,
-orderKey: PathOrderKey,
-}
+phpstan-type MaterializedResult SomeWork\\P2PPathFinder\\Application\\Service\\MaterializedResult
 
 ### Public methods
 

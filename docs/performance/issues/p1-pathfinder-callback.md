@@ -3,7 +3,7 @@
 ## Summary
 `PathFinderService->findBestPaths` dominates the high-fan-out profile (≈51% time,
 ≈12% memory) because the candidate callback allocates large
-`MaterializedResultEntry` arrays, captures full `candidate` payloads inside
+`MaterializedResult` DTOs, captures full `candidate` payloads inside
 `PathOrderKey`, and instantiates `PathResult` objects before tolerance checks have
 passed.
 
@@ -11,8 +11,8 @@ passed.
 - In [`PathFinderService::findBestPaths`](../../src/Application/Service/PathFinderService.php)
   move tolerance evaluation ahead of `PathResult`/`PathOrderKey` creation so we
   only allocate when the route is accepted.
-- Replace the `MaterializedResultEntry` array with a lightweight DTO or reuse a
-  preallocated buffer to avoid per-result array churn during `usort`.
+- Replace the per-result array with a lightweight `MaterializedResult` DTO or
+  reuse a preallocated buffer to avoid per-result churn during `usort`.
 - Drop the raw `candidate` array from the `PathOrderKey` metadata or replace it
   with the minimal ordering payload so we stop retaining the entire search state
   for each candidate.
