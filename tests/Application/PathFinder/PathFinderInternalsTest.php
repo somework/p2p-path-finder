@@ -15,12 +15,16 @@ use SomeWork\P2PPathFinder\Application\Graph\GraphNode;
 use SomeWork\P2PPathFinder\Application\PathFinder\CandidateResultHeap;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\SearchStateQueue;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
+use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
+use function array_fill;
 use function array_is_list;
 use function array_map;
 use function is_array;
@@ -323,7 +327,7 @@ final class PathFinderInternalsTest extends TestCase
             $collected[] = $clone->extract();
         }
 
-        $costs = array_map(static fn (array $entry): string => $entry['candidate']['cost'], $collected);
+        $costs = array_map(static fn (array $entry): string => $entry['candidate']->cost(), $collected);
         sort($costs);
 
         self::assertSame([
@@ -342,7 +346,12 @@ final class PathFinderInternalsTest extends TestCase
         $this->invokeFinderMethod($finder, 'recordResult', [$heap, $this->buildCandidate('1.00', '1.00'), 0]);
         $this->invokeFinderMethod($finder, 'recordResult', [$heap, $this->buildCandidate('1.00', '1.50'), 1]);
 
-        $finalized = $this->invokeFinderMethod($finder, 'finalizeResults', [$heap]);
+        /** @var list<CandidatePath> $finalizedCandidates */
+        $finalizedCandidates = $this->invokeFinderMethod($finder, 'finalizeResults', [$heap]);
+        $finalized = array_map(
+            static fn (CandidatePath $candidate): array => $candidate->toArray(),
+            $finalizedCandidates,
+        );
 
         self::assertSame([
             BcMath::normalize('1.00', self::SCALE),
@@ -589,15 +598,16 @@ final class PathFinderInternalsTest extends TestCase
             'USD' => new GraphNode('USD'),
         ]);
 
+        $constraints = SpendConstraints::from(
+            CurrencyScenarioFactory::money('EUR', '5.00', 2),
+            CurrencyScenarioFactory::money('EUR', '10.00', 2),
+        );
+
         $outcome = $finder->findBestPaths(
             $graph,
             'EUR',
             'USD',
-            [
-                'min' => CurrencyScenarioFactory::money('EUR', '5.00', 2),
-                'max' => CurrencyScenarioFactory::money('EUR', '10.00', 2),
-                'desired' => null,
-            ],
+            $constraints,
         );
 
         self::assertSame([], $outcome->paths());
@@ -852,19 +862,36 @@ final class PathFinderInternalsTest extends TestCase
         return $reflection->invokeArgs($finder, $arguments);
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function buildCandidate(string $cost, string $product): array
+    private function buildCandidate(string $cost, string $product): CandidatePath
     {
-        return [
-            'cost' => BcMath::normalize($cost, self::SCALE),
-            'product' => BcMath::normalize($product, self::SCALE),
-            'hops' => 1,
-            'edges' => [],
-            'amountRange' => null,
-            'desiredAmount' => null,
+        return CandidatePath::from(
+            BcMath::normalize($cost, self::SCALE),
+            BcMath::normalize($product, self::SCALE),
+            1,
+            $this->dummyEdges(1),
+        );
+    }
+
+    /**
+     * @return list<array{from: string, to: string, order: Order, rate: mixed, orderSide: OrderSide, conversionRate: string}>
+     */
+    private function dummyEdges(int $count): array
+    {
+        if (0 === $count) {
+            return [];
+        }
+
+        $order = OrderFactory::buy('SRC', 'DST', '1.000', '1.000', '1.000', 3, 3);
+        $edge = [
+            'from' => 'SRC',
+            'to' => 'DST',
+            'order' => $order,
+            'rate' => $order->effectiveRate(),
+            'orderSide' => OrderSide::BUY,
+            'conversionRate' => BcMath::normalize('1.000000000000000000', self::SCALE),
         ];
+
+        return array_fill(0, $count, $edge);
     }
 
     /**

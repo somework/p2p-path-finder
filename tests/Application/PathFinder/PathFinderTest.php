@@ -19,6 +19,8 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
@@ -42,17 +44,27 @@ final class PathFinderTest extends TestCase
     private const SCALE = 18;
 
     /**
-     * @param SearchOutcome<array> $searchResult
+     * @param SearchOutcome<CandidatePath> $searchResult
      *
-     * @return list<array>
+     * @return list<array{
+     *     cost: numeric-string,
+     *     product: numeric-string,
+     *     hops: int,
+     *     edges: list<array{from: string, to: string, order: mixed, rate: mixed, orderSide: mixed, conversionRate: string}>,
+     *     amountRange: array{min: Money, max: Money}|null,
+     *     desiredAmount: Money|null,
+     * }>
      */
     private static function extractPaths(SearchOutcome $searchResult): array
     {
-        return $searchResult->paths();
+        return array_map(
+            static fn (CandidatePath $path): array => $path->toArray(),
+            $searchResult->paths(),
+        );
     }
 
     /**
-     * @param SearchOutcome<array> $searchResult
+     * @param SearchOutcome<CandidatePath> $searchResult
      */
     private static function extractGuardLimits(SearchOutcome $searchResult): GuardLimitStatus
     {
@@ -241,38 +253,32 @@ final class PathFinderTest extends TestCase
         $recordResult->setAccessible(true);
 
         $candidates = [
-            [
-                'cost' => '0.100000000000000000',
-                'product' => '10.000000000000000000',
-                'hops' => 2,
-                'edges' => [
+            CandidatePath::from(
+                '0.100000000000000000',
+                '10.000000000000000000',
+                2,
+                [
                     ['from' => 'SRC', 'to' => 'BET'],
                     ['from' => 'BET', 'to' => 'TRG'],
                 ],
-                'amountRange' => null,
-                'desiredAmount' => null,
-            ],
-            [
-                'cost' => '0.100000000000000000',
-                'product' => '10.000000000000000000',
-                'hops' => 2,
-                'edges' => [
+            ),
+            CandidatePath::from(
+                '0.100000000000000000',
+                '10.000000000000000000',
+                2,
+                [
                     ['from' => 'SRC', 'to' => 'ALP'],
                     ['from' => 'ALP', 'to' => 'TRG'],
                 ],
-                'amountRange' => null,
-                'desiredAmount' => null,
-            ],
-            [
-                'cost' => '0.100000000000000000',
-                'product' => '10.000000000000000000',
-                'hops' => 1,
-                'edges' => [
+            ),
+            CandidatePath::from(
+                '0.100000000000000000',
+                '10.000000000000000000',
+                1,
+                [
                     ['from' => 'SRC', 'to' => 'TRG'],
                 ],
-                'amountRange' => null,
-                'desiredAmount' => null,
-            ],
+            ),
         ];
 
         foreach ($candidates as $index => $candidate) {
@@ -281,19 +287,19 @@ final class PathFinderTest extends TestCase
 
         $finalize = new ReflectionMethod(PathFinder::class, 'finalizeResults');
         $finalize->setAccessible(true);
-        /** @var list<array> $finalized */
+        /** @var list<CandidatePath> $finalized */
         $finalized = $finalize->invoke($finder, $heap);
 
         self::assertCount(3, $finalized);
 
         $expectedHops = [1, 2, 2];
         foreach ($finalized as $index => $candidate) {
-            self::assertSame($expectedHops[$index], $candidate['hops']);
-            self::assertSame('0.100000000000000000', $candidate['cost']);
+            self::assertSame($expectedHops[$index], $candidate->hops());
+            self::assertSame('0.100000000000000000', $candidate->cost());
         }
 
         $signatures = array_map(
-            static fn (array $candidate): string => self::routeSignatureFromEdges($candidate['edges']),
+            static fn (CandidatePath $candidate): string => self::routeSignatureFromEdges($candidate->edges()),
             $finalized,
         );
 
@@ -328,38 +334,32 @@ final class PathFinderTest extends TestCase
         $recordResult->setAccessible(true);
 
         $candidates = [
-            [
-                'cost' => '0.100000000000000000',
-                'product' => '10.000000000000000000',
-                'hops' => 2,
-                'edges' => [
+            CandidatePath::from(
+                '0.100000000000000000',
+                '10.000000000000000000',
+                2,
+                [
                     ['from' => 'SRC', 'to' => 'BET'],
                     ['from' => 'BET', 'to' => 'TRG'],
                 ],
-                'amountRange' => null,
-                'desiredAmount' => null,
-            ],
-            [
-                'cost' => '0.100000000000000000',
-                'product' => '10.000000000000000000',
-                'hops' => 2,
-                'edges' => [
+            ),
+            CandidatePath::from(
+                '0.100000000000000000',
+                '10.000000000000000000',
+                2,
+                [
                     ['from' => 'SRC', 'to' => 'ALP'],
                     ['from' => 'ALP', 'to' => 'TRG'],
                 ],
-                'amountRange' => null,
-                'desiredAmount' => null,
-            ],
-            [
-                'cost' => '0.100000000000000000',
-                'product' => '10.000000000000000000',
-                'hops' => 1,
-                'edges' => [
+            ),
+            CandidatePath::from(
+                '0.100000000000000000',
+                '10.000000000000000000',
+                1,
+                [
                     ['from' => 'SRC', 'to' => 'TRG'],
                 ],
-                'amountRange' => null,
-                'desiredAmount' => null,
-            ],
+            ),
         ];
 
         foreach ($candidates as $index => $candidate) {
@@ -368,11 +368,11 @@ final class PathFinderTest extends TestCase
 
         $finalize = new ReflectionMethod(PathFinder::class, 'finalizeResults');
         $finalize->setAccessible(true);
-        /** @var list<array> $finalized */
+        /** @var list<CandidatePath> $finalized */
         $finalized = $finalize->invoke($finder, $heap);
 
         $signatures = array_map(
-            static fn (array $candidate): string => self::routeSignatureFromEdges($candidate['edges']),
+            static fn (CandidatePath $candidate): string => self::routeSignatureFromEdges($candidate->edges()),
             $finalized,
         );
 
@@ -560,13 +560,14 @@ final class PathFinderTest extends TestCase
             'SRC',
             'TRG',
             null,
-            static function (array $candidate) use (&$evaluatedCandidates): bool {
+            static function (CandidatePath $candidate) use (&$evaluatedCandidates): bool {
+                $edges = $candidate->edges();
                 $nodes = array_merge(
-                    [$candidate['edges'][0]['from']],
-                    array_map(static fn (array $edge): string => $edge['to'], $candidate['edges']),
+                    [$edges[0]['from'] ?? ''],
+                    array_map(static fn (array $edge): string => $edge['to'], $edges),
                 );
 
-                $evaluatedCandidates[] = ['nodes' => $nodes, 'cost' => $candidate['cost']];
+                $evaluatedCandidates[] = ['nodes' => $nodes, 'cost' => $candidate->cost()];
 
                 return true;
             }
@@ -1140,16 +1141,14 @@ final class PathFinderTest extends TestCase
 
         $visitedCandidates = [];
         $spend = Money::fromString('EUR', '100.00', 2);
+        $constraints = SpendConstraints::from($spend, $spend, $spend);
+
         $searchResult = $finder->findBestPaths(
             $graph,
             'EUR',
             'USD',
-            [
-                'min' => $spend,
-                'max' => $spend,
-                'desired' => $spend,
-            ],
-            static function (array $candidate) use (&$visitedCandidates): bool {
+            $constraints,
+            static function (CandidatePath $candidate) use (&$visitedCandidates): bool {
                 $visitedCandidates[] = $candidate;
 
                 return $candidate['hops'] >= 2;
@@ -1358,19 +1357,19 @@ final class PathFinderTest extends TestCase
     /**
      * @dataProvider provideMalformedSpendConstraints
      */
-    public function test_it_requires_spend_constraints_to_include_bounds(array $constraints): void
+    public function test_it_rejects_non_object_spend_constraints(mixed $constraints): void
     {
         $orders = self::createRubToUsdSellOrders();
         $graph = (new GraphBuilder())->build($orders);
 
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
-        $this->expectException(InvalidInput::class);
+        $this->expectException(\TypeError::class);
         $finder->findBestPaths($graph, 'RUB', 'USD', $constraints);
     }
 
     /**
-     * @return iterable<string, array{array<string, mixed>}>
+     * @return iterable<string, array{mixed}>
      */
     public static function provideMalformedSpendConstraints(): iterable
     {
@@ -1396,41 +1395,13 @@ final class PathFinderTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider provideSpendConstraintsMissingBounds
-     */
-    public function test_it_throws_when_one_of_the_spend_bounds_is_missing(array $constraints): void
+    public function test_spend_constraints_require_consistent_currency(): void
     {
-        $order = OrderFactory::buy('EUR', 'USD', '1.000', '1.000', '1.100', 3, 3);
-        $graph = (new GraphBuilder())->build([$order]);
-
-        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
+        $min = CurrencyScenarioFactory::money('EUR', '1.000', 3);
+        $max = CurrencyScenarioFactory::money('USD', '1.000', 3);
 
         $this->expectException(InvalidInput::class);
-        $this->expectExceptionMessage('Spend constraints must include both minimum and maximum bounds.');
-
-        $finder->findBestPaths($graph, 'EUR', 'USD', $constraints);
-    }
-
-    /**
-     * @return iterable<string, array{array<string, mixed>}>
-     */
-    public static function provideSpendConstraintsMissingBounds(): iterable
-    {
-        $minimum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
-        $maximum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
-
-        yield 'missing_minimum' => [
-            [
-                'max' => $maximum,
-            ],
-        ];
-
-        yield 'missing_maximum' => [
-            [
-                'min' => $minimum,
-            ],
-        ];
+        SpendConstraints::from($min, $max);
     }
 
     public function test_it_accepts_spend_constraints_with_both_bounds(): void
@@ -1443,14 +1414,13 @@ final class PathFinderTest extends TestCase
         $minimum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
         $maximum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
 
+        $constraints = SpendConstraints::from($minimum, $maximum);
+
         $results = self::extractPaths($finder->findBestPaths(
             $graph,
             'EUR',
             'USD',
-            [
-                'min' => $minimum,
-                'max' => $maximum,
-            ],
+            $constraints,
         ));
 
         self::assertNotSame([], $results);
@@ -1477,14 +1447,13 @@ final class PathFinderTest extends TestCase
         $minimum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
         $maximum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
 
+        $constraints = SpendConstraints::from($minimum, $maximum);
+
         $results = self::extractPaths($finder->findBestPaths(
             $graph,
             'EUR',
             'USD',
-            [
-                'min' => $minimum,
-                'max' => $maximum,
-            ],
+            $constraints,
         ));
 
         self::assertNotSame([], $results);
@@ -1513,15 +1482,13 @@ final class PathFinderTest extends TestCase
         $maximum = CurrencyScenarioFactory::money('EUR', '1.000', 3);
         $desired = CurrencyScenarioFactory::money('EUR', '1.000', 3);
 
+        $constraints = SpendConstraints::from($minimum, $maximum, $desired);
+
         $results = self::extractPaths($finder->findBestPaths(
             $graph,
             'EUR',
             'USD',
-            [
-                'min' => $minimum,
-                'max' => $maximum,
-                'desired' => $desired,
-            ],
+            $constraints,
         ));
 
         self::assertNotSame([], $results);
@@ -1552,15 +1519,13 @@ final class PathFinderTest extends TestCase
         $maximum = CurrencyScenarioFactory::money('EUR', '3.000', 3);
         $desired = CurrencyScenarioFactory::money('EUR', '10.000', 3);
 
+        $constraints = SpendConstraints::from($minimum, $maximum, $desired);
+
         $results = self::extractPaths($finder->findBestPaths(
             $graph,
             'EUR',
             'USD',
-            [
-                'min' => $minimum,
-                'max' => $maximum,
-                'desired' => $desired,
-            ],
+            $constraints,
         ));
 
         self::assertNotSame([], $results);
@@ -1594,14 +1559,13 @@ final class PathFinderTest extends TestCase
         $minSpend = CurrencyScenarioFactory::money('SRC', '10.000', 3);
         $maxSpend = CurrencyScenarioFactory::money('SRC', '20.000', 3);
 
+        $constraints = SpendConstraints::from($minSpend, $maxSpend);
+
         $results = self::extractPaths($finder->findBestPaths(
             $graph,
             'SRC',
             'DST',
-            [
-                'min' => $minSpend,
-                'max' => $maxSpend,
-            ],
+            $constraints,
         ));
 
         self::assertNotSame([], $results);
@@ -1639,16 +1603,14 @@ final class PathFinderTest extends TestCase
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
         $accepted = false;
 
+        $constraints = SpendConstraints::from($desiredSpend, $desiredSpend, $desiredSpend);
+
         $searchResult = $finder->findBestPaths(
             $graph,
             $source,
             $target,
-            [
-                'min' => $desiredSpend,
-                'max' => $desiredSpend,
-                'desired' => $desiredSpend,
-            ],
-            static function () use (&$accepted): bool {
+            $constraints,
+            static function (CandidatePath $candidate) use (&$accepted): bool {
                 $accepted = true;
 
                 return true;
@@ -1752,15 +1714,13 @@ final class PathFinderTest extends TestCase
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
         $grossSpend = CurrencyScenarioFactory::money('EUR', '1.050', 3);
 
+        $constraints = SpendConstraints::from($grossSpend, $grossSpend, $grossSpend);
+
         $results = self::extractPaths($finder->findBestPaths(
             $graph,
             'EUR',
             'USD',
-            [
-                'min' => $grossSpend,
-                'max' => $grossSpend,
-                'desired' => $grossSpend,
-            ],
+            $constraints,
         ));
 
         self::assertNotSame([], $results);
@@ -1851,7 +1811,16 @@ final class PathFinderTest extends TestCase
         self::assertTrue($first->hasPaths());
         self::assertTrue($second->hasPaths());
 
-        self::assertSame($first->paths(), $second->paths(), 'Extreme rate scenarios should produce deterministic outcomes.');
+        $firstPaths = array_map(
+            static fn (CandidatePath $path): array => $path->toArray(),
+            $first->paths(),
+        );
+        $secondPaths = array_map(
+            static fn (CandidatePath $path): array => $path->toArray(),
+            $second->paths(),
+        );
+
+        self::assertSame($firstPaths, $secondPaths, 'Extreme rate scenarios should produce deterministic outcomes.');
         self::assertSame(
             $first->guardLimits()->expansionsReached(),
             $second->guardLimits()->expansionsReached(),
@@ -1863,7 +1832,7 @@ final class PathFinderTest extends TestCase
             'Extreme rate scenarios should produce deterministic guard exhaustion state.',
         );
 
-        $best = $first->paths()[0];
+        $best = $firstPaths[0];
         self::assertSame($expectedHops, $best['hops']);
         self::assertSame($expectedProduct, $best['product']);
         $expectedCost = BcMath::div('1', $expectedProduct, self::SCALE);

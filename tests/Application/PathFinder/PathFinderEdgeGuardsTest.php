@@ -11,6 +11,8 @@ use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\Graph\GraphNode;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
@@ -49,15 +51,17 @@ final class PathFinderEdgeGuardsTest extends TestCase
 
         $finder = new PathFinder(2, '0.0', 3, 8, 8);
 
+        $constraints = SpendConstraints::from(
+            Money::fromString('EUR', '10.000', 3),
+            Money::fromString('EUR', '20.000', 3),
+            Money::fromString('EUR', '12.000', 3),
+        );
+
         $outcome = $finder->findBestPaths(
             $graph,
             'EUR',
             'USD',
-            [
-                'min' => Money::fromString('EUR', '10.000', 3),
-                'max' => Money::fromString('EUR', '20.000', 3),
-                'desired' => Money::fromString('EUR', '12.000', 3),
-            ],
+            $constraints,
         );
 
         self::assertSame([], $outcome->paths());
@@ -206,9 +210,10 @@ final class PathFinderEdgeGuardsTest extends TestCase
 
         self::assertCount(1, $paths);
         $firstPath = $paths[0];
-        self::assertCount(1, $firstPath['edges']);
-        self::assertSame('AAA', $firstPath['edges'][0]['from']);
-        self::assertSame('BBB', $firstPath['edges'][0]['to']);
+        $edges = $firstPath->edges();
+        self::assertCount(1, $edges);
+        self::assertSame('AAA', $edges[0]['from']);
+        self::assertSame('BBB', $edges[0]['to']);
     }
 
     public function test_it_does_not_relax_best_cost_after_worse_candidate(): void
@@ -267,9 +272,11 @@ final class PathFinderEdgeGuardsTest extends TestCase
         $paths = $finder->findBestPaths($graph, 'AAA', 'BBB')->paths();
 
         self::assertCount(2, $paths);
+        $costs = array_map(static fn (CandidatePath $path): string => $path->cost(), $paths);
+
         self::assertSame(
             ['0.250000000000000000', '2.000000000000000000'],
-            array_column($paths, 'cost'),
+            $costs,
         );
     }
 
@@ -328,9 +335,11 @@ final class PathFinderEdgeGuardsTest extends TestCase
 
         $paths = $finder->findBestPaths($graph, 'AAA', 'ZZZ')->paths();
 
+        $costs = array_map(static fn (CandidatePath $path): string => $path->cost(), $paths);
+
         self::assertSame(
             ['0.500000000000000000'],
-            array_column($paths, 'cost'),
+            $costs,
         );
     }
 }

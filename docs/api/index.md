@@ -257,77 +257,21 @@ psalm-type Graph = array<string, array{currency: string, edges: list<GraphEdge>}
 
 phpstan-type Graph array<string, array{currency: string, edges: list<GraphEdge>}>
 
-psalm-type SpendRange = array{min: Money, max: Money}
+**Value Objects**
 
-phpstan-type SpendRange array{min: Money, max: Money}
+`SpendConstraints`
 
-psalm-type SpendConstraints = array{min?: Money, max?: Money, desired?: Money|null}
+* `min`: `Money` – inclusive lower bound on spend amount
+* `max`: `Money` – inclusive upper bound on spend amount
+* `desired`: `Money|null` – optional preferred spend amount propagated through the graph
 
-phpstan-type SpendConstraints array{min?: Money, max?: Money, desired?: Money|null}
+`CandidatePath`
 
-psalm-type PathEdge = array{
-from: string,
-to: string,
-order: Order,
-rate: ExchangeRate,
-orderSide: OrderSide,
-conversionRate: numeric-string,
-}
-
-phpstan-type PathEdge array{
-from: string,
-to: string,
-order: Order,
-rate: ExchangeRate,
-orderSide: OrderSide,
-conversionRate: string,
-}
-
-psalm-type Candidate = array{
-cost: numeric-string,
-product: numeric-string,
-hops: int,
-edges: list<PathEdge>,
-amountRange: SpendRange|null,
-desiredAmount: Money|null,
-}
-
-phpstan-type Candidate array{
-cost: string,
-product: string,
-hops: int,
-edges: list<PathEdge>,
-amountRange: SpendRange|null,
-desiredAmount: Money|null,
-}
-
-psalm-type CandidateHeapEntry = array{
-candidate: Candidate,
-order: int,
-cost: numeric-string,
-}
-
-phpstan-type CandidateHeapEntry array{
-candidate: Candidate,
-order: int,
-cost: numeric-string,
-}
-
-psalm-type CandidateResultEntry = array{
-candidate: Candidate,
-order: int,
-cost: numeric-string,
-routeSignature: string,
-orderKey: PathOrderKey,
-}
-
-phpstan-type CandidateResultEntry array{
-candidate: Candidate,
-order: int,
-cost: string,
-routeSignature: string,
-orderKey: PathOrderKey,
-}
+* `cost`: `numeric-string`
+* `product`: `numeric-string`
+* `hops`: `int`
+* `edges`: `list<PathEdge>`
+* `range`: `SpendConstraints|null`
 
 psalm-type SearchQueueEntry = array{
 state: SearchState,
@@ -367,9 +311,9 @@ visited: array<string, bool>,
 `PathFinder::__construct(int $maxHops = 4, string $tolerance = '0', int $topK = 1, int $maxExpansions = 250000, int $maxVisitedStates = 250000, ?SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy $orderingStrategy = null)`
 
 ### findBestPaths
-`PathFinder::findBestPaths(array $graph, string $source, string $target, ?array $spendConstraints = null, ?callable $acceptCandidate = null): SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome`
+`PathFinder::findBestPaths(SomeWork\P2PPathFinder\Application\Graph\Graph $graph, string $source, string $target, ?SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints $spendConstraints = null, ?callable $acceptCandidate = null): SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome`
 
-Returns: SearchOutcome<Candidate>
+Returns: SearchOutcome<CandidatePath>
 
 ## SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus
 

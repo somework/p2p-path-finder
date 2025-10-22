@@ -15,5 +15,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 - README now links to community resources and highlights how the changelog will track
   progress toward the `1.0.0-rc` milestone.
+- Breaking: `PathFinder::findBestPaths()` now consumes `SpendConstraints` and emits
+  `CandidatePath` instances, replacing the previous associative array payloads.
+  Custom callbacks or integrations must migrate to the new value objects.
 
 [Unreleased]: https://github.com/somework/p2p-path-finder/compare/main...HEAD

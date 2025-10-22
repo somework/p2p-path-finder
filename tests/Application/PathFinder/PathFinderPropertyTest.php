@@ -9,6 +9,8 @@ use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
@@ -62,8 +64,14 @@ final class PathFinderPropertyTest extends TestCase
                 'Repeated search invocations must share guard metadata.',
             );
 
-            $firstPaths = $firstResult->paths();
-            $secondPaths = $secondResult->paths();
+            $firstPaths = array_map(
+                static fn (CandidatePath $path): array => $path->toArray(),
+                $firstResult->paths(),
+            );
+            $secondPaths = array_map(
+                static fn (CandidatePath $path): array => $path->toArray(),
+                $secondResult->paths(),
+            );
 
             self::assertSame($firstPaths, $secondPaths, 'PathFinder search should be deterministic.');
 
@@ -96,7 +104,10 @@ final class PathFinderPropertyTest extends TestCase
                 $scenario['source'],
                 $scenario['target'],
             );
-            $permutedPaths = $permutedOutcome->paths();
+            $permutedPaths = array_map(
+                static fn (CandidatePath $path): array => $path->toArray(),
+                $permutedOutcome->paths(),
+            );
 
             self::assertSame(
                 $firstPaths,
@@ -186,7 +197,16 @@ final class PathFinderPropertyTest extends TestCase
             $first = $finder->findBestPaths($graph, $scenario['source'], $scenario['target']);
             $second = $finder->findBestPaths($graph, $scenario['source'], $scenario['target']);
 
-            self::assertSame($first->paths(), $second->paths());
+            $firstPaths = array_map(
+                static fn (CandidatePath $path): array => $path->toArray(),
+                $first->paths(),
+            );
+            $secondPaths = array_map(
+                static fn (CandidatePath $path): array => $path->toArray(),
+                $second->paths(),
+            );
+
+            self::assertSame($firstPaths, $secondPaths);
             $this->assertGuardStatusEquals(
                 $first->guardLimits(),
                 $second->guardLimits(),
@@ -220,10 +240,8 @@ final class PathFinderPropertyTest extends TestCase
 
     /**
      * @param array{currency: string, edges: list<array{orderSide: OrderSide, grossBaseCapacity: array{min: Money, max: Money}, quoteCapacity: array{min: Money, max: Money}>}>} $graph
-     *
-     * @return array{min: Money, max: Money, desired: Money}
      */
-    private function deriveSpendConstraints(Graph $graph, string $source): array
+    private function deriveSpendConstraints(Graph $graph, string $source): SpendConstraints
     {
         $node = $graph->node($source);
         self::assertNotNull($node, 'Generated scenario must include a spend node.');
@@ -244,21 +262,17 @@ final class PathFinderPropertyTest extends TestCase
             $desired = $maximum;
         }
 
-        return ['min' => $minimum, 'max' => $maximum, 'desired' => $desired];
+        return SpendConstraints::from($minimum, $maximum, $desired);
     }
 
-    /**
-     * @param array{min: Money, max: Money, desired: Money} $constraints
-     *
-     * @return array{min: Money, max: Money, desired: Money}
-     */
-    private function scaleSpendConstraints(array $constraints, string $scaleFactor): array
+    private function scaleSpendConstraints(SpendConstraints $constraints, string $scaleFactor): SpendConstraints
     {
-        return [
-            'min' => $constraints['min']->multiply($scaleFactor),
-            'max' => $constraints['max']->multiply($scaleFactor),
-            'desired' => $constraints['desired']->multiply($scaleFactor),
-        ];
+        $scaledMin = $constraints->min()->multiply($scaleFactor);
+        $scaledMax = $constraints->max()->multiply($scaleFactor);
+        $desired = $constraints->desired();
+        $scaledDesired = null === $desired ? null : $desired->multiply($scaleFactor);
+
+        return SpendConstraints::from($scaledMin, $scaledMax, $scaledDesired);
     }
 
     private function scaleOrder(Order $order, string $scaleFactor): Order
@@ -285,10 +299,7 @@ final class PathFinderPropertyTest extends TestCase
         );
     }
 
-    /**
-     * @param array{cost: numeric-string, hops: int, edges: list<array{from: string, to: string, orderSide: OrderSide, order: Order}>} $path
-     */
-    private function routeSignature(array $path): string
+    private function routeSignature(CandidatePath $path): string
     {
         $segments = array_map(
             static function (array $edge): string {
@@ -304,10 +315,10 @@ final class PathFinderPropertyTest extends TestCase
                     ],
                 );
             },
-            $path['edges'],
+            $path->edges(),
         );
 
-        return $path['hops'].'|'.implode(';', $segments);
+        return $path->hops().'|'.implode(';', $segments);
     }
 
     private function assertGuardStatusEquals(GuardLimitStatus $expected, GuardLimitStatus $actual, string $message): void
