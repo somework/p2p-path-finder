@@ -7,7 +7,12 @@ namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use ReflectionProperty;
+use SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity;
+use SomeWork\P2PPathFinder\Application\Graph\EdgeSegment;
+use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
+use SomeWork\P2PPathFinder\Application\Graph\GraphNode;
 use SomeWork\P2PPathFinder\Application\PathFinder\CandidateResultHeap;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
@@ -417,6 +422,8 @@ final class PathFinderTest extends TestCase
             ],
         ];
 
+        $graph = self::graphFromArray($graph);
+
         $finder = new PathFinder(maxHops: 3, tolerance: '0.0', topK: 2);
         $results = self::extractPaths($finder->findBestPaths($graph, 'SRC', 'TRG'));
 
@@ -477,6 +484,8 @@ final class PathFinderTest extends TestCase
             'IDR' => ['currency' => 'IDR', 'edges' => []],
             'JPY' => ['currency' => 'JPY', 'edges' => []],
         ];
+
+        $graph = self::graphFromArray($graph);
 
         $finder = new PathFinder(maxHops: 4, tolerance: '0.5', topK: 3);
         $outcome = $finder->findBestPaths($graph, 'RUB', 'IDR');
@@ -541,6 +550,8 @@ final class PathFinderTest extends TestCase
             ],
             'TRG' => ['currency' => 'TRG', 'edges' => []],
         ];
+
+        $graph = self::graphFromArray($graph);
 
         $finder = new PathFinder(maxHops: 4, tolerance: '0.1', topK: 3);
         $evaluatedCandidates = [];
@@ -657,6 +668,8 @@ final class PathFinderTest extends TestCase
             'TRG' => ['currency' => 'TRG', 'edges' => []],
         ];
 
+        $graph = self::graphFromArray($graph);
+
         $finder = new PathFinder(maxHops: 4, tolerance: '0.9', topK: 2);
         $paths = $finder->findBestPaths($graph, 'SRC', 'TRG')->paths();
 
@@ -729,6 +742,8 @@ final class PathFinderTest extends TestCase
             'TRG' => ['currency' => 'TRG', 'edges' => []],
         ];
 
+        $graph = self::graphFromArray($graph);
+
         $finder = new PathFinder(maxHops: 4, tolerance: '0.9', topK: 3);
         $paths = $finder->findBestPaths($graph, 'SRC', 'TRG')->paths();
 
@@ -794,6 +809,8 @@ final class PathFinderTest extends TestCase
             'TRG' => ['currency' => 'TRG', 'edges' => []],
         ];
 
+        $graph = self::graphFromArray($graph);
+
         $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 3);
         $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
         $paths = $outcome->paths();
@@ -831,6 +848,8 @@ final class PathFinderTest extends TestCase
             ],
             'TRG' => ['currency' => 'TRG', 'edges' => []],
         ];
+
+        $graph = self::graphFromArray($graph);
 
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0', topK: 1);
         $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
@@ -871,6 +890,8 @@ final class PathFinderTest extends TestCase
             'TRG' => ['currency' => 'TRG', 'edges' => []],
         ];
 
+        $graph = self::graphFromArray($graph);
+
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0', topK: 1);
         $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
         $paths = $outcome->paths();
@@ -910,6 +931,8 @@ final class PathFinderTest extends TestCase
             'DED' => ['currency' => 'DED', 'edges' => []],
             'TRG' => ['currency' => 'TRG', 'edges' => []],
         ];
+
+        $graph = self::graphFromArray($graph);
 
         $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 1);
         $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
@@ -955,6 +978,8 @@ final class PathFinderTest extends TestCase
             'TRG' => ['currency' => 'TRG', 'edges' => []],
         ];
 
+        $graph = self::graphFromArray($graph);
+
         $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 1, maxVisitedStates: 2);
         $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
 
@@ -996,6 +1021,8 @@ final class PathFinderTest extends TestCase
             'TRG' => ['currency' => 'TRG', 'edges' => []],
         ];
 
+        $graph = self::graphFromArray($graph);
+
         $finder = new PathFinder(maxHops: 4, tolerance: '0.0', topK: 2, maxVisitedStates: 5);
         $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
 
@@ -1036,6 +1063,8 @@ final class PathFinderTest extends TestCase
             ],
             'TRG' => ['currency' => 'TRG', 'edges' => []],
         ];
+
+        $graph = self::graphFromArray($graph);
 
         $finder = new PathFinder(maxHops: 4, tolerance: '0.0', topK: 1);
         $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
@@ -2281,6 +2310,82 @@ final class PathFinderTest extends TestCase
                 'grossBase' => ['min' => $baseMin, 'max' => $baseMax],
             ]],
         ];
+    }
+
+    /**
+     * @param array<string, array{currency: string, edges: list<array<string, mixed>>}> $graph
+     */
+    private static function graphFromArray(array $graph): Graph
+    {
+        $nodes = [];
+
+        foreach ($graph as $currency => $node) {
+            $nodes[$currency] = self::hydrateNode($node);
+        }
+
+        return new Graph($nodes);
+    }
+
+    /**
+     * @param array{currency: string, edges: list<array<string, mixed>>} $node
+     */
+    private static function hydrateNode(array $node): GraphNode
+    {
+        return new GraphNode(
+            $node['currency'],
+            array_map([self::class, 'hydrateEdge'], $node['edges']),
+        );
+    }
+
+    /**
+     * @param array{
+     *     from: string,
+     *     to: string,
+     *     orderSide: OrderSide,
+     *     order: Order,
+     *     rate: ExchangeRate,
+     *     baseCapacity: array{min: Money, max: Money},
+     *     quoteCapacity: array{min: Money, max: Money},
+     *     grossBaseCapacity: array{min: Money, max: Money},
+     *     segments?: list<array{
+     *         isMandatory: bool,
+     *         base: array{min: Money, max: Money},
+     *         quote: array{min: Money, max: Money},
+     *         grossBase: array{min: Money, max: Money},
+     *     }>
+     * } $edge
+     */
+    private static function hydrateEdge(array $edge): GraphEdge
+    {
+        return new GraphEdge(
+            $edge['from'],
+            $edge['to'],
+            $edge['orderSide'],
+            $edge['order'],
+            $edge['rate'],
+            new EdgeCapacity($edge['baseCapacity']['min'], $edge['baseCapacity']['max']),
+            new EdgeCapacity($edge['quoteCapacity']['min'], $edge['quoteCapacity']['max']),
+            new EdgeCapacity($edge['grossBaseCapacity']['min'], $edge['grossBaseCapacity']['max']),
+            array_map([self::class, 'hydrateSegment'], $edge['segments'] ?? []),
+        );
+    }
+
+    /**
+     * @param array{
+     *     isMandatory: bool,
+     *     base: array{min: Money, max: Money},
+     *     quote: array{min: Money, max: Money},
+     *     grossBase: array{min: Money, max: Money},
+     * } $segment
+     */
+    private static function hydrateSegment(array $segment): EdgeSegment
+    {
+        return new EdgeSegment(
+            $segment['isMandatory'],
+            new EdgeCapacity($segment['base']['min'], $segment['base']['max']),
+            new EdgeCapacity($segment['quote']['min'], $segment['quote']['max']),
+            new EdgeCapacity($segment['grossBase']['min'], $segment['grossBase']['max']),
+        );
     }
 
     /**

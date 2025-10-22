@@ -16,7 +16,6 @@ final class MaximumAmountFilter implements OrderFilterInterface
     {
     }
 
-    #[\Override]
     public function accepts(Order $order): bool
     {
         $maximum = $order->bounds()->max();

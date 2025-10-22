@@ -40,7 +40,6 @@ final class OrderBook implements IteratorAggregate
     /**
      * @return Traversable<int, Order>
      */
-    #[\Override]
     public function getIterator(): Traversable
     {
         return new ArrayIterator($this->orders);

@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 
 use PHPUnit\Framework\TestCase;
+use SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity;
+use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
+use SomeWork\P2PPathFinder\Application\Graph\GraphNode;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
@@ -27,11 +31,21 @@ final class PathFinderEdgeGuardsTest extends TestCase
         $graph = (new GraphBuilder())->build([$order]);
         $edge = $graph['EUR']['edges'][0];
 
-        $edge['quoteCapacity']['min'] = Money::zero('USD', 3);
-        $edge['quoteCapacity']['max'] = Money::zero('USD', 3);
-        $edge['grossBaseCapacity']['min'] = Money::zero('EUR', 3);
-        $edge['grossBaseCapacity']['max'] = Money::zero('EUR', 3);
-        $graph['EUR']['edges'][0] = $edge;
+        $mutatedEdge = new GraphEdge(
+            $edge->from(),
+            $edge->to(),
+            $edge->orderSide(),
+            $edge->order(),
+            $edge->rate(),
+            $edge->baseCapacity(),
+            new EdgeCapacity(Money::zero('EUR', 3), Money::zero('EUR', 3)),
+            new EdgeCapacity(Money::zero('USD', 3), Money::zero('USD', 3)),
+        );
+
+        $graph = new Graph([
+            'EUR' => new GraphNode('EUR', [$mutatedEdge]),
+            'USD' => new GraphNode('USD', []),
+        ]);
 
         $finder = new PathFinder(2, '0.0', 3, 8, 8);
 

@@ -6,7 +6,10 @@ namespace SomeWork\P2PPathFinder\Tests\Application\Graph;
 
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
+use SomeWork\P2PPathFinder\Application\Graph\EdgeSegment;
+use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
@@ -93,11 +96,11 @@ final class GraphBuilderTest extends TestCase
             '30000.000',
         );
 
-        $graph = (new GraphBuilder())->build([
+        $graph = $this->exportGraph((new GraphBuilder())->build([
             $validOrder,
             'not-an-order',
             42,
-        ]);
+        ]));
 
         self::assertSame(['BTC', 'USD'], array_keys($graph));
         self::assertCount(1, $graph['BTC']['edges']);
@@ -123,11 +126,11 @@ final class GraphBuilderTest extends TestCase
             '2000',
         );
 
-        $graph = (new GraphBuilder())->build([
+        $graph = $this->exportGraph((new GraphBuilder())->build([
             $firstOrder,
             'skip-me',
             $secondOrder,
-        ]);
+        ]));
 
         self::assertArrayHasKey('ETH', $graph);
         self::assertCount(1, $graph['ETH']['edges']);
@@ -187,7 +190,7 @@ final class GraphBuilderTest extends TestCase
             $this->percentageFeePolicy('0.10'),
         );
 
-        $graph = (new GraphBuilder())->build([$order]);
+        $graph = $this->exportGraph((new GraphBuilder())->build([$order]));
 
         $edges = $graph['BTC']['edges'];
         self::assertCount(1, $edges);
@@ -229,7 +232,7 @@ final class GraphBuilderTest extends TestCase
             $this->percentageFeePolicy('0.10'),
         );
 
-        $graph = (new GraphBuilder())->build([$order]);
+        $graph = $this->exportGraph((new GraphBuilder())->build([$order]));
 
         /** @var list<GraphEdge> $edges */
         $edges = $graph['EUR']['edges'];
@@ -271,7 +274,7 @@ final class GraphBuilderTest extends TestCase
             '30000',
         );
 
-        $graph = (new GraphBuilder())->build([$pointOrder]);
+        $graph = $this->exportGraph((new GraphBuilder())->build([$pointOrder]));
 
         /** @var list<GraphEdge> $edges */
         $edges = $graph['BTC']['edges'];
@@ -295,7 +298,7 @@ final class GraphBuilderTest extends TestCase
             $this->basePercentageFeePolicy('0.10'),
         );
 
-        $graph = (new GraphBuilder())->build([$order]);
+        $graph = $this->exportGraph((new GraphBuilder())->build([$order]));
 
         /** @var list<GraphEdge> $edges */
         $edges = $graph['USD']['edges'];
@@ -336,7 +339,7 @@ final class GraphBuilderTest extends TestCase
             $this->basePercentageFeePolicy('0.02'),
         );
 
-        $graph = (new GraphBuilder())->build([$order]);
+        $graph = $this->exportGraph((new GraphBuilder())->build([$order]));
 
         /** @var list<GraphEdge> $edges */
         $edges = $graph['BTC']['edges'];
@@ -377,7 +380,7 @@ final class GraphBuilderTest extends TestCase
             $this->mixedPercentageFeePolicy('0.02', '0.05'),
         );
 
-        $graph = (new GraphBuilder())->build([$order]);
+        $graph = $this->exportGraph((new GraphBuilder())->build([$order]));
 
         /** @var list<GraphEdge> $edges */
         $edges = $graph['BTC']['edges'];
@@ -409,7 +412,7 @@ final class GraphBuilderTest extends TestCase
     {
         $order = $this->createOrder(OrderSide::BUY, 'ETH', 'USN', '0.000', '5.000', '2000');
 
-        $graph = (new GraphBuilder())->build([$order]);
+        $graph = $this->exportGraph((new GraphBuilder())->build([$order]));
 
         /** @var list<GraphEdge> $edges */
         $edges = $graph['ETH']['edges'];
@@ -428,7 +431,7 @@ final class GraphBuilderTest extends TestCase
     {
         $order = $this->createOrder(OrderSide::BUY, 'BTC', 'USD', '1.250', '3.750', '2500.000');
 
-        $graph = (new GraphBuilder())->build([$order]);
+        $graph = $this->exportGraph((new GraphBuilder())->build([$order]));
 
         $edges = $graph['BTC']['edges'];
         self::assertCount(1, $edges);
@@ -445,7 +448,7 @@ final class GraphBuilderTest extends TestCase
     {
         $order = $this->createOrder(OrderSide::BUY, 'ETH', 'USD', '0.000', '0.000', '1800.000');
 
-        $graph = (new GraphBuilder())->build([$order]);
+        $graph = $this->exportGraph((new GraphBuilder())->build([$order]));
 
         $edges = $graph['ETH']['edges'];
         self::assertCount(1, $edges);
@@ -470,15 +473,77 @@ final class GraphBuilderTest extends TestCase
             'secondarySellOrder' => $this->createOrder(OrderSide::SELL, 'LTC', 'USD', '1.000', '4.000', '90'),
         ];
 
-        /** @var Graph $graph */
-        $graph = (new GraphBuilder())->build([
+        /** @var Graph $graphObject */
+        $graphObject = (new GraphBuilder())->build([
             $orders['primaryBuyOrder'],
             $orders['secondaryBuyOrder'],
             $orders['primarySellOrder'],
             $orders['secondarySellOrder'],
         ]);
 
+        $graph = $this->exportGraph($graphObject);
+
         return [$graph, $orders];
+    }
+
+    /**
+     * @return array<string, array{currency: string, edges: list<array<string, mixed>>}>
+     */
+    private function exportGraph(Graph $graph): array
+    {
+        $export = [];
+
+        foreach ($graph as $currency => $node) {
+            $export[$currency] = [
+                'currency' => $currency,
+                'edges' => array_map([$this, 'exportEdge'], $node->edges()),
+            ];
+        }
+
+        return $export;
+    }
+
+    private function exportEdge(GraphEdge $edge): array
+    {
+        return [
+            'from' => $edge->from(),
+            'to' => $edge->to(),
+            'orderSide' => $edge->orderSide(),
+            'order' => $edge->order(),
+            'rate' => $edge->rate(),
+            'baseCapacity' => [
+                'min' => $edge->baseCapacity()->min(),
+                'max' => $edge->baseCapacity()->max(),
+            ],
+            'quoteCapacity' => [
+                'min' => $edge->quoteCapacity()->min(),
+                'max' => $edge->quoteCapacity()->max(),
+            ],
+            'grossBaseCapacity' => [
+                'min' => $edge->grossBaseCapacity()->min(),
+                'max' => $edge->grossBaseCapacity()->max(),
+            ],
+            'segments' => array_map([$this, 'exportSegment'], $edge->segments()),
+        ];
+    }
+
+    private function exportSegment(EdgeSegment $segment): array
+    {
+        return [
+            'isMandatory' => $segment->isMandatory(),
+            'base' => [
+                'min' => $segment->base()->min(),
+                'max' => $segment->base()->max(),
+            ],
+            'quote' => [
+                'min' => $segment->quote()->min(),
+                'max' => $segment->quote()->max(),
+            ],
+            'grossBase' => [
+                'min' => $segment->grossBase()->min(),
+                'max' => $segment->grossBase()->max(),
+            ],
+        ];
     }
 
     /**

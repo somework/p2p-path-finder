@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 
 use PHPUnit\Framework\TestCase;
+use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
@@ -222,18 +223,20 @@ final class PathFinderPropertyTest extends TestCase
      *
      * @return array{min: Money, max: Money, desired: Money}
      */
-    private function deriveSpendConstraints(array $graph, string $source): array
+    private function deriveSpendConstraints(Graph $graph, string $source): array
     {
-        $edges = $graph[$source]['edges'] ?? [];
+        $node = $graph->node($source);
+        self::assertNotNull($node, 'Generated scenario must include a spend node.');
+        $edges = $node->edges();
         self::assertNotSame([], $edges, 'Generated scenario must include spendable edges.');
 
         $edge = $edges[0];
-        $capacity = OrderSide::BUY === $edge['orderSide']
-            ? $edge['grossBaseCapacity']
-            : $edge['quoteCapacity'];
+        $capacity = OrderSide::BUY === $edge->orderSide()
+            ? $edge->grossBaseCapacity()
+            : $edge->quoteCapacity();
 
-        $minimum = $capacity['min'];
-        $maximum = $capacity['max'];
+        $minimum = $capacity->min();
+        $maximum = $capacity->max();
         $scale = max($minimum->scale(), $maximum->scale());
         $desired = $minimum->add($maximum, $scale)->divide('2', $scale);
 

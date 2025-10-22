@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Application\Result;
 
 use JsonSerializable;
+use SomeWork\P2PPathFinder\Application\Support\SerializesMoney;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
@@ -17,6 +18,8 @@ use function array_is_list;
  */
 final class PathResult implements JsonSerializable
 {
+    use SerializesMoney;
+
     /**
      * @var array<string, Money>
      */
@@ -117,7 +120,6 @@ final class PathResult implements JsonSerializable
      *     }>,
      * }
      */
-    #[\Override]
     public function jsonSerialize(): array
     {
         $fees = [];
@@ -165,17 +167,5 @@ final class PathResult implements JsonSerializable
         ksort($normalized);
 
         return $normalized;
-    }
-
-    /**
-     * @return array{currency: string, amount: string, scale: int}
-     */
-    private static function serializeMoney(Money $money): array
-    {
-        return [
-            'currency' => $money->currency(),
-            'amount' => $money->amount(),
-            'scale' => $money->scale(),
-        ];
     }
 }

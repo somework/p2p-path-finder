@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathFinder;
 
+use SomeWork\P2PPathFinder\Application\Graph\Graph;
+use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\Guard\SearchGuards;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy;
@@ -19,7 +21,6 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 use SplPriorityQueue;
 
-use function array_key_exists;
 use function array_map;
 use function array_values;
 use function implode;
@@ -30,44 +31,6 @@ use function usort;
 
 /**
  * Implementation of a tolerance-aware best-path search through the trading graph.
- *
- * @psalm-type GraphEdge = array{
- *     from: string,
- *     to: string,
- *     orderSide: OrderSide,
- *     order: Order,
- *     rate: ExchangeRate,
- *     baseCapacity: array{min: Money, max: Money},
- *     quoteCapacity: array{min: Money, max: Money},
- *     grossBaseCapacity: array{min: Money, max: Money},
- *     segments: list<array{
- *         isMandatory: bool,
- *         base: array{min: Money, max: Money},
- *         quote: array{min: Money, max: Money},
- *         grossBase: array{min: Money, max: Money},
- *     }>,
- * }
- *
- * @phpstan-type GraphEdge array{
- *     from: string,
- *     to: string,
- *     orderSide: OrderSide,
- *     order: Order,
- *     rate: ExchangeRate,
- *     baseCapacity: array{min: Money, max: Money},
- *     quoteCapacity: array{min: Money, max: Money},
- *     grossBaseCapacity: array{min: Money, max: Money},
- *     segments: list<array{
- *         isMandatory: bool,
- *         base: array{min: Money, max: Money},
- *         quote: array{min: Money, max: Money},
- *         grossBase: array{min: Money, max: Money},
- *     }>,
- * }
- *
- * @psalm-type Graph = array<string, array{currency: string, edges: list<GraphEdge>}>
- *
- * @phpstan-type Graph array<string, array{currency: string, edges: list<GraphEdge>}>
  *
  * @psalm-type SpendRange = array{min: Money, max: Money}
  *
@@ -242,7 +205,6 @@ final class PathFinder
     }
 
     /**
-     * @param Graph                         $graph
      * @param SpendConstraints|null         $spendConstraints
      * @param callable(Candidate):bool|null $acceptCandidate
      *
@@ -253,7 +215,7 @@ final class PathFinder
      * @psalm-return SearchOutcome<Candidate>
      */
     public function findBestPaths(
-        array $graph,
+        Graph $graph,
         string $source,
         string $target,
         ?array $spendConstraints = null,
@@ -262,7 +224,7 @@ final class PathFinder
         $source = strtoupper($source);
         $target = strtoupper($target);
 
-        if (!array_key_exists($source, $graph) || !array_key_exists($target, $graph)) {
+        if (!$graph->hasNode($source) || !$graph->hasNode($target)) {
             /** @var SearchOutcome<Candidate> $empty */
             $empty = SearchOutcome::empty(GuardLimitStatus::none());
 
@@ -341,13 +303,14 @@ final class PathFinder
                 continue;
             }
 
-            if (!array_key_exists($state['node'], $graph)) {
+            $currentNode = $graph->node($state['node']);
+            if (null === $currentNode) {
                 continue;
             }
 
-            foreach ($graph[$state['node']]['edges'] as $edge) {
-                $nextNode = $edge['to'];
-                if (!array_key_exists($nextNode, $graph)) {
+            foreach ($currentNode->edges() as $edge) {
+                $nextNode = $edge->to();
+                if (!$graph->hasNode($nextNode)) {
                     continue;
                 }
 
@@ -413,11 +376,11 @@ final class PathFinder
 
                 $nextPath = $state['path'];
                 $nextPath[] = [
-                    'from' => $edge['from'],
+                    'from' => $edge->from(),
                     'to' => $nextNode,
-                    'order' => $edge['order'],
-                    'rate' => $edge['rate'],
-                    'orderSide' => $edge['orderSide'],
+                    'order' => $edge->order(),
+                    'rate' => $edge->rate(),
+                    'orderSide' => $edge->orderSide(),
                     'conversionRate' => $conversionRate,
                 ];
 
@@ -741,30 +704,28 @@ final class PathFinder
     }
 
     /**
-     * @param GraphEdge  $edge
      * @param SpendRange $range
      *
      * @return SpendRange|null
      */
-    private function edgeSupportsAmount(array $edge, array $range): ?array
+    private function edgeSupportsAmount(GraphEdge $edge, array $range): ?array
     {
-        $key = OrderSide::BUY === $edge['orderSide'] ? 'grossBase' : 'quote';
-        $capacity = OrderSide::BUY === $edge['orderSide']
-            ? $edge['grossBaseCapacity']
-            : $edge['quoteCapacity'];
+        $isBuy = OrderSide::BUY === $edge->orderSide();
+        $capacity = $isBuy ? $edge->grossBaseCapacity() : $edge->quoteCapacity();
 
         $scale = max(
             $range['min']->scale(),
             $range['max']->scale(),
-            $capacity['min']->scale(),
-            $capacity['max']->scale(),
+            $capacity->min()->scale(),
+            $capacity->max()->scale(),
         );
 
-        foreach ($edge['segments'] as $segment) {
+        foreach ($edge->segments() as $segment) {
+            $segmentCapacity = $isBuy ? $segment->grossBase() : $segment->quote();
             $scale = max(
                 $scale,
-                $segment[$key]['min']->scale(),
-                $segment[$key]['max']->scale(),
+                $segmentCapacity->min()->scale(),
+                $segmentCapacity->max()->scale(),
             );
         }
 
@@ -775,19 +736,20 @@ final class PathFinder
             [$requestedMin, $requestedMax] = [$requestedMax, $requestedMin];
         }
 
-        if ([] === $edge['segments']) {
-            $minimum = $capacity['min']->withScale($scale);
-            $maximum = $capacity['max']->withScale($scale);
+        if ([] === $edge->segments()) {
+            $minimum = $capacity->min()->withScale($scale);
+            $maximum = $capacity->max()->withScale($scale);
         } else {
             $minimum = Money::zero($requestedMin->currency(), $scale);
             $maximum = Money::zero($requestedMin->currency(), $scale);
 
-            foreach ($edge['segments'] as $segment) {
-                if ($segment['isMandatory']) {
-                    $minimum = $minimum->add($segment[$key]['min']->withScale($scale));
+            foreach ($edge->segments() as $segment) {
+                $segmentCapacity = $isBuy ? $segment->grossBase() : $segment->quote();
+                if ($segment->isMandatory()) {
+                    $minimum = $minimum->add($segmentCapacity->min()->withScale($scale));
                 }
 
-                $maximum = $maximum->add($segment[$key]['max']->withScale($scale));
+                $maximum = $maximum->add($segmentCapacity->max()->withScale($scale));
             }
         }
 
@@ -816,12 +778,11 @@ final class PathFinder
     }
 
     /**
-     * @param GraphEdge  $edge
      * @param SpendRange $range
      *
      * @return SpendRange
      */
-    private function calculateNextRange(array $edge, array $range): array
+    private function calculateNextRange(GraphEdge $edge, array $range): array
     {
         $minimum = $this->convertEdgeAmount($edge, $range['min']);
         $maximum = $this->convertEdgeAmount($edge, $range['max']);
@@ -833,37 +794,34 @@ final class PathFinder
         return ['min' => $minimum, 'max' => $maximum];
     }
 
-    /**
-     * @param GraphEdge $edge
-     */
-    private function convertEdgeAmount(array $edge, Money $current): Money
+    private function convertEdgeAmount(GraphEdge $edge, Money $current): Money
     {
         $conversionRate = $this->edgeEffectiveConversionRate($edge);
         if (1 !== BcMath::comp($conversionRate, '0', self::SCALE)) {
-            return Money::zero($edge['to'], max($current->scale(), self::SCALE));
+            return Money::zero($edge->to(), max($current->scale(), self::SCALE));
         }
 
-        $sourceCapacity = OrderSide::BUY === $edge['orderSide']
-            ? $edge['grossBaseCapacity']
-            : $edge['quoteCapacity'];
-        $targetCapacity = OrderSide::BUY === $edge['orderSide']
-            ? $edge['quoteCapacity']
-            : $edge['baseCapacity'];
+        $sourceCapacity = OrderSide::BUY === $edge->orderSide()
+            ? $edge->grossBaseCapacity()
+            : $edge->quoteCapacity();
+        $targetCapacity = OrderSide::BUY === $edge->orderSide()
+            ? $edge->quoteCapacity()
+            : $edge->baseCapacity();
 
         $sourceScale = max(
-            $sourceCapacity['min']->scale(),
-            $sourceCapacity['max']->scale(),
+            $sourceCapacity->min()->scale(),
+            $sourceCapacity->max()->scale(),
             $current->scale(),
             self::SCALE,
         );
         $targetScale = max(
-            $targetCapacity['min']->scale(),
-            $targetCapacity['max']->scale(),
+            $targetCapacity->min()->scale(),
+            $targetCapacity->max()->scale(),
             self::SCALE,
         );
 
-        $sourceMin = $sourceCapacity['min']->withScale($sourceScale);
-        $sourceMax = $sourceCapacity['max']->withScale($sourceScale);
+        $sourceMin = $sourceCapacity->min()->withScale($sourceScale);
+        $sourceMax = $sourceCapacity->max()->withScale($sourceScale);
         $clampedCurrent = $current->withScale($sourceScale);
 
         if ($clampedCurrent->lessThan($sourceMin)) {
@@ -875,8 +833,8 @@ final class PathFinder
         }
 
         $sourceDelta = $sourceMax->subtract($sourceMin, $sourceScale);
-        $targetMin = $targetCapacity['min']->withScale($targetScale);
-        $targetMax = $targetCapacity['max']->withScale($targetScale);
+        $targetMin = $targetCapacity->min()->withScale($targetScale);
+        $targetMax = $targetCapacity->max()->withScale($targetScale);
         $targetDelta = $targetMax->subtract($targetMin, $targetScale);
 
         $ratioScale = max($sourceScale, $targetScale, self::SCALE);
@@ -906,7 +864,7 @@ final class PathFinder
 
         $normalized = BcMath::normalize($baseAmount, $ratioScale + self::SUM_EXTRA_SCALE);
         $result = Money::fromString(
-            $edge['to'],
+            $edge->to(),
             $normalized,
             $ratioScale + self::SUM_EXTRA_SCALE,
         );
@@ -941,20 +899,18 @@ final class PathFinder
     }
 
     /**
-     * @param GraphEdge $edge
-     *
      * @throws PrecisionViolation when the edge ratio cannot be evaluated using BCMath
      *
      * @return numeric-string
      */
-    private function edgeEffectiveConversionRate(array $edge): string
+    private function edgeEffectiveConversionRate(GraphEdge $edge): string
     {
         $baseToQuote = $this->edgeBaseToQuoteRatio($edge);
         if (1 !== BcMath::comp($baseToQuote, '0', self::SCALE)) {
             return $baseToQuote;
         }
 
-        if (OrderSide::SELL === $edge['orderSide']) {
+        if (OrderSide::SELL === $edge->orderSide()) {
             return BcMath::div('1', $baseToQuote, self::SCALE);
         }
 
@@ -962,27 +918,26 @@ final class PathFinder
     }
 
     /**
-     * @param GraphEdge $edge
-     *
      * @throws PrecisionViolation when the edge capacity ratios cannot be evaluated using BCMath
      *
      * @return numeric-string
      */
-    private function edgeBaseToQuoteRatio(array $edge): string
+    private function edgeBaseToQuoteRatio(GraphEdge $edge): string
     {
-        $baseCapacity = OrderSide::BUY === $edge['orderSide']
-            ? $edge['grossBaseCapacity']
-            : $edge['baseCapacity'];
+        $baseCapacity = OrderSide::BUY === $edge->orderSide()
+            ? $edge->grossBaseCapacity()
+            : $edge->baseCapacity();
 
-        $baseScale = max($baseCapacity['min']->scale(), $baseCapacity['max']->scale());
-        $quoteScale = max($edge['quoteCapacity']['min']->scale(), $edge['quoteCapacity']['max']->scale());
+        $baseScale = max($baseCapacity->min()->scale(), $baseCapacity->max()->scale());
+        $quoteCapacity = $edge->quoteCapacity();
+        $quoteScale = max($quoteCapacity->min()->scale(), $quoteCapacity->max()->scale());
 
-        $baseMax = $baseCapacity['max']->withScale($baseScale)->amount();
+        $baseMax = $baseCapacity->max()->withScale($baseScale)->amount();
         if (0 === BcMath::comp($baseMax, '0', $baseScale)) {
             return BcMath::normalize('0', self::SCALE);
         }
 
-        $quoteMax = $edge['quoteCapacity']['max']->withScale($quoteScale)->amount();
+        $quoteMax = $quoteCapacity->max()->withScale($quoteScale)->amount();
 
         return BcMath::div($quoteMax, $baseMax, self::SCALE);
     }
@@ -1065,7 +1020,6 @@ final class SearchStateQueue extends SplPriorityQueue
      * @psalm-param SearchState                                               $value
      * @psalm-param array{cost: numeric-string, order: int}|SearchQueueEntry $priority
      */
-    #[\Override]
     public function insert($value, $priority): true
     {
         if (isset($priority['state'], $priority['priority'])) {
@@ -1089,7 +1043,6 @@ final class SearchStateQueue extends SplPriorityQueue
     /**
      * @psalm-return SearchState
      */
-    #[\Override]
     public function extract(): array
     {
         /** @var SearchQueueEntry $entry */
@@ -1108,7 +1061,6 @@ final class SearchStateQueue extends SplPriorityQueue
      * @psalm-param SearchQueueEntry $priority1
      * @psalm-param SearchQueueEntry $priority2
      */
-    #[\Override]
     public function compare($priority1, $priority2): int
     {
         $comparison = BcMath::comp($priority1['priority']['cost'], $priority2['priority']['cost'], $this->scale);
@@ -1141,7 +1093,6 @@ final class CandidateResultHeap extends SplPriorityQueue
      * @psalm-param CandidateHeapEntry $priority1
      * @psalm-param CandidateHeapEntry $priority2
      */
-    #[\Override]
     public function compare($priority1, $priority2): int
     {
         $leftCost = $priority1['cost'];

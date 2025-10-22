@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Service;
 
+use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
@@ -22,7 +23,6 @@ use function substr;
  *
  * @internal
  *
- * @psalm-import-type GraphEdge from PathFinder
  * @psalm-import-type PathEdge from PathFinder
  */
 final class LegMaterializer
@@ -42,7 +42,7 @@ final class LegMaterializer
     }
 
     /**
-     * @param list<GraphEdge>|list<PathEdge>                       $edges
+     * @param list<GraphEdge|PathEdge>                             $edges
      * @param array{net: Money, gross: Money, grossCeiling: Money} $initialSeed
      *
      * @return array{
@@ -74,10 +74,10 @@ final class LegMaterializer
         $applyTolerance = true;
 
         foreach ($edges as $edge) {
-            $order = $edge['order'];
-            $orderSide = $edge['orderSide'];
-            $from = $edge['from'];
-            $to = $edge['to'];
+            $order = $edge instanceof GraphEdge ? $edge->order() : $edge['order'];
+            $orderSide = $edge instanceof GraphEdge ? $edge->orderSide() : $edge['orderSide'];
+            $from = $edge instanceof GraphEdge ? $edge->from() : $edge['from'];
+            $to = $edge instanceof GraphEdge ? $edge->to() : $edge['to'];
 
             if ($from !== $currentCurrency) {
                 return null;

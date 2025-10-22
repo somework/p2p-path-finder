@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
@@ -60,7 +61,12 @@ final class PathFinderServicePropertyTest extends TestCase
             $graph = $this->graphBuilder->build($orders);
 
             $source = $scenario['source'];
-            $edges = $graph[$source]['edges'] ?? [];
+            $node = $graph->node($source);
+            if (null === $node) {
+                self::fail('Generated scenario must include the source node.');
+            }
+
+            $edges = $node->edges();
             if ([] === $edges) {
                 self::fail('Generated scenario must expose at least one outgoing edge from the source node.');
             }
@@ -128,7 +134,12 @@ final class PathFinderServicePropertyTest extends TestCase
             $graph = $this->graphBuilder->build($orders);
 
             $source = $scenario['source'];
-            $edges = $graph[$source]['edges'] ?? [];
+            $node = $graph->node($source);
+            if (null === $node) {
+                self::fail('Generated scenario must include the source node.');
+            }
+
+            $edges = $node->edges();
             if ([] === $edges) {
                 self::fail('Generated scenario must expose at least one outgoing edge from the source node.');
             }
@@ -232,7 +243,11 @@ final class PathFinderServicePropertyTest extends TestCase
             $orders = $scenario['orders'];
             $orderBook = new OrderBook($orders);
             $graph = $this->graphBuilder->build($orders);
-            $edges = $graph[$scenario['source']]['edges'] ?? [];
+            $node = $graph->node($scenario['source']);
+
+            self::assertNotNull($node, 'Dataset scenario should include the source node.');
+
+            $edges = $node->edges();
 
             self::assertNotSame([], $edges, 'Dataset scenario should expose source edges.');
 
@@ -256,14 +271,14 @@ final class PathFinderServicePropertyTest extends TestCase
         }
     }
 
-    /**
-     * @param array{orderSide: OrderSide, grossBaseCapacity: array{min: Money, max: Money}, quoteCapacity: array{min: Money, max: Money}} $edge
-     */
-    private function deriveSpendAmount(array $edge): Money
+    private function deriveSpendAmount(GraphEdge $edge): Money
     {
-        $capacity = OrderSide::BUY === $edge['orderSide'] ? $edge['grossBaseCapacity'] : $edge['quoteCapacity'];
-        $minimum = $capacity['min'];
-        $maximum = $capacity['max'];
+        $capacity = OrderSide::BUY === $edge->orderSide()
+            ? $edge->grossBaseCapacity()
+            : $edge->quoteCapacity();
+
+        $minimum = $capacity->min();
+        $maximum = $capacity->max();
         $scale = max($minimum->scale(), $maximum->scale());
 
         $midpoint = $minimum->add($maximum, $scale)->divide('2', $scale);

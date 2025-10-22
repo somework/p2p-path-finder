@@ -16,7 +16,6 @@ final class MinimumAmountFilter implements OrderFilterInterface
     {
     }
 
-    #[\Override]
     public function accepts(Order $order): bool
     {
         $minimum = $order->bounds()->min();

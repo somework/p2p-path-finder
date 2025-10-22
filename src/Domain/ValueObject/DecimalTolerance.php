@@ -136,7 +136,6 @@ final class DecimalTolerance implements JsonSerializable
     /**
      * @return numeric-string
      */
-    #[\Override]
     public function jsonSerialize(): string
     {
         return $this->ratio;

@@ -7,6 +7,11 @@ namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use ReflectionProperty;
+use SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity;
+use SomeWork\P2PPathFinder\Application\Graph\EdgeSegment;
+use SomeWork\P2PPathFinder\Application\Graph\Graph;
+use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
+use SomeWork\P2PPathFinder\Application\Graph\GraphNode;
 use SomeWork\P2PPathFinder\Application\PathFinder\CandidateResultHeap;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\SearchStateQueue;
@@ -579,16 +584,10 @@ final class PathFinderInternalsTest extends TestCase
             'to' => 'GAP',
         ]);
 
-        $graph = [
-            'EUR' => [
-                'currency' => 'EUR',
-                'edges' => [$edge],
-            ],
-            'USD' => [
-                'currency' => 'USD',
-                'edges' => [],
-            ],
-        ];
+        $graph = new Graph([
+            'EUR' => new GraphNode('EUR', [$edge]),
+            'USD' => new GraphNode('USD'),
+        ]);
 
         $outcome = $finder->findBestPaths(
             $graph,
@@ -632,15 +631,15 @@ final class PathFinderInternalsTest extends TestCase
                 [
                     'isMandatory' => true,
                     'base' => [
-                        'min' => CurrencyScenarioFactory::money('USD', '1.00', 2),
+                        'min' => Money::zero('USD', 2),
                         'max' => Money::zero('USD', 2),
                     ],
                     'quote' => [
-                        'min' => CurrencyScenarioFactory::money('EUR', '5.00', 2),
+                        'min' => Money::zero('EUR', 2),
                         'max' => Money::zero('EUR', 2),
                     ],
                     'grossBase' => [
-                        'min' => CurrencyScenarioFactory::money('USD', '1.10', 2),
+                        'min' => Money::zero('USD', 2),
                         'max' => Money::zero('USD', 2),
                     ],
                 ],
@@ -718,9 +717,9 @@ final class PathFinderInternalsTest extends TestCase
     /**
      * @param array<string, mixed> $overrides
      *
-     * @return array<string, mixed>
+     * @return GraphEdge fixture representing a sell edge for test scenarios
      */
-    private function createSellEdge(array $overrides = []): array
+    private function createSellEdge(array $overrides = []): GraphEdge
     {
         $order = OrderFactory::createOrder(
             OrderSide::SELL,
@@ -785,7 +784,9 @@ final class PathFinderInternalsTest extends TestCase
             ],
         ];
 
-        return $this->arrayReplaceRecursive($edge, $overrides);
+        $edge = $this->arrayReplaceRecursive($edge, $overrides);
+
+        return $this->hydrateEdge($edge);
     }
 
     /**
@@ -812,6 +813,32 @@ final class PathFinderInternalsTest extends TestCase
         }
 
         return $base;
+    }
+
+    /**
+     * @param array{from:string,to:string,orderSide:OrderSide,order:mixed,rate:mixed,baseCapacity:array{min:Money,max:Money},quoteCapacity:array{min:Money,max:Money},grossBaseCapacity:array{min:Money,max:Money},segments:list<array{isMandatory:bool,base:array{min:Money,max:Money},quote:array{min:Money,max:Money},grossBase:array{min:Money,max:Money}>}> $edge
+     */
+    private function hydrateEdge(array $edge): GraphEdge
+    {
+        return new GraphEdge(
+            $edge['from'],
+            $edge['to'],
+            $edge['orderSide'],
+            $edge['order'],
+            $edge['rate'],
+            new EdgeCapacity($edge['baseCapacity']['min'], $edge['baseCapacity']['max']),
+            new EdgeCapacity($edge['quoteCapacity']['min'], $edge['quoteCapacity']['max']),
+            new EdgeCapacity($edge['grossBaseCapacity']['min'], $edge['grossBaseCapacity']['max']),
+            array_map(
+                static fn (array $segment): EdgeSegment => new EdgeSegment(
+                    $segment['isMandatory'],
+                    new EdgeCapacity($segment['base']['min'], $segment['base']['max']),
+                    new EdgeCapacity($segment['quote']['min'], $segment['quote']['max']),
+                    new EdgeCapacity($segment['grossBase']['min'], $segment['grossBase']['max']),
+                ),
+                $edge['segments'],
+            ),
+        );
     }
 
     /**
