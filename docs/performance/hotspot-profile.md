@@ -48,7 +48,7 @@ work attributable to this component” rather than a disjoint partition.
 | `PathFinderBench->benchFindBottleneckMandatoryMinima` | 19.6 | 8.0 | Harness cost for invoking the service across both datasets. | N/A (benchmark scaffolding). |
 | `GraphBuilder->build` | 5.9 | 0.4 | Mutating the graph by reference and reusing zero `Money` instances removes the copy-on-write churn from the old implementation. | **P1.** Confirmed fixed – see [issue](./issues/p1-graph-builder.md) for follow-up tweaks. |
 | `PathFinderService->findBestPaths` | 7.7 | 0.7 | Reworked materialisation keeps candidate DTOs on stack and defers allocations until tolerance checks pass. | **P1.** Acceptance criteria met – see [issue](./issues/p1-pathfinder-callback.md). |
-| `ExchangeRate` value-object creation in `setUp()` | 2.0 | <0.1 | Fixture bootstrap still hydrates immutable exchange rates for every run, though the absolute cost dropped after the service optimisations. | P2. Consider caching fixture `ExchangeRate` instances across runs or sharing the base order set between benchmarks. |
+| `ExchangeRate` value-object creation in `setUp()` | 0.3 | 0.2 | Fixture bootstrap now just pays the cold-start hydration before the memoised `ExchangeRate` cache is populated. | N/A – cached across runs; cold-start only. |
 | `FeeBreakdown` helpers (via `GraphBuilder->build`) | 0.5 | 0.2 | Fee resolution now short-circuits the zero-fee path, so the remaining cost comes from the handful of orders that still charge fees. | P3. Keep an eye on this if fee-heavy datasets are introduced. |
 
 Queue operations (`SearchStateQueue->insert` / `extract`) consumed roughly 0.01% of
