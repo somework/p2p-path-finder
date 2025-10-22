@@ -274,7 +274,7 @@ class PathFinderBench
             foreach ($currentLayer as $index => $asset) {
                 for ($i = 0; $i < $fanout; ++$i) {
                     $nextAsset = $this->syntheticCurrency($counter);
-                    $orders[] = self::materialiseOrder(
+                    $orders[] = new Order(
                         OrderSide::SELL,
                         self::assetPair($nextAsset, $asset),
                         OrderBounds::from(
@@ -291,7 +291,7 @@ class PathFinderBench
         }
 
         foreach ($currentLayer as $asset) {
-            $orders[] = self::materialiseOrder(
+            $orders[] = new Order(
                 OrderSide::SELL,
                 self::assetPair('DST', $asset),
                 OrderBounds::from(
@@ -339,7 +339,7 @@ class PathFinderBench
 
         for ($pathIndex = 0; $pathIndex < $paths; ++$pathIndex) {
             $branchCurrency = $this->syntheticCurrency($counter);
-            $orders[] = self::materialiseOrder(
+            $orders[] = new Order(
                 OrderSide::BUY,
                 self::assetPair('SRC', $branchCurrency),
                 OrderBounds::from(
@@ -349,7 +349,7 @@ class PathFinderBench
                 self::exchangeRate('SRC', $branchCurrency, '1.000000', 6),
             );
 
-            $orders[] = self::materialiseOrder(
+            $orders[] = new Order(
                 OrderSide::BUY,
                 self::assetPair($branchCurrency, 'DST'),
                 OrderBounds::from(
@@ -387,14 +387,5 @@ class PathFinderBench
         $key = $base.'|'.$quote.'|'.$rate.'|'.$scale;
 
         return self::$exchangeRateCache[$key] ??= ExchangeRate::fromString($base, $quote, $rate, $scale);
-    }
-
-    private static function materialiseOrder(
-        OrderSide $side,
-        AssetPair $assetPair,
-        OrderBounds $bounds,
-        ExchangeRate $rate,
-    ): Order {
-        return new Order($side, $assetPair, $bounds, $rate);
     }
 }
