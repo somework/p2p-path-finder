@@ -6,6 +6,7 @@ namespace SomeWork\P2PPathFinder\Application\Service;
 
 use Closure;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
@@ -30,11 +31,9 @@ use function usort;
  * High level facade orchestrating order filtering, graph building and path search.
  *
  * @phpstan-import-type Candidate from PathFinder
- * @phpstan-import-type Graph from PathFinder
  * @phpstan-import-type SpendConstraints from PathFinder
  *
  * @psalm-import-type Candidate from PathFinder
- * @psalm-import-type Graph from PathFinder
  * @psalm-import-type SpendConstraints from PathFinder
  */
 final class PathFinderService
@@ -46,7 +45,7 @@ final class PathFinderService
     private readonly ToleranceEvaluator $toleranceEvaluator;
     private readonly PathOrderStrategy $orderingStrategy;
     /**
-     * @var Closure(PathSearchConfig):Closure(array, string, string, array, callable):SearchOutcome
+     * @var Closure(PathSearchConfig):Closure(Graph, string, string, array, callable):SearchOutcome
      */
     private readonly Closure $pathFinderFactory;
 
@@ -91,7 +90,7 @@ final class PathFinderService
              * @psalm-return SearchOutcome<Candidate>
              */
             $runner = static function (
-                array $graph,
+                Graph $graph,
                 string $source,
                 string $target,
                 array $range,
@@ -107,9 +106,6 @@ final class PathFinderService
                     $config->pathFinderTimeBudgetMs(),
                 );
 
-                /** @var Graph $graph */
-                $graph = $graph;
-
                 /** @var SpendConstraints $range */
                 $range = $range;
 
@@ -124,7 +120,7 @@ final class PathFinderService
 
         $factory = $factory instanceof Closure ? $factory : Closure::fromCallable($factory);
 
-        /** @var Closure(PathSearchConfig):Closure(array, string, string, array, callable):SearchOutcome $typedFactory */
+        /** @var Closure(PathSearchConfig):Closure(Graph, string, string, array, callable):SearchOutcome $typedFactory */
         $typedFactory = $factory;
 
         $this->pathFinderFactory = $typedFactory;
@@ -161,9 +157,8 @@ final class PathFinderService
             return $empty;
         }
 
-        /** @var Graph $graph */
         $graph = $this->graphBuilder->build($orders);
-        if (!isset($graph[$sourceCurrency], $graph[$targetCurrency])) {
+        if (!$graph->hasNode($sourceCurrency) || !$graph->hasNode($targetCurrency)) {
             /** @var SearchOutcome<PathResult> $empty */
             $empty = SearchOutcome::empty(GuardLimitStatus::none());
 

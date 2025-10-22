@@ -4,22 +4,13 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Graph;
 
-use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
-use function array_key_exists;
-
 /**
  * Converts a collection of domain orders into a weighted directed graph representation.
- *
- * @psalm-import-type Graph from PathFinder
- * @psalm-import-type GraphEdge from PathFinder
- *
- * @phpstan-import-type Graph from PathFinder
- * @phpstan-import-type GraphEdge from PathFinder
  */
 final class GraphBuilder
 {
@@ -36,21 +27,13 @@ final class GraphBuilder
 
     /**
      * @param iterable<Order> $orders
-     *
-     * @psalm-param iterable<Order> $orders
-     *
-     * @return Graph
-     *
-     * @psalm-return Graph
      */
-    public function build(iterable $orders): array
+    public function build(iterable $orders): Graph
     {
-        /**
-         * @var Graph $graph
-         *
-         * @psalm-var Graph $graph
-         */
-        $graph = [];
+        /** @var array<string, list<GraphEdge>> $edges */
+        $edges = [];
+        /** @var array<string, true> $currencies */
+        $currencies = [];
 
         foreach ($orders as $order) {
             if (!$order instanceof Order) {
@@ -64,41 +47,21 @@ final class GraphBuilder
                 OrderSide::SELL => [$pair->quote(), $pair->base()],
             };
 
-            $this->initializeNode($graph, $fromCurrency);
-            $this->initializeNode($graph, $toCurrency);
+            $currencies[$fromCurrency] = true;
+            $currencies[$toCurrency] = true;
 
-            $graph[$fromCurrency]['edges'][] = $this->createEdge($order, $fromCurrency, $toCurrency);
+            $edges[$fromCurrency][] = $this->createEdge($order, $fromCurrency, $toCurrency);
         }
 
-        return $graph;
-    }
-
-    /**
-     * @param array<string, array{currency: string, edges: list<GraphEdge>}> &$graph
-     *
-     * @psalm-param array<string, array{currency: string, edges: list<GraphEdge>}> &$graph
-     */
-    private function initializeNode(array &$graph, string $currency): void
-    {
-        if (array_key_exists($currency, $graph)) {
-            return;
+        $nodes = [];
+        foreach ($currencies as $currency => $_) {
+            $nodes[$currency] = new GraphNode($currency, $edges[$currency] ?? []);
         }
 
-        /** @psalm-var list<GraphEdge> $edges */
-        $edges = [];
-
-        $graph[$currency] = [
-            'currency' => $currency,
-            'edges' => $edges,
-        ];
+        return new Graph($nodes);
     }
 
-    /**
-     * @return GraphEdge
-     *
-     * @psalm-return GraphEdge
-     */
-    private function createEdge(Order $order, string $fromCurrency, string $toCurrency): array
+    private function createEdge(Order $order, string $fromCurrency, string $toCurrency): GraphEdge
     {
         $bounds = $order->bounds();
 
@@ -112,25 +75,16 @@ final class GraphBuilder
         $maxFees = $maxFill['fees'];
         $hasFees = !$minFees->isZero() || !$maxFees->isZero();
 
-        return [
-            'from' => $fromCurrency,
-            'to' => $toCurrency,
-            'orderSide' => $order->side(),
-            'order' => $order,
-            'rate' => $order->effectiveRate(),
-            'baseCapacity' => [
-                'min' => $minFill['netBase'],
-                'max' => $maxFill['netBase'],
-            ],
-            'quoteCapacity' => [
-                'min' => $minFill['quote'],
-                'max' => $maxFill['quote'],
-            ],
-            'grossBaseCapacity' => [
-                'min' => $minFill['grossBase'],
-                'max' => $maxFill['grossBase'],
-            ],
-            'segments' => $this->buildSegments(
+        return new GraphEdge(
+            $fromCurrency,
+            $toCurrency,
+            $order->side(),
+            $order,
+            $order->effectiveRate(),
+            new EdgeCapacity($minFill['netBase'], $maxFill['netBase']),
+            new EdgeCapacity($minFill['quote'], $maxFill['quote']),
+            new EdgeCapacity($minFill['grossBase'], $maxFill['grossBase']),
+            $this->buildSegments(
                 $minFill['netBase'],
                 $maxFill['netBase'],
                 $minFill['quote'],
@@ -139,16 +93,11 @@ final class GraphBuilder
                 $maxFill['grossBase'],
                 $hasFees,
             ),
-        ];
+        );
     }
 
     /**
-     * @return list<array{
-     *     isMandatory: bool,
-     *     base: array{min: Money, max: Money},
-     *     quote: array{min: Money, max: Money},
-     *     grossBase: array{min: Money, max: Money},
-     * }>
+     * @return list<EdgeSegment>
      */
     private function buildSegments(
         Money $minBase,
@@ -166,21 +115,12 @@ final class GraphBuilder
         $segments = [];
 
         if (!$minBase->isZero()) {
-            $segments[] = [
-                'isMandatory' => true,
-                'base' => [
-                    'min' => $minBase,
-                    'max' => $minBase,
-                ],
-                'quote' => [
-                    'min' => $minQuote,
-                    'max' => $minQuote,
-                ],
-                'grossBase' => [
-                    'min' => $minGrossBase,
-                    'max' => $minGrossBase,
-                ],
-            ];
+            $segments[] = new EdgeSegment(
+                true,
+                new EdgeCapacity($minBase, $minBase),
+                new EdgeCapacity($minQuote, $minQuote),
+                new EdgeCapacity($minGrossBase, $minGrossBase),
+            );
         }
 
         $baseRemainder = $maxBase->subtract($minBase);
@@ -188,39 +128,39 @@ final class GraphBuilder
             $quoteRemainder = $maxQuote->subtract($minQuote);
             $grossBaseRemainder = $maxGrossBase->subtract($minGrossBase);
 
-            $segments[] = [
-                'isMandatory' => false,
-                'base' => [
-                    'min' => $this->zeroMoney($baseRemainder->currency(), $baseRemainder->scale()),
-                    'max' => $baseRemainder,
-                ],
-                'quote' => [
-                    'min' => $this->zeroMoney($quoteRemainder->currency(), $quoteRemainder->scale()),
-                    'max' => $quoteRemainder,
-                ],
-                'grossBase' => [
-                    'min' => $this->zeroMoney($grossBaseRemainder->currency(), $grossBaseRemainder->scale()),
-                    'max' => $grossBaseRemainder,
-                ],
-            ];
+            $segments[] = new EdgeSegment(
+                false,
+                new EdgeCapacity(
+                    $this->zeroMoney($baseRemainder->currency(), $baseRemainder->scale()),
+                    $baseRemainder,
+                ),
+                new EdgeCapacity(
+                    $this->zeroMoney($quoteRemainder->currency(), $quoteRemainder->scale()),
+                    $quoteRemainder,
+                ),
+                new EdgeCapacity(
+                    $this->zeroMoney($grossBaseRemainder->currency(), $grossBaseRemainder->scale()),
+                    $grossBaseRemainder,
+                ),
+            );
         }
 
         if ([] === $segments) {
-            $segments[] = [
-                'isMandatory' => false,
-                'base' => [
-                    'min' => $this->zeroMoney($minBase->currency(), $minBase->scale()),
-                    'max' => $this->zeroMoney($maxBase->currency(), $maxBase->scale()),
-                ],
-                'quote' => [
-                    'min' => $this->zeroMoney($minQuote->currency(), $minQuote->scale()),
-                    'max' => $this->zeroMoney($maxQuote->currency(), $maxQuote->scale()),
-                ],
-                'grossBase' => [
-                    'min' => $this->zeroMoney($minGrossBase->currency(), $minGrossBase->scale()),
-                    'max' => $this->zeroMoney($maxGrossBase->currency(), $maxGrossBase->scale()),
-                ],
-            ];
+            $segments[] = new EdgeSegment(
+                false,
+                new EdgeCapacity(
+                    $this->zeroMoney($minBase->currency(), $minBase->scale()),
+                    $this->zeroMoney($maxBase->currency(), $maxBase->scale()),
+                ),
+                new EdgeCapacity(
+                    $this->zeroMoney($minQuote->currency(), $minQuote->scale()),
+                    $this->zeroMoney($maxQuote->currency(), $maxQuote->scale()),
+                ),
+                new EdgeCapacity(
+                    $this->zeroMoney($minGrossBase->currency(), $minGrossBase->scale()),
+                    $this->zeroMoney($maxGrossBase->currency(), $maxGrossBase->scale()),
+                ),
+            );
         }
 
         return $segments;

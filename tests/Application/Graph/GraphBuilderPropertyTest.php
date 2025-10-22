@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Application\Graph;
 
 use PHPUnit\Framework\TestCase;
+use SomeWork\P2PPathFinder\Application\Graph\EdgeSegment;
+use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Application\Support\Generator\GraphScenarioGenerator;
@@ -38,7 +41,7 @@ final class GraphBuilderPropertyTest extends TestCase
 
         for ($iteration = 0; $iteration < $limit; ++$iteration) {
             $orders = $this->generator->orders();
-            $graph = $builder->build($orders);
+            $graph = $this->exportGraph($builder->build($orders));
 
             $expectedCurrencies = $this->collectCurrencies($orders);
             $actualCurrencies = array_keys($graph);
@@ -53,6 +56,66 @@ final class GraphBuilderPropertyTest extends TestCase
                 }
             }
         }
+    }
+
+    /**
+     * @return array<string, array{currency: string, edges: list<array<string, mixed>>}>
+     */
+    private function exportGraph(Graph $graph): array
+    {
+        $export = [];
+
+        foreach ($graph as $currency => $node) {
+            $export[$currency] = [
+                'currency' => $currency,
+                'edges' => array_map([$this, 'exportEdge'], $node->edges()),
+            ];
+        }
+
+        return $export;
+    }
+
+    private function exportEdge(GraphEdge $edge): array
+    {
+        return [
+            'from' => $edge->from(),
+            'to' => $edge->to(),
+            'orderSide' => $edge->orderSide(),
+            'order' => $edge->order(),
+            'rate' => $edge->rate(),
+            'baseCapacity' => [
+                'min' => $edge->baseCapacity()->min(),
+                'max' => $edge->baseCapacity()->max(),
+            ],
+            'quoteCapacity' => [
+                'min' => $edge->quoteCapacity()->min(),
+                'max' => $edge->quoteCapacity()->max(),
+            ],
+            'grossBaseCapacity' => [
+                'min' => $edge->grossBaseCapacity()->min(),
+                'max' => $edge->grossBaseCapacity()->max(),
+            ],
+            'segments' => array_map([$this, 'exportSegment'], $edge->segments()),
+        ];
+    }
+
+    private function exportSegment(EdgeSegment $segment): array
+    {
+        return [
+            'isMandatory' => $segment->isMandatory(),
+            'base' => [
+                'min' => $segment->base()->min(),
+                'max' => $segment->base()->max(),
+            ],
+            'quote' => [
+                'min' => $segment->quote()->min(),
+                'max' => $segment->quote()->max(),
+            ],
+            'grossBase' => [
+                'min' => $segment->grossBase()->min(),
+                'max' => $segment->grossBase()->max(),
+            ],
+        ];
     }
 
     /**

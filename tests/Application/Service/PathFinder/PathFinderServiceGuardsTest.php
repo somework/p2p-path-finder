@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Application\Service\PathFinder;
 
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
@@ -345,7 +346,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
     private function pathFinderFactoryForCandidates(array $candidates, ?GuardLimitStatus $guardLimits = null): callable
     {
         return static function (PathSearchConfig $config) use ($candidates, $guardLimits): callable {
-            return static function (array $graph, string $source, string $target, array $range, callable $callback) use ($candidates, $guardLimits): SearchOutcome {
+            return static function (Graph $graph, string $source, string $target, array $range, callable $callback) use ($candidates, $guardLimits): SearchOutcome {
                 foreach ($candidates as $candidate) {
                     $callback($candidate);
                 }
