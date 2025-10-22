@@ -17,7 +17,8 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 use function array_fill;
 use function array_map;
 use function array_merge;
-use function number_format;
+use function bcdiv;
+use function bcsub;
 use function str_pad;
 use function strlen;
 
@@ -78,7 +79,7 @@ class PathFinderBench
     {
         $orderBook = new OrderBook(array_merge(...array_fill(0, $params['orderSetRepeats'], $this->baseOrders)));
         $config = PathSearchConfig::builder()
-            ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+            ->withSpendAmount(self::money('USD', '100.00', 2))
             ->withToleranceBounds('0.00', '0.02')
             ->withHopLimits($params['minHop'], $params['maxHop'])
             ->withResultLimit(5)
@@ -95,7 +96,7 @@ class PathFinderBench
     {
         $orderBook = $this->buildDenseOrderBook($params['depth'], $params['fanout']);
         $config = PathSearchConfig::builder()
-            ->withSpendAmount(Money::fromString('SRC', '10.00', 2))
+            ->withSpendAmount(self::money('SRC', '10.00', 2))
             ->withToleranceBounds('0.00', '0.00')
             ->withHopLimits(1, $params['maxHop'])
             ->withSearchGuards($params['searchGuard'], $params['searchGuard'])
@@ -113,7 +114,7 @@ class PathFinderBench
     {
         $orderBook = $this->buildKBestOrderBook($params['orderCount']);
         $config = PathSearchConfig::builder()
-            ->withSpendAmount(Money::fromString('SRC', '1.00', 2))
+            ->withSpendAmount(self::money('SRC', '1.00', 2))
             ->withToleranceBounds('0.00', '0.00')
             ->withHopLimits(2, 2)
             ->withResultLimit($params['resultLimit'])
@@ -131,7 +132,7 @@ class PathFinderBench
         $factory = $params['factory'];
         $orderBook = clone $this->bottleneckOrderBooks[$factory];
         $config = PathSearchConfig::builder()
-            ->withSpendAmount(Money::fromString('SRC', $params['spend'], 2))
+            ->withSpendAmount(self::money('SRC', $params['spend'], 2))
             ->withToleranceBounds('0.00', '0.00')
             ->withHopLimits($params['minHop'], $params['maxHop'])
             ->withResultLimit($params['resultLimit'])
@@ -339,6 +340,8 @@ class PathFinderBench
 
         for ($pathIndex = 0; $pathIndex < $paths; ++$pathIndex) {
             $branchCurrency = $this->syntheticCurrency($counter);
+            $decrement = bcdiv((string) ($pathIndex + 1), '100000', 6);
+            $rate = bcsub('1.000000', $decrement, 6);
             $orders[] = new Order(
                 OrderSide::BUY,
                 self::assetPair('SRC', $branchCurrency),
@@ -359,7 +362,7 @@ class PathFinderBench
                 self::exchangeRate(
                     $branchCurrency,
                     'DST',
-                    number_format(1.0 - (($pathIndex + 1) * 0.00001), 6, '.', ''),
+                    $rate,
                     6,
                 ),
             );
