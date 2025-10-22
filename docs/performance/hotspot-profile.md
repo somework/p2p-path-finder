@@ -59,12 +59,14 @@ rails prune most states.
 
 | Component | Time % | Memory % | Notes | Suggested mitigation |
 | --- | ---:| ---:| --- | --- |
-| `GraphBuilder->build` | 35.3 | 5.0 | In-place graph mutation and cached zero `Money` values cut runtime by ~30% and trimmed allocations substantially, but the dense order book still stresses this stage. | **P1.** Mitigation landed – see [issue](./issues/p1-graph-builder.md) for remaining nice-to-haves. |
-| `PathFinderService->findBestPaths` | 36.9 | 5.3 | The rewritten candidate callback now reuses buffers and skips premature DTO creation, halving the previous memory pressure. | **P1.** Acceptance criteria satisfied – see [issue](./issues/p1-pathfinder-callback.md). |
-| `BottleneckOrderBookFactory::createHighFanOut` | 26.0 | 1.7 | Fixture factory still rebuilds the dense order book every run; relative share grew now that search/materialisation are cheaper. | P2. Provide a shared, memoised fixture in the benchmark to avoid rebuilding identical order books. |
-| `ExchangeRate` hydration | 9.0 | 0.3 | Exchange-rate hydration now shows up because the dominant hotspots were reduced. | P2. Cache fixture exchange rates alongside the shared order book. |
-| `OrderSpendAnalyzer->filterOrders` | 0.4 | 0.0 | Remains a minor contributor even with higher fan-out. | P3. Monitor after the P1 items land; not currently a bottleneck. |
+| `GraphBuilder->build` | 38.7 | 5.1 | In-place graph mutation still dominates, with `createEdge`/`OrderFillEvaluator` showing up underneath this stage even after fixture caching. | **P1.** Mitigation landed – see [issue](./issues/p1-graph-builder.md) for remaining nice-to-haves. |
+| `PathFinderService->findBestPaths` | 40.0 | 5.4 | The refactored candidate callback continues to reuse buffers and keeps allocations low, but the dense frontier keeps this slice near 40%. | **P1.** Acceptance criteria satisfied – see [issue](./issues/p1-pathfinder-callback.md). |
+| `BottleneckOrderBookFactory::createHighFanOut` | 25.6 | 1.4 | Memoised fixture now front-loads the dense book build once per PhpBench process; subsequent iterations clone the cached instance. | P3. Cold-start cost only – revisit if we need to hide warm-up time. |
+| `Money::fromString` (fixture warm-up) | 19.1 | 2.3 | `Money::fromString` and its `BcMath::normalize` dependency now appear because the cached book hydrates its values during the initial build (`ExchangeRate::fromString` trails at ~9%). | P3. Acceptable warm-up overhead; no action unless start-up time becomes critical. |
+| `OrderSpendAnalyzer->filterOrders` | 0.4 | 0.05 | Remains a minor contributor even with higher fan-out. | P3. Monitor after the P1 items land; not currently a bottleneck. |
 | `SearchStateQueue` operations | <0.02 | <0.01 | Queue push/pop still register at the noise floor after the refactors. | No action required; re-evaluate after other changes. |
+
+Fixture caching shifts the high-fan-out profile toward genuine search work: the cold-start hydration for `Money::fromString`/`ExchangeRate::fromString` shows up once when the memoised order book is materialised, after which GraphBuilder and the path finder dominate steady-state costs.
 
 ## Proposed mitigation backlog
 
@@ -72,7 +74,7 @@ The following mitigations have been triaged:
 
 * **P1 – GraphBuilder copy churn:** tracked in [docs/performance/issues/p1-graph-builder.md](./issues/p1-graph-builder.md).
 * **P1 – PathFinder materialisation overhead:** tracked in [docs/performance/issues/p1-pathfinder-callback.md](./issues/p1-pathfinder-callback.md).
-* **P2 – Fixture caching:** fold exchange-rate and order-book caching into the benchmarks to stabilise harness noise.
+* **P2 – Fixture caching (complete):** Bottleneck fixtures and bench-level helpers now memoise their data; only the cold-start hydration captured above remains.
 * **P3 – Queue micro-optimisations:** revisit only if future profiling shows the frontier costs growing.
 
 Re-run the PhpBench command above after each optimisation to validate the impact on
