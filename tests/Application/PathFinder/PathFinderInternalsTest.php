@@ -631,15 +631,15 @@ final class PathFinderInternalsTest extends TestCase
                 [
                     'isMandatory' => true,
                     'base' => [
-                        'min' => CurrencyScenarioFactory::money('USD', '1.00', 2),
+                        'min' => Money::zero('USD', 2),
                         'max' => Money::zero('USD', 2),
                     ],
                     'quote' => [
-                        'min' => CurrencyScenarioFactory::money('EUR', '5.00', 2),
+                        'min' => Money::zero('EUR', 2),
                         'max' => Money::zero('EUR', 2),
                     ],
                     'grossBase' => [
-                        'min' => CurrencyScenarioFactory::money('USD', '1.10', 2),
+                        'min' => Money::zero('USD', 2),
                         'max' => Money::zero('USD', 2),
                     ],
                 ],
