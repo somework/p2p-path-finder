@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Application\Result;
 
 use JsonSerializable;
+use SomeWork\P2PPathFinder\Application\Support\SerializesMoney;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
@@ -17,6 +18,8 @@ use function strtoupper;
  */
 final class PathLeg implements JsonSerializable
 {
+    use SerializesMoney;
+
     private readonly string $fromAsset;
 
     private readonly string $toAsset;
@@ -152,17 +155,5 @@ final class PathLeg implements JsonSerializable
         ksort($normalized);
 
         return $normalized;
-    }
-
-    /**
-     * @return array{currency: string, amount: string, scale: int}
-     */
-    private static function serializeMoney(Money $money): array
-    {
-        return [
-            'currency' => $money->currency(),
-            'amount' => $money->amount(),
-            'scale' => $money->scale(),
-        ];
     }
 }

@@ -9,10 +9,10 @@ use ArrayIterator;
 use IteratorAggregate;
 use JsonSerializable;
 use LogicException;
+use SomeWork\P2PPathFinder\Application\Support\SerializesMoney;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use Traversable;
 
 use function in_array;
@@ -25,6 +25,8 @@ use function in_array;
  */
 final class GraphEdge implements IteratorAggregate, JsonSerializable, ArrayAccess
 {
+    use SerializesMoney;
+
     /**
      * @var list<EdgeSegment>
      */
@@ -237,18 +239,6 @@ final class GraphEdge implements IteratorAggregate, JsonSerializable, ArrayAcces
             'quoteCapacity' => $this->quoteCapacity->jsonSerialize(),
             'grossBaseCapacity' => $this->grossBaseCapacity->jsonSerialize(),
             'segments' => $segments,
-        ];
-    }
-
-    /**
-     * @return array{currency: string, amount: string, scale: int}
-     */
-    private static function serializeMoney(Money $money): array
-    {
-        return [
-            'currency' => $money->currency(),
-            'amount' => $money->amount(),
-            'scale' => $money->scale(),
         ];
     }
 }

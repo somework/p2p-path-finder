@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Application\Graph;
 
 use JsonSerializable;
+use SomeWork\P2PPathFinder\Application\Support\SerializesMoney;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 /**
@@ -12,6 +13,8 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
  */
 final class EdgeCapacity implements JsonSerializable
 {
+    use SerializesMoney;
+
     public function __construct(
         private readonly Money $min,
         private readonly Money $max,
@@ -36,18 +39,6 @@ final class EdgeCapacity implements JsonSerializable
         return [
             'min' => self::serializeMoney($this->min),
             'max' => self::serializeMoney($this->max),
-        ];
-    }
-
-    /**
-     * @return array{currency: string, amount: string, scale: int}
-     */
-    private static function serializeMoney(Money $money): array
-    {
-        return [
-            'currency' => $money->currency(),
-            'amount' => $money->amount(),
-            'scale' => $money->scale(),
         ];
     }
 }
