@@ -15,6 +15,7 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 use function array_fill;
+use function array_map;
 use function array_merge;
 use function number_format;
 use function str_pad;
@@ -28,6 +29,26 @@ use SomeWork\P2PPathFinder\Tests\Fixture\BottleneckOrderBookFactory;
 class PathFinderBench
 {
     private PathFinderService $service;
+
+    /**
+     * @var array<string, Money>
+     */
+    private static array $moneyCache = [];
+
+    /**
+     * @var array<string, AssetPair>
+     */
+    private static array $assetPairCache = [];
+
+    /**
+     * @var array<string, ExchangeRate>
+     */
+    private static array $exchangeRateCache = [];
+
+    /**
+     * @var list<Order>|null
+     */
+    private static ?array $baseOrderPrototypes = null;
 
     /**
      * @var list<Order>
@@ -205,38 +226,40 @@ class PathFinderBench
      */
     private function createBaseOrderSet(): array
     {
-        $orderSet = [];
-        $orderSet[] = new Order(
-            OrderSide::SELL,
-            AssetPair::fromString('USD', 'BTC'),
-            OrderBounds::from(
-                Money::fromString('USD', '10.00', 2),
-                Money::fromString('USD', '1000.00', 2),
+        self::$baseOrderPrototypes ??= [
+            new Order(
+                OrderSide::SELL,
+                self::assetPair('USD', 'BTC'),
+                OrderBounds::from(
+                    self::money('USD', '10.00', 2),
+                    self::money('USD', '1000.00', 2),
+                ),
+                self::exchangeRate('USD', 'BTC', '1.0000', 4),
             ),
-            ExchangeRate::fromString('USD', 'BTC', '1.0000', 4),
-        );
-
-        $orderSet[] = new Order(
-            OrderSide::SELL,
-            AssetPair::fromString('BTC', 'EUR'),
-            OrderBounds::from(
-                Money::fromString('BTC', '50.00', 2),
-                Money::fromString('BTC', '5000.00', 2),
+            new Order(
+                OrderSide::SELL,
+                self::assetPair('BTC', 'EUR'),
+                OrderBounds::from(
+                    self::money('BTC', '50.00', 2),
+                    self::money('BTC', '5000.00', 2),
+                ),
+                self::exchangeRate('BTC', 'EUR', '0.92', 8),
             ),
-            ExchangeRate::fromString('BTC', 'EUR', '0.92', 8),
-        );
-
-        $orderSet[] = new Order(
-            OrderSide::SELL,
-            AssetPair::fromString('EUR', 'BTC'),
-            OrderBounds::from(
-                Money::fromString('EUR', '10.00', 2),
-                Money::fromString('EUR', '1000.00', 2),
+            new Order(
+                OrderSide::SELL,
+                self::assetPair('EUR', 'BTC'),
+                OrderBounds::from(
+                    self::money('EUR', '10.00', 2),
+                    self::money('EUR', '1000.00', 2),
+                ),
+                self::exchangeRate('EUR', 'BTC', '0.000015', 8),
             ),
-            ExchangeRate::fromString('EUR', 'BTC', '0.000015', 8),
-        );
+        ];
 
-        return $orderSet;
+        return array_map(
+            static fn (Order $order): Order => clone $order,
+            self::$baseOrderPrototypes,
+        );
     }
 
     private function buildDenseOrderBook(int $depth, int $fanout): OrderBook
@@ -251,14 +274,14 @@ class PathFinderBench
             foreach ($currentLayer as $index => $asset) {
                 for ($i = 0; $i < $fanout; ++$i) {
                     $nextAsset = $this->syntheticCurrency($counter);
-                    $orders[] = new Order(
+                    $orders[] = self::materialiseOrder(
                         OrderSide::SELL,
-                        AssetPair::fromString($nextAsset, $asset),
+                        self::assetPair($nextAsset, $asset),
                         OrderBounds::from(
-                            Money::fromString($nextAsset, '1.00', 2),
-                            Money::fromString($nextAsset, '1.00', 2),
+                            self::money($nextAsset, '1.00', 2),
+                            self::money($nextAsset, '1.00', 2),
                         ),
-                        ExchangeRate::fromString($nextAsset, $asset, '1.000', 3),
+                        self::exchangeRate($nextAsset, $asset, '1.000', 3),
                     );
                     $nextLayer[] = $nextAsset;
                 }
@@ -268,14 +291,14 @@ class PathFinderBench
         }
 
         foreach ($currentLayer as $asset) {
-            $orders[] = new Order(
+            $orders[] = self::materialiseOrder(
                 OrderSide::SELL,
-                AssetPair::fromString('DST', $asset),
+                self::assetPair('DST', $asset),
                 OrderBounds::from(
-                    Money::fromString('DST', '1.00', 2),
-                    Money::fromString('DST', '1.00', 2),
+                    self::money('DST', '1.00', 2),
+                    self::money('DST', '1.00', 2),
                 ),
-                ExchangeRate::fromString('DST', $asset, '1.000', 3),
+                self::exchangeRate('DST', $asset, '1.000', 3),
             );
         }
 
@@ -316,24 +339,24 @@ class PathFinderBench
 
         for ($pathIndex = 0; $pathIndex < $paths; ++$pathIndex) {
             $branchCurrency = $this->syntheticCurrency($counter);
-            $orders[] = new Order(
+            $orders[] = self::materialiseOrder(
                 OrderSide::BUY,
-                AssetPair::fromString('SRC', $branchCurrency),
+                self::assetPair('SRC', $branchCurrency),
                 OrderBounds::from(
-                    Money::fromString('SRC', '1.00', 2),
-                    Money::fromString('SRC', '1.00', 2),
+                    self::money('SRC', '1.00', 2),
+                    self::money('SRC', '1.00', 2),
                 ),
-                ExchangeRate::fromString('SRC', $branchCurrency, '1.000000', 6),
+                self::exchangeRate('SRC', $branchCurrency, '1.000000', 6),
             );
 
-            $orders[] = new Order(
+            $orders[] = self::materialiseOrder(
                 OrderSide::BUY,
-                AssetPair::fromString($branchCurrency, 'DST'),
+                self::assetPair($branchCurrency, 'DST'),
                 OrderBounds::from(
-                    Money::fromString($branchCurrency, '1.00', 2),
-                    Money::fromString($branchCurrency, '1.00', 2),
+                    self::money($branchCurrency, '1.00', 2),
+                    self::money($branchCurrency, '1.00', 2),
                 ),
-                ExchangeRate::fromString(
+                self::exchangeRate(
                     $branchCurrency,
                     'DST',
                     number_format(1.0 - (($pathIndex + 1) * 0.00001), 6, '.', ''),
@@ -343,5 +366,35 @@ class PathFinderBench
         }
 
         return new OrderBook($orders);
+    }
+
+    private static function money(string $currency, string $amount, int $scale): Money
+    {
+        $key = $currency.'|'.$amount.'|'.$scale;
+
+        return self::$moneyCache[$key] ??= Money::fromString($currency, $amount, $scale);
+    }
+
+    private static function assetPair(string $base, string $quote): AssetPair
+    {
+        $key = $base.'|'.$quote;
+
+        return self::$assetPairCache[$key] ??= AssetPair::fromString($base, $quote);
+    }
+
+    private static function exchangeRate(string $base, string $quote, string $rate, int $scale): ExchangeRate
+    {
+        $key = $base.'|'.$quote.'|'.$rate.'|'.$scale;
+
+        return self::$exchangeRateCache[$key] ??= ExchangeRate::fromString($base, $quote, $rate, $scale);
+    }
+
+    private static function materialiseOrder(
+        OrderSide $side,
+        AssetPair $assetPair,
+        OrderBounds $bounds,
+        ExchangeRate $rate,
+    ): Order {
+        return new Order($side, $assetPair, $bounds, $rate);
     }
 }
