@@ -26,8 +26,8 @@ use function sprintf;
 final class CandidatePath implements ArrayAccess
 {
     /**
-     * @param numeric-string                                                                                                        $cost
-     * @param numeric-string                                                                                                        $product
+     * @param numeric-string                                                                                                                $cost    aggregate spend for the candidate path
+     * @param numeric-string                                                                                                                $product cumulative product of the edge exchange rates
      * @param list<array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}> $edges
      */
     private function __construct(
@@ -40,8 +40,8 @@ final class CandidatePath implements ArrayAccess
     }
 
     /**
-     * @param numeric-string                                                                                                        $cost
-     * @param numeric-string                                                                                                        $product
+     * @param numeric-string                                                                                                                $cost    aggregate spend for the candidate path
+     * @param numeric-string                                                                                                                $product cumulative product of the edge exchange rates
      * @param list<array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}> $edges
      *
      * @throws InvalidInput when the hop count does not match the number of edges
