@@ -90,7 +90,6 @@ final class PathLeg implements JsonSerializable
      *     fees: array<string, array{currency: string, amount: string, scale: int}>,
      * }
      */
-    #[\Override]
     public function jsonSerialize(): array
     {
         $fees = [];

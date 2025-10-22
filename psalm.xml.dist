@@ -12,6 +12,7 @@
         <PossiblyUnusedMethod errorLevel="suppress" />
         <UnusedClass errorLevel="suppress" />
         <UnusedConstructor errorLevel="suppress" />
+        <MissingOverrideAttribute errorLevel="suppress" />
     </issueHandlers>
     <projectFiles>
         <directory name="src" />

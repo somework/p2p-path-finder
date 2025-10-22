@@ -47,7 +47,6 @@ final class EdgeSegment implements JsonSerializable
      *     grossBase: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
      * }
      */
-    #[\Override]
     public function jsonSerialize(): array
     {
         return [

@@ -717,7 +717,7 @@ final class PathFinderInternalsTest extends TestCase
     /**
      * @param array<string, mixed> $overrides
      *
-     * @return array<string, mixed>
+     * @return GraphEdge fixture representing a sell edge for test scenarios
      */
     private function createSellEdge(array $overrides = []): GraphEdge
     {

@@ -16,7 +16,6 @@ final class CurrencyPairFilter implements OrderFilterInterface
     {
     }
 
-    #[\Override]
     public function accepts(Order $order): bool
     {
         $orderPair = $order->assetPair();

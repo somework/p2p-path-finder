@@ -11,8 +11,6 @@ use JsonSerializable;
 use LogicException;
 use Traversable;
 
-use function is_string;
-
 /**
  * Directed multigraph representation keyed by asset symbol.
  *
@@ -61,35 +59,26 @@ final class Graph implements IteratorAggregate, JsonSerializable, ArrayAccess
         return $this->nodes[$currency] ?? null;
     }
 
-    #[\Override]
     public function getIterator(): Traversable
     {
         return new ArrayIterator($this->nodes);
     }
 
-    #[\Override]
     public function offsetExists(mixed $offset): bool
     {
-        return is_string($offset) && isset($this->nodes[$offset]);
+        return isset($this->nodes[$offset]);
     }
 
-    #[\Override]
     public function offsetGet(mixed $offset): ?GraphNode
     {
-        if (!is_string($offset)) {
-            return null;
-        }
-
         return $this->nodes[$offset] ?? null;
     }
 
-    #[\Override]
     public function offsetSet(mixed $offset, mixed $value): void
     {
         throw new LogicException('Graph is immutable.');
     }
 
-    #[\Override]
     public function offsetUnset(mixed $offset): void
     {
         throw new LogicException('Graph is immutable.');
@@ -98,7 +87,6 @@ final class Graph implements IteratorAggregate, JsonSerializable, ArrayAccess
     /**
      * @return array<string, array{currency: string, edges: list<array<string, mixed>>}>
      */
-    #[\Override]
     public function jsonSerialize(): array
     {
         $serialized = [];

@@ -54,19 +54,16 @@ final class GraphNode implements IteratorAggregate, JsonSerializable, ArrayAcces
         return $this->edges;
     }
 
-    #[\Override]
     public function getIterator(): Traversable
     {
         return new ArrayIterator($this->edges);
     }
 
-    #[\Override]
     public function offsetExists(mixed $offset): bool
     {
         return 'currency' === $offset || 'edges' === $offset;
     }
 
-    #[\Override]
     public function offsetGet(mixed $offset): mixed
     {
         return match ($offset) {
@@ -76,13 +73,11 @@ final class GraphNode implements IteratorAggregate, JsonSerializable, ArrayAcces
         };
     }
 
-    #[\Override]
     public function offsetSet(mixed $offset, mixed $value): void
     {
         throw new LogicException('Graph nodes are immutable.');
     }
 
-    #[\Override]
     public function offsetUnset(mixed $offset): void
     {
         throw new LogicException('Graph nodes are immutable.');
@@ -91,7 +86,6 @@ final class GraphNode implements IteratorAggregate, JsonSerializable, ArrayAcces
     /**
      * @return array{currency: string, edges: list<array<string, mixed>>}
      */
-    #[\Override]
     public function jsonSerialize(): array
     {
         return [

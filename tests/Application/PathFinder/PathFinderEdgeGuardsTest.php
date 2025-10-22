@@ -38,8 +38,8 @@ final class PathFinderEdgeGuardsTest extends TestCase
             $edge->order(),
             $edge->rate(),
             $edge->baseCapacity(),
-            new EdgeCapacity(Money::zero('USD', 3), Money::zero('USD', 3)),
             new EdgeCapacity(Money::zero('EUR', 3), Money::zero('EUR', 3)),
+            new EdgeCapacity(Money::zero('USD', 3), Money::zero('USD', 3)),
         );
 
         $graph = new Graph([

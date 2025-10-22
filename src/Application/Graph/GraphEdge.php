@@ -104,13 +104,11 @@ final class GraphEdge implements IteratorAggregate, JsonSerializable, ArrayAcces
         return $this->segments;
     }
 
-    #[\Override]
     public function getIterator(): Traversable
     {
         return new ArrayIterator($this->segments);
     }
 
-    #[\Override]
     public function offsetExists(mixed $offset): bool
     {
         return in_array($offset, [
@@ -126,7 +124,6 @@ final class GraphEdge implements IteratorAggregate, JsonSerializable, ArrayAcces
         ], true);
     }
 
-    #[\Override]
     public function offsetGet(mixed $offset): mixed
     {
         return match ($offset) {
@@ -169,13 +166,11 @@ final class GraphEdge implements IteratorAggregate, JsonSerializable, ArrayAcces
         };
     }
 
-    #[\Override]
     public function offsetSet(mixed $offset, mixed $value): void
     {
         throw new LogicException('Graph edges are immutable.');
     }
 
-    #[\Override]
     public function offsetUnset(mixed $offset): void
     {
         throw new LogicException('Graph edges are immutable.');
@@ -204,7 +199,6 @@ final class GraphEdge implements IteratorAggregate, JsonSerializable, ArrayAcces
      *     }>,
      * }
      */
-    #[\Override]
     public function jsonSerialize(): array
     {
         $segments = [];
