@@ -54,7 +54,7 @@ use function usort;
  *     order: Order,
  *     rate: ExchangeRate,
  *     orderSide: OrderSide,
- *     conversionRate: string,
+ *     conversionRate: numeric-string,
  * }
  *
  * @psalm-type CandidateHeapEntry = array{

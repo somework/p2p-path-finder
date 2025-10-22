@@ -873,7 +873,7 @@ final class PathFinderInternalsTest extends TestCase
     }
 
     /**
-     * @return list<array{from: string, to: string, order: Order, rate: mixed, orderSide: OrderSide, conversionRate: string}>
+     * @return list<array{from: string, to: string, order: Order, rate: mixed, orderSide: OrderSide, conversionRate: numeric-string}>
      */
     private function dummyEdges(int $count): array
     {

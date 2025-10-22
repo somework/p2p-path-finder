@@ -50,7 +50,7 @@ final class PathFinderTest extends TestCase
      *     cost: numeric-string,
      *     product: numeric-string,
      *     hops: int,
-     *     edges: list<array{from: string, to: string, order: mixed, rate: mixed, orderSide: mixed, conversionRate: string}>,
+     *     edges: list<array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}>,
      *     amountRange: array{min: Money, max: Money}|null,
      *     desiredAmount: Money|null,
      * }>
@@ -258,8 +258,8 @@ final class PathFinderTest extends TestCase
                 '10.000000000000000000',
                 2,
                 [
-                    ['from' => 'SRC', 'to' => 'BET'],
-                    ['from' => 'BET', 'to' => 'TRG'],
+                    self::stubCandidateEdge('SRC', 'BET'),
+                    self::stubCandidateEdge('BET', 'TRG'),
                 ],
             ),
             CandidatePath::from(
@@ -267,8 +267,8 @@ final class PathFinderTest extends TestCase
                 '10.000000000000000000',
                 2,
                 [
-                    ['from' => 'SRC', 'to' => 'ALP'],
-                    ['from' => 'ALP', 'to' => 'TRG'],
+                    self::stubCandidateEdge('SRC', 'ALP'),
+                    self::stubCandidateEdge('ALP', 'TRG'),
                 ],
             ),
             CandidatePath::from(
@@ -276,7 +276,7 @@ final class PathFinderTest extends TestCase
                 '10.000000000000000000',
                 1,
                 [
-                    ['from' => 'SRC', 'to' => 'TRG'],
+                    self::stubCandidateEdge('SRC', 'TRG'),
                 ],
             ),
         ];
@@ -339,8 +339,8 @@ final class PathFinderTest extends TestCase
                 '10.000000000000000000',
                 2,
                 [
-                    ['from' => 'SRC', 'to' => 'BET'],
-                    ['from' => 'BET', 'to' => 'TRG'],
+                    self::stubCandidateEdge('SRC', 'BET'),
+                    self::stubCandidateEdge('BET', 'TRG'),
                 ],
             ),
             CandidatePath::from(
@@ -348,8 +348,8 @@ final class PathFinderTest extends TestCase
                 '10.000000000000000000',
                 2,
                 [
-                    ['from' => 'SRC', 'to' => 'ALP'],
-                    ['from' => 'ALP', 'to' => 'TRG'],
+                    self::stubCandidateEdge('SRC', 'ALP'),
+                    self::stubCandidateEdge('ALP', 'TRG'),
                 ],
             ),
             CandidatePath::from(
@@ -357,7 +357,7 @@ final class PathFinderTest extends TestCase
                 '10.000000000000000000',
                 1,
                 [
-                    ['from' => 'SRC', 'to' => 'TRG'],
+                    self::stubCandidateEdge('SRC', 'TRG'),
                 ],
             ),
         ];
@@ -383,7 +383,7 @@ final class PathFinderTest extends TestCase
     }
 
     /**
-     * @param list<array{from: string, to: string}> $edges
+     * @param list<array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}> $edges
      */
     private static function routeSignatureFromEdges(array $edges): string
     {
@@ -398,6 +398,33 @@ final class PathFinderTest extends TestCase
         }
 
         return implode('->', $nodes);
+    }
+
+    /**
+     * @return array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}
+     */
+    private static function stubCandidateEdge(string $from, string $to): array
+    {
+        /** @var numeric-string $rate */
+        $rate = '1.000000000000000000';
+
+        return [
+            'from' => $from,
+            'to' => $to,
+            'order' => OrderFactory::createOrder(
+                OrderSide::BUY,
+                $from,
+                $to,
+                '1.000000000000000000',
+                '1.000000000000000000',
+                $rate,
+                amountScale: self::SCALE,
+                rateScale: self::SCALE,
+            ),
+            'rate' => ExchangeRate::fromString($from, $to, $rate, self::SCALE),
+            'orderSide' => OrderSide::BUY,
+            'conversionRate' => $rate,
+        ];
     }
 
     public function test_it_skips_duplicate_states_with_identical_cost_and_hops(): void

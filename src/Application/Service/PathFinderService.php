@@ -19,6 +19,9 @@ use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
+use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
+use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
@@ -41,7 +44,7 @@ final class PathFinderService
     private readonly ToleranceEvaluator $toleranceEvaluator;
     private readonly PathOrderStrategy $orderingStrategy;
     /**
-     * @var Closure(PathSearchConfig):Closure(Graph, string, string, ?SpendConstraints, callable(CandidatePath):bool):SearchOutcome
+     * @var Closure(PathSearchConfig):Closure(Graph, string, string, ?SpendConstraints, callable(CandidatePath):bool):SearchOutcome<CandidatePath>
      */
     private readonly Closure $pathFinderFactory;
 
@@ -101,7 +104,7 @@ final class PathFinderService
 
         $factory = $factory instanceof Closure ? $factory : Closure::fromCallable($factory);
 
-        /** @var Closure(PathSearchConfig):Closure(Graph, string, string, ?SpendConstraints, callable(CandidatePath):bool):SearchOutcome $typedFactory */
+        /** @var Closure(PathSearchConfig):Closure(Graph, string, string, ?SpendConstraints, callable(CandidatePath):bool):SearchOutcome<CandidatePath> $typedFactory */
         $typedFactory = $factory;
 
         $this->pathFinderFactory = $typedFactory;
@@ -288,9 +291,7 @@ final class PathFinderService
     }
 
     /**
-     * @phpstan-param list<array{from: string, to: string}> $edges
-     *
-     * @psalm-param list<array{from: string, to: string, ...}> $edges
+     * @param list<array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}> $edges
      */
     private function routeSignature(array $edges): string
     {

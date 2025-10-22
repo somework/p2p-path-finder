@@ -28,7 +28,7 @@ final class CandidatePath implements ArrayAccess
     /**
      * @param numeric-string                                                                                                        $cost
      * @param numeric-string                                                                                                        $product
-     * @param list<array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: string}> $edges
+     * @param list<array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}> $edges
      */
     private function __construct(
         private readonly string $cost,
@@ -42,7 +42,7 @@ final class CandidatePath implements ArrayAccess
     /**
      * @param numeric-string                                                                                                        $cost
      * @param numeric-string                                                                                                        $product
-     * @param list<array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: string}> $edges
+     * @param list<array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}> $edges
      *
      * @throws InvalidInput when the hop count does not match the number of edges
      */
@@ -88,7 +88,7 @@ final class CandidatePath implements ArrayAccess
     }
 
     /**
-     * @return list<array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: string}>
+     * @return list<array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}>
      */
     public function edges(): array
     {
@@ -114,7 +114,7 @@ final class CandidatePath implements ArrayAccess
             'edges' => $this->edges,
             'amountRange' => $this->range?->toRange(),
             'desiredAmount' => $this->range?->desired(),
-            default => throw new LogicException(sprintf('Unknown candidate path attribute "%s".', (string) $offset)),
+            default => throw new LogicException(sprintf('Unknown candidate path attribute "%s".', $offset)),
         };
     }
 
@@ -133,7 +133,7 @@ final class CandidatePath implements ArrayAccess
      *     cost: numeric-string,
      *     product: numeric-string,
      *     hops: int,
-     *     edges: list<array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: string}>,
+     *     edges: list<array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}>,
      *     amountRange: array{min: Money, max: Money}|null,
      *     desiredAmount: Money|null,
      * }
