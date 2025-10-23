@@ -6,7 +6,7 @@ namespace SomeWork\P2PPathFinder\Tests\Application\Service\PathFinder;
 
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
-use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Service\LegMaterializer;
@@ -31,7 +31,7 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
     /**
      * @param SearchOutcome<PathResult> $result
      */
-    private static function extractGuardLimits(SearchOutcome $result): GuardLimitStatus
+    private static function extractGuardLimits(SearchOutcome $result): SearchGuardReport
     {
         return $result->guardLimits();
     }

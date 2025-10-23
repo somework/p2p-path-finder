@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
-use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
@@ -321,7 +321,7 @@ final class PathFinderPropertyTest extends TestCase
         return $path->hops().'|'.implode(';', $segments);
     }
 
-    private function assertGuardStatusEquals(GuardLimitStatus $expected, GuardLimitStatus $actual, string $message): void
+    private function assertGuardStatusEquals(SearchGuardReport $expected, SearchGuardReport $actual, string $message): void
     {
         self::assertSame(
             $expected->expansionsReached(),
@@ -329,14 +329,39 @@ final class PathFinderPropertyTest extends TestCase
             $message.' (expansions)',
         );
         self::assertSame(
+            $expected->expansions(),
+            $actual->expansions(),
+            $message.' (expansion count)',
+        );
+        self::assertSame(
             $expected->visitedStatesReached(),
             $actual->visitedStatesReached(),
             $message.' (visited states)',
         );
         self::assertSame(
+            $expected->visitedStates(),
+            $actual->visitedStates(),
+            $message.' (visited count)',
+        );
+        self::assertSame(
             $expected->timeBudgetReached(),
             $actual->timeBudgetReached(),
             $message.' (time budget)',
+        );
+        self::assertSame(
+            $expected->expansionLimit(),
+            $actual->expansionLimit(),
+            $message.' (expansion limit)',
+        );
+        self::assertSame(
+            $expected->visitedStateLimit(),
+            $actual->visitedStateLimit(),
+            $message.' (visited limit)',
+        );
+        self::assertSame(
+            $expected->timeBudgetLimit(),
+            $actual->timeBudgetLimit(),
+            $message.' (time limit)',
         );
     }
 }

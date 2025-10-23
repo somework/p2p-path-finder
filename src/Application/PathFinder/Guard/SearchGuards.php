@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Application\PathFinder\Guard;
 
 use Closure;
-use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 
 use function microtime;
 
@@ -72,8 +72,25 @@ final class SearchGuards
         ++$this->expansions;
     }
 
-    public function finalize(bool $visitedGuardReached): GuardLimitStatus
+    public function finalize(int $visitedStates, int $visitedStateLimit, bool $visitedGuardReached): SearchGuardReport
     {
-        return new GuardLimitStatus($this->expansionLimitReached, $visitedGuardReached, $this->timeBudgetReached);
+        $now = ($this->clock)();
+        $elapsedMilliseconds = max(0.0, ($now - $this->startedAt) * 1000.0);
+
+        if (null !== $this->timeBudgetMs && !$this->timeBudgetReached && $elapsedMilliseconds >= (float) $this->timeBudgetMs) {
+            $this->timeBudgetReached = true;
+        }
+
+        return new SearchGuardReport(
+            expansionsReached: $this->expansionLimitReached,
+            visitedStatesReached: $visitedGuardReached,
+            timeBudgetReached: $this->timeBudgetReached,
+            expansions: $this->expansions,
+            visitedStates: $visitedStates,
+            elapsedMilliseconds: $elapsedMilliseconds,
+            expansionLimit: $this->maxExpansions,
+            visitedStateLimit: $visitedStateLimit,
+            timeBudgetLimit: $this->timeBudgetMs,
+        );
     }
 }

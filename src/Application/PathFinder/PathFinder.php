@@ -7,10 +7,10 @@ namespace SomeWork\P2PPathFinder\Application\PathFinder;
 use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\Guard\SearchGuards;
-use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
@@ -202,7 +202,7 @@ final class PathFinder
 
         if (!$graph->hasNode($source) || !$graph->hasNode($target)) {
             /** @var SearchOutcome<CandidatePath> $empty */
-            $empty = SearchOutcome::empty(GuardLimitStatus::none());
+            $empty = SearchOutcome::empty(SearchGuardReport::idle($this->maxVisitedStates, $this->maxExpansions, $this->timeBudgetMs));
 
             return $empty;
         }
@@ -392,7 +392,7 @@ final class PathFinder
             }
         }
 
-        $guardLimits = $guards->finalize($visitedGuardReached);
+        $guardLimits = $guards->finalize($visitedStates, $this->maxVisitedStates, $visitedGuardReached);
 
         if (0 === $results->count()) {
             /** @var SearchOutcome<CandidatePath> $empty */

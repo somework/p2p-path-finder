@@ -75,9 +75,10 @@ notice.【F:src/Application/Service/OrderSpendAnalyzer.php†L17-L23】【F:src/
   the tolerance validation performed by `PathFinder`.【F:src/Domain/ValueObject/BcMath.php†L79-L121】【F:src/Application/PathFinder/PathFinder.php†L166-L212】
 * **Wall-clock guard rails.** `PathSearchConfig::withSearchTimeBudget()` injects a
   millisecond budget directly into the search loop so that runaway expansions halt even when
-  structural guardrails are relaxed. The resulting status is surfaced via
-  `GuardLimitStatus::timeBudgetReached()` and participates in the same metadata/exception
-  pathways as the other guard knobs.【F:src/Application/Config/PathSearchConfigBuilder.php†L89-L129】【F:src/Application/PathFinder/PathFinder.php†L206-L297】【F:tests/Application/Service/PathFinder/PathFinderServiceGuardsTest.php†L296-L332】
+  structural guardrails are relaxed. The resulting report is surfaced via
+  `SearchGuardReport::timeBudgetReached()` alongside concrete counters for expansions,
+  visited states and elapsed milliseconds, and participates in the same metadata/exception
+  pathways as the other guard knobs.【F:src/Application/Config/PathSearchConfigBuilder.php†L89-L129】【F:src/Application/PathFinder/PathFinder.php†L206-L407】【F:tests/Application/Service/PathFinder/PathFinderServiceGuardsTest.php†L235-L309】
 
 See [docs/guarded-search-example.md](docs/guarded-search-example.md) for a guided example
 that combines these invariants with guard-rail configuration and demonstrates the
@@ -129,8 +130,10 @@ $config = PathSearchConfig::builder()
 // The search honours the configured guard thresholds.
 ```
 
-Guard-limit breaches are reported via `SearchOutcome::guardLimits()` metadata by default. To
-escalate those breaches to exceptions instead, call `withGuardLimitException()`:
+Guard-limit breaches are reported via `SearchOutcome::guardLimits()` metadata by default.
+The returned `SearchGuardReport` exposes both boolean guard flags and the actual expansion,
+visited-state and elapsed-time counters for observability. To escalate breaches to
+exceptions instead, call `withGuardLimitException()`:
 
 ```php
 $config = PathSearchConfig::builder()
@@ -142,7 +145,8 @@ $config = PathSearchConfig::builder()
     ->withGuardLimitException()
     ->build();
 
-// GuardLimitExceeded is thrown when any guard threshold is hit.
+// GuardLimitExceeded is thrown when any guard threshold is hit and the report contains
+// the counters that triggered the guard.
 ```
 
 See [docs/guarded-search-example.md](docs/guarded-search-example.md) for a complete,
@@ -221,9 +225,10 @@ The library ships with domain-specific exceptions under the
 * `InfeasiblePath` &mdash; indicates that no route satisfies the requested constraints.
 
 Search guardrails (expansion/visited-state/time-budget limits) surface through the
-`SearchOutcome::guardLimits()` method. The returned `GuardLimitStatus` aggregate exposes
-helpers such as `anyLimitReached()` so callers can inspect whether searches exhausted their
-configured protections without relying on exceptions. Opt-in escalation via
+`SearchOutcome::guardLimits()` method. The returned `SearchGuardReport` aggregate exposes
+helpers such as `anyLimitReached()` and captures the actual expansion/visited counts and
+elapsed milliseconds so callers can inspect whether searches exhausted their configured
+protections without relying on exceptions. Opt-in escalation via
 `withGuardLimitException()` converts those guard-limit breaches into a `GuardLimitExceeded`
 throwable instead of metadata.
 

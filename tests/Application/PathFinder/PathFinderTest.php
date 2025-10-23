@@ -15,9 +15,9 @@ use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\Graph\GraphNode;
 use SomeWork\P2PPathFinder\Application\PathFinder\CandidateResultHeap;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
-use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
@@ -66,7 +66,7 @@ final class PathFinderTest extends TestCase
     /**
      * @param SearchOutcome<CandidatePath> $searchResult
      */
-    private static function extractGuardLimits(SearchOutcome $searchResult): GuardLimitStatus
+    private static function extractGuardLimits(SearchOutcome $searchResult): SearchGuardReport
     {
         return $searchResult->guardLimits();
     }
@@ -1013,7 +1013,10 @@ final class PathFinderTest extends TestCase
 
         $paths = $outcome->paths();
         self::assertNotSame([], $paths);
-        self::assertTrue($outcome->guardLimits()->visitedStatesReached());
+        $report = $outcome->guardLimits();
+        self::assertTrue($report->visitedStatesReached());
+        self::assertSame(2, $report->visitedStateLimit());
+        self::assertSame(2, $report->visitedStates());
     }
 
     public function test_it_keeps_processing_guarded_states_with_matching_signatures(): void
@@ -1070,7 +1073,10 @@ final class PathFinderTest extends TestCase
         );
         self::assertSame(['SRC', 'ALT', 'AUX', 'TRG'], $secondNodes);
 
-        self::assertTrue($outcome->guardLimits()->visitedStatesReached());
+        $report = $outcome->guardLimits();
+        self::assertTrue($report->visitedStatesReached());
+        self::assertSame(5, $report->visitedStateLimit());
+        self::assertSame(5, $report->visitedStates());
     }
 
     public function test_it_does_not_accept_cycles_that_improve_conversion_costs(): void
@@ -1998,8 +2004,11 @@ final class PathFinderTest extends TestCase
 
         $guardedResult = $guardedFinder->findBestPaths($graph, 'SRC', 'DST');
 
-        self::assertTrue($guardedResult->guardLimits()->timeBudgetReached());
-        self::assertTrue($guardedResult->guardLimits()->anyLimitReached());
+        $report = $guardedResult->guardLimits();
+        self::assertTrue($report->timeBudgetReached());
+        self::assertTrue($report->anyLimitReached());
+        self::assertSame(1, $report->timeBudgetLimit());
+        self::assertGreaterThanOrEqual(1.0, $report->elapsedMilliseconds());
     }
 
     public function test_it_enforces_expansion_guard_on_dense_graph(): void
@@ -2018,8 +2027,11 @@ final class PathFinderTest extends TestCase
         $guardedResult = $guardedFinder->findBestPaths($graph, 'SRC', 'DST');
 
         self::assertSame([], $guardedResult->paths());
-        self::assertTrue($guardedResult->guardLimits()->expansionsReached());
-        self::assertFalse($guardedResult->guardLimits()->visitedStatesReached());
+        $expansionReport = $guardedResult->guardLimits();
+        self::assertTrue($expansionReport->expansionsReached());
+        self::assertFalse($expansionReport->visitedStatesReached());
+        self::assertSame(1, $expansionReport->expansions());
+        self::assertSame(1, $expansionReport->expansionLimit());
 
         $relaxedFinder = new PathFinder(
             maxHops: 5,

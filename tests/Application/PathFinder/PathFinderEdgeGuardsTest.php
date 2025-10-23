@@ -65,8 +65,11 @@ final class PathFinderEdgeGuardsTest extends TestCase
         );
 
         self::assertSame([], $outcome->paths());
-        self::assertFalse($outcome->guardLimits()->expansionsReached());
-        self::assertFalse($outcome->guardLimits()->visitedStatesReached());
+        $report = $outcome->guardLimits();
+        self::assertFalse($report->expansionsReached());
+        self::assertFalse($report->visitedStatesReached());
+        self::assertSame(8, $report->expansionLimit());
+        self::assertSame(8, $report->visitedStateLimit());
     }
 
     /**
@@ -90,8 +93,13 @@ final class PathFinderEdgeGuardsTest extends TestCase
         $outcome = $finder->findBestPaths($graph, $source, $target);
 
         self::assertSame([], $outcome->paths());
-        self::assertFalse($outcome->guardLimits()->expansionsReached());
-        self::assertFalse($outcome->guardLimits()->visitedStatesReached());
+        $report = $outcome->guardLimits();
+        self::assertFalse($report->expansionsReached());
+        self::assertFalse($report->visitedStatesReached());
+        self::assertSame(PathFinder::DEFAULT_MAX_EXPANSIONS, $report->expansionLimit());
+        self::assertSame(PathFinder::DEFAULT_MAX_VISITED_STATES, $report->visitedStateLimit());
+        self::assertSame(0, $report->expansions());
+        self::assertSame(0, $report->visitedStates());
     }
 
     /**
@@ -145,8 +153,11 @@ final class PathFinderEdgeGuardsTest extends TestCase
         $outcome = $finder->findBestPaths($graph, 'AAA', 'BBB');
 
         self::assertSame([], $outcome->paths());
-        self::assertTrue($outcome->guardLimits()->expansionsReached());
-        self::assertFalse($outcome->guardLimits()->visitedStatesReached());
+        $report = $outcome->guardLimits();
+        self::assertTrue($report->expansionsReached());
+        self::assertFalse($report->visitedStatesReached());
+        self::assertSame(1, $report->expansions());
+        self::assertSame(1, $report->expansionLimit());
     }
 
     public function test_it_marks_visited_guard_when_limit_reached(): void
@@ -167,8 +178,11 @@ final class PathFinderEdgeGuardsTest extends TestCase
         $outcome = $finder->findBestPaths($graph, 'AAA', 'BBB');
 
         self::assertSame([], $outcome->paths());
-        self::assertFalse($outcome->guardLimits()->expansionsReached());
-        self::assertTrue($outcome->guardLimits()->visitedStatesReached());
+        $report = $outcome->guardLimits();
+        self::assertFalse($report->expansionsReached());
+        self::assertTrue($report->visitedStatesReached());
+        self::assertSame(1, $report->visitedStates());
+        self::assertSame(1, $report->visitedStateLimit());
     }
 
     public function test_it_prunes_candidates_exceeding_best_cost_without_tolerance(): void

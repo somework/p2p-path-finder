@@ -10,9 +10,9 @@ use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
-use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Service\MaterializedResult;
@@ -388,8 +388,8 @@ final class PathFinderServicePropertyTest extends TestCase
     }
 
     private function assertGuardStatusEquals(
-        GuardLimitStatus $expected,
-        GuardLimitStatus $actual,
+        SearchGuardReport $expected,
+        SearchGuardReport $actual,
         string $message = 'Guard metadata should be identical'
     ): void {
         self::assertSame(

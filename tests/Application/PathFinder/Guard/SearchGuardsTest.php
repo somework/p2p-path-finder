@@ -26,11 +26,17 @@ final class SearchGuardsTest extends TestCase
 
         self::assertFalse($guards->canExpand());
 
-        $status = $guards->finalize(false);
+        $status = $guards->finalize(3, 5, false);
 
         self::assertTrue($status->expansionsReached());
         self::assertFalse($status->timeBudgetReached());
         self::assertFalse($status->visitedStatesReached());
+        self::assertSame(2, $status->expansions());
+        self::assertSame(3, $status->visitedStates());
+        self::assertSame(2, $status->expansionLimit());
+        self::assertSame(5, $status->visitedStateLimit());
+        self::assertNull($status->timeBudgetLimit());
+        self::assertSame(0.0, $status->elapsedMilliseconds());
     }
 
     public function test_it_reports_time_budget_breaches(): void
@@ -51,11 +57,17 @@ final class SearchGuardsTest extends TestCase
         $now = 0.006; // 6 milliseconds since start.
         self::assertFalse($guards->canExpand());
 
-        $status = $guards->finalize(true);
+        $status = $guards->finalize(4, 10, true);
 
         self::assertFalse($status->expansionsReached());
         self::assertTrue($status->timeBudgetReached());
         self::assertTrue($status->visitedStatesReached());
+        self::assertSame(1, $status->expansions());
+        self::assertSame(4, $status->visitedStates());
+        self::assertSame(10, $status->expansionLimit());
+        self::assertSame(10, $status->visitedStateLimit());
+        self::assertSame(5, $status->timeBudgetLimit());
+        self::assertEqualsWithDelta(6.0, $status->elapsedMilliseconds(), 0.0001);
     }
 
     public function test_time_budget_is_exhausted_when_elapsed_equals_limit(): void
@@ -72,7 +84,10 @@ final class SearchGuardsTest extends TestCase
         $now = 0.005; // exactly 5 milliseconds since start.
 
         self::assertFalse($guards->canExpand());
-        self::assertTrue($guards->finalize(false)->timeBudgetReached());
+        $report = $guards->finalize(1, 10, false);
+        self::assertTrue($report->timeBudgetReached());
+        self::assertSame(5, $report->timeBudgetLimit());
+        self::assertEqualsWithDelta(5.0, $report->elapsedMilliseconds(), 0.0001);
     }
 
     public function test_time_budget_measures_elapsed_relative_to_start_time(): void
@@ -91,6 +106,8 @@ final class SearchGuardsTest extends TestCase
 
         $now = 17.506; // 6 milliseconds since start.
         self::assertFalse($guards->canExpand());
-        self::assertTrue($guards->finalize(false)->timeBudgetReached());
+        $report = $guards->finalize(1, 10, false);
+        self::assertTrue($report->timeBudgetReached());
+        self::assertEqualsWithDelta(6.0, $report->elapsedMilliseconds(), 0.0001);
     }
 }
