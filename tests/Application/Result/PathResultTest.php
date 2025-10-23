@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Application\Result;
 
 use PHPUnit\Framework\TestCase;
+use SomeWork\P2PPathFinder\Application\Result\MoneyMap;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
+use SomeWork\P2PPathFinder\Application\Result\PathLegCollection;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
@@ -20,7 +22,7 @@ final class PathResultTest extends TestCase
             'btc',
             Money::fromString('USD', '60', 2),
             Money::fromString('BTC', '0.002', 6),
-            [Money::fromString('USD', '0.30', 2)],
+            MoneyMap::fromList([Money::fromString('USD', '0.30', 2)], true),
         );
 
         $secondLeg = new PathLeg(
@@ -28,18 +30,18 @@ final class PathResultTest extends TestCase
             'eur',
             Money::fromString('BTC', '0.002', 6),
             Money::fromString('EUR', '55', 2),
-            [Money::fromString('EUR', '0.10', 2)],
+            MoneyMap::fromList([Money::fromString('EUR', '0.10', 2)], true),
         );
 
         $result = new PathResult(
             Money::fromString('USD', '60', 2),
             Money::fromString('EUR', '55', 2),
             DecimalTolerance::fromNumericString('0.05'),
-            [$firstLeg, $secondLeg],
-            [
+            PathLegCollection::fromList([$firstLeg, $secondLeg]),
+            MoneyMap::fromAssociative([
                 'USD' => Money::fromString('USD', '0.30', 2),
                 'EUR' => Money::fromString('EUR', '0.10', 2),
-            ],
+            ]),
         );
 
         $this->assertSame(
@@ -107,18 +109,12 @@ final class PathResultTest extends TestCase
             'btc',
             Money::fromString('USD', '10', 2),
             Money::fromString('BTC', '0.001', 6),
-            [],
         );
 
         $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Path legs must be provided as a list.');
 
-        new PathResult(
-            Money::fromString('USD', '10', 2),
-            Money::fromString('BTC', '0.001', 6),
-            DecimalTolerance::fromNumericString('0.1'),
-            ['first' => $leg],
-        );
+        PathLegCollection::fromList(['first' => $leg]);
     }
 
     public function test_path_legs_must_contain_only_path_leg_instances(): void
@@ -126,20 +122,15 @@ final class PathResultTest extends TestCase
         $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Every path leg must be an instance of PathLeg.');
 
-        new PathResult(
-            Money::fromString('USD', '10', 2),
-            Money::fromString('BTC', '0.001', 6),
-            DecimalTolerance::fromNumericString('0.1'),
-            [
-                new PathLeg(
-                    'usd',
-                    'btc',
-                    Money::fromString('USD', '10', 2),
-                    Money::fromString('BTC', '0.001', 6),
-                ),
-                'invalid-leg',
-            ],
-        );
+        PathLegCollection::fromList([
+            new PathLeg(
+                'usd',
+                'btc',
+                Money::fromString('USD', '10', 2),
+                Money::fromString('BTC', '0.001', 6),
+            ),
+            'invalid-leg',
+        ]);
     }
 
     public function test_fee_breakdown_merges_duplicate_currencies(): void
@@ -149,22 +140,21 @@ final class PathResultTest extends TestCase
             'btc',
             Money::fromString('USD', '10', 2),
             Money::fromString('BTC', '0.001', 6),
-            [],
         );
 
         $result = new PathResult(
             Money::fromString('USD', '10', 2),
             Money::fromString('BTC', '0.001', 6),
             DecimalTolerance::fromNumericString('0.1'),
-            [$leg],
-            [
+            PathLegCollection::fromList([$leg]),
+            MoneyMap::fromList([
                 Money::fromString('USD', '0.30', 2),
                 Money::fromString('USD', '0.200', 3),
                 Money::fromString('EUR', '1', 2),
-            ],
+            ]),
         );
 
-        $fees = $result->feeBreakdown();
+        $fees = $result->feeBreakdown()->toArray();
 
         $this->assertCount(2, $fees);
         $this->assertSame('0.500', $fees['USD']->amount());
@@ -182,23 +172,10 @@ final class PathResultTest extends TestCase
 
     public function test_fee_breakdown_requires_money_instances(): void
     {
-        $leg = new PathLeg(
-            'usd',
-            'btc',
-            Money::fromString('USD', '10', 2),
-            Money::fromString('BTC', '0.001', 6),
-        );
-
         $this->expectException(InvalidInput::class);
-        $this->expectExceptionMessage('Fee breakdown must contain instances of Money.');
+        $this->expectExceptionMessage('Money map entries must be instances of Money.');
 
-        new PathResult(
-            Money::fromString('USD', '10', 2),
-            Money::fromString('BTC', '0.001', 6),
-            DecimalTolerance::fromNumericString('0.1'),
-            [$leg],
-            ['invalid-fee'],
-        );
+        MoneyMap::fromList(['invalid-fee']);
     }
 
     public function test_empty_legs_and_fees_are_preserved(): void
@@ -209,8 +186,8 @@ final class PathResultTest extends TestCase
             DecimalTolerance::fromNumericString('0.0'),
         );
 
-        $this->assertSame([], $result->legs());
-        $this->assertSame([], $result->feeBreakdown());
+        $this->assertSame([], $result->legs()->toArray());
+        $this->assertSame([], $result->feeBreakdown()->toArray());
 
         self::assertSame('0.00', $result->residualTolerancePercentage());
         self::assertSame('0.0000', $result->residualTolerancePercentage(4));

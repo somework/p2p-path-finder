@@ -11,8 +11,6 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
-use function array_is_list;
-
 /**
  * Aggregated representation of a discovered conversion path.
  */
@@ -20,41 +18,22 @@ final class PathResult implements JsonSerializable
 {
     use SerializesMoney;
 
-    /**
-     * @var array<string, Money>
-     */
-    private readonly array $feeBreakdown;
+    private readonly MoneyMap $feeBreakdown;
+
+    private readonly PathLegCollection $legs;
 
     /**
-     * @var list<PathLeg>
-     */
-    private readonly array $legs;
-
-    /**
-     * @param list<PathLeg>           $legs
-     * @param array<array-key, Money> $feeBreakdown
-     *
      * @throws InvalidInput|PrecisionViolation when fee entries are invalid or cannot be merged deterministically
      */
     public function __construct(
         private readonly Money $totalSpent,
         private readonly Money $totalReceived,
         private readonly DecimalTolerance $residualTolerance,
-        array $legs = [],
-        array $feeBreakdown = [],
+        ?PathLegCollection $legs = null,
+        ?MoneyMap $feeBreakdown = null,
     ) {
-        if (!array_is_list($legs)) {
-            throw new InvalidInput('Path legs must be provided as a list.');
-        }
-
-        foreach ($legs as $leg) {
-            if (!$leg instanceof PathLeg) {
-                throw new InvalidInput('Every path leg must be an instance of PathLeg.');
-            }
-        }
-
-        $this->legs = $legs;
-        $this->feeBreakdown = $this->normalizeFeeBreakdown($feeBreakdown);
+        $this->legs = $legs ?? PathLegCollection::empty();
+        $this->feeBreakdown = $feeBreakdown ?? MoneyMap::empty();
     }
 
     /**
@@ -73,12 +52,17 @@ final class PathResult implements JsonSerializable
         return $this->totalReceived;
     }
 
+    public function feeBreakdown(): MoneyMap
+    {
+        return $this->feeBreakdown;
+    }
+
     /**
      * @return array<string, Money>
      */
-    public function feeBreakdown(): array
+    public function feeBreakdownAsArray(): array
     {
-        return $this->feeBreakdown;
+        return $this->feeBreakdown->toArray();
     }
 
     /**
@@ -97,12 +81,37 @@ final class PathResult implements JsonSerializable
         return $this->residualTolerance->percentage($scale);
     }
 
+    public function legs(): PathLegCollection
+    {
+        return $this->legs;
+    }
+
     /**
      * @return list<PathLeg>
      */
-    public function legs(): array
+    public function legsAsArray(): array
     {
-        return $this->legs;
+        return $this->legs->toArray();
+    }
+
+    /**
+     * @return array{
+     *     totalSpent: Money,
+     *     totalReceived: Money,
+     *     residualTolerance: DecimalTolerance,
+     *     feeBreakdown: MoneyMap,
+     *     legs: PathLegCollection,
+     * }
+     */
+    public function toArray(): array
+    {
+        return [
+            'totalSpent' => $this->totalSpent,
+            'totalReceived' => $this->totalReceived,
+            'residualTolerance' => $this->residualTolerance,
+            'feeBreakdown' => $this->feeBreakdown,
+            'legs' => $this->legs,
+        ];
     }
 
     /**
@@ -122,50 +131,12 @@ final class PathResult implements JsonSerializable
      */
     public function jsonSerialize(): array
     {
-        $fees = [];
-        foreach ($this->feeBreakdown as $currency => $fee) {
-            $fees[$currency] = self::serializeMoney($fee);
-        }
-
         return [
             'totalSpent' => self::serializeMoney($this->totalSpent),
             'totalReceived' => self::serializeMoney($this->totalReceived),
             'residualTolerance' => $this->residualTolerance->ratio(),
-            'feeBreakdown' => $fees,
-            'legs' => array_map(static fn (PathLeg $leg): array => $leg->jsonSerialize(), $this->legs),
+            'feeBreakdown' => $this->feeBreakdown->jsonSerialize(),
+            'legs' => $this->legs->jsonSerialize(),
         ];
-    }
-
-    /**
-     * @param array<array-key, Money> $feeBreakdown
-     *
-     * @throws InvalidInput|PrecisionViolation when fee entries are invalid or cannot be merged deterministically
-     *
-     * @return array<string, Money>
-     */
-    private function normalizeFeeBreakdown(array $feeBreakdown): array
-    {
-        /** @var array<string, Money> $normalized */
-        $normalized = [];
-
-        foreach ($feeBreakdown as $entry) {
-            if (!$entry instanceof Money) {
-                throw new InvalidInput('Fee breakdown must contain instances of Money.');
-            }
-
-            $currency = $entry->currency();
-
-            if (isset($normalized[$currency])) {
-                $normalized[$currency] = $normalized[$currency]->add($entry);
-
-                continue;
-            }
-
-            $normalized[$currency] = $entry;
-        }
-
-        ksort($normalized);
-
-        return $normalized;
     }
 }

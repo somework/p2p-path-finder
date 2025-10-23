@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Application\Result;
 
 use PHPUnit\Framework\TestCase;
+use SomeWork\P2PPathFinder\Application\Result\MoneyMap;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
+use SomeWork\P2PPathFinder\Application\Result\PathLegCollection;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Result\PathResultFormatter;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
@@ -22,15 +24,15 @@ final class PathResultFormatterTest extends TestCase
             'eur',
             Money::fromString('USD', '100', 2),
             Money::fromString('EUR', '95', 2),
-            [Money::fromString('USD', '1.50', 2)],
+            MoneyMap::fromList([Money::fromString('USD', '1.50', 2)], true),
         );
 
         $result = new PathResult(
             Money::fromString('USD', '100', 2),
             Money::fromString('EUR', '95', 2),
             DecimalTolerance::fromNumericString('0.025'),
-            [$leg],
-            ['USD' => Money::fromString('USD', '1.50', 2)],
+            PathLegCollection::fromList([$leg]),
+            MoneyMap::fromAssociative(['USD' => Money::fromString('USD', '1.50', 2)]),
         );
 
         $formatter = new PathResultFormatter();
@@ -62,8 +64,8 @@ final class PathResultFormatterTest extends TestCase
             Money::fromString('USD', '100', 2),
             Money::fromString('EUR', '100', 2),
             DecimalTolerance::fromNumericString('0.015'),
-            [$leg],
-            [],
+            PathLegCollection::fromList([$leg]),
+            MoneyMap::empty(),
         );
 
         $formatter = new PathResultFormatter();

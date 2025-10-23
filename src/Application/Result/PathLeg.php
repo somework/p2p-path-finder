@@ -8,7 +8,6 @@ use JsonSerializable;
 use SomeWork\P2PPathFinder\Application\Support\SerializesMoney;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
-use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function sprintf;
 use function strtoupper;
@@ -24,24 +23,21 @@ final class PathLeg implements JsonSerializable
 
     private readonly string $toAsset;
 
-    /**
-     * @var array<string, Money>
-     */
-    private readonly array $fees;
+    private readonly MoneyMap $fees;
 
-    /**
-     * @param array<array-key, Money> $fees
-     */
     public function __construct(
         string $fromAsset,
         string $toAsset,
         private readonly Money $spent,
         private readonly Money $received,
-        array $fees = [],
+        ?MoneyMap $fees = null,
     ) {
         $this->fromAsset = self::normalizeAsset($fromAsset, 'from');
         $this->toAsset = self::normalizeAsset($toAsset, 'to');
-        $this->fees = $this->normalizeFees($fees);
+        $this->assertMoneyMatchesAsset($this->spent, $this->fromAsset, 'spent');
+        $this->assertMoneyMatchesAsset($this->received, $this->toAsset, 'received');
+
+        $this->fees = $fees ?? MoneyMap::empty();
     }
 
     /**
@@ -76,12 +72,17 @@ final class PathLeg implements JsonSerializable
         return $this->received;
     }
 
+    public function fees(): MoneyMap
+    {
+        return $this->fees;
+    }
+
     /**
      * @return array<string, Money>
      */
-    public function fees(): array
+    public function feesAsArray(): array
     {
-        return $this->fees;
+        return $this->fees->toArray();
     }
 
     /**
@@ -95,17 +96,32 @@ final class PathLeg implements JsonSerializable
      */
     public function jsonSerialize(): array
     {
-        $fees = [];
-        foreach ($this->fees as $currency => $fee) {
-            $fees[$currency] = self::serializeMoney($fee);
-        }
-
         return [
             'from' => $this->fromAsset,
             'to' => $this->toAsset,
             'spent' => self::serializeMoney($this->spent),
             'received' => self::serializeMoney($this->received),
-            'fees' => $fees,
+            'fees' => $this->fees->jsonSerialize(),
+        ];
+    }
+
+    /**
+     * @return array{
+     *     from: string,
+     *     to: string,
+     *     spent: Money,
+     *     received: Money,
+     *     fees: MoneyMap,
+     * }
+     */
+    public function toArray(): array
+    {
+        return [
+            'from' => $this->fromAsset,
+            'to' => $this->toAsset,
+            'spent' => $this->spent,
+            'received' => $this->received,
+            'fees' => $this->fees,
         ];
     }
 
@@ -120,40 +136,10 @@ final class PathLeg implements JsonSerializable
         return $normalized;
     }
 
-    /**
-     * @param array<array-key, Money> $fees
-     *
-     * @throws InvalidInput|PrecisionViolation when fee entries are invalid or cannot be merged deterministically
-     *
-     * @return array<string, Money>
-     */
-    private function normalizeFees(array $fees): array
+    private function assertMoneyMatchesAsset(Money $money, string $asset, string $field): void
     {
-        /** @var array<string, Money> $normalized */
-        $normalized = [];
-
-        foreach ($fees as $fee) {
-            if (!$fee instanceof Money) {
-                throw new InvalidInput('Path leg fees must be instances of Money.');
-            }
-
-            if ($fee->isZero()) {
-                continue;
-            }
-
-            $currency = $fee->currency();
-
-            if (isset($normalized[$currency])) {
-                $normalized[$currency] = $normalized[$currency]->add($fee);
-
-                continue;
-            }
-
-            $normalized[$currency] = $fee;
+        if ($money->currency() !== $asset) {
+            throw new InvalidInput(sprintf('Path leg %s currency must match the %s asset.', $field, $field));
         }
-
-        ksort($normalized);
-
-        return $normalized;
     }
 }
