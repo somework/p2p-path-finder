@@ -55,10 +55,13 @@ final class GraphBuilder
 
         $nodes = [];
         foreach ($currencies as $currency => $_) {
-            $nodes[$currency] = new GraphNode($currency, $edges[$currency] ?? []);
+            $nodes[] = new GraphNode(
+                $currency,
+                GraphEdgeCollection::fromArray($edges[$currency] ?? []),
+            );
         }
 
-        return new Graph($nodes);
+        return new Graph(GraphNodeCollection::fromArray($nodes));
     }
 
     private function createEdge(Order $order, string $fromCurrency, string $toCurrency): GraphEdge

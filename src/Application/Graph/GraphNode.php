@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Application\Graph;
 
 use ArrayAccess;
-use ArrayIterator;
 use IteratorAggregate;
 use JsonSerializable;
-use LogicException;
+use SomeWork\P2PPathFinder\Application\Support\GuardsArrayAccessOffset;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use Traversable;
 
 /**
@@ -19,26 +19,25 @@ use Traversable;
  */
 final class GraphNode implements IteratorAggregate, JsonSerializable, ArrayAccess
 {
-    /**
-     * @var list<GraphEdge>
-     */
-    private readonly array $edges;
+    use GuardsArrayAccessOffset;
+
+    private readonly GraphEdgeCollection $edges;
 
     /**
-     * @param list<GraphEdge> $edges
+     * @param GraphEdgeCollection|array<array-key, GraphEdge> $edges
      */
-    public function __construct(private readonly string $currency, array $edges = [])
+    public function __construct(private readonly string $currency, GraphEdgeCollection|array $edges = [])
     {
-        $normalized = [];
-        foreach ($edges as $edge) {
-            if (!$edge instanceof GraphEdge) {
-                continue;
-            }
+        $collection = $edges instanceof GraphEdgeCollection
+            ? $edges
+            : GraphEdgeCollection::fromArray($edges);
 
-            $normalized[] = $edge;
+        $origin = $collection->originCurrency();
+        if (null !== $origin && $origin !== $this->currency) {
+            throw new InvalidInput('Graph node currency must match edge origins.');
         }
 
-        $this->edges = $normalized;
+        $this->edges = $collection;
     }
 
     public function currency(): string
@@ -46,27 +45,36 @@ final class GraphNode implements IteratorAggregate, JsonSerializable, ArrayAcces
         return $this->currency;
     }
 
-    /**
-     * @return list<GraphEdge>
-     */
-    public function edges(): array
+    public function edges(): GraphEdgeCollection
     {
         return $this->edges;
     }
 
     public function getIterator(): Traversable
     {
-        return new ArrayIterator($this->edges);
+        return $this->edges->getIterator();
     }
 
     public function offsetExists(mixed $offset): bool
     {
-        return 'currency' === $offset || 'edges' === $offset;
+        $normalized = $this->normalizeStringOffset($offset);
+
+        if (null === $normalized) {
+            return false;
+        }
+
+        return 'currency' === $normalized || 'edges' === $normalized;
     }
 
     public function offsetGet(mixed $offset): mixed
     {
-        return match ($offset) {
+        $normalized = $this->normalizeStringOffset($offset);
+
+        if (null === $normalized) {
+            return null;
+        }
+
+        return match ($normalized) {
             'currency' => $this->currency,
             'edges' => $this->edges,
             default => null,
@@ -75,12 +83,12 @@ final class GraphNode implements IteratorAggregate, JsonSerializable, ArrayAcces
 
     public function offsetSet(mixed $offset, mixed $value): void
     {
-        throw new LogicException('Graph nodes are immutable.');
+        throw new InvalidInput('Graph nodes are immutable.');
     }
 
     public function offsetUnset(mixed $offset): void
     {
-        throw new LogicException('Graph nodes are immutable.');
+        throw new InvalidInput('Graph nodes are immutable.');
     }
 
     /**
@@ -90,10 +98,7 @@ final class GraphNode implements IteratorAggregate, JsonSerializable, ArrayAcces
     {
         return [
             'currency' => $this->currency,
-            'edges' => array_map(
-                static fn (GraphEdge $edge): array => $edge->jsonSerialize(),
-                $this->edges,
-            ),
+            'edges' => $this->edges->jsonSerialize(),
         ];
     }
 }

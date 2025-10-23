@@ -496,7 +496,7 @@ final class GraphBuilderTest extends TestCase
         foreach ($graph as $currency => $node) {
             $export[$currency] = [
                 'currency' => $currency,
-                'edges' => array_map([$this, 'exportEdge'], $node->edges()),
+                'edges' => array_map([$this, 'exportEdge'], $node->edges()->toArray()),
             ];
         }
 

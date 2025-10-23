@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Application\Graph;
 
 use ArrayAccess;
-use ArrayIterator;
 use IteratorAggregate;
 use JsonSerializable;
 use LogicException;
@@ -22,49 +21,36 @@ final class Graph implements IteratorAggregate, JsonSerializable, ArrayAccess
 {
     use GuardsArrayAccessOffset;
 
-    /**
-     * @var array<string, GraphNode>
-     */
-    private readonly array $nodes;
+    private readonly GraphNodeCollection $nodes;
 
     /**
-     * @param array<string, GraphNode> $nodes
+     * @param GraphNodeCollection|array<array-key, GraphNode> $nodes
      */
-    public function __construct(array $nodes = [])
+    public function __construct(GraphNodeCollection|array $nodes = [])
     {
-        $normalized = [];
-        foreach ($nodes as $node) {
-            if (!$node instanceof GraphNode) {
-                continue;
-            }
-
-            $normalized[$node->currency()] = $node;
-        }
-
-        $this->nodes = $normalized;
+        $this->nodes = $nodes instanceof GraphNodeCollection
+            ? $nodes
+            : GraphNodeCollection::fromArray($nodes);
     }
 
-    /**
-     * @return array<string, GraphNode>
-     */
-    public function nodes(): array
+    public function nodes(): GraphNodeCollection
     {
         return $this->nodes;
     }
 
     public function hasNode(string $currency): bool
     {
-        return isset($this->nodes[$currency]);
+        return $this->nodes->has($currency);
     }
 
     public function node(string $currency): ?GraphNode
     {
-        return $this->nodes[$currency] ?? null;
+        return $this->nodes->get($currency);
     }
 
     public function getIterator(): Traversable
     {
-        return new ArrayIterator($this->nodes);
+        return $this->nodes->getIterator();
     }
 
     public function offsetExists(mixed $offset): bool
@@ -75,7 +61,7 @@ final class Graph implements IteratorAggregate, JsonSerializable, ArrayAccess
             return false;
         }
 
-        return isset($this->nodes[$normalized]);
+        return $this->nodes->has($normalized);
     }
 
     public function offsetGet(mixed $offset): ?GraphNode
@@ -86,7 +72,7 @@ final class Graph implements IteratorAggregate, JsonSerializable, ArrayAccess
             return null;
         }
 
-        return $this->nodes[$normalized] ?? null;
+        return $this->nodes->get($normalized);
     }
 
     public function offsetSet(mixed $offset, mixed $value): void
@@ -104,11 +90,6 @@ final class Graph implements IteratorAggregate, JsonSerializable, ArrayAccess
      */
     public function jsonSerialize(): array
     {
-        $serialized = [];
-        foreach ($this->nodes as $currency => $node) {
-            $serialized[$currency] = $node->jsonSerialize();
-        }
-
-        return $serialized;
+        return $this->nodes->jsonSerialize();
     }
 }
