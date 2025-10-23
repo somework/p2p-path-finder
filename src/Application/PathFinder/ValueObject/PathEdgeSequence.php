@@ -95,7 +95,7 @@ final class PathEdgeSequence implements ArrayAccess, Countable, IteratorAggregat
     {
         $lastKey = array_key_last($this->edges);
 
-        if ($lastKey === null) {
+        if (null === $lastKey) {
             return null;
         }
 
