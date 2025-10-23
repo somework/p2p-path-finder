@@ -224,7 +224,7 @@ final class PathFinderEdgeGuardsTest extends TestCase
 
         self::assertCount(1, $paths);
         $firstPath = $paths[0];
-        $edges = $firstPath->edges();
+        $edges = $firstPath->edges()->toArray();
         self::assertCount(1, $edges);
         self::assertSame('AAA', $edges[0]['from']);
         self::assertSame('BBB', $edges[0]['to']);

@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Service;
 
-use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
-use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Application\Result\MoneyMap;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
 use SomeWork\P2PPathFinder\Application\Result\PathLegCollection;
@@ -23,8 +22,6 @@ use function substr;
  * Resolves concrete path legs from abstract graph edges.
  *
  * @internal
- *
- * @psalm-import-type PathEdge from PathFinder
  */
 final class LegMaterializer
 {
@@ -43,7 +40,6 @@ final class LegMaterializer
     }
 
     /**
-     * @param list<GraphEdge|PathEdge>                             $edges
      * @param array{net: Money, gross: Money, grossCeiling: Money} $initialSeed
      *
      * @return array{
@@ -54,7 +50,7 @@ final class LegMaterializer
      *     feeBreakdown: MoneyMap,
      * }|null
      */
-    public function materialize(array $edges, Money $requestedSpend, array $initialSeed, string $targetCurrency): ?array
+    public function materialize(PathEdgeSequence $edges, Money $requestedSpend, array $initialSeed, string $targetCurrency): ?array
     {
         $legs = [];
         $current = $initialSeed['net'];
@@ -75,10 +71,10 @@ final class LegMaterializer
         $applyTolerance = true;
 
         foreach ($edges as $edge) {
-            $order = $edge instanceof GraphEdge ? $edge->order() : $edge['order'];
-            $orderSide = $edge instanceof GraphEdge ? $edge->orderSide() : $edge['orderSide'];
-            $from = $edge instanceof GraphEdge ? $edge->from() : $edge['from'];
-            $to = $edge instanceof GraphEdge ? $edge->to() : $edge['to'];
+            $order = $edge->order();
+            $orderSide = $edge->orderSide();
+            $from = $edge->from();
+            $to = $edge->to();
 
             if ($from !== $currentCurrency) {
                 return null;

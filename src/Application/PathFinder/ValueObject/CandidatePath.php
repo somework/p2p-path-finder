@@ -13,7 +13,6 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
-use function count;
 use function in_array;
 use function sprintf;
 
@@ -26,23 +25,21 @@ use function sprintf;
 final class CandidatePath implements ArrayAccess
 {
     /**
-     * @param numeric-string                                                                                                                $cost    aggregate spend for the candidate path
-     * @param numeric-string                                                                                                                $product cumulative product of the edge exchange rates
-     * @param list<array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}> $edges
+     * @param numeric-string $cost    aggregate spend for the candidate path
+     * @param numeric-string $product cumulative product of the edge exchange rates
      */
     private function __construct(
         private readonly string $cost,
         private readonly string $product,
         private readonly int $hops,
-        private readonly array $edges,
+        private readonly PathEdgeSequence $edges,
         private readonly ?SpendConstraints $range,
     ) {
     }
 
     /**
-     * @param numeric-string                                                                                                                $cost    aggregate spend for the candidate path
-     * @param numeric-string                                                                                                                $product cumulative product of the edge exchange rates
-     * @param list<array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}> $edges
+     * @param numeric-string $cost    aggregate spend for the candidate path
+     * @param numeric-string $product cumulative product of the edge exchange rates
      *
      * @throws InvalidInput when the hop count does not match the number of edges
      */
@@ -50,7 +47,7 @@ final class CandidatePath implements ArrayAccess
         string $cost,
         string $product,
         int $hops,
-        array $edges,
+        PathEdgeSequence $edges,
         ?SpendConstraints $range = null
     ): self {
         BcMath::ensureNumeric($cost, $product);
@@ -59,7 +56,7 @@ final class CandidatePath implements ArrayAccess
             throw new InvalidInput('Hop count cannot be negative.');
         }
 
-        if ($hops !== count($edges)) {
+        if ($hops !== $edges->count()) {
             throw new InvalidInput('Hop count must match the number of edges in the candidate path.');
         }
 
@@ -87,10 +84,7 @@ final class CandidatePath implements ArrayAccess
         return $this->hops;
     }
 
-    /**
-     * @return list<array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}>
-     */
-    public function edges(): array
+    public function edges(): PathEdgeSequence
     {
         return $this->edges;
     }
@@ -115,7 +109,7 @@ final class CandidatePath implements ArrayAccess
             'cost' => $this->cost,
             'product' => $this->product,
             'hops' => $this->hops,
-            'edges' => $this->edges,
+            'edges' => $this->edges->toArray(),
             'amountRange' => $this->range?->toRange(),
             'desiredAmount' => $this->range?->desired(),
             default => throw new LogicException(sprintf('Unknown candidate path attribute "%s".', $offset)),
@@ -148,7 +142,7 @@ final class CandidatePath implements ArrayAccess
             'cost' => $this->cost,
             'product' => $this->product,
             'hops' => $this->hops,
-            'edges' => $this->edges,
+            'edges' => $this->edges->toArray(),
             'amountRange' => $this->range?->toRange(),
             'desiredAmount' => $this->range?->desired(),
         ];

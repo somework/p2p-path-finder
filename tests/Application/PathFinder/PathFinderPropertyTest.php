@@ -315,7 +315,7 @@ final class PathFinderPropertyTest extends TestCase
                     ],
                 );
             },
-            $path->edges(),
+            $path->edges()->toArray(),
         );
 
         return $path->hops().'|'.implode(';', $segments);

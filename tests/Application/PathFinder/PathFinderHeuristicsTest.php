@@ -10,10 +10,11 @@ use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\SearchStateQueue;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Application\Service\LegMaterializer;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
-use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
@@ -22,7 +23,6 @@ use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
 use function array_fill;
-use function count;
 
 /**
  * @covers \SomeWork\P2PPathFinder\Application\PathFinder\PathFinder
@@ -742,13 +742,11 @@ final class PathFinderHeuristicsTest extends TestCase
 
         $first = $this->buildCandidate($cost, [[
             'from' => 'SRC',
-            'to' => 'MID',
-            'label' => 'first',
+            'to' => 'MID_A',
         ]]);
         $second = $this->buildCandidate($cost, [[
             'from' => 'SRC',
-            'to' => 'MID',
-            'label' => 'second',
+            'to' => 'MID_B',
         ]]);
 
         $recordResult->invokeArgs($finder, [$heap, $first, 0]);
@@ -759,41 +757,52 @@ final class PathFinderHeuristicsTest extends TestCase
 
         $results = $finalize->invoke($finder, $heap);
 
-        self::assertSame('first', $results[0]['edges'][0]['label']);
-        self::assertSame('second', $results[1]['edges'][0]['label']);
+        self::assertSame('MID_A', $results[0]['edges'][0]['to']);
+        self::assertSame('MID_B', $results[1]['edges'][0]['to']);
     }
 
-    /**
-     * @return list<array{from: string, to: string, order: Order, rate: mixed, orderSide: OrderSide, conversionRate: numeric-string}>
-     */
-    private function dummyEdges(int $count): array
+    private function dummyEdges(int $count): PathEdgeSequence
     {
         if (0 === $count) {
-            return [];
+            return PathEdgeSequence::empty();
         }
 
         $order = OrderFactory::buy('SRC', 'DST', '1.000', '1.000', '1.000', 3, 3);
-        $edge = [
-            'from' => 'SRC',
-            'to' => 'DST',
-            'order' => $order,
-            'rate' => $order->effectiveRate(),
-            'orderSide' => OrderSide::BUY,
-            'conversionRate' => BcMath::normalize('1.000000000000000000', 18),
-        ];
+        $edge = PathEdge::create(
+            'SRC',
+            'DST',
+            $order,
+            $order->effectiveRate(),
+            OrderSide::BUY,
+            BcMath::normalize('1.000000000000000000', 18),
+        );
 
-        return array_fill(0, $count, $edge);
+        return PathEdgeSequence::fromList(array_fill(0, $count, $edge));
     }
 
     private function buildCandidate(string $cost, array $edges = []): CandidatePath
     {
         $normalized = BcMath::normalize($cost, 18);
 
+        $edgeSequence = [] === $edges
+            ? PathEdgeSequence::empty()
+            : PathEdgeSequence::fromList(array_map(
+                fn (array $edge): PathEdge => PathEdge::create(
+                    $edge['from'],
+                    $edge['to'],
+                    $edge['order'],
+                    $edge['rate'],
+                    $edge['orderSide'],
+                    $edge['conversionRate'],
+                ),
+                $this->ensureEdgeDefaults($edges),
+            ));
+
         return CandidatePath::from(
             $normalized,
             BcMath::normalize('1.000000000000000000', 18),
-            count($edges),
-            [] === $edges ? $edges : $this->ensureEdgeDefaults($edges),
+            $edgeSequence->count(),
+            $edgeSequence,
         );
     }
 

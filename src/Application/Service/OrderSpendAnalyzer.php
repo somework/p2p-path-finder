@@ -7,7 +7,7 @@ namespace SomeWork\P2PPathFinder\Application\Service;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
-use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
@@ -19,8 +19,6 @@ use function max;
  * Encapsulates filtering orders and determining spend bounds.
  *
  * @internal
- *
- * @psalm-import-type PathEdge from PathFinder
  */
 final class OrderSpendAnalyzer
 {
@@ -71,16 +69,14 @@ final class OrderSpendAnalyzer
     }
 
     /**
-     * @param GraphEdge|PathEdge $edge
-     *
      * @return array{net: Money, gross: Money, grossCeiling: Money}|null
      */
-    public function determineInitialSpendAmount(PathSearchConfig $config, GraphEdge|array $edge): ?array
+    public function determineInitialSpendAmount(PathSearchConfig $config, GraphEdge|PathEdge $edge): ?array
     {
         $desired = $config->spendAmount();
         $configMin = $config->minimumSpendAmount();
         $configMax = $config->maximumSpendAmount();
-        $order = $edge instanceof GraphEdge ? $edge->order() : $edge['order'];
+        $order = $edge instanceof GraphEdge ? $edge->order() : $edge->order();
 
         [$orderMinGross, $orderMaxGross] = $this->determineOrderSpendBounds($order);
 
