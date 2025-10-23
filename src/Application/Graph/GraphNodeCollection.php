@@ -103,13 +103,7 @@ final class GraphNodeCollection implements ArrayAccess, Countable, IteratorAggre
      */
     public function getIterator(): Traversable
     {
-        $ordered = [];
-
-        foreach ($this->order as $currency) {
-            $ordered[$currency] = $this->nodes[$currency];
-        }
-
-        return new ArrayIterator($ordered);
+        return new ArrayIterator($this->buildOrderedNodes());
     }
 
     public function offsetExists(mixed $offset): bool
@@ -149,13 +143,7 @@ final class GraphNodeCollection implements ArrayAccess, Countable, IteratorAggre
      */
     public function toArray(): array
     {
-        $ordered = [];
-
-        foreach ($this->order as $currency) {
-            $ordered[$currency] = $this->nodes[$currency];
-        }
-
-        return $ordered;
+        return $this->buildOrderedNodes();
     }
 
     /**
@@ -165,10 +153,24 @@ final class GraphNodeCollection implements ArrayAccess, Countable, IteratorAggre
     {
         $serialized = [];
 
-        foreach ($this->order as $currency) {
-            $serialized[$currency] = $this->nodes[$currency]->jsonSerialize();
+        foreach ($this->buildOrderedNodes() as $currency => $node) {
+            $serialized[$currency] = $node->jsonSerialize();
         }
 
         return $serialized;
+    }
+
+    /**
+     * @return array<string, GraphNode>
+     */
+    private function buildOrderedNodes(): array
+    {
+        $ordered = [];
+
+        foreach ($this->order as $currency) {
+            $ordered[$currency] = $this->nodes[$currency];
+        }
+
+        return $ordered;
     }
 }

@@ -64,7 +64,7 @@ final class GraphStructureTest extends TestCase
         $node = new GraphNode('USD');
 
         $this->expectException(InvalidInput::class);
-        $this->expectExceptionMessage('Graph nodes must be unique per currency.');
+        $this->expectExceptionMessageMatches('/Graph nodes must be unique per currency.*provided more than once/');
 
         new Graph([$node, $node]);
     }

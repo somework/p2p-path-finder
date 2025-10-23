@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Application\Graph;
 
 use ArrayAccess;
-use ArrayIterator;
 use IteratorAggregate;
 use JsonSerializable;
 use LogicException;
@@ -51,7 +50,7 @@ final class GraphNode implements IteratorAggregate, JsonSerializable, ArrayAcces
 
     public function getIterator(): Traversable
     {
-        return new ArrayIterator($this->edges->toArray());
+        return $this->edges->getIterator();
     }
 
     public function offsetExists(mixed $offset): bool
@@ -85,10 +84,7 @@ final class GraphNode implements IteratorAggregate, JsonSerializable, ArrayAcces
     {
         return [
             'currency' => $this->currency,
-            'edges' => array_map(
-                static fn (GraphEdge $edge): array => $edge->jsonSerialize(),
-                $this->edges->toArray(),
-            ),
+            'edges' => $this->edges->jsonSerialize(),
         ];
     }
 }
