@@ -9,9 +9,11 @@ use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\SearchStateQueue;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\Service\LegMaterializer;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
+use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
@@ -19,6 +21,7 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
+use function array_fill;
 use function count;
 
 /**
@@ -574,14 +577,12 @@ final class PathFinderHeuristicsTest extends TestCase
             $record->invoke(
                 $finder,
                 $heap,
-                [
-                    'cost' => $normalizedCost,
-                    'product' => BcMath::div('1', $normalizedCost, 18),
-                    'hops' => 1,
-                    'edges' => [],
-                    'amountRange' => null,
-                    'desiredAmount' => null,
-                ],
+                CandidatePath::from(
+                    $normalizedCost,
+                    BcMath::div('1', $normalizedCost, 18),
+                    1,
+                    $this->dummyEdges(1),
+                ),
                 $candidate['order'],
             );
         }
@@ -611,14 +612,12 @@ final class PathFinderHeuristicsTest extends TestCase
             $record->invoke(
                 $finder,
                 $heap,
-                [
-                    'cost' => BcMath::normalize('1.000', 18),
-                    'product' => BcMath::normalize('1.000', 18),
-                    'hops' => $order,
-                    'edges' => [],
-                    'amountRange' => null,
-                    'desiredAmount' => null,
-                ],
+                CandidatePath::from(
+                    BcMath::normalize('1.000', 18),
+                    BcMath::normalize('1.000', 18),
+                    $order,
+                    $this->dummyEdges($order),
+                ),
                 $order,
             );
         }
@@ -765,24 +764,60 @@ final class PathFinderHeuristicsTest extends TestCase
     }
 
     /**
-     * @return array{
-     *     cost: numeric-string,
-     *     product: numeric-string,
-     *     hops: int,
-     *     edges: list<array<string, string>>,
-     *     amountRange: null,
-     *     desiredAmount: null,
-     * }
+     * @return list<array{from: string, to: string, order: Order, rate: mixed, orderSide: OrderSide, conversionRate: numeric-string}>
      */
-    private function buildCandidate(string $cost, array $edges = []): array
+    private function dummyEdges(int $count): array
     {
-        return [
-            'cost' => $cost,
-            'product' => BcMath::normalize('1.000000000000000000', 18),
-            'hops' => count($edges),
-            'edges' => $edges,
-            'amountRange' => null,
-            'desiredAmount' => null,
+        if (0 === $count) {
+            return [];
+        }
+
+        $order = OrderFactory::buy('SRC', 'DST', '1.000', '1.000', '1.000', 3, 3);
+        $edge = [
+            'from' => 'SRC',
+            'to' => 'DST',
+            'order' => $order,
+            'rate' => $order->effectiveRate(),
+            'orderSide' => OrderSide::BUY,
+            'conversionRate' => BcMath::normalize('1.000000000000000000', 18),
         ];
+
+        return array_fill(0, $count, $edge);
+    }
+
+    private function buildCandidate(string $cost, array $edges = []): CandidatePath
+    {
+        $normalized = BcMath::normalize($cost, 18);
+
+        return CandidatePath::from(
+            $normalized,
+            BcMath::normalize('1.000000000000000000', 18),
+            count($edges),
+            [] === $edges ? $edges : $this->ensureEdgeDefaults($edges),
+        );
+    }
+
+    /**
+     * @param list<array> $edges
+     *
+     * @return list<array>
+     */
+    private function ensureEdgeDefaults(array $edges): array
+    {
+        return array_map(
+            static function (array $edge): array {
+                $order = $edge['order'] ?? OrderFactory::buy('SRC', 'DST', '1.000', '1.000', '1.000', 3, 3);
+
+                return $edge + [
+                    'from' => $edge['from'] ?? 'SRC',
+                    'to' => $edge['to'] ?? 'DST',
+                    'order' => $order,
+                    'rate' => $order->effectiveRate(),
+                    'orderSide' => $edge['orderSide'] ?? OrderSide::BUY,
+                    'conversionRate' => $edge['conversionRate'] ?? BcMath::normalize('1.000000000000000000', 18),
+                ];
+            },
+            $edges,
+        );
     }
 }

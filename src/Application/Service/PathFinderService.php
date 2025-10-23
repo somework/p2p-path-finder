@@ -15,8 +15,13 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignat
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
+use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
+use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
@@ -29,12 +34,6 @@ use function usort;
 
 /**
  * High level facade orchestrating order filtering, graph building and path search.
- *
- * @phpstan-import-type Candidate from PathFinder
- * @phpstan-import-type SpendConstraints from PathFinder
- *
- * @psalm-import-type Candidate from PathFinder
- * @psalm-import-type SpendConstraints from PathFinder
  */
 final class PathFinderService
 {
@@ -45,7 +44,7 @@ final class PathFinderService
     private readonly ToleranceEvaluator $toleranceEvaluator;
     private readonly PathOrderStrategy $orderingStrategy;
     /**
-     * @var Closure(PathSearchConfig):Closure(Graph, string, string, array, callable):SearchOutcome
+     * @var Closure(PathSearchConfig):Closure(Graph, string, string, ?SpendConstraints, callable(CandidatePath):bool):SearchOutcome<CandidatePath>
      */
     private readonly Closure $pathFinderFactory;
 
@@ -71,29 +70,17 @@ final class PathFinderService
         $strategy = $this->orderingStrategy;
         $factory = $pathFinderFactory ?? static function (PathSearchConfig $config) use ($strategy): Closure {
             /**
-             * @param Graph                    $graph
-             * @param SpendConstraints         $range
-             * @param callable(Candidate):bool $callback
+             * @param Graph                        $graph
+             * @param SpendConstraints|null        $constraints
+             * @param callable(CandidatePath):bool $callback
              *
-             * @phpstan-param Graph                    $graph
-             * @phpstan-param SpendConstraints         $range
-             * @phpstan-param callable(Candidate):bool $callback
-             *
-             * @psalm-param Graph                    $graph
-             * @psalm-param SpendConstraints         $range
-             * @psalm-param callable(Candidate):bool $callback
-             *
-             * @return SearchOutcome<Candidate>
-             *
-             * @phpstan-return SearchOutcome<Candidate>
-             *
-             * @psalm-return SearchOutcome<Candidate>
+             * @return SearchOutcome<CandidatePath>
              */
             $runner = static function (
                 Graph $graph,
                 string $source,
                 string $target,
-                array $range,
+                ?SpendConstraints $constraints,
                 callable $callback,
             ) use ($config, $strategy): SearchOutcome {
                 $pathFinder = new PathFinder(
@@ -106,13 +93,10 @@ final class PathFinderService
                     $config->pathFinderTimeBudgetMs(),
                 );
 
-                /** @var SpendConstraints $range */
-                $range = $range;
-
-                /** @var callable(Candidate):bool $callback */
+                /** @var callable(CandidatePath):bool $callback */
                 $callback = $callback;
 
-                return $pathFinder->findBestPaths($graph, $source, $target, $range, $callback);
+                return $pathFinder->findBestPaths($graph, $source, $target, $constraints, $callback);
             };
 
             return $runner;
@@ -120,7 +104,7 @@ final class PathFinderService
 
         $factory = $factory instanceof Closure ? $factory : Closure::fromCallable($factory);
 
-        /** @var Closure(PathSearchConfig):Closure(Graph, string, string, array, callable):SearchOutcome $typedFactory */
+        /** @var Closure(PathSearchConfig):Closure(Graph, string, string, ?SpendConstraints, callable(CandidatePath):bool):SearchOutcome<CandidatePath> $typedFactory */
         $typedFactory = $factory;
 
         $this->pathFinderFactory = $typedFactory;
@@ -167,11 +151,7 @@ final class PathFinderService
 
         $runnerFactory = $this->pathFinderFactory;
         /**
-         * @var Closure(Graph, string, string, SpendConstraints, callable(Candidate):bool):SearchOutcome<Candidate> $runner
-         *
-         * @phpstan-var Closure(Graph, string, string, SpendConstraints, callable(Candidate):bool):SearchOutcome<Candidate> $runner
-         *
-         * @psalm-var Closure(Graph, string, string, SpendConstraints, callable(Candidate):bool):SearchOutcome<Candidate> $runner
+         * @var Closure(Graph, string, string, ?SpendConstraints, callable(CandidatePath):bool):SearchOutcome<CandidatePath> $runner
          */
         $runner = $runnerFactory($config);
 
@@ -184,26 +164,22 @@ final class PathFinderService
             $graph,
             $sourceCurrency,
             $targetCurrency,
-            [
-                'min' => $config->minimumSpendAmount(),
-                'max' => $config->maximumSpendAmount(),
-                'desired' => $requestedSpend,
-            ],
-            /**
-             * @phpstan-param Candidate $candidate
-             *
-             * @psalm-param Candidate $candidate
-             */
-            function (array $candidate) use (&$materializedResults, &$resultOrder, $config, $sourceCurrency, $targetCurrency, $requestedSpend) {
-                if ($candidate['hops'] < $config->minimumHops() || $candidate['hops'] > $config->maximumHops()) {
+            SpendConstraints::from(
+                $config->minimumSpendAmount(),
+                $config->maximumSpendAmount(),
+                $requestedSpend,
+            ),
+            function (CandidatePath $candidate) use (&$materializedResults, &$resultOrder, $config, $sourceCurrency, $targetCurrency, $requestedSpend) {
+                if ($candidate->hops() < $config->minimumHops() || $candidate->hops() > $config->maximumHops()) {
                     return false;
                 }
 
-                if ([] === $candidate['edges']) {
+                $edges = $candidate->edges();
+                if ([] === $edges) {
                     return false;
                 }
 
-                $firstEdge = $candidate['edges'][0];
+                $firstEdge = $edges[0];
                 if ($firstEdge['from'] !== $sourceCurrency) {
                     return false;
                 }
@@ -214,7 +190,7 @@ final class PathFinderService
                 }
 
                 $materialized = $this->legMaterializer->materialize(
-                    $candidate['edges'],
+                    $edges,
                     $requestedSpend,
                     $initialSeed,
                     $targetCurrency,
@@ -234,7 +210,7 @@ final class PathFinderService
                     return false;
                 }
 
-                $routeSignature = $this->routeSignature($candidate['edges']);
+                $routeSignature = $this->routeSignature($edges);
                 $result = new PathResult(
                     $materialized['totalSpent'],
                     $materialized['totalReceived'],
@@ -244,8 +220,8 @@ final class PathFinderService
                 );
 
                 $orderKey = new PathOrderKey(
-                    $candidate['cost'],
-                    $candidate['hops'],
+                    $candidate->cost(),
+                    $candidate->hops(),
                     $routeSignature,
                     $resultOrder,
                 );
@@ -315,9 +291,7 @@ final class PathFinderService
     }
 
     /**
-     * @phpstan-param list<array{from: string, to: string}> $edges
-     *
-     * @psalm-param list<array{from: string, to: string, ...}> $edges
+     * @param list<array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}> $edges
      */
     private function routeSignature(array $edges): string
     {

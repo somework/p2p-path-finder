@@ -10,12 +10,19 @@ use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
+use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 use SomeWork\P2PPathFinder\Tests\Fixture\FeePolicyFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
+
+use function array_pad;
+use function count;
+use function is_array;
 
 /**
  * @covers \SomeWork\P2PPathFinder\Application\Service\PathFinderService
@@ -115,7 +122,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
             [
                 'cost' => '1.000000000000000000',
                 'product' => '1.000000000000000000',
-                'hops' => 1,
+                'hops' => 0,
                 'edges' => [],
                 'amountRange' => null,
                 'desiredAmount' => null,
@@ -341,18 +348,72 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
     }
 
     /**
-     * @param list<array{cost: numeric-string, product: numeric-string, hops: int, edges: list<array>, amountRange: mixed, desiredAmount: mixed}> $candidates
+     * @param list<CandidatePath|array{cost: numeric-string, product: numeric-string, hops: int, edges: list<array>, amountRange: mixed, desiredAmount: mixed}> $candidates
      */
     private function pathFinderFactoryForCandidates(array $candidates, ?GuardLimitStatus $guardLimits = null): callable
     {
-        return static function (PathSearchConfig $config) use ($candidates, $guardLimits): callable {
-            return static function (Graph $graph, string $source, string $target, array $range, callable $callback) use ($candidates, $guardLimits): SearchOutcome {
-                foreach ($candidates as $candidate) {
+        $normalized = array_map(
+            static function ($candidate): CandidatePath {
+                if ($candidate instanceof CandidatePath) {
+                    return $candidate;
+                }
+
+                $range = null;
+                if (is_array($candidate['amountRange'])) {
+                    $range = SpendConstraints::from(
+                        $candidate['amountRange']['min'],
+                        $candidate['amountRange']['max'],
+                        $candidate['desiredAmount'],
+                    );
+                }
+
+                return CandidatePath::from(
+                    $candidate['cost'],
+                    $candidate['product'],
+                    $candidate['hops'],
+                    self::normalizeEdges($candidate['edges'], $candidate['hops']),
+                    $range,
+                );
+            },
+            $candidates,
+        );
+
+        return static function (PathSearchConfig $config) use ($normalized, $guardLimits): callable {
+            return static function (Graph $graph, string $source, string $target, ?SpendConstraints $range, callable $callback) use ($normalized, $guardLimits): SearchOutcome {
+                foreach ($normalized as $candidate) {
                     $callback($candidate);
                 }
 
                 return new SearchOutcome([], $guardLimits ?? GuardLimitStatus::none());
             };
         };
+    }
+
+    /**
+     * @param list<array> $edges
+     *
+     * @return list<array>
+     */
+    private static function normalizeEdges(array $edges, int $hops): array
+    {
+        if (count($edges) === $hops) {
+            return $edges;
+        }
+
+        if ([] === $edges) {
+            return [];
+        }
+
+        $order = OrderFactory::sell('SRC', 'DST', '1.000', '1.000', '1.000', 3, 3);
+        $template = [
+            'from' => 'SRC',
+            'to' => 'DST',
+            'order' => $order,
+            'rate' => $order->effectiveRate(),
+            'orderSide' => OrderSide::SELL,
+            'conversionRate' => BcMath::normalize('1.000000000000000000', 18),
+        ];
+
+        return array_pad($edges, $hops, $template);
     }
 }

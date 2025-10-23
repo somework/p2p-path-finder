@@ -12,6 +12,8 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignat
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
@@ -23,6 +25,7 @@ use SplPriorityQueue;
 
 use function array_map;
 use function array_values;
+use function count;
 use function implode;
 use function sprintf;
 use function str_repeat;
@@ -35,10 +38,6 @@ use function usort;
  * @psalm-type SpendRange = array{min: Money, max: Money}
  *
  * @phpstan-type SpendRange array{min: Money, max: Money}
- *
- * @psalm-type SpendConstraints = array{min?: Money, max?: Money, desired?: Money|null}
- *
- * @phpstan-type SpendConstraints array{min?: Money, max?: Money, desired?: Money|null}
  *
  * @psalm-type PathEdge = array{
  *     from: string,
@@ -55,41 +54,23 @@ use function usort;
  *     order: Order,
  *     rate: ExchangeRate,
  *     orderSide: OrderSide,
- *     conversionRate: string,
- * }
- *
- * @psalm-type Candidate = array{
- *     cost: numeric-string,
- *     product: numeric-string,
- *     hops: int,
- *     edges: list<PathEdge>,
- *     amountRange: SpendRange|null,
- *     desiredAmount: Money|null,
- * }
- *
- * @phpstan-type Candidate array{
- *     cost: string,
- *     product: string,
- *     hops: int,
- *     edges: list<PathEdge>,
- *     amountRange: SpendRange|null,
- *     desiredAmount: Money|null,
+ *     conversionRate: numeric-string,
  * }
  *
  * @psalm-type CandidateHeapEntry = array{
- *     candidate: Candidate,
+ *     candidate: CandidatePath,
  *     order: int,
  *     cost: numeric-string,
  * }
  *
  * @phpstan-type CandidateHeapEntry array{
- *     candidate: Candidate,
+ *     candidate: CandidatePath,
  *     order: int,
  *     cost: numeric-string,
  * }
  *
  * @psalm-type CandidateResultEntry = array{
- *     candidate: Candidate,
+ *     candidate: CandidatePath,
  *     order: int,
  *     cost: numeric-string,
  *     routeSignature: string,
@@ -97,7 +78,7 @@ use function usort;
  * }
  *
  * @phpstan-type CandidateResultEntry array{
- *     candidate: Candidate,
+ *     candidate: CandidatePath,
  *     order: int,
  *     cost: string,
  *     routeSignature: string,
@@ -205,27 +186,22 @@ final class PathFinder
     }
 
     /**
-     * @param SpendConstraints|null         $spendConstraints
-     * @param callable(Candidate):bool|null $acceptCandidate
+     * @param callable(CandidatePath):bool|null $acceptCandidate
      *
-     * @return SearchOutcome<Candidate>
-     *
-     * @phpstan-return SearchOutcome<Candidate>
-     *
-     * @psalm-return SearchOutcome<Candidate>
+     * @return SearchOutcome<CandidatePath>
      */
     public function findBestPaths(
         Graph $graph,
         string $source,
         string $target,
-        ?array $spendConstraints = null,
+        ?SpendConstraints $spendConstraints = null,
         ?callable $acceptCandidate = null
     ): SearchOutcome {
         $source = strtoupper($source);
         $target = strtoupper($target);
 
         if (!$graph->hasNode($source) || !$graph->hasNode($target)) {
-            /** @var SearchOutcome<Candidate> $empty */
+            /** @var SearchOutcome<CandidatePath> $empty */
             $empty = SearchOutcome::empty(GuardLimitStatus::none());
 
             return $empty;
@@ -234,15 +210,8 @@ final class PathFinder
         $range = null;
         $desiredSpend = null;
         if (null !== $spendConstraints) {
-            if (!isset($spendConstraints['min'], $spendConstraints['max'])) {
-                throw new InvalidInput('Spend constraints must include both minimum and maximum bounds.');
-            }
-
-            $range = [
-                'min' => $spendConstraints['min'],
-                'max' => $spendConstraints['max'],
-            ];
-            $desiredSpend = $spendConstraints['desired'] ?? null;
+            $range = $spendConstraints->toRange();
+            $desiredSpend = $spendConstraints->desired();
         }
 
         [
@@ -276,21 +245,29 @@ final class PathFinder
 
                 BcMath::ensureNumeric($candidateCost, $candidateProduct);
 
-                $candidate = [
-                    'cost' => $candidateCost,
-                    'product' => $candidateProduct,
-                    'hops' => $state['hops'],
-                    'edges' => $state['path'],
-                    'amountRange' => $state['amountRange'],
-                    'desiredAmount' => $state['desiredAmount'],
-                ];
+                $candidateRange = null;
+                if (null !== $state['amountRange']) {
+                    $candidateRange = SpendConstraints::from(
+                        $state['amountRange']['min'],
+                        $state['amountRange']['max'],
+                        $state['desiredAmount'],
+                    );
+                }
+
+                $candidate = CandidatePath::from(
+                    $candidateCost,
+                    $candidateProduct,
+                    count($state['path']),
+                    $state['path'],
+                    $candidateRange,
+                );
 
                 if (null === $acceptCandidate || $acceptCandidate($candidate)) {
                     if (
                         null === $bestTargetCost
-                        || -1 === BcMath::comp($candidate['cost'], $bestTargetCost, self::SCALE)
+                        || -1 === BcMath::comp($candidate->cost(), $bestTargetCost, self::SCALE)
                     ) {
-                        $bestTargetCost = $candidate['cost'];
+                        $bestTargetCost = $candidate->cost();
                     }
 
                     $this->recordResult($results, $candidate, $resultInsertionOrder++);
@@ -418,13 +395,13 @@ final class PathFinder
         $guardLimits = $guards->finalize($visitedGuardReached);
 
         if (0 === $results->count()) {
-            /** @var SearchOutcome<Candidate> $empty */
+            /** @var SearchOutcome<CandidatePath> $empty */
             $empty = SearchOutcome::empty($guardLimits);
 
             return $empty;
         }
 
-        /** @var list<Candidate> $finalized */
+        /** @var list<CandidatePath> $finalized */
         $finalized = $this->finalizeResults($results);
 
         return new SearchOutcome($finalized, $guardLimits);
@@ -556,15 +533,10 @@ final class PathFinder
         return new CandidateResultHeap(self::SCALE);
     }
 
-    /**
-     * @phpstan-param Candidate $candidate
-     *
-     * @psalm-param Candidate $candidate
-     */
-    private function recordResult(CandidateResultHeap $results, array $candidate, int $order): void
+    private function recordResult(CandidateResultHeap $results, CandidatePath $candidate, int $order): void
     {
         /** @var numeric-string $candidateCost */
-        $candidateCost = $candidate['cost'];
+        $candidateCost = $candidate->cost();
         $entry = [
             'candidate' => $candidate,
             'order' => $order,
@@ -621,7 +593,7 @@ final class PathFinder
     }
 
     /**
-     * @return list<Candidate>
+     * @return list<CandidatePath>
      */
     private function finalizeResults(CandidateResultHeap $results): array
     {
@@ -629,12 +601,12 @@ final class PathFinder
         $entries = $this->collectResultEntries($results);
         $this->sortResultEntries($entries);
 
-        /** @var list<Candidate> $finalized */
+        /** @var list<CandidatePath> $finalized */
         $finalized = array_map(
             /**
              * @param CandidateResultEntry $entry
              */
-            static fn (array $entry): array => $entry['candidate'],
+            static fn (array $entry): CandidatePath => $entry['candidate'],
             $entries,
         );
 
@@ -655,10 +627,10 @@ final class PathFinder
         while (!$clone->isEmpty()) {
             /** @var CandidateHeapEntry $entry */
             $entry = $clone->extract();
-            $entry['routeSignature'] = $this->routeSignature($entry['candidate']['edges']);
+            $entry['routeSignature'] = $this->routeSignature($entry['candidate']->edges());
             $entry['orderKey'] = new PathOrderKey(
                 $entry['cost'],
-                $entry['candidate']['hops'],
+                $entry['candidate']->hops(),
                 $entry['routeSignature'],
                 $entry['order'],
             );
