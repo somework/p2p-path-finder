@@ -9,6 +9,7 @@ use ArrayIterator;
 use Countable;
 use IteratorAggregate;
 use JsonSerializable;
+use SomeWork\P2PPathFinder\Application\Support\GuardsArrayAccessOffset;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use Traversable;
 
@@ -25,6 +26,8 @@ use function count;
  */
 final class PathLegCollection implements ArrayAccess, Countable, IteratorAggregate, JsonSerializable
 {
+    use GuardsArrayAccessOffset;
+
     /**
      * @var list<PathLeg>
      */
@@ -117,16 +120,24 @@ final class PathLegCollection implements ArrayAccess, Countable, IteratorAggrega
 
     public function offsetExists(mixed $offset): bool
     {
-        return isset($this->legs[$offset]);
+        $normalized = $this->normalizeIntegerOffset($offset);
+
+        if (null === $normalized) {
+            return false;
+        }
+
+        return isset($this->legs[$normalized]);
     }
 
     public function offsetGet(mixed $offset): PathLeg
     {
-        if (!isset($this->legs[$offset])) {
+        $normalized = $this->normalizeIntegerOffset($offset);
+
+        if (null === $normalized || !isset($this->legs[$normalized])) {
             throw new InvalidInput('Path leg index must reference an existing position.');
         }
 
-        return $this->legs[$offset];
+        return $this->legs[$normalized];
     }
 
     public function offsetSet(mixed $offset, mixed $value): void

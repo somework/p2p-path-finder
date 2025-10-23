@@ -9,6 +9,7 @@ use ArrayIterator;
 use Countable;
 use IteratorAggregate;
 use JsonSerializable;
+use SomeWork\P2PPathFinder\Application\Support\GuardsArrayAccessOffset;
 use SomeWork\P2PPathFinder\Application\Support\SerializesMoney;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
@@ -26,6 +27,7 @@ use function ksort;
  */
 final class MoneyMap implements ArrayAccess, Countable, IteratorAggregate, JsonSerializable
 {
+    use GuardsArrayAccessOffset;
     use SerializesMoney;
 
     /**
@@ -187,16 +189,24 @@ final class MoneyMap implements ArrayAccess, Countable, IteratorAggregate, JsonS
 
     public function offsetExists(mixed $offset): bool
     {
-        return isset($this->values[$offset]);
+        $normalized = $this->normalizeStringOffset($offset);
+
+        if (null === $normalized) {
+            return false;
+        }
+
+        return isset($this->values[$normalized]);
     }
 
     public function offsetGet(mixed $offset): Money
     {
-        if (!isset($this->values[$offset])) {
+        $normalized = $this->normalizeStringOffset($offset);
+
+        if (null === $normalized || !isset($this->values[$normalized])) {
             throw new InvalidInput('Money map index must be a known currency code.');
         }
 
-        return $this->values[$offset];
+        return $this->values[$normalized];
     }
 
     public function offsetSet(mixed $offset, mixed $value): void

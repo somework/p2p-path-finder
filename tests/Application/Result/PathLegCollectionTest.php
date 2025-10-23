@@ -77,4 +77,23 @@ final class PathLegCollectionTest extends TestCase
             ),
         ]);
     }
+
+    public function test_it_rejects_non_integer_offsets(): void
+    {
+        $collection = PathLegCollection::fromList([
+            new PathLeg(
+                'usd',
+                'btc',
+                Money::fromString('USD', '1', 2),
+                Money::fromString('BTC', '2', 2),
+            ),
+        ]);
+
+        self::assertFalse(isset($collection['0']));
+
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Path leg index must reference an existing position.');
+
+        $collection['0'];
+    }
 }
