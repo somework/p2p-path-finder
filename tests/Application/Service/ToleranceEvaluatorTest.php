@@ -81,6 +81,20 @@ final class ToleranceEvaluatorTest extends TestCase
         self::assertSame('0.000000000000000000', $result->ratio());
     }
 
+    public function test_returns_null_when_zero_requested_but_actual_positive(): void
+    {
+        $config = $this->createConfig();
+        $evaluator = new ToleranceEvaluator();
+
+        $result = $evaluator->evaluate(
+            $config,
+            Money::fromString('USD', '0.00', 2),
+            Money::fromString('USD', '1.00', 2),
+        );
+
+        self::assertNull($result);
+    }
+
     public function test_returns_decimal_when_underspend_matches_minimum_tolerance(): void
     {
         $config = $this->createConfig();

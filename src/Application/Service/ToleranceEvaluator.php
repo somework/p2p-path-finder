@@ -32,6 +32,17 @@ final class ToleranceEvaluator
         $requestedComparable = $requestedSpend->withScale(max($requestedSpend->scale(), $actualSpend->scale()));
         $actualComparable = $actualSpend->withScale($requestedComparable->scale());
 
+        $requestedAmount = $requestedComparable->amount();
+        $actualAmount = $actualComparable->amount();
+        $comparisonScale = $requestedComparable->scale();
+
+        if (
+            0 === BcMath::comp($requestedAmount, '0', $comparisonScale)
+            && 1 === BcMath::comp($actualAmount, '0', $comparisonScale)
+        ) {
+            return null;
+        }
+
         $toleranceWindow = $config->toleranceWindow();
         $toleranceScale = ToleranceWindow::scale();
         $minimumTolerance = $toleranceWindow->minimum();
@@ -62,12 +73,16 @@ final class ToleranceEvaluator
         $targetScale = ToleranceWindow::scale();
         $scale = max($desired->scale(), $actual->scale(), $targetScale);
         $desiredAmount = $desired->withScale($scale)->amount();
+        $actualAmount = $actual->withScale($scale)->amount();
 
         if (0 === BcMath::comp($desiredAmount, '0', $scale)) {
-            return BcMath::normalize('0', $targetScale);
+            if (0 === BcMath::comp($actualAmount, '0', $scale)) {
+                return BcMath::normalize('0', $targetScale);
+            }
+
+            return BcMath::normalize('1', $targetScale);
         }
 
-        $actualAmount = $actual->withScale($scale)->amount();
         $diff = BcMath::sub($actualAmount, $desiredAmount, $scale + 4);
 
         if ('-' === $diff[0]) {
