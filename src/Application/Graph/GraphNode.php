@@ -9,6 +9,7 @@ use ArrayIterator;
 use IteratorAggregate;
 use JsonSerializable;
 use LogicException;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use Traversable;
 
 /**
@@ -19,26 +20,23 @@ use Traversable;
  */
 final class GraphNode implements IteratorAggregate, JsonSerializable, ArrayAccess
 {
-    /**
-     * @var list<GraphEdge>
-     */
-    private readonly array $edges;
+    private readonly GraphEdgeCollection $edges;
 
     /**
-     * @param list<GraphEdge> $edges
+     * @param GraphEdgeCollection|array<array-key, GraphEdge> $edges
      */
-    public function __construct(private readonly string $currency, array $edges = [])
+    public function __construct(private readonly string $currency, GraphEdgeCollection|array $edges = [])
     {
-        $normalized = [];
-        foreach ($edges as $edge) {
-            if (!$edge instanceof GraphEdge) {
-                continue;
-            }
+        $collection = $edges instanceof GraphEdgeCollection
+            ? $edges
+            : GraphEdgeCollection::fromArray($edges);
 
-            $normalized[] = $edge;
+        $origin = $collection->originCurrency();
+        if (null !== $origin && $origin !== $this->currency) {
+            throw new InvalidInput('Graph node currency must match edge origins.');
         }
 
-        $this->edges = $normalized;
+        $this->edges = $collection;
     }
 
     public function currency(): string
@@ -46,17 +44,14 @@ final class GraphNode implements IteratorAggregate, JsonSerializable, ArrayAcces
         return $this->currency;
     }
 
-    /**
-     * @return list<GraphEdge>
-     */
-    public function edges(): array
+    public function edges(): GraphEdgeCollection
     {
         return $this->edges;
     }
 
     public function getIterator(): Traversable
     {
-        return new ArrayIterator($this->edges);
+        return new ArrayIterator($this->edges->toArray());
     }
 
     public function offsetExists(mixed $offset): bool
@@ -92,7 +87,7 @@ final class GraphNode implements IteratorAggregate, JsonSerializable, ArrayAcces
             'currency' => $this->currency,
             'edges' => array_map(
                 static fn (GraphEdge $edge): array => $edge->jsonSerialize(),
-                $this->edges,
+                $this->edges->toArray(),
             ),
         ];
     }

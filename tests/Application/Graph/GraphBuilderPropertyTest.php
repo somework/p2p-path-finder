@@ -10,6 +10,7 @@ use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Application\Support\Generator\GraphScenarioGenerator;
 use SomeWork\P2PPathFinder\Tests\Support\InfectionIterationLimiter;
@@ -17,8 +18,9 @@ use SomeWork\P2PPathFinder\Tests\Support\InfectionIterationLimiter;
 use function array_filter;
 use function array_key_first;
 use function array_keys;
+use function array_unique;
+use function array_values;
 use function count;
-use function sort;
 
 final class GraphBuilderPropertyTest extends TestCase
 {
@@ -45,12 +47,19 @@ final class GraphBuilderPropertyTest extends TestCase
 
             $expectedCurrencies = $this->collectCurrencies($orders);
             $actualCurrencies = array_keys($graph);
-            sort($expectedCurrencies);
-            sort($actualCurrencies);
 
             self::assertSame($expectedCurrencies, $actualCurrencies);
 
             foreach ($graph as $node) {
+                $origins = array_values(array_unique(array_map(
+                    static fn (array $edge): string => $edge['from'],
+                    $node['edges'],
+                )));
+
+                if ([] !== $node['edges']) {
+                    self::assertSame([$node['currency']], $origins);
+                }
+
                 foreach ($node['edges'] as $edge) {
                     $this->assertEdgeConsistency($edge);
                 }
@@ -68,7 +77,7 @@ final class GraphBuilderPropertyTest extends TestCase
         foreach ($graph as $currency => $node) {
             $export[$currency] = [
                 'currency' => $currency,
-                'edges' => array_map([$this, 'exportEdge'], $node->edges()),
+                'edges' => array_map([$this, 'exportEdge'], $node->edges()->toArray()),
             ];
         }
 
@@ -128,9 +137,13 @@ final class GraphBuilderPropertyTest extends TestCase
         $currencies = [];
 
         foreach ($orders as $order) {
-            $pair = $order->assetPair();
-            $currencies[$pair->base()] = true;
-            $currencies[$pair->quote()] = true;
+            [$from, $to] = match ($order->side()) {
+                OrderSide::BUY => [$order->assetPair()->base(), $order->assetPair()->quote()],
+                OrderSide::SELL => [$order->assetPair()->quote(), $order->assetPair()->base()],
+            };
+
+            $currencies[$from] = true;
+            $currencies[$to] = true;
         }
 
         return array_keys($currencies);
