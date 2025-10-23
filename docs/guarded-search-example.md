@@ -48,7 +48,11 @@ $service = new PathFinderService(new GraphBuilder());
 $result = $service->findBestPaths($orderBook, $config, 'BTC');
 
 foreach ($result->paths() as $path) {
-    printf("Found path with residual tolerance %s and %d segments\n", $path->residualTolerance(), count($path->legs()));
+    printf(
+        "Found path with residual tolerance %s%% and %d segments\n",
+        $path->residualTolerancePercentage(),
+        count($path->legs()),
+    );
 }
 
 $report = $result->guardLimits();
@@ -60,6 +64,13 @@ printf(
     $report->expansionLimit(),
     $report->elapsedMilliseconds(),
 );
+```
+
+Example output (values will vary by machine):
+
+```
+Found path with residual tolerance 0.00% and 2 segments
+Explored 3/20000 states across 3/50000 expansions in 5.124ms
 ```
 
 The `withSearchGuards()` call ensures the traversal halts if either the visited-state or
