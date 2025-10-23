@@ -121,7 +121,7 @@ final class PathEdge implements ArrayAccess
             'rate' => $this->rate,
             'orderSide' => $this->orderSide,
             'conversionRate' => $this->conversionRate,
-            default => throw new LogicException(sprintf('Unknown path edge attribute "%s".', (string) $offset)),
+            default => throw new LogicException(sprintf('Unknown path edge attribute "%s".', $offset)),
         };
     }
 

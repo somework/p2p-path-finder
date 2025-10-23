@@ -14,10 +14,9 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use Traversable;
 
+use function array_key_last;
 use function array_map;
-use function array_values;
 use function count;
-use function is_int;
 use function sprintf;
 
 /**
@@ -71,7 +70,7 @@ final class PathEdgeSequence implements ArrayAccess, Countable, IteratorAggregat
             }
         }
 
-        return new self(array_values($edges));
+        return new self($edges);
     }
 
     public function append(PathEdge $edge): self
@@ -94,11 +93,13 @@ final class PathEdgeSequence implements ArrayAccess, Countable, IteratorAggregat
 
     public function last(): ?PathEdge
     {
-        if ($this->isEmpty()) {
+        $lastKey = array_key_last($this->edges);
+
+        if ($lastKey === null) {
             return null;
         }
 
-        return $this->edges[count($this->edges) - 1];
+        return $this->edges[$lastKey];
     }
 
     /**
@@ -118,13 +119,13 @@ final class PathEdgeSequence implements ArrayAccess, Countable, IteratorAggregat
 
     public function offsetExists(mixed $offset): bool
     {
-        return is_int($offset) && isset($this->edges[$offset]);
+        return isset($this->edges[$offset]);
     }
 
     public function offsetGet(mixed $offset): PathEdge
     {
-        if (!is_int($offset) || !isset($this->edges[$offset])) {
-            throw new LogicException(sprintf('Undefined path edge at offset %s.', (string) $offset));
+        if (!isset($this->edges[$offset])) {
+            throw new LogicException(sprintf('Undefined path edge at offset %s.', $offset));
         }
 
         return $this->edges[$offset];
