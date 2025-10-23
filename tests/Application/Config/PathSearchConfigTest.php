@@ -8,8 +8,10 @@ use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfigBuilder;
+use SomeWork\P2PPathFinder\Application\Config\SearchGuardConfig;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Domain\ValueObject\ToleranceWindow;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 final class PathSearchConfigTest extends TestCase
@@ -35,8 +37,7 @@ final class PathSearchConfigTest extends TestCase
 
         new PathSearchConfig(
             Money::fromString('EUR', '100.00', 2),
-            '0.0',
-            '0.1',
+            ToleranceWindow::fromStrings('0.0', '0.1'),
             0,
             1,
         );
@@ -49,8 +50,7 @@ final class PathSearchConfigTest extends TestCase
 
         new PathSearchConfig(
             Money::fromString('EUR', '100.00', 2),
-            '0.0',
-            '0.1',
+            ToleranceWindow::fromStrings('0.0', '0.1'),
             3,
             2,
         );
@@ -63,8 +63,7 @@ final class PathSearchConfigTest extends TestCase
 
         new PathSearchConfig(
             Money::fromString('EUR', '50.00', 2),
-            '0.0',
-            '0.1',
+            ToleranceWindow::fromStrings('0.0', '0.1'),
             1,
             2,
             resultLimit: 0,
@@ -78,11 +77,10 @@ final class PathSearchConfigTest extends TestCase
 
         new PathSearchConfig(
             Money::fromString('EUR', '50.00', 2),
-            '0.0',
-            '0.1',
+            ToleranceWindow::fromStrings('0.0', '0.1'),
             1,
             2,
-            pathFinderMaxExpansions: 0,
+            searchGuards: new SearchGuardConfig(PathFinder::DEFAULT_MAX_VISITED_STATES, 0),
         );
     }
 
@@ -93,11 +91,10 @@ final class PathSearchConfigTest extends TestCase
 
         new PathSearchConfig(
             Money::fromString('EUR', '50.00', 2),
-            '0.0',
-            '0.1',
+            ToleranceWindow::fromStrings('0.0', '0.1'),
             1,
             2,
-            pathFinderMaxVisitedStates: 0,
+            searchGuards: new SearchGuardConfig(0, PathFinder::DEFAULT_MAX_EXPANSIONS),
         );
     }
 
@@ -105,20 +102,19 @@ final class PathSearchConfigTest extends TestCase
     {
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '250.00', 2))
-            ->withToleranceBounds('0.15', '0.05')
+            ->withToleranceBounds('0.05', '0.15')
             ->withHopLimits(1, 4)
             ->build();
 
         self::assertSame('0.150000000000000000', $config->pathFinderTolerance());
-        self::assertSame('override', $config->pathFinderToleranceSource());
+        self::assertSame('maximum', $config->pathFinderToleranceSource());
     }
 
     public function test_path_finder_tolerance_preserves_high_precision_string(): void
     {
         $config = new PathSearchConfig(
             Money::fromString('USD', '250.00', 2),
-            '0.50',
-            '0.999999999999999999',
+            ToleranceWindow::fromStrings('0.50', '0.999999999999999999'),
             1,
             4,
         );
@@ -131,8 +127,7 @@ final class PathSearchConfigTest extends TestCase
     {
         $config = new PathSearchConfig(
             Money::fromString('EUR', '100.00', 2),
-            '0.1',
-            '0.2',
+            ToleranceWindow::fromStrings('0.1', '0.2'),
             1,
             3,
             pathFinderToleranceOverride: '0.050000000000000000',
@@ -146,8 +141,7 @@ final class PathSearchConfigTest extends TestCase
     {
         $config = new PathSearchConfig(
             Money::fromString('USD', '75.00', 2),
-            '0.250000000000000000',
-            '0.250000000000000000',
+            ToleranceWindow::fromStrings('0.250000000000000000', '0.250000000000000000'),
             1,
             3,
         );
@@ -160,8 +154,7 @@ final class PathSearchConfigTest extends TestCase
     {
         $config = new PathSearchConfig(
             Money::fromString('USD', '100.00', 2),
-            '0.05',
-            '0.20',
+            ToleranceWindow::fromStrings('0.05', '0.20'),
             1,
             3,
         );
@@ -170,18 +163,12 @@ final class PathSearchConfigTest extends TestCase
         self::assertSame('maximum', $config->pathFinderToleranceSource());
     }
 
-    public function test_path_finder_tolerance_records_minimum_when_lower_bound_exceeds_upper(): void
+    public function test_builder_rejects_inverted_tolerance_bounds(): void
     {
-        $config = new PathSearchConfig(
-            Money::fromString('EUR', '42.00', 2),
-            '0.150000000000000000',
-            '0.050000000000000000',
-            1,
-            4,
-        );
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Minimum tolerance must be less than or equal to maximum tolerance.');
 
-        self::assertSame('0.150000000000000000', $config->pathFinderTolerance());
-        self::assertSame('minimum', $config->pathFinderToleranceSource());
+        PathSearchConfig::builder()->withToleranceBounds('0.150000000000000000', '0.050000000000000000');
     }
 
     public function test_string_tolerance_remains_below_float_cap(): void
@@ -248,11 +235,14 @@ final class PathSearchConfigTest extends TestCase
     {
         $config = new PathSearchConfig(
             Money::fromString('EUR', '50.00', 2),
-            '0.0',
-            '0.1',
+            ToleranceWindow::fromStrings('0.0', '0.1'),
             1,
             2,
-            pathFinderTimeBudgetMs: 1,
+            searchGuards: new SearchGuardConfig(
+                PathFinder::DEFAULT_MAX_VISITED_STATES,
+                PathFinder::DEFAULT_MAX_EXPANSIONS,
+                1,
+            ),
         );
 
         self::assertSame(1, $config->pathFinderTimeBudgetMs());
@@ -265,11 +255,14 @@ final class PathSearchConfigTest extends TestCase
 
         new PathSearchConfig(
             Money::fromString('EUR', '50.00', 2),
-            '0.0',
-            '0.1',
+            ToleranceWindow::fromStrings('0.0', '0.1'),
             1,
             2,
-            pathFinderTimeBudgetMs: 0,
+            searchGuards: new SearchGuardConfig(
+                PathFinder::DEFAULT_MAX_VISITED_STATES,
+                PathFinder::DEFAULT_MAX_EXPANSIONS,
+                0,
+            ),
         );
     }
 
@@ -435,8 +428,7 @@ final class PathSearchConfigTest extends TestCase
     {
         $config = new PathSearchConfig(
             Money::fromString('EUR', '100.00', 2),
-            '0.1',
-            '0.2',
+            ToleranceWindow::fromStrings('0.1', '0.2'),
             1,
             3,
         );
@@ -477,8 +469,7 @@ final class PathSearchConfigTest extends TestCase
 
         new PathSearchConfig(
             Money::fromString('EUR', '100.00', 2),
-            '1.0',
-            '0.2',
+            ToleranceWindow::fromStrings('1.0', '0.2'),
             1,
             3,
         );
@@ -491,22 +482,22 @@ final class PathSearchConfigTest extends TestCase
 
         new PathSearchConfig(
             Money::fromString('EUR', '100.00', 2),
-            '0.1',
-            '1.0',
+            ToleranceWindow::fromStrings('0.1', '1.0'),
             1,
             3,
         );
     }
 
-    public function test_path_finder_tolerance_prefers_minimum_when_bounds_inverted(): void
+    public function test_builder_rejects_inverted_bounds_after_other_configuration(): void
     {
-        $config = PathSearchConfig::builder()
+        $builder = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '200.00', 2))
-            ->withToleranceBounds('0.20', '0.05')
-            ->withHopLimits(1, 3)
-            ->build();
+            ->withHopLimits(1, 3);
 
-        self::assertSame('0.200000000000000000', $config->pathFinderTolerance());
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Minimum tolerance must be less than or equal to maximum tolerance.');
+
+        $builder->withToleranceBounds('0.20', '0.05');
     }
 
     public function test_builder_preserves_minimum_tolerance_when_bounds_are_equal(): void
@@ -518,14 +509,14 @@ final class PathSearchConfigTest extends TestCase
             ->build();
 
         self::assertSame('0.150000000000000000', $config->pathFinderTolerance());
-        self::assertSame('override', $config->pathFinderToleranceSource());
+        self::assertSame('minimum', $config->pathFinderToleranceSource());
     }
 
     public function test_bounded_spend_calculation_maintains_scale_precision(): void
     {
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '123.45', 2))
-            ->withToleranceBounds('0.50008101', '0.0')
+            ->withToleranceBounds('0.50008101', '0.50008101')
             ->withHopLimits(1, 3)
             ->build();
 
@@ -539,9 +530,9 @@ final class PathSearchConfigTest extends TestCase
             ->withSpendAmount(Money::fromString('EUR', '10.00', 2))
             ->withHopLimits(1, 2);
 
-        $minimum = new ReflectionProperty(PathSearchConfigBuilder::class, 'minimumTolerance');
-        $minimum->setAccessible(true);
-        $minimum->setValue($builder, '0.100000000000000000');
+        $window = new ReflectionProperty(PathSearchConfigBuilder::class, 'toleranceWindow');
+        $window->setAccessible(true);
+        $window->setValue($builder, null);
 
         $this->expectException(InvalidInput::class);
         $builder->build();

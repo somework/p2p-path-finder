@@ -54,7 +54,8 @@ foreach ($result->paths() as $path) {
 
 The `withSearchGuards()` call ensures the traversal halts if either the visited-state or
 expansion thresholds are exceeded, providing predictable runtime characteristics even on
-dense graphs.
+dense graphs. The limits are wrapped in an immutable `SearchGuardConfig`, so you can also
+pass an optional third argument to impose a millisecond time budget when needed.
 
 ## Regression edge cases
 

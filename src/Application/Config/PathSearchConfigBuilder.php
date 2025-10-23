@@ -4,15 +4,12 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Config;
 
-use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Domain\ValueObject\ToleranceWindow;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function is_int;
-use function is_string;
-use function sprintf;
 
 /**
  * Fluent builder used to construct {@see PathSearchConfig} instances.
@@ -21,13 +18,7 @@ final class PathSearchConfigBuilder
 {
     private ?Money $spendAmount = null;
 
-    /** @var numeric-string|null */
-    private ?string $minimumTolerance = null;
-
-    /** @var numeric-string|null */
-    private ?string $maximumTolerance = null;
-
-    private ?string $pathFinderToleranceOverride = null;
+    private ?ToleranceWindow $toleranceWindow = null;
 
     private ?int $minimumHops = null;
 
@@ -35,11 +26,7 @@ final class PathSearchConfigBuilder
 
     private int $resultLimit = 1;
 
-    private ?int $maxVisitedStates = null;
-
-    private ?int $maxExpansions = null;
-
-    private ?int $timeBudgetMs = null;
+    private ?SearchGuardConfig $searchGuards = null;
 
     private bool $throwOnGuardLimit = false;
 
@@ -60,12 +47,7 @@ final class PathSearchConfigBuilder
      */
     public function withToleranceBounds(string $minimumTolerance, string $maximumTolerance): self
     {
-        $minimumString = $this->normalizeTolerance($minimumTolerance, 'Minimum tolerance');
-        $maximumString = $this->normalizeTolerance($maximumTolerance, 'Maximum tolerance');
-
-        $this->minimumTolerance = $minimumString;
-        $this->maximumTolerance = $maximumString;
-        $this->pathFinderToleranceOverride = $this->resolvePathFinderTolerance($minimumString, $maximumString);
+        $this->toleranceWindow = ToleranceWindow::fromStrings($minimumTolerance, $maximumTolerance);
 
         return $this;
     }
@@ -114,20 +96,7 @@ final class PathSearchConfigBuilder
      */
     public function withSearchGuards(int $maxVisitedStates, int $maxExpansions, ?int $timeBudgetMs = null): self
     {
-        if ($maxVisitedStates < 1) {
-            throw new InvalidInput('Maximum visited states must be at least one.');
-        }
-
-        if ($maxExpansions < 1) {
-            throw new InvalidInput('Maximum expansions must be at least one.');
-        }
-
-        $this->maxVisitedStates = $maxVisitedStates;
-        $this->maxExpansions = $maxExpansions;
-
-        if (null !== $timeBudgetMs) {
-            $this->withSearchTimeBudget($timeBudgetMs);
-        }
+        $this->searchGuards = new SearchGuardConfig($maxVisitedStates, $maxExpansions, $timeBudgetMs);
 
         return $this;
     }
@@ -139,11 +108,8 @@ final class PathSearchConfigBuilder
      */
     public function withSearchTimeBudget(?int $timeBudgetMs): self
     {
-        if (null !== $timeBudgetMs && $timeBudgetMs < 1) {
-            throw new InvalidInput('Time budget must be at least one millisecond.');
-        }
-
-        $this->timeBudgetMs = $timeBudgetMs;
+        $current = $this->searchGuards ?? SearchGuardConfig::defaults();
+        $this->searchGuards = $current->withTimeBudget($timeBudgetMs);
 
         return $this;
     }
@@ -166,7 +132,7 @@ final class PathSearchConfigBuilder
             throw new InvalidInput('Spend amount must be provided.');
         }
 
-        if (!is_string($this->minimumTolerance) || !is_string($this->maximumTolerance)) {
+        if (!$this->toleranceWindow instanceof ToleranceWindow) {
             throw new InvalidInput('Tolerance bounds must be configured.');
         }
 
@@ -174,58 +140,16 @@ final class PathSearchConfigBuilder
             throw new InvalidInput('Hop limits must be configured.');
         }
 
-        $maxVisitedStates = $this->maxVisitedStates ?? PathFinder::DEFAULT_MAX_VISITED_STATES;
-        $maxExpansions = $this->maxExpansions ?? PathFinder::DEFAULT_MAX_EXPANSIONS;
+        $searchGuards = $this->searchGuards ?? SearchGuardConfig::defaults();
 
         return new PathSearchConfig(
             $this->spendAmount,
-            $this->minimumTolerance,
-            $this->maximumTolerance,
+            $this->toleranceWindow,
             $this->minimumHops,
             $this->maximumHops,
             $this->resultLimit,
-            $maxExpansions,
-            $maxVisitedStates,
-            $this->timeBudgetMs,
-            $this->pathFinderToleranceOverride,
-            $this->throwOnGuardLimit,
+            $searchGuards,
+            throwOnGuardLimit: $this->throwOnGuardLimit,
         );
     }
-
-    /**
-     * @throws InvalidInput|PrecisionViolation when the tolerance value is not numeric or out of range
-     *
-     * @return numeric-string
-     */
-    private function normalizeTolerance(string $value, string $context): string
-    {
-        BcMath::ensureNumeric($value);
-        /** @var numeric-string $value */
-        $normalized = BcMath::normalize($value, self::PATH_FINDER_TOLERANCE_SCALE);
-
-        if (BcMath::comp($normalized, '0', self::PATH_FINDER_TOLERANCE_SCALE) < 0 || BcMath::comp($normalized, '1', self::PATH_FINDER_TOLERANCE_SCALE) >= 0) {
-            throw new InvalidInput(sprintf('%s must be in the [0, 1) range.', $context));
-        }
-
-        return $normalized;
-    }
-
-    /**
-     * @param numeric-string $minimum
-     * @param numeric-string $maximum
-     *
-     * @throws PrecisionViolation when the BCMath extension is unavailable
-     *
-     * @return numeric-string
-     */
-    private function resolvePathFinderTolerance(string $minimum, string $maximum): string
-    {
-        if (BcMath::comp($minimum, $maximum, self::PATH_FINDER_TOLERANCE_SCALE) >= 0) {
-            return $minimum;
-        }
-
-        return $maximum;
-    }
-
-    private const PATH_FINDER_TOLERANCE_SCALE = 18;
 }

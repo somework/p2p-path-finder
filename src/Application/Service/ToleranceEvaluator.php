@@ -8,6 +8,7 @@ use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Domain\ValueObject\ToleranceWindow;
 
 use function max;
 use function substr;
@@ -24,8 +25,6 @@ use function substr;
  */
 final class ToleranceEvaluator
 {
-    private const RESIDUAL_SCALE = 18;
-
     public function evaluate(PathSearchConfig $config, Money $requestedSpend, Money $actualSpend): ?DecimalTolerance
     {
         $residual = $this->calculateResidualTolerance($requestedSpend, $actualSpend);
@@ -33,24 +32,37 @@ final class ToleranceEvaluator
         $requestedComparable = $requestedSpend->withScale(max($requestedSpend->scale(), $actualSpend->scale()));
         $actualComparable = $actualSpend->withScale($requestedComparable->scale());
 
-        $minimumTolerance = BcMath::normalize($config->minimumTolerance(), self::RESIDUAL_SCALE);
-        $maximumTolerance = BcMath::normalize($config->maximumTolerance(), self::RESIDUAL_SCALE);
+        $requestedAmount = $requestedComparable->amount();
+        $actualAmount = $actualComparable->amount();
+        $comparisonScale = $requestedComparable->scale();
+
+        if (
+            0 === BcMath::comp($requestedAmount, '0', $comparisonScale)
+            && 1 === BcMath::comp($actualAmount, '0', $comparisonScale)
+        ) {
+            return null;
+        }
+
+        $toleranceWindow = $config->toleranceWindow();
+        $toleranceScale = ToleranceWindow::scale();
+        $minimumTolerance = $toleranceWindow->minimum();
+        $maximumTolerance = $toleranceWindow->maximum();
 
         if (
             $actualComparable->lessThan($requestedComparable)
-            && 1 === BcMath::comp($residual, $minimumTolerance, self::RESIDUAL_SCALE)
+            && 1 === BcMath::comp($residual, $minimumTolerance, $toleranceScale)
         ) {
             return null;
         }
 
         if (
             $actualComparable->greaterThan($requestedComparable)
-            && 1 === BcMath::comp($residual, $maximumTolerance, self::RESIDUAL_SCALE)
+            && 1 === BcMath::comp($residual, $maximumTolerance, $toleranceScale)
         ) {
             return null;
         }
 
-        return DecimalTolerance::fromNumericString($residual, self::RESIDUAL_SCALE);
+        return DecimalTolerance::fromNumericString($residual, $toleranceScale);
     }
 
     /**
@@ -58,14 +70,19 @@ final class ToleranceEvaluator
      */
     private function calculateResidualTolerance(Money $desired, Money $actual): string
     {
-        $scale = max($desired->scale(), $actual->scale(), self::RESIDUAL_SCALE);
+        $targetScale = ToleranceWindow::scale();
+        $scale = max($desired->scale(), $actual->scale(), $targetScale);
         $desiredAmount = $desired->withScale($scale)->amount();
+        $actualAmount = $actual->withScale($scale)->amount();
 
         if (0 === BcMath::comp($desiredAmount, '0', $scale)) {
-            return BcMath::normalize('0', self::RESIDUAL_SCALE);
+            if (0 === BcMath::comp($actualAmount, '0', $scale)) {
+                return BcMath::normalize('0', $targetScale);
+            }
+
+            return BcMath::normalize('1', $targetScale);
         }
 
-        $actualAmount = $actual->withScale($scale)->amount();
         $diff = BcMath::sub($actualAmount, $desiredAmount, $scale + 4);
 
         if ('-' === $diff[0]) {
@@ -79,8 +96,8 @@ final class ToleranceEvaluator
         }
 
         BcMath::ensureNumeric($diff);
-        $ratio = BcMath::div($diff, $desiredAmount, self::RESIDUAL_SCALE + 4);
+        $ratio = BcMath::div($diff, $desiredAmount, $targetScale + 4);
 
-        return BcMath::normalize($ratio, self::RESIDUAL_SCALE);
+        return BcMath::normalize($ratio, $targetScale);
     }
 }

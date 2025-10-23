@@ -8,7 +8,7 @@ Immutable configuration carrying constraints used by {@see PathFinderService}.
 ### Public methods
 
 ### __construct
-`PathSearchConfig::__construct(SomeWork\P2PPathFinder\Domain\ValueObject\Money $spendAmount, string $minimumTolerance, string $maximumTolerance, int $minimumHops, int $maximumHops, int $resultLimit = 1, int $pathFinderMaxExpansions = 250000, int $pathFinderMaxVisitedStates = 250000, ?string $pathFinderToleranceOverride = null, bool $throwOnGuardLimit = false)`
+`PathSearchConfig::__construct(SomeWork\P2PPathFinder\Domain\ValueObject\Money $spendAmount, SomeWork\P2PPathFinder\Domain\ValueObject\ToleranceWindow $toleranceWindow, int $minimumHops, int $maximumHops, int $resultLimit = 1, ?SomeWork\P2PPathFinder\Application\Config\SearchGuardConfig $searchGuards = null, ?string $pathFinderToleranceOverride = null, bool $throwOnGuardLimit = false)`
 
 ### builder
 `PathSearchConfig::builder(): SomeWork\P2PPathFinder\Application\Config\PathSearchConfigBuilder`
@@ -19,6 +19,11 @@ Returns a fluent builder for constructing configuration instances.
 `PathSearchConfig::spendAmount(): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
 
 Returns the target spend amount expressed in the source asset.
+
+### toleranceWindow
+`PathSearchConfig::toleranceWindow(): SomeWork\P2PPathFinder\Domain\ValueObject\ToleranceWindow`
+
+Returns the normalized tolerance window applied to spend calculations.
 
 ### minimumTolerance
 `PathSearchConfig::minimumTolerance(): string`
@@ -112,7 +117,7 @@ Configures the minimum and maximum allowed number of hops in a resulting path.
 Limits how many paths should be returned by the search service.
 
 ### withSearchGuards
-`PathSearchConfigBuilder::withSearchGuards(int $maxVisitedStates, int $maxExpansions): self`
+`PathSearchConfigBuilder::withSearchGuards(int $maxVisitedStates, int $maxExpansions, ?int $timeBudgetMs = null): self`
 
 Configures limits that guard search explosion in dense graphs.
 
@@ -123,6 +128,29 @@ Configures limits that guard search explosion in dense graphs.
 `PathSearchConfigBuilder::build(): SomeWork\P2PPathFinder\Application\Config\PathSearchConfig`
 
 Builds a validated {@see PathSearchConfig} instance.
+
+## SomeWork\P2PPathFinder\Application\Config\SearchGuardConfig
+Immutable guard limits used by {@see PathFinder}.
+
+### Public methods
+
+### __construct
+`SearchGuardConfig::__construct(int $maxVisitedStates = 250000, int $maxExpansions = 250000, ?int $timeBudgetMs = null)`
+
+### defaults
+`SearchGuardConfig::defaults(): self`
+
+### withTimeBudget
+`SearchGuardConfig::withTimeBudget(?int $timeBudgetMs): self`
+
+### maxVisitedStates
+`SearchGuardConfig::maxVisitedStates(): int`
+
+### maxExpansions
+`SearchGuardConfig::maxExpansions(): int`
+
+### timeBudgetMs
+`SearchGuardConfig::timeBudgetMs(): ?int`
 
 ## SomeWork\P2PPathFinder\Application\Filter\CurrencyPairFilter
 Accepts orders that match an exact asset pair.
@@ -844,6 +872,42 @@ Returns: numeric-string
 `DecimalTolerance::jsonSerialize(): string`
 
 Returns: numeric-string
+
+## SomeWork\P2PPathFinder\Domain\ValueObject\ToleranceWindow
+Represents a normalized tolerance window with deterministic heuristics.
+
+### Public methods
+
+### fromStrings
+`ToleranceWindow::fromStrings(string $minimum, string $maximum): self`
+
+### normalizeTolerance
+`ToleranceWindow::normalizeTolerance(string $value, string $context): string`
+
+Returns: numeric-string
+
+### minimum
+`ToleranceWindow::minimum(): string`
+
+Returns: numeric-string
+
+### maximum
+`ToleranceWindow::maximum(): string`
+
+Returns: numeric-string
+
+### heuristicTolerance
+`ToleranceWindow::heuristicTolerance(): string`
+
+Returns: numeric-string
+
+### heuristicSource
+`ToleranceWindow::heuristicSource(): string`
+
+Returns: 'minimum'|'maximum'
+
+### scale
+`ToleranceWindow::scale(): int`
 
 ## SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate
 Value object encapsulating an exchange rate between two assets.
