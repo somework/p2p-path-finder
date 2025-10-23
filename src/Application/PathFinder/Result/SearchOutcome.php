@@ -14,12 +14,12 @@ final class SearchOutcome
      */
     private readonly array $paths;
 
-    private readonly GuardLimitStatus $guardLimits;
+    private readonly SearchGuardReport $guardLimits;
 
     /**
      * @param list<TPath> $paths
      */
-    public function __construct(array $paths, GuardLimitStatus $guardLimits)
+    public function __construct(array $paths, SearchGuardReport $guardLimits)
     {
         $this->paths = $paths;
         $this->guardLimits = $guardLimits;
@@ -28,7 +28,7 @@ final class SearchOutcome
     /**
      * @return SearchOutcome<mixed>
      */
-    public static function empty(GuardLimitStatus $guardLimits): self
+    public static function empty(SearchGuardReport $guardLimits): self
     {
         return new self([], $guardLimits);
     }
@@ -46,7 +46,7 @@ final class SearchOutcome
         return [] !== $this->paths;
     }
 
-    public function guardLimits(): GuardLimitStatus
+    public function guardLimits(): SearchGuardReport
     {
         return $this->guardLimits;
     }

@@ -8,7 +8,7 @@ use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
-use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
@@ -217,7 +217,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
     public function test_it_reports_guard_limits_via_metadata_by_default(): void
     {
         $orderBook = $this->simpleEuroToUsdOrderBook();
-        $guardStatus = new GuardLimitStatus(true, false, false);
+        $guardStatus = new SearchGuardReport(true, false, false, 10, 0, 0.0, 10, 25, null);
         $factory = $this->pathFinderFactoryForCandidates([], $guardStatus);
         $service = $this->makeServiceWithFactory($factory);
 
@@ -238,7 +238,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
     public function test_it_can_escalate_guard_limit_breaches_to_exception(): void
     {
         $orderBook = $this->simpleEuroToUsdOrderBook();
-        $guardStatus = new GuardLimitStatus(true, true, false);
+        $guardStatus = new SearchGuardReport(true, true, false, 200, 100, 0.0, 200, 100, null);
         $factory = $this->pathFinderFactoryForCandidates([], $guardStatus);
         $service = $this->makeServiceWithFactory($factory);
 
@@ -251,7 +251,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
             ->build();
 
         $this->expectException(GuardLimitExceeded::class);
-        $this->expectExceptionMessage('Search guard limit exceeded: expansions limit of 200 and visited states limit of 100.');
+        $this->expectExceptionMessage('Search guard limit exceeded: expansions 200/200 and visited states 100/100.');
 
         $service->findBestPaths($orderBook, $config, 'USD');
     }
@@ -259,7 +259,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
     public function test_it_describes_single_guard_limit_breach_when_throwing_exception(): void
     {
         $orderBook = $this->simpleEuroToUsdOrderBook();
-        $guardStatus = new GuardLimitStatus(true, false, false);
+        $guardStatus = new SearchGuardReport(true, false, false, 200, 0, 0.0, 200, 50, null);
         $factory = $this->pathFinderFactoryForCandidates([], $guardStatus);
         $service = $this->makeServiceWithFactory($factory);
 
@@ -272,7 +272,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
             ->build();
 
         $this->expectException(GuardLimitExceeded::class);
-        $this->expectExceptionMessage('Search guard limit exceeded: expansions limit of 200.');
+        $this->expectExceptionMessage('Search guard limit exceeded: expansions 200/200.');
 
         $service->findBestPaths($orderBook, $config, 'USD');
     }
@@ -280,7 +280,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
     public function test_it_describes_visited_states_guard_limit_when_throwing_exception(): void
     {
         $orderBook = $this->simpleEuroToUsdOrderBook();
-        $guardStatus = new GuardLimitStatus(false, true, false);
+        $guardStatus = new SearchGuardReport(false, true, false, 0, 25, 0.0, 50, 25, null);
         $factory = $this->pathFinderFactoryForCandidates([], $guardStatus);
         $service = $this->makeServiceWithFactory($factory);
 
@@ -293,7 +293,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
             ->build();
 
         $this->expectException(GuardLimitExceeded::class);
-        $this->expectExceptionMessage('Search guard limit exceeded: visited states limit of 25.');
+        $this->expectExceptionMessage('Search guard limit exceeded: visited states 25/25.');
 
         $service->findBestPaths($orderBook, $config, 'USD');
     }
@@ -301,7 +301,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
     public function test_it_reports_time_budget_guard_via_metadata(): void
     {
         $orderBook = $this->simpleEuroToUsdOrderBook();
-        $guardStatus = new GuardLimitStatus(false, false, true);
+        $guardStatus = new SearchGuardReport(false, false, true, 0, 0, 25.0, 10, 25, 1);
         $factory = $this->pathFinderFactoryForCandidates([], $guardStatus);
         $service = $this->makeServiceWithFactory($factory);
 
@@ -314,15 +314,18 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
 
         $outcome = $service->findBestPaths($orderBook, $config, 'USD');
 
-        self::assertTrue($outcome->guardLimits()->timeBudgetReached());
-        self::assertFalse($outcome->guardLimits()->expansionsReached());
-        self::assertFalse($outcome->guardLimits()->visitedStatesReached());
+        $report = $outcome->guardLimits();
+        self::assertTrue($report->timeBudgetReached());
+        self::assertFalse($report->expansionsReached());
+        self::assertFalse($report->visitedStatesReached());
+        self::assertSame(1, $report->timeBudgetLimit());
+        self::assertSame(25.0, $report->elapsedMilliseconds());
     }
 
     public function test_it_includes_time_budget_guard_in_exception_message(): void
     {
         $orderBook = $this->simpleEuroToUsdOrderBook();
-        $guardStatus = new GuardLimitStatus(false, false, true);
+        $guardStatus = new SearchGuardReport(false, false, true, 0, 0, 25.0, 10, 25, 2);
         $factory = $this->pathFinderFactoryForCandidates([], $guardStatus);
         $service = $this->makeServiceWithFactory($factory);
 
@@ -335,7 +338,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
             ->build();
 
         $this->expectException(GuardLimitExceeded::class);
-        $this->expectExceptionMessage('Search guard limit exceeded: time budget of 2ms.');
+        $this->expectExceptionMessage('Search guard limit exceeded: elapsed 25.000ms/2ms.');
 
         $service->findBestPaths($orderBook, $config, 'USD');
     }
@@ -350,7 +353,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
     /**
      * @param list<CandidatePath|array{cost: numeric-string, product: numeric-string, hops: int, edges: list<array>, amountRange: mixed, desiredAmount: mixed}> $candidates
      */
-    private function pathFinderFactoryForCandidates(array $candidates, ?GuardLimitStatus $guardLimits = null): callable
+    private function pathFinderFactoryForCandidates(array $candidates, ?SearchGuardReport $guardLimits = null): callable
     {
         $normalized = array_map(
             static function ($candidate): CandidatePath {
@@ -384,7 +387,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
                     $callback($candidate);
                 }
 
-                return new SearchOutcome([], $guardLimits ?? GuardLimitStatus::none());
+                return new SearchOutcome([], $guardLimits ?? SearchGuardReport::none());
             };
         };
     }

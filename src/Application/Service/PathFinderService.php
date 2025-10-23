@@ -10,10 +10,10 @@ use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
-use SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
@@ -114,8 +114,8 @@ final class PathFinderService
      * Searches for the best conversion paths from the configured spend asset to the target asset.
      *
      * Guard limit breaches are reported through the returned {@see SearchOutcome::guardLimits()}
-     * metadata. Inspect the {@see GuardLimitStatus} via helpers like
-     * {@see GuardLimitStatus::anyLimitReached()} to determine whether the search exhausted its
+     * metadata. Inspect the {@see SearchGuardReport} via helpers like
+     * {@see SearchGuardReport::anyLimitReached()} to determine whether the search exhausted its
      * configured protections.
      *
      * @throws InvalidInput       when the requested target asset identifier is empty
@@ -136,7 +136,11 @@ final class PathFinderService
         $orders = $this->orderSpendAnalyzer->filterOrders($orderBook, $config);
         if ([] === $orders) {
             /** @var SearchOutcome<PathResult> $empty */
-            $empty = SearchOutcome::empty(GuardLimitStatus::none());
+            $empty = SearchOutcome::empty(SearchGuardReport::idle(
+                $config->pathFinderMaxVisitedStates(),
+                $config->pathFinderMaxExpansions(),
+                $config->pathFinderTimeBudgetMs(),
+            ));
 
             return $empty;
         }
@@ -144,7 +148,11 @@ final class PathFinderService
         $graph = $this->graphBuilder->build($orders);
         if (!$graph->hasNode($sourceCurrency) || !$graph->hasNode($targetCurrency)) {
             /** @var SearchOutcome<PathResult> $empty */
-            $empty = SearchOutcome::empty(GuardLimitStatus::none());
+            $empty = SearchOutcome::empty(SearchGuardReport::idle(
+                $config->pathFinderMaxVisitedStates(),
+                $config->pathFinderMaxExpansions(),
+                $config->pathFinderTimeBudgetMs(),
+            ));
 
             return $empty;
         }
@@ -255,7 +263,7 @@ final class PathFinderService
         );
     }
 
-    private function assertGuardLimits(PathSearchConfig $config, GuardLimitStatus $guardLimits): void
+    private function assertGuardLimits(PathSearchConfig $config, SearchGuardReport $guardLimits): void
     {
         if (!$config->throwOnGuardLimit() || !$guardLimits->anyLimitReached()) {
             return;
@@ -264,23 +272,32 @@ final class PathFinderService
         throw new GuardLimitExceeded($this->formatGuardLimitMessage($config, $guardLimits));
     }
 
-    private function formatGuardLimitMessage(PathSearchConfig $config, GuardLimitStatus $guardLimits): string
+    private function formatGuardLimitMessage(PathSearchConfig $config, SearchGuardReport $guardLimits): string
     {
         $breaches = [];
 
         if ($guardLimits->expansionsReached()) {
-            $breaches[] = sprintf('expansions limit of %d', $config->pathFinderMaxExpansions());
+            $breaches[] = sprintf(
+                'expansions %d/%d',
+                $guardLimits->expansions(),
+                $guardLimits->expansionLimit(),
+            );
         }
 
         if ($guardLimits->visitedStatesReached()) {
-            $breaches[] = sprintf('visited states limit of %d', $config->pathFinderMaxVisitedStates());
+            $breaches[] = sprintf(
+                'visited states %d/%d',
+                $guardLimits->visitedStates(),
+                $guardLimits->visitedStateLimit(),
+            );
         }
 
         if ($guardLimits->timeBudgetReached()) {
-            $timeBudget = $config->pathFinderTimeBudgetMs();
-            $breaches[] = null === $timeBudget
-                ? 'time budget'
-                : sprintf('time budget of %dms', $timeBudget);
+            $elapsed = sprintf('%.3fms', $guardLimits->elapsedMilliseconds());
+            $limit = $guardLimits->timeBudgetLimit();
+            $breaches[] = null === $limit
+                ? sprintf('elapsed %s (unbounded)', $elapsed)
+                : sprintf('elapsed %s/%dms', $elapsed, $limit);
         }
 
         if ([] === $breaches) {

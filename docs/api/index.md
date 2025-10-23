@@ -343,24 +343,48 @@ visited: array<string, bool>,
 
 Returns: SearchOutcome<CandidatePath>
 
-## SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus
+## SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport
 
 ### Public methods
 
 ### __construct
-`GuardLimitStatus::__construct(bool $expansionsReached, bool $visitedStatesReached)`
+`SearchGuardReport::__construct(bool $expansionsReached, bool $visitedStatesReached, bool $timeBudgetReached, int $expansions, int $visitedStates, float $elapsedMilliseconds, int $expansionLimit, int $visitedStateLimit, ?int $timeBudgetLimit)`
+
+### idle
+`SearchGuardReport::idle(int $maxVisitedStates, int $maxExpansions, ?int $timeBudgetMs = null): self`
 
 ### none
-`GuardLimitStatus::none(): self`
+`SearchGuardReport::none(): self`
 
 ### expansionsReached
-`GuardLimitStatus::expansionsReached(): bool`
+`SearchGuardReport::expansionsReached(): bool`
 
 ### visitedStatesReached
-`GuardLimitStatus::visitedStatesReached(): bool`
+`SearchGuardReport::visitedStatesReached(): bool`
+
+### timeBudgetReached
+`SearchGuardReport::timeBudgetReached(): bool`
 
 ### anyLimitReached
-`GuardLimitStatus::anyLimitReached(): bool`
+`SearchGuardReport::anyLimitReached(): bool`
+
+### expansions
+`SearchGuardReport::expansions(): int`
+
+### visitedStates
+`SearchGuardReport::visitedStates(): int`
+
+### elapsedMilliseconds
+`SearchGuardReport::elapsedMilliseconds(): float`
+
+### expansionLimit
+`SearchGuardReport::expansionLimit(): int`
+
+### visitedStateLimit
+`SearchGuardReport::visitedStateLimit(): int`
+
+### timeBudgetLimit
+`SearchGuardReport::timeBudgetLimit(): ?int`
 
 ## SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy
 
@@ -411,10 +435,10 @@ Returns: Payload
 ### Public methods
 
 ### __construct
-`SearchOutcome::__construct(array $paths, SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus $guardLimits)`
+`SearchOutcome::__construct(array $paths, SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport $guardLimits)`
 
 ### empty
-`SearchOutcome::empty(SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus $guardLimits): self`
+`SearchOutcome::empty(SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport $guardLimits): self`
 
 Returns: SearchOutcome<mixed>
 
@@ -427,7 +451,7 @@ Returns: list<TPath>
 `SearchOutcome::hasPaths(): bool`
 
 ### guardLimits
-`SearchOutcome::guardLimits(): SomeWork\P2PPathFinder\Application\PathFinder\Result\GuardLimitStatus`
+`SearchOutcome::guardLimits(): SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport`
 
 ## SomeWork\P2PPathFinder\Application\Result\PathLeg
 Describes a single conversion leg in a path finder result.
@@ -593,8 +617,8 @@ phpstan-type MaterializedResult SomeWork\\P2PPathFinder\\Application\\Service\\M
 Searches for the best conversion paths from the configured spend asset to the target asset.
 
 Guard limit breaches are reported through the returned {@see SearchOutcome::guardLimits()}
-metadata. Inspect the {@see GuardLimitStatus} via helpers like
-{@see GuardLimitStatus::anyLimitReached()} to determine whether the search exhausted its
+metadata. Inspect the {@see SearchGuardReport} via helpers like
+{@see SearchGuardReport::anyLimitReached()} to determine whether the search exhausted its
 configured protections.
 
 

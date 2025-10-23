@@ -50,6 +50,16 @@ $result = $service->findBestPaths($orderBook, $config, 'BTC');
 foreach ($result->paths() as $path) {
     printf("Found path with residual tolerance %s and %d segments\n", $path->residualTolerance(), count($path->legs()));
 }
+
+$report = $result->guardLimits();
+printf(
+    "Explored %d/%d states across %d/%d expansions in %.3fms\n",
+    $report->visitedStates(),
+    $report->visitedStateLimit(),
+    $report->expansions(),
+    $report->expansionLimit(),
+    $report->elapsedMilliseconds(),
+);
 ```
 
 The `withSearchGuards()` call ensures the traversal halts if either the visited-state or
@@ -65,7 +75,7 @@ scenarios we have encountered in production. They live in
 `PathFinderServiceEdgeCaseTest`. The fixtures cover:
 
 - `PathFinderEdgeCaseFixtures::emptyOrderBook()` – asserts that empty books propagate a
-  pristine `GuardLimitStatus` without leaking partial paths.
+  pristine `SearchGuardReport` (all counters zeroed) without leaking partial paths.
 - `PathFinderEdgeCaseFixtures::incompatibleBounds()` – models min/max conflicts between hops
   so the service returns an empty result set with untouched guard metadata.
 - `PathFinderEdgeCaseFixtures::longGuardLimitedChain()` – forces expansion guard breaches and

@@ -41,6 +41,12 @@ final class PathFinderServiceEdgeCaseTest extends PathFinderServiceTestCase
         self::assertFalse($guardLimits->visitedStatesReached());
         self::assertFalse($guardLimits->timeBudgetReached());
         self::assertFalse($guardLimits->anyLimitReached());
+        self::assertSame($config->pathFinderMaxExpansions(), $guardLimits->expansionLimit());
+        self::assertSame($config->pathFinderMaxVisitedStates(), $guardLimits->visitedStateLimit());
+        self::assertSame($config->pathFinderTimeBudgetMs(), $guardLimits->timeBudgetLimit());
+        self::assertSame(0, $guardLimits->expansions());
+        self::assertSame(0, $guardLimits->visitedStates());
+        self::assertSame(0.0, $guardLimits->elapsedMilliseconds());
     }
 
     /**
@@ -72,6 +78,9 @@ final class PathFinderServiceEdgeCaseTest extends PathFinderServiceTestCase
         self::assertFalse($guardLimits->visitedStatesReached());
         self::assertFalse($guardLimits->timeBudgetReached());
         self::assertTrue($guardLimits->anyLimitReached());
+        self::assertSame($expansionLimit, $guardLimits->expansionLimit());
+        self::assertSame($visitedLimit, $guardLimits->visitedStateLimit());
+        self::assertSame($expansionLimit, $guardLimits->expansions());
     }
 
     /**
@@ -103,7 +112,7 @@ final class PathFinderServiceEdgeCaseTest extends PathFinderServiceTestCase
         } catch (GuardLimitExceeded $exception) {
             self::assertStringContainsString('Search guard limit exceeded', $exception->getMessage());
             self::assertStringContainsString(
-                sprintf('expansions limit of %d', $expansionLimit),
+                sprintf('expansions %d/%d', $expansionLimit, $expansionLimit),
                 $exception->getMessage(),
             );
 
