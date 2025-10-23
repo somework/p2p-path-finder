@@ -7,7 +7,6 @@ namespace SomeWork\P2PPathFinder\Application\Graph;
 use ArrayAccess;
 use IteratorAggregate;
 use JsonSerializable;
-use LogicException;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use Traversable;
 
@@ -69,12 +68,12 @@ final class GraphNode implements IteratorAggregate, JsonSerializable, ArrayAcces
 
     public function offsetSet(mixed $offset, mixed $value): void
     {
-        throw new LogicException('Graph nodes are immutable.');
+        throw new InvalidInput('Graph nodes are immutable.');
     }
 
     public function offsetUnset(mixed $offset): void
     {
-        throw new LogicException('Graph nodes are immutable.');
+        throw new InvalidInput('Graph nodes are immutable.');
     }
 
     /**
