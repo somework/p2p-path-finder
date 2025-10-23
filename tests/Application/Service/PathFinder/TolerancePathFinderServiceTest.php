@@ -260,7 +260,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '8.00', 2))
-            ->withToleranceBounds('0.25', '0.05')
+            ->withToleranceBounds('0.10', '0.25')
             ->withHopLimits(1, 1)
             ->build();
 

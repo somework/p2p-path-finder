@@ -9,6 +9,7 @@ use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Service\ToleranceEvaluator;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Domain\ValueObject\ToleranceWindow;
 
 final class ToleranceEvaluatorTest extends TestCase
 {
@@ -16,8 +17,7 @@ final class ToleranceEvaluatorTest extends TestCase
     {
         return new PathSearchConfig(
             Money::fromString('USD', '100.00', 2),
-            '0.05',
-            '0.10',
+            ToleranceWindow::fromStrings('0.05', '0.10'),
             1,
             3,
         );
