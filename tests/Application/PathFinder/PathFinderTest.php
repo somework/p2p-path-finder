@@ -17,7 +17,6 @@ use SomeWork\P2PPathFinder\Application\PathFinder\CandidateResultHeap;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
-use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
@@ -61,14 +60,6 @@ final class PathFinderTest extends TestCase
             static fn (CandidatePath $path): array => $path->toArray(),
             $searchResult->paths(),
         );
-    }
-
-    /**
-     * @param SearchOutcome<CandidatePath> $searchResult
-     */
-    private static function extractGuardLimits(SearchOutcome $searchResult): SearchGuardReport
-    {
-        return $searchResult->guardLimits();
     }
 
     /**

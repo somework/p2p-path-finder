@@ -19,6 +19,39 @@ final class SearchGuardReportTest extends TestCase
         self::assertSame(0, $report->visitedStates());
         self::assertSame(0, $report->expansions());
         self::assertSame(0.0, $report->elapsedMilliseconds());
+        self::assertFalse($report->expansionsReached());
+        self::assertFalse($report->visitedStatesReached());
+        self::assertFalse($report->timeBudgetReached());
+        self::assertFalse($report->anyLimitReached());
+    }
+
+    public function test_idle_factory_defaults_time_budget_limit_to_null_when_not_provided(): void
+    {
+        $report = SearchGuardReport::idle(25, 10);
+
+        self::assertNull($report->timeBudgetLimit());
+        self::assertSame(0, $report->visitedStates());
+        self::assertSame(0, $report->expansions());
+        self::assertSame(0.0, $report->elapsedMilliseconds());
+        self::assertFalse($report->expansionsReached());
+        self::assertFalse($report->visitedStatesReached());
+        self::assertFalse($report->timeBudgetReached());
+        self::assertFalse($report->anyLimitReached());
+    }
+
+    public function test_none_factory_returns_neutral_report(): void
+    {
+        $report = SearchGuardReport::none();
+
+        self::assertSame(0, $report->visitedStateLimit());
+        self::assertSame(0, $report->expansionLimit());
+        self::assertNull($report->timeBudgetLimit());
+        self::assertSame(0, $report->visitedStates());
+        self::assertSame(0, $report->expansions());
+        self::assertSame(0.0, $report->elapsedMilliseconds());
+        self::assertFalse($report->expansionsReached());
+        self::assertFalse($report->visitedStatesReached());
+        self::assertFalse($report->timeBudgetReached());
         self::assertFalse($report->anyLimitReached());
     }
 
