@@ -102,7 +102,11 @@ final class CandidatePath implements ArrayAccess
 
     public function offsetExists(mixed $offset): bool
     {
-        return in_array($offset, ['cost', 'product', 'hops', 'edges', 'amountRange', 'desiredAmount'], true);
+        if (in_array($offset, ['amountRange', 'desiredAmount'], true)) {
+            return null !== $this->range;
+        }
+
+        return in_array($offset, ['cost', 'product', 'hops', 'edges'], true);
     }
 
     public function offsetGet(mixed $offset): mixed
