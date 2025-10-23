@@ -7,6 +7,7 @@ namespace SomeWork\P2PPathFinder\Application\Graph;
 use ArrayAccess;
 use IteratorAggregate;
 use JsonSerializable;
+use SomeWork\P2PPathFinder\Application\Support\GuardsArrayAccessOffset;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use Traversable;
 
@@ -18,6 +19,8 @@ use Traversable;
  */
 final class GraphNode implements IteratorAggregate, JsonSerializable, ArrayAccess
 {
+    use GuardsArrayAccessOffset;
+
     private readonly GraphEdgeCollection $edges;
 
     /**
@@ -54,12 +57,24 @@ final class GraphNode implements IteratorAggregate, JsonSerializable, ArrayAcces
 
     public function offsetExists(mixed $offset): bool
     {
-        return 'currency' === $offset || 'edges' === $offset;
+        $normalized = $this->normalizeStringOffset($offset);
+
+        if (null === $normalized) {
+            return false;
+        }
+
+        return 'currency' === $normalized || 'edges' === $normalized;
     }
 
     public function offsetGet(mixed $offset): mixed
     {
-        return match ($offset) {
+        $normalized = $this->normalizeStringOffset($offset);
+
+        if (null === $normalized) {
+            return null;
+        }
+
+        return match ($normalized) {
             'currency' => $this->currency,
             'edges' => $this->edges,
             default => null,
