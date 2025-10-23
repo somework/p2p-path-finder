@@ -132,12 +132,13 @@ final class LegMaterializerTest extends TestCase
         self::assertTrue($config->maximumSpendAmount()->greaterThan($materialized['totalSpent']));
 
         $feeBreakdown = $materialized['feeBreakdown'];
-        self::assertArrayHasKey('AAA', $feeBreakdown);
-        self::assertArrayHasKey('USD', $feeBreakdown);
-        self::assertArrayHasKey('EUR', $feeBreakdown);
-        self::assertSame('7.925', $feeBreakdown['AAA']->amount());
-        self::assertSame('2.041', $feeBreakdown['USD']->amount());
-        self::assertSame('2.823', $feeBreakdown['EUR']->amount());
+        $feeBreakdownMap = $feeBreakdown->toArray();
+        self::assertArrayHasKey('AAA', $feeBreakdownMap);
+        self::assertArrayHasKey('USD', $feeBreakdownMap);
+        self::assertArrayHasKey('EUR', $feeBreakdownMap);
+        self::assertSame('7.925', $feeBreakdownMap['AAA']->amount());
+        self::assertSame('2.041', $feeBreakdownMap['USD']->amount());
+        self::assertSame('2.823', $feeBreakdownMap['EUR']->amount());
 
         $legs = $materialized['legs'];
         self::assertCount(2, $legs);
@@ -371,31 +372,15 @@ final class LegMaterializerTest extends TestCase
         );
 
         $map = $method->invoke($materializer, $fees);
+        $mapArray = $map->toArray();
 
-        self::assertSame(['AAA', 'ZZZ'], array_keys($map));
+        self::assertSame(['AAA', 'ZZZ'], array_keys($mapArray));
         self::assertSame('0.750', $map['AAA']->amount());
         self::assertSame('1.250', $map['ZZZ']->amount());
 
         $zeroFees = FeeBreakdown::of(Money::zero('AAA', 3), Money::zero('BBB', 3));
-        self::assertSame([], $method->invoke($materializer, $zeroFees));
-    }
-
-    public function test_accumulate_fee_breakdown_merges_matching_currencies(): void
-    {
-        $materializer = new LegMaterializer();
-        $method = new ReflectionMethod(LegMaterializer::class, 'accumulateFeeBreakdown');
-        $method->setAccessible(true);
-
-        $breakdown = ['USD' => Money::fromString('USD', '1.000', 3)];
-        $legFees = [
-            'USD' => Money::fromString('USD', '0.500', 3),
-            'EUR' => Money::fromString('EUR', '0.250', 3),
-        ];
-
-        $method->invokeArgs($materializer, [&$breakdown, $legFees]);
-
-        self::assertSame('1.500', $breakdown['USD']->amount());
-        self::assertSame('0.250', $breakdown['EUR']->amount());
+        $zeroMap = $method->invoke($materializer, $zeroFees);
+        self::assertTrue($zeroMap->isEmpty());
     }
 
     public function test_reduce_budget_clamps_to_zero_when_spend_exceeds_budget(): void

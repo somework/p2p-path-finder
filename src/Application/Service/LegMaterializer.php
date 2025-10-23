@@ -6,7 +6,9 @@ namespace SomeWork\P2PPathFinder\Application\Service;
 
 use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Application\Result\MoneyMap;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
+use SomeWork\P2PPathFinder\Application\Result\PathLegCollection;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
@@ -14,7 +16,6 @@ use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
-use function ksort;
 use function max;
 use function substr;
 
@@ -49,8 +50,8 @@ final class LegMaterializer
      *     totalSpent: Money,
      *     totalReceived: Money,
      *     toleranceSpent: Money,
-     *     legs: list<PathLeg>,
-     *     feeBreakdown: array<string, Money>,
+     *     legs: PathLegCollection,
+     *     feeBreakdown: MoneyMap,
      * }|null
      */
     public function materialize(array $edges, Money $requestedSpend, array $initialSeed, string $targetCurrency): ?array
@@ -58,7 +59,7 @@ final class LegMaterializer
         $legs = [];
         $current = $initialSeed['net'];
         $currentCurrency = $current->currency();
-        $feeBreakdown = [];
+        $feeBreakdown = MoneyMap::empty();
 
         $initialGrossSeed = $initialSeed['gross'];
         $initialGrossCeiling = $initialSeed['grossCeiling'];
@@ -125,7 +126,7 @@ final class LegMaterializer
             }
 
             $legFees = $this->convertFeesToMap($fees);
-            $this->accumulateFeeBreakdown($feeBreakdown, $legFees);
+            $feeBreakdown = $feeBreakdown->merge($legFees);
 
             if ($spent->currency() === $grossSpent->currency()) {
                 $grossSpent = $grossSpent->add($spent, $grossSpentScale);
@@ -148,7 +149,7 @@ final class LegMaterializer
             'totalSpent' => $grossSpent,
             'totalReceived' => $current,
             'toleranceSpent' => $toleranceSpent,
-            'legs' => $legs,
+            'legs' => PathLegCollection::fromList($legs),
             'feeBreakdown' => $feeBreakdown,
         ];
     }
@@ -416,57 +417,21 @@ final class LegMaterializer
         ];
     }
 
-    /**
-     * @return array<string, Money>
-     */
-    private function convertFeesToMap(FeeBreakdown $fees): array
+    private function convertFeesToMap(FeeBreakdown $fees): MoneyMap
     {
-        $normalized = [];
-
         $baseFee = $fees->baseFee();
-        if (null !== $baseFee && !$baseFee->isZero()) {
-            $this->accumulateFee($normalized, $baseFee);
-        }
-
         $quoteFee = $fees->quoteFee();
-        if (null !== $quoteFee && !$quoteFee->isZero()) {
-            $this->accumulateFee($normalized, $quoteFee);
+
+        $entries = [];
+        if (null !== $baseFee) {
+            $entries[] = $baseFee;
         }
 
-        ksort($normalized);
-
-        return $normalized;
-    }
-
-    /**
-     * @param array<string, Money> $feeBreakdown
-     * @param array<string, Money> $legFees
-     */
-    private function accumulateFeeBreakdown(array &$feeBreakdown, array $legFees): void
-    {
-        foreach ($legFees as $fee) {
-            $this->accumulateFee($feeBreakdown, $fee);
-        }
-    }
-
-    /**
-     * @param array<string, Money> $feeBreakdown
-     */
-    private function accumulateFee(array &$feeBreakdown, Money $fee): void
-    {
-        if ($fee->isZero()) {
-            return;
+        if (null !== $quoteFee) {
+            $entries[] = $quoteFee;
         }
 
-        $currency = $fee->currency();
-
-        if (isset($feeBreakdown[$currency])) {
-            $feeBreakdown[$currency] = $feeBreakdown[$currency]->add($fee);
-
-            return;
-        }
-
-        $feeBreakdown[$currency] = $fee;
+        return MoneyMap::fromList($entries, true);
     }
 
     private function reduceBudget(Money $budget, Money $spent): Money

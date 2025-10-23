@@ -340,18 +340,24 @@ final class PathFinderServicePropertyTest extends TestCase
     }
 
     /**
-     * @param list<PathLeg> $legs
+     * @param iterable<PathLeg> $legs
      */
-    private function routeSignatureFromLegs(array $legs): string
+    private function routeSignatureFromLegs(iterable $legs): string
     {
-        if ([] === $legs) {
-            return '';
-        }
-
-        $nodes = [$legs[0]->from()];
+        $nodes = [];
+        $firstLeg = true;
 
         foreach ($legs as $leg) {
+            if ($firstLeg) {
+                $nodes[] = $leg->from();
+                $firstLeg = false;
+            }
+
             $nodes[] = $leg->to();
+        }
+
+        if ([] === $nodes) {
+            return '';
         }
 
         return implode('->', $nodes);

@@ -9,9 +9,8 @@ use ArrayIterator;
 use IteratorAggregate;
 use JsonSerializable;
 use LogicException;
+use SomeWork\P2PPathFinder\Application\Support\GuardsArrayAccessOffset;
 use Traversable;
-
-use function is_string;
 
 /**
  * Directed multigraph representation keyed by asset symbol.
@@ -21,6 +20,8 @@ use function is_string;
  */
 final class Graph implements IteratorAggregate, JsonSerializable, ArrayAccess
 {
+    use GuardsArrayAccessOffset;
+
     /**
      * @var array<string, GraphNode>
      */
@@ -68,7 +69,7 @@ final class Graph implements IteratorAggregate, JsonSerializable, ArrayAccess
 
     public function offsetExists(mixed $offset): bool
     {
-        $normalized = $this->normalizeOffset($offset);
+        $normalized = $this->normalizeStringOffset($offset);
 
         if (null === $normalized) {
             return false;
@@ -79,7 +80,7 @@ final class Graph implements IteratorAggregate, JsonSerializable, ArrayAccess
 
     public function offsetGet(mixed $offset): ?GraphNode
     {
-        $normalized = $this->normalizeOffset($offset);
+        $normalized = $this->normalizeStringOffset($offset);
 
         if (null === $normalized) {
             return null;
@@ -96,15 +97,6 @@ final class Graph implements IteratorAggregate, JsonSerializable, ArrayAccess
     public function offsetUnset(mixed $offset): void
     {
         throw new LogicException('Graph is immutable.');
-    }
-
-    private function normalizeOffset(mixed $offset): ?string
-    {
-        if (!is_string($offset)) {
-            return null;
-        }
-
-        return $offset;
     }
 
     /**

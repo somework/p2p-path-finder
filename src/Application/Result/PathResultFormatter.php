@@ -105,12 +105,9 @@ final class PathResultFormatter
         return implode(PHP_EOL.PHP_EOL, $blocks);
     }
 
-    /**
-     * @param array<string, Money> $fees
-     */
-    private function formatFeeSummary(array $fees): string
+    private function formatFeeSummary(MoneyMap $fees): string
     {
-        if ([] === $fees) {
+        if ($fees->isEmpty()) {
             return 'none';
         }
 
