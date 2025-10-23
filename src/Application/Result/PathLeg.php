@@ -34,8 +34,8 @@ final class PathLeg implements JsonSerializable
     ) {
         $this->fromAsset = self::normalizeAsset($fromAsset, 'from');
         $this->toAsset = self::normalizeAsset($toAsset, 'to');
-        $this->assertMoneyMatchesAsset($this->spent, $this->fromAsset, 'spent');
-        $this->assertMoneyMatchesAsset($this->received, $this->toAsset, 'received');
+        $this->assertMoneyMatchesAsset($this->spent, $this->fromAsset, 'spent', 'from');
+        $this->assertMoneyMatchesAsset($this->received, $this->toAsset, 'received', 'to');
 
         $this->fees = $fees ?? MoneyMap::empty();
     }
@@ -136,10 +136,14 @@ final class PathLeg implements JsonSerializable
         return $normalized;
     }
 
-    private function assertMoneyMatchesAsset(Money $money, string $asset, string $field): void
-    {
+    private function assertMoneyMatchesAsset(
+        Money $money,
+        string $asset,
+        string $moneyField,
+        string $assetField,
+    ): void {
         if ($money->currency() !== $asset) {
-            throw new InvalidInput(sprintf('Path leg %s currency must match the %s asset.', $field, $field));
+            throw new InvalidInput(sprintf('Path leg %s currency must match the %s asset.', $moneyField, $assetField));
         }
     }
 }

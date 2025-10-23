@@ -16,7 +16,6 @@ use function array_diff_key;
 use function array_is_list;
 use function array_key_first;
 use function count;
-use function is_int;
 
 /**
  * Immutable ordered collection of {@see PathLeg} instances.
@@ -109,8 +108,8 @@ final class PathLegCollection implements ArrayAccess, Countable, IteratorAggrega
     {
         $serialized = [];
 
-        foreach ($this->legs as $index => $leg) {
-            $serialized[$index] = $leg->jsonSerialize();
+        foreach ($this->legs as $leg) {
+            $serialized[] = $leg->jsonSerialize();
         }
 
         return $serialized;
@@ -118,12 +117,12 @@ final class PathLegCollection implements ArrayAccess, Countable, IteratorAggrega
 
     public function offsetExists(mixed $offset): bool
     {
-        return is_int($offset) && isset($this->legs[$offset]);
+        return isset($this->legs[$offset]);
     }
 
     public function offsetGet(mixed $offset): PathLeg
     {
-        if (!is_int($offset) || !isset($this->legs[$offset])) {
+        if (!isset($this->legs[$offset])) {
             throw new InvalidInput('Path leg index must reference an existing position.');
         }
 
@@ -173,7 +172,11 @@ final class PathLegCollection implements ArrayAccess, Countable, IteratorAggrega
             throw new InvalidInput('Path legs must form a monotonic sequence.');
         }
 
-        $currentAsset = (string) array_key_first($startCandidates);
+        /** @var string|null $currentAsset */
+        $currentAsset = array_key_first($startCandidates);
+        if (null === $currentAsset) {
+            throw new InvalidInput('Path legs must form a monotonic sequence.');
+        }
         $sorted = [];
         /** @var array<string, true> $visitedDestinations */
         $visitedDestinations = [];

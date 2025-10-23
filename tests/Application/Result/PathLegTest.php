@@ -99,7 +99,7 @@ final class PathLegTest extends TestCase
     public function test_spent_currency_must_match_source_asset(): void
     {
         $this->expectException(InvalidInput::class);
-        $this->expectExceptionMessage('Path leg spent currency must match the spent asset.');
+        $this->expectExceptionMessage('Path leg spent currency must match the from asset.');
 
         new PathLeg(
             'usd',
@@ -112,7 +112,7 @@ final class PathLegTest extends TestCase
     public function test_received_currency_must_match_destination_asset(): void
     {
         $this->expectException(InvalidInput::class);
-        $this->expectExceptionMessage('Path leg received currency must match the received asset.');
+        $this->expectExceptionMessage('Path leg received currency must match the to asset.');
 
         new PathLeg(
             'usd',

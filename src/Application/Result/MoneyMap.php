@@ -16,7 +16,6 @@ use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 use Traversable;
 
 use function count;
-use function is_string;
 use function ksort;
 
 /**
@@ -188,12 +187,12 @@ final class MoneyMap implements ArrayAccess, Countable, IteratorAggregate, JsonS
 
     public function offsetExists(mixed $offset): bool
     {
-        return is_string($offset) && isset($this->values[$offset]);
+        return isset($this->values[$offset]);
     }
 
     public function offsetGet(mixed $offset): Money
     {
-        if (!is_string($offset) || !isset($this->values[$offset])) {
+        if (!isset($this->values[$offset])) {
             throw new InvalidInput('Money map index must be a known currency code.');
         }
 
