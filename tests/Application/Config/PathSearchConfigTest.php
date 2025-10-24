@@ -424,6 +424,21 @@ final class PathSearchConfigTest extends TestCase
         self::assertSame(1, $config->pathFinderTimeBudgetMs());
     }
 
+    public function test_builder_preserves_custom_guard_limits_when_updating_time_budget(): void
+    {
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '50.00', 2))
+            ->withToleranceBounds('0.05', '0.10')
+            ->withHopLimits(2, 3)
+            ->withSearchGuards(123, 456)
+            ->withSearchTimeBudget(789)
+            ->build();
+
+        self::assertSame(123, $config->pathFinderMaxVisitedStates());
+        self::assertSame(456, $config->pathFinderMaxExpansions());
+        self::assertSame(789, $config->pathFinderTimeBudgetMs());
+    }
+
     public function test_constructor_enforces_default_limits_and_bounds(): void
     {
         $config = new PathSearchConfig(
