@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Application\Graph;
 
 use ArrayAccess;
-use ArrayIterator;
 use IteratorAggregate;
 use JsonSerializable;
 use LogicException;
@@ -27,10 +26,7 @@ final class GraphEdge implements IteratorAggregate, JsonSerializable, ArrayAcces
 {
     use SerializesMoney;
 
-    /**
-     * @var list<EdgeSegment>
-     */
-    private readonly array $segments;
+    private readonly EdgeSegmentCollection $segments;
 
     /**
      * @param list<EdgeSegment> $segments
@@ -46,16 +42,9 @@ final class GraphEdge implements IteratorAggregate, JsonSerializable, ArrayAcces
         private readonly EdgeCapacity $grossBaseCapacity,
         array $segments = [],
     ) {
-        $normalized = [];
-        foreach ($segments as $segment) {
-            if (!$segment instanceof EdgeSegment) {
-                continue;
-            }
-
-            $normalized[] = $segment;
-        }
-
-        $this->segments = $normalized;
+        $this->segments = [] === $segments
+            ? EdgeSegmentCollection::empty()
+            : EdgeSegmentCollection::fromArray($segments);
     }
 
     public function from(): string
@@ -103,12 +92,12 @@ final class GraphEdge implements IteratorAggregate, JsonSerializable, ArrayAcces
      */
     public function segments(): array
     {
-        return $this->segments;
+        return $this->segments->toArray();
     }
 
     public function getIterator(): Traversable
     {
-        return new ArrayIterator($this->segments);
+        return $this->segments->getIterator();
     }
 
     public function offsetExists(mixed $offset): bool
@@ -146,24 +135,7 @@ final class GraphEdge implements IteratorAggregate, JsonSerializable, ArrayAcces
                 'min' => $this->grossBaseCapacity->min(),
                 'max' => $this->grossBaseCapacity->max(),
             ],
-            'segments' => array_map(
-                static fn (EdgeSegment $segment): array => [
-                    'isMandatory' => $segment->isMandatory(),
-                    'base' => [
-                        'min' => $segment->base()->min(),
-                        'max' => $segment->base()->max(),
-                    ],
-                    'quote' => [
-                        'min' => $segment->quote()->min(),
-                        'max' => $segment->quote()->max(),
-                    ],
-                    'grossBase' => [
-                        'min' => $segment->grossBase()->min(),
-                        'max' => $segment->grossBase()->max(),
-                    ],
-                ],
-                $this->segments,
-            ),
+            'segments' => $this->segments->jsonSerialize(),
             default => null,
         };
     }
