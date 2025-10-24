@@ -64,7 +64,7 @@ final class SearchState
         ?array $amountRange,
         ?Money $desiredAmount
     ): self {
-        BcMath::ensureNumeric($unitValue, $unitValue);
+        BcMath::ensureNumeric($unitValue);
 
         return new self(
             $node,

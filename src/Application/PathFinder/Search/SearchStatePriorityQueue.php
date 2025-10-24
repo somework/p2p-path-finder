@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathFinder\Search;
 
+use InvalidArgumentException;
 use SplPriorityQueue;
 
 /**
@@ -26,6 +27,14 @@ final class SearchStatePriorityQueue extends SplPriorityQueue
      */
     public function compare(mixed $priority1, mixed $priority2): int
     {
+        if (!$priority1 instanceof SearchStatePriority) {
+            throw new InvalidArgumentException('Search state priority queue expects search state priorities.');
+        }
+
+        if (!$priority2 instanceof SearchStatePriority) {
+            throw new InvalidArgumentException('Search state priority queue expects search state priorities.');
+        }
+
         return $priority1->compare($priority2, $this->scale);
     }
 }
