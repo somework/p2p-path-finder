@@ -7,10 +7,13 @@ namespace SomeWork\P2PPathFinder\Tests\Application\Service\PathFinder;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
@@ -392,31 +395,74 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
         };
     }
 
-    /**
-     * @param list<array> $edges
-     *
-     * @return list<array>
-     */
-    private static function normalizeEdges(array $edges, int $hops): array
+    private static function normalizeEdges(array $edges, int $hops): PathEdgeSequence
     {
-        if (count($edges) === $hops) {
-            return $edges;
+        if ([] === $edges && 0 === $hops) {
+            return PathEdgeSequence::empty();
         }
 
-        if ([] === $edges) {
-            return [];
+        $normalized = array_map(
+            static function ($edge): array {
+                if ($edge instanceof PathEdge) {
+                    return $edge->toArray();
+                }
+
+                if ($edge instanceof GraphEdge) {
+                    return [
+                        'from' => $edge->from(),
+                        'to' => $edge->to(),
+                        'order' => $edge->order(),
+                        'rate' => $edge->rate(),
+                        'orderSide' => $edge->orderSide(),
+                        'conversionRate' => BcMath::normalize('1.000000000000000000', 18),
+                    ];
+                }
+
+                return $edge;
+            },
+            $edges,
+        );
+
+        if (count($normalized) !== $hops) {
+            $order = OrderFactory::sell('SRC', 'DST', '1.000', '1.000', '1.000', 3, 3);
+            $template = [
+                'from' => 'SRC',
+                'to' => 'DST',
+                'order' => $order,
+                'rate' => $order->effectiveRate(),
+                'orderSide' => OrderSide::SELL,
+                'conversionRate' => BcMath::normalize('1.000000000000000000', 18),
+            ];
+
+            $normalized = array_pad($normalized, $hops, $template);
         }
 
-        $order = OrderFactory::sell('SRC', 'DST', '1.000', '1.000', '1.000', 3, 3);
-        $template = [
-            'from' => 'SRC',
-            'to' => 'DST',
-            'order' => $order,
-            'rate' => $order->effectiveRate(),
-            'orderSide' => OrderSide::SELL,
-            'conversionRate' => BcMath::normalize('1.000000000000000000', 18),
-        ];
+        $normalized = array_map(
+            static function (array $edge): array {
+                $order = $edge['order'] ?? OrderFactory::sell('SRC', 'DST', '1.000', '1.000', '1.000', 3, 3);
 
-        return array_pad($edges, $hops, $template);
+                return $edge + [
+                    'from' => $edge['from'] ?? 'SRC',
+                    'to' => $edge['to'] ?? 'DST',
+                    'order' => $order,
+                    'rate' => $edge['rate'] ?? $order->effectiveRate(),
+                    'orderSide' => $edge['orderSide'] ?? OrderSide::SELL,
+                    'conversionRate' => $edge['conversionRate'] ?? BcMath::normalize('1.000000000000000000', 18),
+                ];
+            },
+            $normalized,
+        );
+
+        return PathEdgeSequence::fromList(array_map(
+            static fn (array $edge): PathEdge => PathEdge::create(
+                $edge['from'],
+                $edge['to'],
+                $edge['order'],
+                $edge['rate'],
+                $edge['orderSide'],
+                $edge['conversionRate'],
+            ),
+            $normalized,
+        ));
     }
 }

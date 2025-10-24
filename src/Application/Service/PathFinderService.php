@@ -16,12 +16,11 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrat
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
-use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
@@ -183,12 +182,12 @@ final class PathFinderService
                 }
 
                 $edges = $candidate->edges();
-                if ([] === $edges) {
+                if ($edges->isEmpty()) {
                     return false;
                 }
 
-                $firstEdge = $edges[0];
-                if ($firstEdge['from'] !== $sourceCurrency) {
+                $firstEdge = $edges->first();
+                if (null === $firstEdge || $firstEdge->from() !== $sourceCurrency) {
                     return false;
                 }
 
@@ -307,19 +306,21 @@ final class PathFinderService
         return 'Search guard limit exceeded: '.implode(' and ', $breaches).'.';
     }
 
-    /**
-     * @param list<array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}> $edges
-     */
-    private function routeSignature(array $edges): string
+    private function routeSignature(PathEdgeSequence $edges): string
     {
-        if ([] === $edges) {
+        if ($edges->isEmpty()) {
             return '';
         }
 
-        $nodes = [$edges[0]['from']];
+        $first = $edges->first();
+        if (null === $first) {
+            return '';
+        }
+
+        $nodes = [$first->from()];
 
         foreach ($edges as $edge) {
-            $nodes[] = $edge['to'];
+            $nodes[] = $edge->to();
         }
 
         return implode('->', $nodes);

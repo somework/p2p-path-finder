@@ -19,6 +19,8 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
@@ -248,27 +250,27 @@ final class PathFinderTest extends TestCase
                 '0.100000000000000000',
                 '10.000000000000000000',
                 2,
-                [
+                PathEdgeSequence::fromList([
                     self::stubCandidateEdge('SRC', 'BET'),
                     self::stubCandidateEdge('BET', 'TRG'),
-                ],
+                ]),
             ),
             CandidatePath::from(
                 '0.100000000000000000',
                 '10.000000000000000000',
                 2,
-                [
+                PathEdgeSequence::fromList([
                     self::stubCandidateEdge('SRC', 'ALP'),
                     self::stubCandidateEdge('ALP', 'TRG'),
-                ],
+                ]),
             ),
             CandidatePath::from(
                 '0.100000000000000000',
                 '10.000000000000000000',
                 1,
-                [
+                PathEdgeSequence::fromList([
                     self::stubCandidateEdge('SRC', 'TRG'),
-                ],
+                ]),
             ),
         ];
 
@@ -329,27 +331,27 @@ final class PathFinderTest extends TestCase
                 '0.100000000000000000',
                 '10.000000000000000000',
                 2,
-                [
+                PathEdgeSequence::fromList([
                     self::stubCandidateEdge('SRC', 'BET'),
                     self::stubCandidateEdge('BET', 'TRG'),
-                ],
+                ]),
             ),
             CandidatePath::from(
                 '0.100000000000000000',
                 '10.000000000000000000',
                 2,
-                [
+                PathEdgeSequence::fromList([
                     self::stubCandidateEdge('SRC', 'ALP'),
                     self::stubCandidateEdge('ALP', 'TRG'),
-                ],
+                ]),
             ),
             CandidatePath::from(
                 '0.100000000000000000',
                 '10.000000000000000000',
                 1,
-                [
+                PathEdgeSequence::fromList([
                     self::stubCandidateEdge('SRC', 'TRG'),
-                ],
+                ]),
             ),
         ];
 
@@ -373,36 +375,35 @@ final class PathFinderTest extends TestCase
         );
     }
 
-    /**
-     * @param list<array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}> $edges
-     */
-    private static function routeSignatureFromEdges(array $edges): string
+    private static function routeSignatureFromEdges(PathEdgeSequence $edges): string
     {
-        if ([] === $edges) {
+        if ($edges->isEmpty()) {
             return '';
         }
 
-        $nodes = [$edges[0]['from']];
+        $first = $edges->first();
+        if (null === $first) {
+            return '';
+        }
+
+        $nodes = [$first->from()];
 
         foreach ($edges as $edge) {
-            $nodes[] = $edge['to'];
+            $nodes[] = $edge->to();
         }
 
         return implode('->', $nodes);
     }
 
-    /**
-     * @return array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}
-     */
-    private static function stubCandidateEdge(string $from, string $to): array
+    private static function stubCandidateEdge(string $from, string $to): PathEdge
     {
         /** @var numeric-string $rate */
         $rate = '1.000000000000000000';
 
-        return [
-            'from' => $from,
-            'to' => $to,
-            'order' => OrderFactory::createOrder(
+        return PathEdge::create(
+            $from,
+            $to,
+            OrderFactory::createOrder(
                 OrderSide::BUY,
                 $from,
                 $to,
@@ -412,10 +413,10 @@ final class PathFinderTest extends TestCase
                 amountScale: self::SCALE,
                 rateScale: self::SCALE,
             ),
-            'rate' => ExchangeRate::fromString($from, $to, $rate, self::SCALE),
-            'orderSide' => OrderSide::BUY,
-            'conversionRate' => $rate,
-        ];
+            ExchangeRate::fromString($from, $to, $rate, self::SCALE),
+            OrderSide::BUY,
+            $rate,
+        );
     }
 
     public function test_it_skips_duplicate_states_with_identical_cost_and_hops(): void
@@ -580,10 +581,15 @@ final class PathFinderTest extends TestCase
             null,
             static function (CandidatePath $candidate) use (&$evaluatedCandidates): bool {
                 $edges = $candidate->edges();
-                $nodes = array_merge(
-                    [$edges[0]['from'] ?? ''],
-                    array_map(static fn (array $edge): string => $edge['to'], $edges),
-                );
+                $edgeArray = $edges->toArray();
+                $nodes = [];
+
+                if ([] !== $edgeArray) {
+                    $nodes = array_merge(
+                        [$edgeArray[0]['from'] ?? ''],
+                        array_map(static fn (array $edge): string => $edge['to'], $edgeArray),
+                    );
+                }
 
                 $evaluatedCandidates[] = ['nodes' => $nodes, 'cost' => $candidate->cost()];
 

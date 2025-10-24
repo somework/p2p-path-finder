@@ -13,11 +13,12 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrat
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
-use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
@@ -25,7 +26,6 @@ use SplPriorityQueue;
 
 use function array_map;
 use function array_values;
-use function count;
 use function implode;
 use function sprintf;
 use function str_repeat;
@@ -38,24 +38,6 @@ use function usort;
  * @psalm-type SpendRange = array{min: Money, max: Money}
  *
  * @phpstan-type SpendRange array{min: Money, max: Money}
- *
- * @psalm-type PathEdge = array{
- *     from: string,
- *     to: string,
- *     order: Order,
- *     rate: ExchangeRate,
- *     orderSide: OrderSide,
- *     conversionRate: numeric-string,
- * }
- *
- * @phpstan-type PathEdge array{
- *     from: string,
- *     to: string,
- *     order: Order,
- *     rate: ExchangeRate,
- *     orderSide: OrderSide,
- *     conversionRate: numeric-string,
- * }
  *
  * @psalm-type CandidateHeapEntry = array{
  *     candidate: CandidatePath,
@@ -100,7 +82,7 @@ use function usort;
  *     cost: numeric-string,
  *     product: numeric-string,
  *     hops: int,
- *     path: list<PathEdge>,
+ *     path: PathEdgeSequence,
  *     amountRange: SpendRange|null,
  *     desiredAmount: Money|null,
  *     visited: array<string, bool>,
@@ -111,7 +93,7 @@ use function usort;
  *     cost: numeric-string,
  *     product: numeric-string,
  *     hops: int,
- *     path: list<PathEdge>,
+ *     path: PathEdgeSequence,
  *     amountRange: SpendRange|null,
  *     desiredAmount: Money|null,
  *     visited: array<string, bool>,
@@ -257,7 +239,7 @@ final class PathFinder
                 $candidate = CandidatePath::from(
                     $candidateCost,
                     $candidateProduct,
-                    count($state['path']),
+                    $state['path']->count(),
                     $state['path'],
                     $candidateRange,
                 );
@@ -351,15 +333,7 @@ final class PathFinder
                     }
                 }
 
-                $nextPath = $state['path'];
-                $nextPath[] = [
-                    'from' => $edge->from(),
-                    'to' => $nextNode,
-                    'order' => $edge->order(),
-                    'rate' => $edge->rate(),
-                    'orderSide' => $edge->orderSide(),
-                    'conversionRate' => $conversionRate,
-                ];
+                $nextPath = $state['path']->append(PathEdge::fromGraphEdge($edge, $conversionRate));
 
                 $nextVisited = $state['visited'];
                 $nextVisited[$nextNode] = true;
@@ -570,7 +544,7 @@ final class PathFinder
             'cost' => $this->unitValue,
             'product' => $this->unitValue,
             'hops' => 0,
-            'path' => [],
+            'path' => PathEdgeSequence::empty(),
             'amountRange' => $range,
             'desiredAmount' => $desiredSpend,
             'visited' => [$source => true],
@@ -657,19 +631,21 @@ final class PathFinder
         return $this->orderingStrategy->compare($left['orderKey'], $right['orderKey']);
     }
 
-    /**
-     * @param list<PathEdge> $edges
-     */
-    private function routeSignature(array $edges): string
+    private function routeSignature(PathEdgeSequence $edges): string
     {
-        if ([] === $edges) {
+        if ($edges->isEmpty()) {
             return '';
         }
 
-        $nodes = [$edges[0]['from']];
+        $first = $edges->first();
+        if (null === $first) {
+            return '';
+        }
+
+        $nodes = [$first->from()];
 
         foreach ($edges as $edge) {
-            $nodes[] = $edge['to'];
+            $nodes[] = $edge->to();
         }
 
         return implode('->', $nodes);

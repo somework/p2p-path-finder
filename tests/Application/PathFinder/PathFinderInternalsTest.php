@@ -16,6 +16,8 @@ use SomeWork\P2PPathFinder\Application\PathFinder\CandidateResultHeap;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\SearchStateQueue;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
@@ -181,7 +183,8 @@ final class PathFinderInternalsTest extends TestCase
 
         self::assertSame($unit, $state['cost']);
         self::assertSame($unit, $state['product']);
-        self::assertSame([], $state['path']);
+        self::assertInstanceOf(PathEdgeSequence::class, $state['path']);
+        self::assertTrue($state['path']->isEmpty());
         self::assertSame($range, $state['amountRange']);
         self::assertSame($desired, $state['desiredAmount']);
 
@@ -872,30 +875,27 @@ final class PathFinderInternalsTest extends TestCase
         );
     }
 
-    /**
-     * @return list<array{from: string, to: string, order: Order, rate: mixed, orderSide: OrderSide, conversionRate: numeric-string}>
-     */
-    private function dummyEdges(int $count): array
+    private function dummyEdges(int $count): PathEdgeSequence
     {
         if (0 === $count) {
-            return [];
+            return PathEdgeSequence::empty();
         }
 
         $order = OrderFactory::buy('SRC', 'DST', '1.000', '1.000', '1.000', 3, 3);
-        $edge = [
-            'from' => 'SRC',
-            'to' => 'DST',
-            'order' => $order,
-            'rate' => $order->effectiveRate(),
-            'orderSide' => OrderSide::BUY,
-            'conversionRate' => BcMath::normalize('1.000000000000000000', self::SCALE),
-        ];
+        $edge = PathEdge::create(
+            'SRC',
+            'DST',
+            $order,
+            $order->effectiveRate(),
+            OrderSide::BUY,
+            BcMath::normalize('1.000000000000000000', self::SCALE),
+        );
 
-        return array_fill(0, $count, $edge);
+        return PathEdgeSequence::fromList(array_fill(0, $count, $edge));
     }
 
     /**
-     * @return array{node: string, cost: string, product: string, hops: int, path: list<array>, amountRange: null, desiredAmount: null, visited: array<string, bool>}
+     * @return array{node: string, cost: string, product: string, hops: int, path: PathEdgeSequence, amountRange: null, desiredAmount: null, visited: array<string, bool>}
      */
     private function buildState(string $node): array
     {
@@ -906,7 +906,7 @@ final class PathFinderInternalsTest extends TestCase
             'cost' => $unit,
             'product' => $unit,
             'hops' => 0,
-            'path' => [],
+            'path' => PathEdgeSequence::empty(),
             'amountRange' => null,
             'desiredAmount' => null,
             'visited' => [$node => true],

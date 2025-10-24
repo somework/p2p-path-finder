@@ -8,6 +8,9 @@ use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Application\Service\LegMaterializer;
 use SomeWork\P2PPathFinder\Application\Service\OrderSpendAnalyzer;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
@@ -48,7 +51,7 @@ final class LegMaterializerTest extends TestCase
         $initialSeed = $analyzer->determineInitialSpendAmount($config, $edges[0]);
         self::assertNotNull($initialSeed);
 
-        $materialized = $materializer->materialize($edges, $config->spendAmount(), $initialSeed, 'JPY');
+        $materialized = $materializer->materialize($this->pathEdges($edges), $config->spendAmount(), $initialSeed, 'JPY');
         self::assertNotNull($materialized);
 
         self::assertSame('EUR', $materialized['totalSpent']->currency());
@@ -120,7 +123,7 @@ final class LegMaterializerTest extends TestCase
         $initialSeed = $analyzer->determineInitialSpendAmount($config, $edges[0]);
         self::assertNotNull($initialSeed);
 
-        $materialized = $materializer->materialize($edges, $config->spendAmount(), $initialSeed, 'EUR');
+        $materialized = $materializer->materialize($this->pathEdges($edges), $config->spendAmount(), $initialSeed, 'EUR');
         self::assertNotNull($materialized);
 
         self::assertSame('USD', $materialized['totalSpent']->currency());
@@ -195,7 +198,7 @@ final class LegMaterializerTest extends TestCase
         ];
 
         self::assertNull(
-            $materializer->materialize($misorderedEdges, $config->spendAmount(), $initialSeed, 'JPY')
+            $materializer->materialize($this->pathEdges($misorderedEdges), $config->spendAmount(), $initialSeed, 'JPY')
         );
     }
 
@@ -226,7 +229,7 @@ final class LegMaterializerTest extends TestCase
         $initialSeed = $analyzer->determineInitialSpendAmount($config, $edge);
         self::assertNotNull($initialSeed);
 
-        $materialized = $materializer->materialize([$edge], $config->spendAmount(), $initialSeed, 'EUR');
+        $materialized = $materializer->materialize($this->pathEdges([$edge]), $config->spendAmount(), $initialSeed, 'EUR');
         self::assertNotNull($materialized);
 
         self::assertSame('USD', $materialized['totalSpent']->currency());
@@ -261,7 +264,7 @@ final class LegMaterializerTest extends TestCase
         self::assertNotNull($initialSeed);
 
         self::assertNull(
-            $materializer->materialize($edges, $config->spendAmount(), $initialSeed, 'USD')
+            $materializer->materialize($this->pathEdges($edges), $config->spendAmount(), $initialSeed, 'USD')
         );
     }
 
@@ -490,7 +493,7 @@ final class LegMaterializerTest extends TestCase
         self::assertNotNull($initialSeed);
 
         self::assertNull(
-            $materializer->materialize($edges, $config->spendAmount(), $initialSeed, 'JPY'),
+            $materializer->materialize($this->pathEdges($edges), $config->spendAmount(), $initialSeed, 'JPY'),
         );
     }
 
@@ -530,7 +533,7 @@ final class LegMaterializerTest extends TestCase
         );
 
         self::assertNull(
-            $materializer->materialize([$edge], $config->spendAmount(), $insufficientSeed, 'EUR')
+            $materializer->materialize($this->pathEdges([$edge]), $config->spendAmount(), $insufficientSeed, 'EUR')
         );
     }
 
@@ -622,7 +625,7 @@ final class LegMaterializerTest extends TestCase
 
         self::assertNotNull($initialSeed);
 
-        $materialized = $materializer->materialize($edges, $config->spendAmount(), $initialSeed, 'JPY');
+        $materialized = $materializer->materialize($this->pathEdges($edges), $config->spendAmount(), $initialSeed, 'JPY');
 
         self::assertNotNull($materialized);
         self::assertSame('USD', $materialized['totalSpent']->currency());
@@ -742,6 +745,28 @@ final class LegMaterializerTest extends TestCase
         self::assertSame(5, $aligned->scale());
         self::assertSame('1.20000', $aligned->amount());
         self::assertSame('USD', $aligned->currency());
+    }
+
+    /**
+     * @param list<GraphEdge> $edges
+     */
+    private function pathEdges(array $edges): PathEdgeSequence
+    {
+        if ([] === $edges) {
+            return PathEdgeSequence::empty();
+        }
+
+        return PathEdgeSequence::fromList(array_map(
+            static fn (GraphEdge $edge): PathEdge => PathEdge::create(
+                $edge->from(),
+                $edge->to(),
+                $edge->order(),
+                $edge->rate(),
+                $edge->orderSide(),
+                BcMath::normalize('1.000000000000000000', 18),
+            ),
+            $edges,
+        ));
     }
 
     private function createOrder(OrderSide $side, string $base, string $quote, string $min, string $max, string $rate, int $rateScale): Order
