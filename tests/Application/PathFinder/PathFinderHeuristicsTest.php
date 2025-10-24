@@ -8,6 +8,11 @@ use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchQueueEntry;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchState;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriority;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRecord;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRegistry;
 use SomeWork\P2PPathFinder\Application\PathFinder\SearchStateQueue;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
@@ -31,60 +36,34 @@ final class PathFinderHeuristicsTest extends TestCase
 {
     public function test_dominated_state_is_detected(): void
     {
-        $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
-
-        $method = new ReflectionMethod(PathFinder::class, 'isDominated');
-        $method->setAccessible(true);
-
-        $signature = 'range:null|desired:null';
-        $existing = [
-            [
-                'cost' => BcMath::normalize('1.000', 18),
-                'hops' => 1,
-                'signature' => $signature,
-            ],
-        ];
-
-        $result = $method->invoke(
-            $finder,
-            $existing,
-            BcMath::normalize('1.250', 18),
-            3,
-            $signature,
+        $registry = SearchStateRegistry::withInitial(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('1.000', 18), 1, 'range:null|desired:null'),
         );
 
-        self::assertTrue($result);
+        $candidate = new SearchStateRecord(BcMath::normalize('1.250', 18), 3, 'range:null|desired:null');
+
+        self::assertTrue($registry->isDominated('USD', $candidate, 18));
     }
 
-    public function test_dominated_state_search_skips_mismatched_signatures(): void
+    public function test_registry_ignores_mismatched_signatures_when_evaluating_dominance(): void
     {
-        $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
-
-        $method = new ReflectionMethod(PathFinder::class, 'isDominated');
-        $method->setAccessible(true);
-
-        $existing = [
-            [
-                'cost' => BcMath::normalize('0.750', 18),
-                'hops' => 1,
-                'signature' => 'signature-alpha',
-            ],
-            [
-                'cost' => BcMath::normalize('0.800', 18),
-                'hops' => 2,
-                'signature' => 'signature-beta',
-            ],
-        ];
-
-        $result = $method->invoke(
-            $finder,
-            $existing,
-            BcMath::normalize('0.900', 18),
-            2,
-            'signature-beta',
+        $registry = SearchStateRegistry::withInitial(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('0.750', 18), 1, 'signature-alpha'),
         );
 
-        self::assertTrue($result);
+        $registry->register(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('0.800', 18), 2, 'signature-beta'),
+            18,
+        );
+
+        $candidate = new SearchStateRecord(BcMath::normalize('0.900', 18), 2, 'signature-beta');
+        $mismatch = new SearchStateRecord(BcMath::normalize('0.900', 18), 2, 'signature-gamma');
+
+        self::assertTrue($registry->isDominated('USD', $candidate, 18));
+        self::assertFalse($registry->isDominated('USD', $mismatch, 18));
     }
 
     public function test_record_state_replaces_inferior_entries(): void
@@ -95,44 +74,31 @@ final class PathFinderHeuristicsTest extends TestCase
         $signatureMethod->setAccessible(true);
         $signature = $signatureMethod->invoke($finder, null, null);
 
-        $registry = [
-            'USD' => [
-                [
-                    'cost' => BcMath::normalize('2.000', 18),
-                    'hops' => 3,
-                    'signature' => $signature,
-                ],
-                [
-                    'cost' => BcMath::normalize('3.000', 18),
-                    'hops' => 4,
-                    'signature' => 'other-signature',
-                ],
-            ],
-        ];
-
-        $method = new ReflectionMethod(PathFinder::class, 'recordState');
-        $method->setAccessible(true);
-
-        $args = [
-            &$registry,
+        $registry = SearchStateRegistry::withInitial(
             'USD',
-            BcMath::normalize('1.500', 18),
-            1,
-            null,
-            null,
-            $signature,
-        ];
+            new SearchStateRecord(BcMath::normalize('2.000', 18), 3, $signature),
+        );
+        $registry->register(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('3.000', 18), 4, 'other-signature'),
+            18,
+        );
 
-        $netChange = $method->invokeArgs($finder, $args);
+        $netChange = $registry->register(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('1.500', 18), 1, $signature),
+            18,
+        );
 
         self::assertSame(0, $netChange);
-        self::assertCount(2, $registry['USD']);
-        self::assertSame('other-signature', $registry['USD'][0]['signature']);
+        $records = $registry->recordsFor('USD');
+        self::assertCount(2, $records);
+        self::assertSame('other-signature', $records[0]->signature());
 
-        $newEntry = $registry['USD'][1];
-        self::assertSame($signature, $newEntry['signature']);
-        self::assertSame(BcMath::normalize('1.500', 18), $newEntry['cost']);
-        self::assertSame(1, $newEntry['hops']);
+        $replacement = $records[1];
+        self::assertSame($signature, $replacement->signature());
+        self::assertSame(BcMath::normalize('1.500', 18), $replacement->cost());
+        self::assertSame(1, $replacement->hops());
     }
 
     public function test_record_state_removes_matching_entry_after_skipping_mismatched_signatures(): void
@@ -144,44 +110,31 @@ final class PathFinderHeuristicsTest extends TestCase
         $primarySignature = $signatureMethod->invoke($finder, null, null);
         $alternateSignature = $primarySignature.'-alt';
 
-        $registry = [
-            'USD' => [
-                [
-                    'cost' => BcMath::normalize('4.000', 18),
-                    'hops' => 5,
-                    'signature' => $alternateSignature,
-                ],
-                [
-                    'cost' => BcMath::normalize('2.750', 18),
-                    'hops' => 3,
-                    'signature' => $primarySignature,
-                ],
-            ],
-        ];
-
-        $method = new ReflectionMethod(PathFinder::class, 'recordState');
-        $method->setAccessible(true);
-
-        $args = [
-            &$registry,
+        $registry = SearchStateRegistry::withInitial(
             'USD',
-            BcMath::normalize('1.250', 18),
-            2,
-            null,
-            null,
-            $primarySignature,
-        ];
+            new SearchStateRecord(BcMath::normalize('4.000', 18), 5, $alternateSignature),
+        );
+        $registry->register(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('2.750', 18), 3, $primarySignature),
+            18,
+        );
 
-        $netChange = $method->invokeArgs($finder, $args);
+        $netChange = $registry->register(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('1.250', 18), 2, $primarySignature),
+            18,
+        );
 
         self::assertSame(0, $netChange);
-        self::assertCount(2, $registry['USD']);
-        self::assertSame($alternateSignature, $registry['USD'][0]['signature']);
+        $records = $registry->recordsFor('USD');
+        self::assertCount(2, $records);
+        self::assertSame($alternateSignature, $records[0]->signature());
 
-        $replacement = $registry['USD'][1];
-        self::assertSame($primarySignature, $replacement['signature']);
-        self::assertSame(BcMath::normalize('1.250', 18), $replacement['cost']);
-        self::assertSame(2, $replacement['hops']);
+        $replacement = $records[1];
+        self::assertSame($primarySignature, $replacement->signature());
+        self::assertSame(BcMath::normalize('1.250', 18), $replacement->cost());
+        self::assertSame(2, $replacement->hops());
     }
 
     public function test_money_signature_formats_null_and_scaled_amounts(): void
@@ -212,16 +165,13 @@ final class PathFinderHeuristicsTest extends TestCase
         $desired = CurrencyScenarioFactory::money('EUR', '2.500', 3);
         $signature = $signatureMethod->invoke($finder, $range, $desired);
 
-        $method = new ReflectionMethod(PathFinder::class, 'hasStateWithSignature');
-        $method->setAccessible(true);
+        $registry = SearchStateRegistry::withInitial(
+            'EUR',
+            new SearchStateRecord(BcMath::normalize('1.000', 18), 1, $signature),
+        );
 
-        $states = [
-            ['cost' => BcMath::normalize('1.000', 18), 'hops' => 1, 'signature' => $signature],
-        ];
-
-        self::assertTrue($method->invoke($finder, $states, $signature));
-        self::assertFalse($method->invoke($finder, $states, $signature.'-mismatch'));
-        self::assertFalse($method->invoke($finder, [], $signature));
+        self::assertTrue($registry->hasSignature('EUR', $signature));
+        self::assertFalse($registry->hasSignature('EUR', $signature.'-mismatch'));
     }
 
     public function test_state_signature_normalizes_range_and_desired_amounts(): void
@@ -587,11 +537,12 @@ final class PathFinderHeuristicsTest extends TestCase
             );
         }
 
+        /** @var list<CandidatePath> $finalized */
         $finalized = $finalize->invoke($finder, $heap);
 
         self::assertCount(2, $finalized);
-        self::assertSame(BcMath::normalize('0.900', 18), $finalized[0]['cost']);
-        self::assertSame(BcMath::normalize('1.050', 18), $finalized[1]['cost']);
+        self::assertSame(BcMath::normalize('0.900', 18), $finalized[0]->cost());
+        self::assertSame(BcMath::normalize('1.050', 18), $finalized[1]->cost());
     }
 
     public function test_record_result_preserves_insertion_order_when_costs_are_equal(): void
@@ -622,12 +573,13 @@ final class PathFinderHeuristicsTest extends TestCase
             );
         }
 
+        /** @var list<CandidatePath> $finalized */
         $finalized = $finalize->invoke($finder, $heap);
 
         self::assertCount(3, $finalized);
-        self::assertSame(0, $finalized[0]['hops']);
-        self::assertSame(1, $finalized[1]['hops']);
-        self::assertSame(2, $finalized[2]['hops']);
+        self::assertSame(0, $finalized[0]->hops());
+        self::assertSame(1, $finalized[1]->hops());
+        self::assertSame(2, $finalized[2]->hops());
     }
 
     public function test_search_state_queue_prioritizes_lowest_cost_entries(): void
@@ -635,37 +587,27 @@ final class PathFinderHeuristicsTest extends TestCase
         new PathFinder(maxHops: 1, tolerance: '0.0');
 
         $queue = new SearchStateQueue(18);
-        $queue->insert(
-            [
-                'node' => 'high',
-                'cost' => BcMath::normalize('1.500', 18),
-                'product' => BcMath::normalize('0.666', 18),
-                'hops' => 1,
-                'path' => [],
-                'amountRange' => null,
-                'desiredAmount' => null,
-                'visited' => [],
-            ],
-            ['cost' => BcMath::normalize('1.500', 18), 'order' => 0],
-        );
+        $queue->push(new SearchQueueEntry(
+            $this->searchState(
+                'high',
+                BcMath::normalize('1.500', 18),
+                BcMath::normalize('0.666', 18),
+                1,
+            ),
+            new SearchStatePriority(BcMath::normalize('1.500', 18), 0),
+        ));
 
-        $queue->insert(
-            [
-                'node' => 'low',
-                'cost' => BcMath::normalize('0.750', 18),
-                'product' => BcMath::normalize('1.333', 18),
-                'hops' => 1,
-                'path' => [],
-                'amountRange' => null,
-                'desiredAmount' => null,
-                'visited' => [],
-            ],
-            ['cost' => BcMath::normalize('0.750', 18), 'order' => 1],
-        );
+        $queue->push(new SearchQueueEntry(
+            $this->searchState(
+                'low',
+                BcMath::normalize('0.750', 18),
+                BcMath::normalize('1.333', 18),
+                1,
+            ),
+            new SearchStatePriority(BcMath::normalize('0.750', 18), 1),
+        ));
 
-        $first = $queue->extract();
-
-        self::assertSame('low', $first['node']);
+        self::assertSame('low', $queue->extract()->node());
     }
 
     public function test_search_state_queue_prefers_earlier_insertion_when_costs_are_equal(): void
@@ -675,24 +617,20 @@ final class PathFinderHeuristicsTest extends TestCase
         $queue = new SearchStateQueue(18);
 
         foreach (['first', 'second', 'third'] as $order => $label) {
-            $queue->insert(
-                [
-                    'node' => $label,
-                    'cost' => BcMath::normalize('0.500', 18),
-                    'product' => BcMath::normalize('2.000', 18),
-                    'hops' => 1,
-                    'path' => [],
-                    'amountRange' => null,
-                    'desiredAmount' => null,
-                    'visited' => [],
-                ],
-                ['cost' => BcMath::normalize('0.500', 18), 'order' => $order],
-            );
+            $queue->push(new SearchQueueEntry(
+                $this->searchState(
+                    $label,
+                    BcMath::normalize('0.500', 18),
+                    BcMath::normalize('2.000', 18),
+                    1,
+                ),
+                new SearchStatePriority(BcMath::normalize('0.500', 18), $order),
+            ));
         }
 
         $extracted = [];
         while (!$queue->isEmpty()) {
-            $extracted[] = $queue->extract()['node'];
+            $extracted[] = $queue->extract()->node();
         }
 
         self::assertSame(['first', 'second', 'third'], $extracted);
@@ -719,11 +657,12 @@ final class PathFinderHeuristicsTest extends TestCase
         $finalize = new ReflectionMethod(PathFinder::class, 'finalizeResults');
         $finalize->setAccessible(true);
 
+        /** @var list<CandidatePath> $results */
         $results = $finalize->invoke($finder, $heap);
 
         self::assertCount(2, $results);
-        self::assertSame($lowCost, $results[0]['cost']);
-        self::assertSame($highCost, $results[1]['cost']);
+        self::assertSame($lowCost, $results[0]->cost());
+        self::assertSame($highCost, $results[1]->cost());
     }
 
     public function test_finalize_results_preserves_insertion_order_for_equal_costs(): void
@@ -755,10 +694,25 @@ final class PathFinderHeuristicsTest extends TestCase
         $finalize = new ReflectionMethod(PathFinder::class, 'finalizeResults');
         $finalize->setAccessible(true);
 
+        /** @var list<CandidatePath> $results */
         $results = $finalize->invoke($finder, $heap);
 
-        self::assertSame('MID_A', $results[0]['edges'][0]['to']);
-        self::assertSame('MID_B', $results[1]['edges'][0]['to']);
+        self::assertSame('MID_A', $results[0]->edges()[0]->to());
+        self::assertSame('MID_B', $results[1]->edges()[0]->to());
+    }
+
+    private function searchState(string $node, string $cost, string $product, int $hops): SearchState
+    {
+        return SearchState::fromComponents(
+            $node,
+            $cost,
+            $product,
+            $hops,
+            PathEdgeSequence::empty(),
+            null,
+            null,
+            [$node => true],
+        );
     }
 
     private function dummyEdges(int $count): PathEdgeSequence

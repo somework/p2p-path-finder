@@ -14,6 +14,14 @@ use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\Graph\GraphNode;
 use SomeWork\P2PPathFinder\Application\PathFinder\CandidateResultHeap;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidateHeapEntry;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidatePriority;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\InsertionOrderCounter;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchQueueEntry;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchState;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriority;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRecord;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRegistry;
 use SomeWork\P2PPathFinder\Application\PathFinder\SearchStateQueue;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
@@ -73,23 +81,23 @@ final class PathFinderInternalsTest extends TestCase
             'max' => CurrencyScenarioFactory::money('USD', '2.00', 2),
         ];
         $signature = $this->invokeFinderMethod($finder, 'stateSignature', [$range, null]);
-        $registry = [
-            'USD' => [
-                ['cost' => BcMath::normalize('1.2', self::SCALE), 'hops' => 3, 'signature' => $signature],
-            ],
-        ];
+        $registry = SearchStateRegistry::withInitial(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('1.2', self::SCALE), 3, $signature),
+        );
 
-        $delta = $this->invokeFinderMethod(
-            $finder,
-            'recordState',
-            [&$registry, 'USD', BcMath::normalize('1.0', self::SCALE), 2, $range, null, $signature],
+        $delta = $registry->register(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('1.0', self::SCALE), 2, $signature),
+            self::SCALE,
         );
 
         self::assertSame(0, $delta);
-        self::assertCount(1, $registry['USD']);
-        self::assertSame($signature, $registry['USD'][0]['signature']);
-        self::assertSame(BcMath::normalize('1.0', self::SCALE), $registry['USD'][0]['cost']);
-        self::assertSame(2, $registry['USD'][0]['hops']);
+        $records = $registry->recordsFor('USD');
+        self::assertCount(1, $records);
+        self::assertSame($signature, $records[0]->signature());
+        self::assertSame(BcMath::normalize('1.0', self::SCALE), $records[0]->cost());
+        self::assertSame(2, $records[0]->hops());
     }
 
     public function test_record_state_preserves_existing_when_new_state_has_higher_hops(): void
@@ -100,21 +108,24 @@ final class PathFinderInternalsTest extends TestCase
             'max' => CurrencyScenarioFactory::money('USD', '3.00', 2),
         ];
         $signature = $this->invokeFinderMethod($finder, 'stateSignature', [$range, null]);
-        $registry = [
-            'USD' => [
-                ['cost' => BcMath::normalize('1.2', self::SCALE), 'hops' => 2, 'signature' => $signature],
-            ],
-        ];
+        $registry = SearchStateRegistry::withInitial(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('1.2', self::SCALE), 2, $signature),
+        );
 
-        $delta = $this->invokeFinderMethod(
-            $finder,
-            'recordState',
-            [&$registry, 'USD', BcMath::normalize('1.0', self::SCALE), 4, $range, null, $signature],
+        $delta = $registry->register(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('1.0', self::SCALE), 4, $signature),
+            self::SCALE,
         );
 
         self::assertSame(1, $delta);
-        self::assertCount(2, $registry['USD']);
-        $costsByHops = array_column($registry['USD'], 'cost', 'hops');
+        $records = $registry->recordsFor('USD');
+        self::assertCount(2, $records);
+        $costsByHops = [];
+        foreach ($records as $record) {
+            $costsByHops[$record->hops()] = $record->cost();
+        }
         self::assertArrayHasKey(2, $costsByHops);
         self::assertArrayHasKey(4, $costsByHops);
     }
@@ -127,21 +138,24 @@ final class PathFinderInternalsTest extends TestCase
             'max' => CurrencyScenarioFactory::money('USD', '3.00', 2),
         ];
         $signature = $this->invokeFinderMethod($finder, 'stateSignature', [$range, null]);
-        $registry = [
-            'USD' => [
-                ['cost' => BcMath::normalize('1.0', self::SCALE), 'hops' => 4, 'signature' => $signature],
-            ],
-        ];
+        $registry = SearchStateRegistry::withInitial(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('1.0', self::SCALE), 4, $signature),
+        );
 
-        $delta = $this->invokeFinderMethod(
-            $finder,
-            'recordState',
-            [&$registry, 'USD', BcMath::normalize('1.5', self::SCALE), 2, $range, null, $signature],
+        $delta = $registry->register(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('1.5', self::SCALE), 2, $signature),
+            self::SCALE,
         );
 
         self::assertSame(1, $delta);
-        self::assertCount(2, $registry['USD']);
-        $costsByHops = array_column($registry['USD'], 'cost', 'hops');
+        $records = $registry->recordsFor('USD');
+        self::assertCount(2, $records);
+        $costsByHops = [];
+        foreach ($records as $record) {
+            $costsByHops[$record->hops()] = $record->cost();
+        }
         self::assertSame(BcMath::normalize('1.0', self::SCALE), $costsByHops[4]);
         self::assertSame(BcMath::normalize('1.5', self::SCALE), $costsByHops[2]);
     }
@@ -166,14 +180,18 @@ final class PathFinderInternalsTest extends TestCase
 
         self::assertInstanceOf(SearchStateQueue::class, $queue);
         self::assertInstanceOf(CandidateResultHeap::class, $results);
-        self::assertSame(1, $insertionOrder);
-        self::assertSame(0, $resultInsertionOrder);
+        self::assertInstanceOf(SearchStateRegistry::class, $bestPerNode);
+        self::assertInstanceOf(InsertionOrderCounter::class, $insertionOrder);
+        self::assertInstanceOf(InsertionOrderCounter::class, $resultInsertionOrder);
         self::assertSame(1, $visitedStates);
+
+        self::assertSame(1, $insertionOrder->next());
+        self::assertSame(0, $resultInsertionOrder->next());
 
         self::assertFalse($queue->isEmpty());
         $state = $queue->extract();
-        self::assertSame('SRC', $state['node']);
-        self::assertSame(['SRC' => true], $state['visited']);
+        self::assertSame('SRC', $state->node());
+        self::assertSame(['SRC' => true], $state->visited());
 
         $signature = $this->invokeFinderMethod($finder, 'stateSignature', [$range, $desired]);
         $unitValueProperty = new ReflectionProperty(PathFinder::class, 'unitValue');
@@ -181,18 +199,19 @@ final class PathFinderInternalsTest extends TestCase
         /** @var numeric-string $unit */
         $unit = $unitValueProperty->getValue($finder);
 
-        self::assertSame($unit, $state['cost']);
-        self::assertSame($unit, $state['product']);
-        self::assertInstanceOf(PathEdgeSequence::class, $state['path']);
-        self::assertTrue($state['path']->isEmpty());
-        self::assertSame($range, $state['amountRange']);
-        self::assertSame($desired, $state['desiredAmount']);
+        self::assertSame($unit, $state->cost());
+        self::assertSame($unit, $state->product());
+        self::assertInstanceOf(PathEdgeSequence::class, $state->path());
+        self::assertTrue($state->path()->isEmpty());
+        self::assertSame($range, $state->amountRange());
+        self::assertSame($desired, $state->desiredAmount());
 
-        self::assertArrayHasKey('SRC', $bestPerNode);
-        self::assertCount(1, $bestPerNode['SRC']);
-        self::assertSame($unit, $bestPerNode['SRC'][0]['cost']);
-        self::assertSame(0, $bestPerNode['SRC'][0]['hops']);
-        self::assertSame($signature, $bestPerNode['SRC'][0]['signature']);
+        self::assertTrue($bestPerNode->hasSignature('SRC', $signature));
+        $records = $bestPerNode->recordsFor('SRC');
+        self::assertCount(1, $records);
+        self::assertSame($unit, $records[0]->cost());
+        self::assertSame(0, $records[0]->hops());
+        self::assertSame($signature, $records[0]->signature());
     }
 
     public function test_record_state_replaces_state_with_equal_hops_and_lower_cost(): void
@@ -203,22 +222,22 @@ final class PathFinderInternalsTest extends TestCase
             'max' => CurrencyScenarioFactory::money('USD', '2.00', 2),
         ];
         $signature = $this->invokeFinderMethod($finder, 'stateSignature', [$range, null]);
-        $registry = [
-            'USD' => [
-                ['cost' => BcMath::normalize('1.5', self::SCALE), 'hops' => 2, 'signature' => $signature],
-            ],
-        ];
+        $registry = SearchStateRegistry::withInitial(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('1.5', self::SCALE), 2, $signature),
+        );
 
-        $delta = $this->invokeFinderMethod(
-            $finder,
-            'recordState',
-            [&$registry, 'USD', BcMath::normalize('1.0', self::SCALE), 2, $range, null, $signature],
+        $delta = $registry->register(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('1.0', self::SCALE), 2, $signature),
+            self::SCALE,
         );
 
         self::assertSame(0, $delta);
-        self::assertCount(1, $registry['USD']);
-        self::assertSame(BcMath::normalize('1.0', self::SCALE), $registry['USD'][0]['cost']);
-        self::assertSame(2, $registry['USD'][0]['hops']);
+        $records = $registry->recordsFor('USD');
+        self::assertCount(1, $records);
+        self::assertSame(BcMath::normalize('1.0', self::SCALE), $records[0]->cost());
+        self::assertSame(2, $records[0]->hops());
     }
 
     public function test_record_state_respects_explicit_signature_override(): void
@@ -229,23 +248,23 @@ final class PathFinderInternalsTest extends TestCase
             'max' => CurrencyScenarioFactory::money('USD', '3.00', 2),
         ];
         $providedSignature = 'provided-signature';
-        $registry = [
-            'USD' => [
-                ['cost' => BcMath::normalize('1.8', self::SCALE), 'hops' => 3, 'signature' => $providedSignature],
-            ],
-        ];
+        $registry = SearchStateRegistry::withInitial(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('1.8', self::SCALE), 3, $providedSignature),
+        );
 
-        $delta = $this->invokeFinderMethod(
-            $finder,
-            'recordState',
-            [&$registry, 'USD', BcMath::normalize('1.2', self::SCALE), 2, $range, null, $providedSignature],
+        $delta = $registry->register(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('1.2', self::SCALE), 2, $providedSignature),
+            self::SCALE,
         );
 
         self::assertSame(0, $delta);
-        self::assertCount(1, $registry['USD']);
-        self::assertSame($providedSignature, $registry['USD'][0]['signature']);
-        self::assertSame(BcMath::normalize('1.2', self::SCALE), $registry['USD'][0]['cost']);
-        self::assertSame(2, $registry['USD'][0]['hops']);
+        $records = $registry->recordsFor('USD');
+        self::assertCount(1, $records);
+        self::assertSame($providedSignature, $records[0]->signature());
+        self::assertSame(BcMath::normalize('1.2', self::SCALE), $records[0]->cost());
+        self::assertSame(2, $records[0]->hops());
     }
 
     public function test_record_state_replaces_equal_cost_with_fewer_hops(): void
@@ -257,57 +276,58 @@ final class PathFinderInternalsTest extends TestCase
         ];
         $signature = $this->invokeFinderMethod($finder, 'stateSignature', [$range, null]);
         $cost = BcMath::normalize('1.750', self::SCALE);
-        $registry = [
-            'USD' => [
-                ['cost' => $cost, 'hops' => 4, 'signature' => $signature],
-            ],
-        ];
+        $registry = SearchStateRegistry::withInitial(
+            'USD',
+            new SearchStateRecord($cost, 4, $signature),
+        );
 
-        $delta = $this->invokeFinderMethod(
-            $finder,
-            'recordState',
-            [&$registry, 'USD', $cost, 2, $range, null, $signature],
+        $delta = $registry->register(
+            'USD',
+            new SearchStateRecord($cost, 2, $signature),
+            self::SCALE,
         );
 
         self::assertSame(0, $delta);
-        self::assertCount(1, $registry['USD']);
-        self::assertSame($cost, $registry['USD'][0]['cost']);
-        self::assertSame(2, $registry['USD'][0]['hops']);
+        $records = $registry->recordsFor('USD');
+        self::assertCount(1, $records);
+        self::assertSame($cost, $records[0]->cost());
+        self::assertSame(2, $records[0]->hops());
     }
 
     public function test_is_dominated_detects_matching_signature(): void
     {
         $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
-        $existing = [
-            [
-                'cost' => BcMath::normalize('1.0', self::SCALE),
-                'hops' => 2,
-                'signature' => 'sig',
-            ],
-        ];
+        $registry = SearchStateRegistry::withInitial(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('1.0', self::SCALE), 2, 'sig'),
+        );
 
-        $dominated = $this->invokeFinderMethod(
-            $finder,
-            'isDominated',
-            [$existing, BcMath::normalize('1.2', self::SCALE), 3, 'sig'],
+        $dominated = $registry->isDominated(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('1.2', self::SCALE), 3, 'sig'),
+            self::SCALE,
         );
 
         self::assertTrue($dominated);
         self::assertFalse(
-            $this->invokeFinderMethod($finder, 'isDominated', [$existing, BcMath::normalize('1.2', self::SCALE), 3, 'other']),
+            $registry->isDominated(
+                'USD',
+                new SearchStateRecord(BcMath::normalize('1.2', self::SCALE), 3, 'other'),
+                self::SCALE,
+            ),
         );
     }
 
     public function test_has_state_with_signature_detects_existing(): void
     {
-        $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
-        $existing = [
-            ['cost' => '1', 'hops' => 1, 'signature' => 'alpha'],
-            ['cost' => '2', 'hops' => 2, 'signature' => 'beta'],
-        ];
+        $registry = SearchStateRegistry::withInitial(
+            'USD',
+            new SearchStateRecord('1', 1, 'alpha'),
+        );
+        $registry->register('USD', new SearchStateRecord('2', 2, 'beta'), self::SCALE);
 
-        self::assertTrue($this->invokeFinderMethod($finder, 'hasStateWithSignature', [$existing, 'beta']));
-        self::assertFalse($this->invokeFinderMethod($finder, 'hasStateWithSignature', [$existing, 'gamma']));
+        self::assertTrue($registry->hasSignature('USD', 'beta'));
+        self::assertFalse($registry->hasSignature('USD', 'gamma'));
     }
 
     public function test_record_result_enforces_top_k_limit(): void
@@ -330,7 +350,7 @@ final class PathFinderInternalsTest extends TestCase
             $collected[] = $clone->extract();
         }
 
-        $costs = array_map(static fn (array $entry): string => $entry['candidate']->cost(), $collected);
+        $costs = array_map(static fn (CandidateHeapEntry $entry): string => $entry->candidate()->cost(), $collected);
         sort($costs);
 
         self::assertSame([
@@ -351,24 +371,19 @@ final class PathFinderInternalsTest extends TestCase
 
         /** @var list<CandidatePath> $finalizedCandidates */
         $finalizedCandidates = $this->invokeFinderMethod($finder, 'finalizeResults', [$heap]);
-        $finalized = array_map(
-            static fn (CandidatePath $candidate): array => $candidate->toArray(),
-            $finalizedCandidates,
-        );
-
         self::assertSame([
             BcMath::normalize('1.00', self::SCALE),
             BcMath::normalize('1.00', self::SCALE),
             BcMath::normalize('2.00', self::SCALE),
-        ], array_map(static fn (array $candidate): string => $candidate['cost'], $finalized));
+        ], array_map(static fn (CandidatePath $candidate): string => $candidate->cost(), $finalizedCandidates));
 
         self::assertSame(
             BcMath::normalize('1.00', self::SCALE),
-            $finalized[0]['product'],
+            $finalizedCandidates[0]->product(),
         );
         self::assertSame(
             BcMath::normalize('1.50', self::SCALE),
-            $finalized[1]['product'],
+            $finalizedCandidates[1]->product(),
         );
     }
 
@@ -546,17 +561,26 @@ final class PathFinderInternalsTest extends TestCase
         /** @var SearchStateQueue $queue */
         $queue = $this->invokeFinderMethod($finder, 'createQueue');
 
-        $queue->insert($this->buildState('A'), ['cost' => BcMath::normalize('0.8', self::SCALE), 'order' => 1]);
-        $queue->insert($this->buildState('B'), ['cost' => BcMath::normalize('0.5', self::SCALE), 'order' => 2]);
-        $queue->insert($this->buildState('C'), ['cost' => BcMath::normalize('0.5', self::SCALE), 'order' => 0]);
+        $queue->push(new SearchQueueEntry(
+            $this->buildState('A'),
+            new SearchStatePriority(BcMath::normalize('0.8', self::SCALE), 1),
+        ));
+        $queue->push(new SearchQueueEntry(
+            $this->buildState('B'),
+            new SearchStatePriority(BcMath::normalize('0.5', self::SCALE), 2),
+        ));
+        $queue->push(new SearchQueueEntry(
+            $this->buildState('C'),
+            new SearchStatePriority(BcMath::normalize('0.5', self::SCALE), 0),
+        ));
 
         $first = $queue->extract();
         $second = $queue->extract();
         $third = $queue->extract();
 
-        self::assertSame('C', $first['node']);
-        self::assertSame('B', $second['node']);
-        self::assertSame('A', $third['node']);
+        self::assertSame('C', $first->node());
+        self::assertSame('B', $second->node());
+        self::assertSame('A', $third->node());
     }
 
     public function test_create_result_heap_orders_by_cost_and_insertion(): void
@@ -565,27 +589,27 @@ final class PathFinderInternalsTest extends TestCase
         /** @var CandidateResultHeap $heap */
         $heap = $this->invokeFinderMethod($finder, 'createResultHeap');
 
-        $heap->insert(
-            ['candidate' => $this->buildCandidate('1.00', '1.00'), 'order' => 0, 'cost' => BcMath::normalize('1.00', self::SCALE)],
-            ['candidate' => $this->buildCandidate('1.00', '1.00'), 'order' => 0, 'cost' => BcMath::normalize('1.00', self::SCALE)],
-        );
-        $heap->insert(
-            ['candidate' => $this->buildCandidate('2.00', '0.50'), 'order' => 2, 'cost' => BcMath::normalize('2.00', self::SCALE)],
-            ['candidate' => $this->buildCandidate('2.00', '0.50'), 'order' => 2, 'cost' => BcMath::normalize('2.00', self::SCALE)],
-        );
-        $heap->insert(
-            ['candidate' => $this->buildCandidate('1.00', '1.50'), 'order' => 1, 'cost' => BcMath::normalize('1.00', self::SCALE)],
-            ['candidate' => $this->buildCandidate('1.00', '1.50'), 'order' => 1, 'cost' => BcMath::normalize('1.00', self::SCALE)],
-        );
+        $heap->push(new CandidateHeapEntry(
+            $this->buildCandidate('1.00', '1.00'),
+            new CandidatePriority(BcMath::normalize('1.00', self::SCALE), 0),
+        ));
+        $heap->push(new CandidateHeapEntry(
+            $this->buildCandidate('2.00', '0.50'),
+            new CandidatePriority(BcMath::normalize('2.00', self::SCALE), 2),
+        ));
+        $heap->push(new CandidateHeapEntry(
+            $this->buildCandidate('1.00', '1.50'),
+            new CandidatePriority(BcMath::normalize('1.00', self::SCALE), 1),
+        ));
 
         $first = $heap->extract();
         $second = $heap->extract();
         $third = $heap->extract();
 
-        self::assertSame(BcMath::normalize('2.00', self::SCALE), $first['candidate']['cost']);
-        self::assertSame(BcMath::normalize('1.00', self::SCALE), $second['candidate']['cost']);
-        self::assertSame(BcMath::normalize('1.00', self::SCALE), $third['candidate']['cost']);
-        self::assertSame(BcMath::normalize('1.50', self::SCALE), $second['candidate']['product']);
+        self::assertSame(BcMath::normalize('2.00', self::SCALE), $first->candidate()->cost());
+        self::assertSame(BcMath::normalize('1.00', self::SCALE), $second->candidate()->cost());
+        self::assertSame(BcMath::normalize('1.00', self::SCALE), $third->candidate()->cost());
+        self::assertSame(BcMath::normalize('1.50', self::SCALE), $second->candidate()->product());
     }
 
     public function test_find_best_paths_skips_edges_with_unknown_target_nodes(): void
@@ -894,22 +918,19 @@ final class PathFinderInternalsTest extends TestCase
         return PathEdgeSequence::fromList(array_fill(0, $count, $edge));
     }
 
-    /**
-     * @return array{node: string, cost: string, product: string, hops: int, path: PathEdgeSequence, amountRange: null, desiredAmount: null, visited: array<string, bool>}
-     */
-    private function buildState(string $node): array
+    private function buildState(string $node): SearchState
     {
         $unit = BcMath::normalize('1', self::SCALE);
 
-        return [
-            'node' => $node,
-            'cost' => $unit,
-            'product' => $unit,
-            'hops' => 0,
-            'path' => PathEdgeSequence::empty(),
-            'amountRange' => null,
-            'desiredAmount' => null,
-            'visited' => [$node => true],
-        ];
+        return SearchState::fromComponents(
+            $node,
+            $unit,
+            $unit,
+            0,
+            PathEdgeSequence::empty(),
+            null,
+            null,
+            [$node => true],
+        );
     }
 }
