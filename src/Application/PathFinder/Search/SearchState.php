@@ -18,9 +18,14 @@ use function is_string;
 final class SearchState
 {
     /**
+     * @var array<string, bool>
+     */
+    private readonly array $visited;
+
+    /**
      * @param numeric-string                     $cost
      * @param numeric-string                     $product
-     * @param array<string, bool>                $visited
+     * @param array<array-key, bool>             $visited
      * @param array{min: Money, max: Money}|null $amountRange
      */
     private function __construct(
@@ -31,7 +36,7 @@ final class SearchState
         private readonly PathEdgeSequence $path,
         private readonly ?array $amountRange,
         private readonly ?Money $desiredAmount,
-        private readonly array $visited,
+        array $visited,
     ) {
         if ('' === $this->node) {
             throw new InvalidArgumentException('Search states require a non-empty node identifier.');
@@ -43,11 +48,11 @@ final class SearchState
 
         BcMath::ensureNumeric($this->cost, $this->product);
 
-        if (!isset($this->visited[$this->node]) || true !== $this->visited[$this->node]) {
+        if (!isset($visited[$this->node]) || true !== $visited[$this->node]) {
             throw new InvalidArgumentException('Search states must mark the current node as visited.');
         }
 
-        foreach ($this->visited as $key => $value) {
+        foreach ($visited as $key => $value) {
             if (!is_string($key) || '' === $key) {
                 throw new InvalidArgumentException('Visited nodes must be indexed by non-empty strings.');
             }
@@ -56,6 +61,9 @@ final class SearchState
                 throw new InvalidArgumentException('Visited node markers must be set to true.');
             }
         }
+
+        /* @var array<string, bool> $visited */
+        $this->visited = $visited;
     }
 
     /**
@@ -86,7 +94,7 @@ final class SearchState
      * @param numeric-string                     $cost
      * @param numeric-string                     $product
      * @param array{min: Money, max: Money}|null $amountRange
-     * @param array<string, bool>                $visited
+     * @param array<array-key, bool>             $visited
      */
     public static function fromComponents(
         string $node,

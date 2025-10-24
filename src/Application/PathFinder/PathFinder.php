@@ -9,6 +9,7 @@ use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\Guard\SearchGuards;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidateHeapEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidatePriority;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidatePriorityQueue;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidateResultEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
@@ -19,6 +20,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Search\InsertionOrderCounter;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchQueueEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchState;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriority;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriorityQueue;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRecord;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRegistry;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
@@ -30,7 +32,6 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
-use SplPriorityQueue;
 
 use function array_map;
 use function implode;
@@ -788,29 +789,11 @@ final class PathFinder
  */
 final class SearchStateQueue
 {
-    /**
-     * @var SplPriorityQueue<SearchStatePriority, SearchQueueEntry>
-     */
-    private SplPriorityQueue $queue;
+    private SearchStatePriorityQueue $queue;
 
     public function __construct(private readonly int $scale)
     {
-        $scale = $this->scale;
-        $this->queue = new class($scale) extends SplPriorityQueue {
-            public function __construct(private readonly int $scale)
-            {
-                $this->setExtractFlags(self::EXTR_DATA);
-            }
-
-            public function compare($priority1, $priority2): int
-            {
-                if (!$priority1 instanceof SearchStatePriority || !$priority2 instanceof SearchStatePriority) {
-                    throw new \InvalidArgumentException('SearchStateQueue compares SearchStatePriority instances only.');
-                }
-
-                return $priority1->compare($priority2, $this->scale);
-            }
-        };
+        $this->queue = new SearchStatePriorityQueue($this->scale);
     }
 
     public function __clone()
@@ -859,29 +842,11 @@ final class SearchStateQueue
  */
 final class CandidateResultHeap
 {
-    /**
-     * @var SplPriorityQueue<CandidatePriority, CandidateHeapEntry>
-     */
-    private SplPriorityQueue $heap;
+    private CandidatePriorityQueue $heap;
 
     public function __construct(private readonly int $scale)
     {
-        $scale = $this->scale;
-        $this->heap = new class($scale) extends SplPriorityQueue {
-            public function __construct(private readonly int $scale)
-            {
-                $this->setExtractFlags(self::EXTR_DATA);
-            }
-
-            public function compare($priority1, $priority2): int
-            {
-                if (!$priority1 instanceof CandidatePriority || !$priority2 instanceof CandidatePriority) {
-                    throw new \InvalidArgumentException('CandidateResultHeap compares CandidatePriority instances only.');
-                }
-
-                return $priority1->compare($priority2, $this->scale);
-            }
-        };
+        $this->heap = new CandidatePriorityQueue($this->scale);
     }
 
     public function __clone()
