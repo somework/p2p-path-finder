@@ -23,7 +23,7 @@ Returns the target spend amount expressed in the source asset.
 ### toleranceWindow
 `PathSearchConfig::toleranceWindow(): SomeWork\P2PPathFinder\Domain\ValueObject\ToleranceWindow`
 
-Returns the normalized tolerance window applied to spend calculations.
+Returns the tolerance window applied to the spend amount.
 
 ### minimumTolerance
 `PathSearchConfig::minimumTolerance(): string`
@@ -63,6 +63,9 @@ Returns the maximum number of state expansions the path finder is allowed to per
 `PathSearchConfig::pathFinderMaxVisitedStates(): int`
 
 Returns the maximum number of unique state signatures tracked during search.
+
+### pathFinderTimeBudgetMs
+`PathSearchConfig::pathFinderTimeBudgetMs(): ?int`
 
 ### minimumSpendAmount
 `PathSearchConfig::minimumSpendAmount(): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
@@ -120,6 +123,11 @@ Limits how many paths should be returned by the search service.
 `PathSearchConfigBuilder::withSearchGuards(int $maxVisitedStates, int $maxExpansions, ?int $timeBudgetMs = null): self`
 
 Configures limits that guard search explosion in dense graphs.
+
+### withSearchTimeBudget
+`PathSearchConfigBuilder::withSearchTimeBudget(?int $timeBudgetMs): self`
+
+Configures an optional wall-clock budget (in milliseconds) for the path finder search.
 
 ### withGuardLimitException
 `PathSearchConfigBuilder::withGuardLimitException(bool $shouldThrow = true): self`
@@ -203,8 +211,137 @@ Accepts orders whose effective rates fall within a tolerance window around a ref
 ### __construct
 `ToleranceWindowFilter::__construct(SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate $referenceRate, string $tolerance)`
 
+Parameter $tolerance: numeric-string
+
 ### accepts
 `ToleranceWindowFilter::accepts(SomeWork\P2PPathFinder\Domain\Order\Order $order): bool`
+
+## SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity
+Represents the minimum and maximum capacity for a given measurement on an edge.
+
+### Public methods
+
+### __construct
+`EdgeCapacity::__construct(SomeWork\P2PPathFinder\Domain\ValueObject\Money $min, SomeWork\P2PPathFinder\Domain\ValueObject\Money $max)`
+
+### min
+`EdgeCapacity::min(): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
+
+### max
+`EdgeCapacity::max(): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
+
+### jsonSerialize
+`EdgeCapacity::jsonSerialize(): array`
+
+Returns: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}}
+
+## SomeWork\P2PPathFinder\Application\Graph\EdgeSegment
+Describes a segmented portion of edge capacity, indicating mandatory and optional fills.
+
+### Public methods
+
+### __construct
+`EdgeSegment::__construct(bool $isMandatory, SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity $base, SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity $quote, SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity $grossBase)`
+
+### isMandatory
+`EdgeSegment::isMandatory(): bool`
+
+### base
+`EdgeSegment::base(): SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity`
+
+### quote
+`EdgeSegment::quote(): SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity`
+
+### grossBase
+`EdgeSegment::grossBase(): SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity`
+
+### jsonSerialize
+`EdgeSegment::jsonSerialize(): array`
+
+Returns: array{
+isMandatory: bool,
+base: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
+quote: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
+grossBase: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
+}
+
+## SomeWork\P2PPathFinder\Application\Graph\EdgeSegmentCollection
+Immutable ordered collection of {@see EdgeSegment} instances attached to a graph edge.
+
+### Public methods
+
+### empty
+`EdgeSegmentCollection::empty(): self`
+
+### fromArray
+`EdgeSegmentCollection::fromArray(array $segments): self`
+
+Parameter $segments: array&lt;array-key, EdgeSegment&gt;
+
+### count
+`EdgeSegmentCollection::count(): int`
+
+### isEmpty
+`EdgeSegmentCollection::isEmpty(): bool`
+
+### getIterator
+`EdgeSegmentCollection::getIterator(): Traversable`
+
+Returns: Traversable&lt;int, EdgeSegment&gt;
+
+### toArray
+`EdgeSegmentCollection::toArray(): array`
+
+Returns: list&lt;EdgeSegment&gt;
+
+### jsonSerialize
+`EdgeSegmentCollection::jsonSerialize(): array`
+
+Returns: list&lt;array{
+isMandatory: bool,
+base: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
+quote: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
+grossBase: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
+}>
+
+## SomeWork\P2PPathFinder\Application\Graph\Graph
+Directed multigraph representation keyed by asset symbol.
+
+### Public methods
+
+### __construct
+`Graph::__construct(SomeWork\P2PPathFinder\Application\Graph\GraphNodeCollection|array $nodes = [])`
+
+Parameter $nodes: GraphNodeCollection|array&lt;array-key, GraphNode&gt;
+
+### nodes
+`Graph::nodes(): SomeWork\P2PPathFinder\Application\Graph\GraphNodeCollection`
+
+### hasNode
+`Graph::hasNode(string $currency): bool`
+
+### node
+`Graph::node(string $currency): ?SomeWork\P2PPathFinder\Application\Graph\GraphNode`
+
+### getIterator
+`Graph::getIterator(): Traversable`
+
+### offsetExists
+`Graph::offsetExists(mixed $offset): bool`
+
+### offsetGet
+`Graph::offsetGet(mixed $offset): ?SomeWork\P2PPathFinder\Application\Graph\GraphNode`
+
+### offsetSet
+`Graph::offsetSet(mixed $offset, mixed $value): void`
+
+### offsetUnset
+`Graph::offsetUnset(mixed $offset): void`
+
+### jsonSerialize
+`Graph::jsonSerialize(): array`
+
+Returns: array&lt;string, array{currency: string, edges: list&lt;array&lt;string, mixed&gt;&gt;}&gt;
 
 ## SomeWork\P2PPathFinder\Application\Graph\GraphBuilder
 Converts a collection of domain orders into a weighted directed graph representation.
@@ -215,12 +352,225 @@ Converts a collection of domain orders into a weighted directed graph representa
 `GraphBuilder::__construct(?SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator $fillEvaluator = null)`
 
 ### build
-`GraphBuilder::build(iterable $orders): array`
+`GraphBuilder::build(iterable $orders): SomeWork\P2PPathFinder\Application\Graph\Graph`
 
-Returns: Graph
+Parameter $orders: iterable&lt;Order&gt;
 
 ### fillEvaluator
 `GraphBuilder::fillEvaluator(): SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator`
+
+## SomeWork\P2PPathFinder\Application\Graph\GraphEdge
+Immutable representation of a directed edge in the trading graph.
+
+### Public methods
+
+### __construct
+`GraphEdge::__construct(string $from, string $to, SomeWork\P2PPathFinder\Domain\Order\OrderSide $orderSide, SomeWork\P2PPathFinder\Domain\Order\Order $order, SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate $rate, SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity $baseCapacity, SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity $quoteCapacity, SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity $grossBaseCapacity, array $segments = [])`
+
+Parameter $segments: list&lt;EdgeSegment&gt;
+
+### from
+`GraphEdge::from(): string`
+
+### to
+`GraphEdge::to(): string`
+
+### orderSide
+`GraphEdge::orderSide(): SomeWork\P2PPathFinder\Domain\Order\OrderSide`
+
+### order
+`GraphEdge::order(): SomeWork\P2PPathFinder\Domain\Order\Order`
+
+### rate
+`GraphEdge::rate(): SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate`
+
+### baseCapacity
+`GraphEdge::baseCapacity(): SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity`
+
+### quoteCapacity
+`GraphEdge::quoteCapacity(): SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity`
+
+### grossBaseCapacity
+`GraphEdge::grossBaseCapacity(): SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity`
+
+### segments
+`GraphEdge::segments(): array`
+
+Returns: list&lt;EdgeSegment&gt;
+
+### getIterator
+`GraphEdge::getIterator(): Traversable`
+
+### offsetExists
+`GraphEdge::offsetExists(mixed $offset): bool`
+
+### offsetGet
+`GraphEdge::offsetGet(mixed $offset): mixed`
+
+### offsetSet
+`GraphEdge::offsetSet(mixed $offset, mixed $value): void`
+
+### offsetUnset
+`GraphEdge::offsetUnset(mixed $offset): void`
+
+### jsonSerialize
+`GraphEdge::jsonSerialize(): array`
+
+Returns: array{
+from: string,
+to: string,
+orderSide: string,
+order: array{
+side: string,
+assetPair: array{base: string, quote: string},
+bounds: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
+effectiveRate: array{baseCurrency: string, quoteCurrency: string, value: string, scale: int},
+},
+rate: array{baseCurrency: string, quoteCurrency: string, value: string, scale: int},
+baseCapacity: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
+quoteCapacity: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
+grossBaseCapacity: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
+segments: list<array{
+isMandatory: bool,
+base: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
+quote: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
+grossBase: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
+}>,
+}
+
+## SomeWork\P2PPathFinder\Application\Graph\GraphEdgeCollection
+Immutable ordered collection of {@see GraphEdge} instances for a single origin currency.
+
+### Public methods
+
+### empty
+`GraphEdgeCollection::empty(): self`
+
+### fromArray
+`GraphEdgeCollection::fromArray(array $edges): self`
+
+Parameter $edges: array&lt;array-key, GraphEdge&gt;
+
+### count
+`GraphEdgeCollection::count(): int`
+
+### isEmpty
+`GraphEdgeCollection::isEmpty(): bool`
+
+### originCurrency
+`GraphEdgeCollection::originCurrency(): ?string`
+
+### getIterator
+`GraphEdgeCollection::getIterator(): Traversable`
+
+Returns: Traversable&lt;int, GraphEdge&gt;
+
+### offsetExists
+`GraphEdgeCollection::offsetExists(mixed $offset): bool`
+
+### offsetGet
+`GraphEdgeCollection::offsetGet(mixed $offset): SomeWork\P2PPathFinder\Application\Graph\GraphEdge`
+
+### offsetSet
+`GraphEdgeCollection::offsetSet(mixed $offset, mixed $value): void`
+
+### offsetUnset
+`GraphEdgeCollection::offsetUnset(mixed $offset): void`
+
+### toArray
+`GraphEdgeCollection::toArray(): array`
+
+Returns: list&lt;GraphEdge&gt;
+
+### jsonSerialize
+`GraphEdgeCollection::jsonSerialize(): array`
+
+Returns: list&lt;array&lt;string, mixed&gt;&gt;
+
+## SomeWork\P2PPathFinder\Application\Graph\GraphNode
+Represents a currency node and its outgoing edges within the trading graph.
+
+### Public methods
+
+### __construct
+`GraphNode::__construct(string $currency, SomeWork\P2PPathFinder\Application\Graph\GraphEdgeCollection|array $edges = [])`
+
+Parameter $edges: GraphEdgeCollection|array&lt;array-key, GraphEdge&gt;
+
+### currency
+`GraphNode::currency(): string`
+
+### edges
+`GraphNode::edges(): SomeWork\P2PPathFinder\Application\Graph\GraphEdgeCollection`
+
+### getIterator
+`GraphNode::getIterator(): Traversable`
+
+### offsetExists
+`GraphNode::offsetExists(mixed $offset): bool`
+
+### offsetGet
+`GraphNode::offsetGet(mixed $offset): mixed`
+
+### offsetSet
+`GraphNode::offsetSet(mixed $offset, mixed $value): void`
+
+### offsetUnset
+`GraphNode::offsetUnset(mixed $offset): void`
+
+### jsonSerialize
+`GraphNode::jsonSerialize(): array`
+
+Returns: array{currency: string, edges: list&lt;array&lt;string, mixed&gt;&gt;}
+
+## SomeWork\P2PPathFinder\Application\Graph\GraphNodeCollection
+Immutable ordered collection of {@see GraphNode} instances keyed by currency.
+
+### Public methods
+
+### empty
+`GraphNodeCollection::empty(): self`
+
+### fromArray
+`GraphNodeCollection::fromArray(array $nodes): self`
+
+Parameter $nodes: array&lt;array-key, GraphNode&gt;
+
+### count
+`GraphNodeCollection::count(): int`
+
+### has
+`GraphNodeCollection::has(string $currency): bool`
+
+### get
+`GraphNodeCollection::get(string $currency): ?SomeWork\P2PPathFinder\Application\Graph\GraphNode`
+
+### getIterator
+`GraphNodeCollection::getIterator(): Traversable`
+
+Returns: Traversable&lt;string, GraphNode&gt;
+
+### offsetExists
+`GraphNodeCollection::offsetExists(mixed $offset): bool`
+
+### offsetGet
+`GraphNodeCollection::offsetGet(mixed $offset): SomeWork\P2PPathFinder\Application\Graph\GraphNode`
+
+### offsetSet
+`GraphNodeCollection::offsetSet(mixed $offset, mixed $value): void`
+
+### offsetUnset
+`GraphNodeCollection::offsetUnset(mixed $offset): void`
+
+### toArray
+`GraphNodeCollection::toArray(): array`
+
+Returns: array&lt;string, GraphNode&gt;
+
+### jsonSerialize
+`GraphNodeCollection::jsonSerialize(): array`
+
+Returns: array&lt;string, array{currency: string, edges: list&lt;array&lt;string, mixed&gt;&gt;}&gt;
 
 ## SomeWork\P2PPathFinder\Application\OrderBook\OrderBook
 
@@ -228,6 +578,8 @@ Returns: Graph
 
 ### __construct
 `OrderBook::__construct(iterable $orders = [])`
+
+Parameter $orders: iterable&lt;Order&gt;
 
 ### add
 `OrderBook::add(SomeWork\P2PPathFinder\Domain\Order\Order $order): void`
@@ -237,113 +589,204 @@ Appends an order to the in-memory order book.
 ### getIterator
 `OrderBook::getIterator(): Traversable`
 
-Returns: Traversable<int, Order>
+Returns: Traversable&lt;int, Order&gt;
 
 ### filter
 `OrderBook::filter(SomeWork\P2PPathFinder\Application\Filter\OrderFilterInterface ...$filters): Generator`
 
-Returns: Generator<int, Order>
+Returns: Generator&lt;int, Order&gt;
 
-## SomeWork\P2PPathFinder\Application\PathFinder\PathFinder
-Implementation of a tolerance-aware best-path search through the trading graph.
-
-psalm-type GraphEdge = array{
-from: string,
-to: string,
-orderSide: OrderSide,
-order: Order,
-rate: ExchangeRate,
-baseCapacity: array{min: Money, max: Money},
-quoteCapacity: array{min: Money, max: Money},
-grossBaseCapacity: array{min: Money, max: Money},
-segments: list<array{
-isMandatory: bool,
-base: array{min: Money, max: Money},
-quote: array{min: Money, max: Money},
-grossBase: array{min: Money, max: Money},
-}>,
-}
-
-phpstan-type GraphEdge array{
-from: string,
-to: string,
-orderSide: OrderSide,
-order: Order,
-rate: ExchangeRate,
-baseCapacity: array{min: Money, max: Money},
-quoteCapacity: array{min: Money, max: Money},
-grossBaseCapacity: array{min: Money, max: Money},
-segments: list<array{
-isMandatory: bool,
-base: array{min: Money, max: Money},
-quote: array{min: Money, max: Money},
-grossBase: array{min: Money, max: Money},
-}>,
-}
-
-psalm-type Graph = array<string, array{currency: string, edges: list<GraphEdge>}>
-
-phpstan-type Graph array<string, array{currency: string, edges: list<GraphEdge>}>
-
-**Value Objects**
-
-`SpendConstraints`
-
-* `min`: `Money` – inclusive lower bound on spend amount
-* `max`: `Money` – inclusive upper bound on spend amount
-* `desired`: `Money|null` – optional preferred spend amount propagated through the graph
-
-`CandidatePath`
-
-* `cost`: `numeric-string`
-* `product`: `numeric-string`
-* `hops`: `int`
-* `edges`: `list<PathEdge>`
-* `range`: `SpendConstraints|null`
-
-psalm-type SearchQueueEntry = array{
-state: SearchState,
-priority: array{cost: numeric-string, order: int},
-}
-
-phpstan-type SearchQueueEntry array{
-state: SearchState,
-priority: array{cost: numeric-string, order: int},
-}
-
-psalm-type SearchState = array{
-node: string,
-cost: numeric-string,
-product: numeric-string,
-hops: int,
-path: list<PathEdge>,
-amountRange: SpendRange|null,
-desiredAmount: Money|null,
-visited: array<string, bool>,
-}
-
-phpstan-type SearchState array{
-node: string,
-cost: numeric-string,
-product: numeric-string,
-hops: int,
-path: list<PathEdge>,
-amountRange: SpendRange|null,
-desiredAmount: Money|null,
-visited: array<string, bool>,
-}
+## SomeWork\P2PPathFinder\Application\PathFinder\Guard\SearchGuards
+Coordinates wall-clock and expansion guard rails for the path search.
 
 ### Public methods
 
 ### __construct
-`PathFinder::__construct(int $maxHops = 4, string $tolerance = '0', int $topK = 1, int $maxExpansions = 250000, int $maxVisitedStates = 250000, ?SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy $orderingStrategy = null)`
+`SearchGuards::__construct(int $maxExpansions, ?int $timeBudgetMs = null, ?callable $clock = null)`
+
+Parameter $clock: Closure():float|callable():float|null
+
+### canExpand
+`SearchGuards::canExpand(): bool`
+
+### recordExpansion
+`SearchGuards::recordExpansion(): void`
+
+### finalize
+`SearchGuards::finalize(int $visitedStates, int $visitedStateLimit, bool $visitedGuardReached): SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport`
+
+## SomeWork\P2PPathFinder\Application\PathFinder\PathFinder
+Implementation of a tolerance-aware best-path search through the trading graph.
+
+psalm-type SpendRange = array{min: Money, max: Money}
+
+phpstan-type SpendRange array{min: Money, max: Money}
+
+### Public methods
+
+### __construct
+`PathFinder::__construct(int $maxHops = 4, string $tolerance = '0', int $topK = 1, int $maxExpansions = 250000, int $maxVisitedStates = 250000, ?SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy $orderingStrategy = null, ?int $timeBudgetMs = null)`
+
+Parameter $maxHops: int — maximum number of edges a path may contain
+Parameter $tolerance: string — value in the [0, 1) range representing the acceptable degradation of the best product
 
 ### findBestPaths
 `PathFinder::findBestPaths(SomeWork\P2PPathFinder\Application\Graph\Graph $graph, string $source, string $target, ?SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints $spendConstraints = null, ?callable $acceptCandidate = null): SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome`
 
-Returns: SearchOutcome<CandidatePath>
+Parameter $acceptCandidate: callable(CandidatePath):bool|null
+
+Returns: SearchOutcome&lt;CandidatePath&gt;
+
+## SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidateHeapEntry
+
+### Public methods
+
+### __construct
+`CandidateHeapEntry::__construct(SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath $candidate, SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidatePriority $priority)`
+
+### candidate
+`CandidateHeapEntry::candidate(): SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath`
+
+### priority
+`CandidateHeapEntry::priority(): SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidatePriority`
+
+## SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidatePriority
+
+### Public methods
+
+### __construct
+`CandidatePriority::__construct(string $cost, int $order)`
+
+Parameter $cost: numeric-string
+
+### cost
+`CandidatePriority::cost(): string`
+
+Returns: numeric-string
+
+### order
+`CandidatePriority::order(): int`
+
+### compare
+`CandidatePriority::compare(self $other, int $scale): int`
+
+## SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy
+
+### Public methods
+
+### __construct
+`CostHopsSignatureOrderingStrategy::__construct(int $costScale)`
+
+### compare
+`CostHopsSignatureOrderingStrategy::compare(SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey $left, SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey $right): int`
+
+## SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey
+psalm-type Payload = array<string, mixed>
+
+phpstan-type Payload array<string, mixed>
+
+### Public methods
+
+### __construct
+`PathOrderKey::__construct(string $cost, int $hops, string $routeSignature, int $insertionOrder, array $payload = [])`
+
+Parameter $payload: Payload
+
+Parameter $cost: string
+
+### cost
+`PathOrderKey::cost(): string`
+
+Returns: string
+
+### hops
+`PathOrderKey::hops(): int`
+
+### routeSignature
+`PathOrderKey::routeSignature(): string`
+
+### insertionOrder
+`PathOrderKey::insertionOrder(): int`
+
+### payload
+`PathOrderKey::payload(): array`
+
+Returns: Payload
+
+## SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy
+
+### Public methods
+
+### compare
+`PathOrderStrategy::compare(SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey $left, SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey $right): int`
+
+## SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet
+Immutable collection of ordered path results.
+
+### Public methods
+
+### empty
+`PathResultSet::empty(): self`
+
+Returns: PathResultSet&lt;TPath&gt;
+
+### fromEntries
+`PathResultSet::fromEntries(SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy $orderingStrategy, iterable $entries): self`
+
+Parameter $entries: iterable&lt;PathResultSetEntry&lt;TIn&gt;&gt;
+
+Returns: PathResultSet&lt;TIn&gt;
+
+### getIterator
+`PathResultSet::getIterator(): Traversable`
+
+Returns: Traversable&lt;int, TPath&gt;
+
+### count
+`PathResultSet::count(): int`
+
+### isEmpty
+`PathResultSet::isEmpty(): bool`
+
+### toArray
+`PathResultSet::toArray(): array`
+
+Returns: list&lt;TPath&gt;
+
+### slice
+`PathResultSet::slice(int $offset, ?int $length = null): self`
+
+Returns: PathResultSet&lt;TPath&gt;
+
+### first
+`PathResultSet::first(): mixed`
+
+Returns: TPath|null
+
+### jsonSerialize
+`PathResultSet::jsonSerialize(): array`
+
+Returns: list&lt;mixed&gt;
+
+## SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSetEntry
+
+### Public methods
+
+### __construct
+`PathResultSetEntry::__construct(mixed $path, SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey $orderKey)`
+
+Parameter $path: TPath
+
+### path
+`PathResultSetEntry::path(): mixed`
+
+Returns: TPath
+
+### orderKey
+`PathResultSetEntry::orderKey(): SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey`
 
 ## SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport
+Immutable snapshot describing how the search interacted with its guard rails.
 
 ### Public methods
 
@@ -386,50 +829,6 @@ Returns: SearchOutcome<CandidatePath>
 ### timeBudgetLimit
 `SearchGuardReport::timeBudgetLimit(): ?int`
 
-## SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy
-
-### Public methods
-
-### __construct
-`CostHopsSignatureOrderingStrategy::__construct(int $costScale)`
-
-### compare
-`CostHopsSignatureOrderingStrategy::compare(SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey $left, SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey $right): int`
-
-## SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey
-psalm-type Payload = array<string, mixed>
-
-phpstan-type Payload array<string, mixed>
-
-### Public methods
-
-### __construct
-`PathOrderKey::__construct(string $cost, int $hops, string $routeSignature, int $insertionOrder, array $payload = [])`
-
-### cost
-`PathOrderKey::cost(): string`
-
-### hops
-`PathOrderKey::hops(): int`
-
-### routeSignature
-`PathOrderKey::routeSignature(): string`
-
-### insertionOrder
-`PathOrderKey::insertionOrder(): int`
-
-### payload
-`PathOrderKey::payload(): array`
-
-Returns: Payload
-
-## SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy
-
-### Public methods
-
-### compare
-`PathOrderStrategy::compare(SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey $left, SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey $right): int`
-
 ## SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome
 
 ### Public methods
@@ -437,15 +836,17 @@ Returns: Payload
 ### __construct
 `SearchOutcome::__construct(SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet $paths, SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport $guardLimits)`
 
+Parameter $paths: PathResultSet&lt;TPath&gt;
+
 ### empty
 `SearchOutcome::empty(SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport $guardLimits): self`
 
-Returns: SearchOutcome<mixed>
+Returns: SearchOutcome&lt;TPath&gt;
 
 ### paths
 `SearchOutcome::paths(): SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet`
 
-Returns: PathResultSet<TPath>
+Returns: PathResultSet&lt;TPath&gt;
 
 ### hasPaths
 `SearchOutcome::hasPaths(): bool`
@@ -453,38 +854,398 @@ Returns: PathResultSet<TPath>
 ### guardLimits
 `SearchOutcome::guardLimits(): SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport`
 
-## SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet
-Immutable, ordered collection of search results.
+## SomeWork\P2PPathFinder\Application\PathFinder\Search\InsertionOrderCounter
+
+### Public methods
+
+### __construct
+`InsertionOrderCounter::__construct(int $value = 0)`
+
+### next
+`InsertionOrderCounter::next(): int`
+
+## SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchQueueEntry
+
+### Public methods
+
+### __construct
+`SearchQueueEntry::__construct(SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchState $state, SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriority $priority)`
+
+### state
+`SearchQueueEntry::state(): SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchState`
+
+### priority
+`SearchQueueEntry::priority(): SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriority`
+
+## SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchState
+Immutable representation of a search frontier state.
+
+### Public methods
+
+### bootstrap
+`SearchState::bootstrap(string $node, string $unitValue, ?array $amountRange, ?SomeWork\P2PPathFinder\Domain\ValueObject\Money $desiredAmount): self`
+
+Parameter $unitValue: numeric-string
+Parameter $amountRange: array{min: Money, max: Money}|null
+
+### fromComponents
+`SearchState::fromComponents(string $node, string $cost, string $product, int $hops, SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence $path, ?array $amountRange, ?SomeWork\P2PPathFinder\Domain\ValueObject\Money $desiredAmount, array $visited): self`
+
+Parameter $cost: numeric-string
+Parameter $product: numeric-string
+Parameter $amountRange: array{min: Money, max: Money}|null
+Parameter $visited: array&lt;array-key, bool&gt;
+
+### transition
+`SearchState::transition(string $nextNode, string $nextCost, string $nextProduct, SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge $edge, ?array $amountRange, ?SomeWork\P2PPathFinder\Domain\ValueObject\Money $desiredAmount): self`
+
+Parameter $nextCost: numeric-string
+Parameter $nextProduct: numeric-string
+Parameter $amountRange: array{min: Money, max: Money}|null
+
+### node
+`SearchState::node(): string`
+
+### cost
+`SearchState::cost(): string`
+
+Returns: numeric-string
+
+### product
+`SearchState::product(): string`
+
+Returns: numeric-string
+
+### hops
+`SearchState::hops(): int`
+
+### path
+`SearchState::path(): SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence`
+
+### amountRange
+`SearchState::amountRange(): ?array`
+
+Returns: array{min: Money, max: Money}|null
+
+### desiredAmount
+`SearchState::desiredAmount(): ?SomeWork\P2PPathFinder\Domain\ValueObject\Money`
+
+### visited
+`SearchState::visited(): array`
+
+Returns: non-empty-array&lt;string, bool&gt;
+
+### hasVisited
+`SearchState::hasVisited(string $node): bool`
+
+## SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriority
+
+### Public methods
+
+### __construct
+`SearchStatePriority::__construct(string $cost, int $order)`
+
+Parameter $cost: numeric-string
+
+### cost
+`SearchStatePriority::cost(): string`
+
+Returns: numeric-string
+
+### order
+`SearchStatePriority::order(): int`
+
+### compare
+`SearchStatePriority::compare(self $other, int $scale): int`
+
+## SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRecord
+
+### Public methods
+
+### __construct
+`SearchStateRecord::__construct(string $cost, int $hops, string $signature)`
+
+Parameter $cost: numeric-string
+
+### cost
+`SearchStateRecord::cost(): string`
+
+Returns: numeric-string
+
+### hops
+`SearchStateRecord::hops(): int`
+
+### signature
+`SearchStateRecord::signature(): string`
+
+### dominates
+`SearchStateRecord::dominates(self $other, int $scale): bool`
+
+## SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRegistry
 
 ### Public methods
 
 ### empty
-`PathResultSet::empty(): self`
+`SearchStateRegistry::empty(): self`
 
-Returns: PathResultSet<mixed>
+### withInitial
+`SearchStateRegistry::withInitial(string $node, SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRecord $record): self`
 
-### fromEntries
-`PathResultSet::fromEntries(SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy $orderingStrategy, iterable $entries): self`
+### recordsFor
+`SearchStateRegistry::recordsFor(string $node): array`
 
-Returns: PathResultSet<mixed>
+Returns: list&lt;SearchStateRecord&gt;
+
+### register
+`SearchStateRegistry::register(string $node, SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRecord $record, int $scale): int`
+
+### isDominated
+`SearchStateRegistry::isDominated(string $node, SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRecord $record, int $scale): bool`
+
+### hasSignature
+`SearchStateRegistry::hasSignature(string $node, string $signature): bool`
+
+## SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath
+
+### Public methods
+
+### from
+`CandidatePath::from(string $cost, string $product, int $hops, SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence $edges, ?SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints $range = null): self`
+
+Parameter $cost: numeric-string — aggregate spend for the candidate path
+Parameter $product: numeric-string — cumulative product of the edge exchange rates
+
+### cost
+`CandidatePath::cost(): string`
+
+Returns: numeric-string
+
+### product
+`CandidatePath::product(): string`
+
+Returns: numeric-string
+
+### hops
+`CandidatePath::hops(): int`
+
+### edges
+`CandidatePath::edges(): SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence`
+
+### range
+`CandidatePath::range(): ?SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints`
+
+### offsetExists
+`CandidatePath::offsetExists(mixed $offset): bool`
+
+### offsetGet
+`CandidatePath::offsetGet(mixed $offset): mixed`
+
+### offsetSet
+`CandidatePath::offsetSet(mixed $offset, mixed $value): void`
+
+### offsetUnset
+`CandidatePath::offsetUnset(mixed $offset): void`
 
 ### toArray
-`PathResultSet::toArray(): array`
+`CandidatePath::toArray(): array`
 
-Returns: list<TPath>
+Returns: array{
+cost: numeric-string,
+product: numeric-string,
+hops: int,
+edges: list<array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}>,
+amountRange: array{min: Money, max: Money}|null,
+desiredAmount: Money|null,
+}
 
-### first
-`PathResultSet::first(): mixed`
+## SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge
 
-Returns: TPath|null
+### Public methods
+
+### create
+`PathEdge::create(string $from, string $to, SomeWork\P2PPathFinder\Domain\Order\Order $order, SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate $rate, SomeWork\P2PPathFinder\Domain\Order\OrderSide $orderSide, string $conversionRate): self`
+
+### fromGraphEdge
+`PathEdge::fromGraphEdge(SomeWork\P2PPathFinder\Application\Graph\GraphEdge $edge, string $conversionRate): self`
+
+### toArray
+`PathEdge::toArray(): array`
+
+Returns: array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}
+
+### from
+`PathEdge::from(): string`
+
+### to
+`PathEdge::to(): string`
+
+### order
+`PathEdge::order(): SomeWork\P2PPathFinder\Domain\Order\Order`
+
+### rate
+`PathEdge::rate(): SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate`
+
+### orderSide
+`PathEdge::orderSide(): SomeWork\P2PPathFinder\Domain\Order\OrderSide`
+
+### conversionRate
+`PathEdge::conversionRate(): string`
+
+Returns: numeric-string
+
+### offsetExists
+`PathEdge::offsetExists(mixed $offset): bool`
+
+### offsetGet
+`PathEdge::offsetGet(mixed $offset): mixed`
+
+### offsetSet
+`PathEdge::offsetSet(mixed $offset, mixed $value): void`
+
+### offsetUnset
+`PathEdge::offsetUnset(mixed $offset): void`
+
+## SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence
+Immutable sequence of {@see PathEdge} instances.
+
+### Public methods
+
+### empty
+`PathEdgeSequence::empty(): self`
+
+### fromIterable
+`PathEdgeSequence::fromIterable(iterable $edges): self`
+
+Parameter $edges: iterable&lt;PathEdge&gt;
+
+### fromList
+`PathEdgeSequence::fromList(array $edges): self`
+
+Parameter $edges: list&lt;PathEdge&gt;
+
+### append
+`PathEdgeSequence::append(SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge $edge): self`
 
 ### isEmpty
-`PathResultSet::isEmpty(): bool`
+`PathEdgeSequence::isEmpty(): bool`
+
+### first
+`PathEdgeSequence::first(): ?SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge`
+
+### last
+`PathEdgeSequence::last(): ?SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge`
+
+### getIterator
+`PathEdgeSequence::getIterator(): Traversable`
+
+Returns: Traversable&lt;int, PathEdge&gt;
+
+### count
+`PathEdgeSequence::count(): int`
+
+### offsetExists
+`PathEdgeSequence::offsetExists(mixed $offset): bool`
+
+### offsetGet
+`PathEdgeSequence::offsetGet(mixed $offset): SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge`
+
+### offsetSet
+`PathEdgeSequence::offsetSet(mixed $offset, mixed $value): void`
+
+### offsetUnset
+`PathEdgeSequence::offsetUnset(mixed $offset): void`
+
+### toList
+`PathEdgeSequence::toList(): array`
+
+Returns: list&lt;PathEdge&gt;
+
+### toArray
+`PathEdgeSequence::toArray(): array`
+
+Returns: list&lt;array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}&gt;
+
+## SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints
+Represents the spend boundaries propagated through the search graph.
+
+### Public methods
+
+### from
+`SpendConstraints::from(SomeWork\P2PPathFinder\Domain\ValueObject\Money $min, SomeWork\P2PPathFinder\Domain\ValueObject\Money $max, ?SomeWork\P2PPathFinder\Domain\ValueObject\Money $desired = null): self`
+
+### min
+`SpendConstraints::min(): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
+
+### max
+`SpendConstraints::max(): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
+
+### desired
+`SpendConstraints::desired(): ?SomeWork\P2PPathFinder\Domain\ValueObject\Money`
+
+### toRange
+`SpendConstraints::toRange(): array`
+
+Returns: array{min: Money, max: Money}
+
+## SomeWork\P2PPathFinder\Application\Result\MoneyMap
+Immutable map keyed by currency codes with {@see Money} entries.
+
+### Public methods
+
+### empty
+`MoneyMap::empty(): self`
+
+### fromList
+`MoneyMap::fromList(iterable $entries, bool $skipZeroValues = false): self`
+
+Parameter $entries: iterable&lt;Money&gt;
+
+### fromAssociative
+`MoneyMap::fromAssociative(iterable $entries, bool $skipZeroValues = false): self`
+
+Parameter $entries: iterable&lt;mixed, Money&gt;
+
+### isEmpty
+`MoneyMap::isEmpty(): bool`
+
+### count
+`MoneyMap::count(): int`
+
+### toArray
+`MoneyMap::toArray(): array`
+
+Returns: array&lt;string, Money&gt;
+
+### getIterator
+`MoneyMap::getIterator(): Traversable`
+
+Returns: Traversable&lt;string, Money&gt;
+
+### get
+`MoneyMap::get(string $currency): ?SomeWork\P2PPathFinder\Domain\ValueObject\Money`
+
+### with
+`MoneyMap::with(SomeWork\P2PPathFinder\Domain\ValueObject\Money $money, bool $skipZeroValue = false): self`
+
+### merge
+`MoneyMap::merge(self $other): self`
 
 ### jsonSerialize
-`PathResultSet::jsonSerialize(): array`
+`MoneyMap::jsonSerialize(): array`
 
-Returns: array
+Returns: array&lt;string, array{currency: string, amount: string, scale: int}&gt;
+
+### offsetExists
+`MoneyMap::offsetExists(mixed $offset): bool`
+
+### offsetGet
+`MoneyMap::offsetGet(mixed $offset): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
+
+### offsetSet
+`MoneyMap::offsetSet(mixed $offset, mixed $value): void`
+
+### offsetUnset
+`MoneyMap::offsetUnset(mixed $offset): void`
 
 ## SomeWork\P2PPathFinder\Application\Result\PathLeg
 Describes a single conversion leg in a path finder result.
@@ -492,7 +1253,7 @@ Describes a single conversion leg in a path finder result.
 ### Public methods
 
 ### __construct
-`PathLeg::__construct(string $fromAsset, string $toAsset, SomeWork\P2PPathFinder\Domain\ValueObject\Money $spent, SomeWork\P2PPathFinder\Domain\ValueObject\Money $received, array $fees = [])`
+`PathLeg::__construct(string $fromAsset, string $toAsset, SomeWork\P2PPathFinder\Domain\ValueObject\Money $spent, SomeWork\P2PPathFinder\Domain\ValueObject\Money $received, ?SomeWork\P2PPathFinder\Application\Result\MoneyMap $fees = null)`
 
 ### from
 `PathLeg::from(): string`
@@ -515,9 +1276,12 @@ Returns the amount of source asset spent in this leg.
 Returns the amount of destination asset received in this leg.
 
 ### fees
-`PathLeg::fees(): array`
+`PathLeg::fees(): SomeWork\P2PPathFinder\Application\Result\MoneyMap`
 
-Returns: array<string, Money>
+### feesAsArray
+`PathLeg::feesAsArray(): array`
+
+Returns: array&lt;string, Money&gt;
 
 ### jsonSerialize
 `PathLeg::jsonSerialize(): array`
@@ -530,13 +1294,76 @@ received: array{currency: string, amount: string, scale: int},
 fees: array<string, array{currency: string, amount: string, scale: int}>,
 }
 
+### toArray
+`PathLeg::toArray(): array`
+
+Returns: array{
+from: string,
+to: string,
+spent: Money,
+received: Money,
+fees: MoneyMap,
+}
+
+## SomeWork\P2PPathFinder\Application\Result\PathLegCollection
+Immutable ordered collection of {@see PathLeg} instances.
+
+### Public methods
+
+### empty
+`PathLegCollection::empty(): self`
+
+### fromList
+`PathLegCollection::fromList(array $legs): self`
+
+Parameter $legs: array&lt;array-key, PathLeg&gt;
+
+### count
+`PathLegCollection::count(): int`
+
+### getIterator
+`PathLegCollection::getIterator(): Traversable`
+
+Returns: Traversable&lt;int, PathLeg&gt;
+
+### toArray
+`PathLegCollection::toArray(): array`
+
+Returns: list&lt;PathLeg&gt;
+
+### isEmpty
+`PathLegCollection::isEmpty(): bool`
+
+### jsonSerialize
+`PathLegCollection::jsonSerialize(): array`
+
+Returns: list&lt;array{
+from: string,
+to: string,
+spent: array{currency: string, amount: string, scale: int},
+received: array{currency: string, amount: string, scale: int},
+fees: array<string, array{currency: string, amount: string, scale: int}>,
+}>
+
+### offsetExists
+`PathLegCollection::offsetExists(mixed $offset): bool`
+
+### offsetGet
+`PathLegCollection::offsetGet(mixed $offset): SomeWork\P2PPathFinder\Application\Result\PathLeg`
+
+### offsetSet
+`PathLegCollection::offsetSet(mixed $offset, mixed $value): void`
+
+### offsetUnset
+`PathLegCollection::offsetUnset(mixed $offset): void`
+
 ## SomeWork\P2PPathFinder\Application\Result\PathResult
 Aggregated representation of a discovered conversion path.
 
 ### Public methods
 
 ### __construct
-`PathResult::__construct(SomeWork\P2PPathFinder\Domain\ValueObject\Money $totalSpent, SomeWork\P2PPathFinder\Domain\ValueObject\Money $totalReceived, SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance $residualTolerance, array $legs = [], array $feeBreakdown = [])`
+`PathResult::__construct(SomeWork\P2PPathFinder\Domain\ValueObject\Money $totalSpent, SomeWork\P2PPathFinder\Domain\ValueObject\Money $totalReceived, SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance $residualTolerance, ?SomeWork\P2PPathFinder\Application\Result\PathLegCollection $legs = null, ?SomeWork\P2PPathFinder\Application\Result\MoneyMap $feeBreakdown = null)`
 
 ### totalSpent
 `PathResult::totalSpent(): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
@@ -549,9 +1376,12 @@ Returns the total amount of source asset spent across the entire path.
 Returns the total amount of destination asset received across the path.
 
 ### feeBreakdown
-`PathResult::feeBreakdown(): array`
+`PathResult::feeBreakdown(): SomeWork\P2PPathFinder\Application\Result\MoneyMap`
 
-Returns: array<string, Money>
+### feeBreakdownAsArray
+`PathResult::feeBreakdownAsArray(): array`
+
+Returns: array&lt;string, Money&gt;
 
 ### residualTolerance
 `PathResult::residualTolerance(): SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance`
@@ -562,9 +1392,23 @@ Returns the remaining tolerance after accounting for the chosen path.
 `PathResult::residualTolerancePercentage(int $scale = 2): string`
 
 ### legs
-`PathResult::legs(): array`
+`PathResult::legs(): SomeWork\P2PPathFinder\Application\Result\PathLegCollection`
 
-Returns: list<PathLeg>
+### legsAsArray
+`PathResult::legsAsArray(): array`
+
+Returns: list&lt;PathLeg&gt;
+
+### toArray
+`PathResult::toArray(): array`
+
+Returns: array{
+totalSpent: Money,
+totalReceived: Money,
+residualTolerance: DecimalTolerance,
+feeBreakdown: MoneyMap,
+legs: PathLegCollection,
+}
 
 ### jsonSerialize
 `PathResult::jsonSerialize(): array`
@@ -608,7 +1452,9 @@ fees: array<string, array{currency: string, amount: string, scale: int}>,
 ### formatMachineCollection
 `PathResultFormatter::formatMachineCollection(SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet $results): array`
 
-Returns: list<array{
+Parameter $results: PathResultSet&lt;PathResult&gt;
+
+Returns: list&lt;array{
 totalSpent: array{currency: string, amount: string, scale: int},
 totalReceived: array{currency: string, amount: string, scale: int},
 residualTolerance: numeric-string,
@@ -628,16 +1474,26 @@ fees: array<string, array{currency: string, amount: string, scale: int}>,
 Produces a multi-line human readable summary of the conversion path.
 
 ### formatHumanCollection
-`PathResultFormatter::formatHumanCollection(array|SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet $results): string`
+`PathResultFormatter::formatHumanCollection(SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet|array $results): string`
+
+Parameter $results: PathResultSet&lt;PathResult&gt;|list&lt;PathResult&gt;
+
+## SomeWork\P2PPathFinder\Application\Service\MaterializedResult
+Immutable container representing a materialised path result and its ordering key.
+
+### Public methods
+
+### __construct
+`MaterializedResult::__construct(SomeWork\P2PPathFinder\Application\Result\PathResult $result, SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey $orderKey)`
+
+### result
+`MaterializedResult::result(): SomeWork\P2PPathFinder\Application\Result\PathResult`
+
+### orderKey
+`MaterializedResult::orderKey(): SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey`
 
 ## SomeWork\P2PPathFinder\Application\Service\PathFinderService
 High level facade orchestrating order filtering, graph building and path search.
-
-
-
-psalm-type MaterializedResult = SomeWork\\P2PPathFinder\\Application\\Service\\MaterializedResult
-
-phpstan-type MaterializedResult SomeWork\\P2PPathFinder\\Application\\Service\\MaterializedResult
 
 ### Public methods
 
@@ -655,10 +1511,13 @@ metadata. Inspect the {@see SearchGuardReport} via helpers like
 configured protections.
 
 
-Returns: SearchOutcome<PathResult>
+Returns: SearchOutcome&lt;PathResult&gt;
 
 ### findBestPath
 `PathFinderService::findBestPath(SomeWork\P2PPathFinder\Application\OrderBook\OrderBook $orderBook, SomeWork\P2PPathFinder\Application\Config\PathSearchConfig $config, string $targetAsset): ?SomeWork\P2PPathFinder\Application\Result\PathResult`
+
+## SomeWork\P2PPathFinder\Application\Support\GuardsArrayAccessOffset
+Helper methods for normalizing array access offsets to primitive types.
 
 ## SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator
 Helper responsible for evaluating fills while accounting for order fees.
@@ -674,6 +1533,9 @@ grossBase: Money,
 netBase: Money,
 fees: FeeBreakdown,
 }
+
+## SomeWork\P2PPathFinder\Application\Support\SerializesMoney
+Shared helpers for normalizing money value objects during serialization.
 
 ## SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown
 Immutable value object describing the fee components for an order fill.
@@ -830,6 +1692,7 @@ Normalizes a numeric string to the provided scale using half-up rounding.
 The path finder normalizes tolerances and costs to 18 decimal places by default,
 so half-up rounding keeps deterministic behaviour even for tie-breaking cases.
 
+Parameter $value: numeric-string
 
 
 Returns: numeric-string
@@ -839,6 +1702,8 @@ Returns: numeric-string
 
 Adds two numeric strings while maintaining deterministic scale handling.
 
+Parameter $left: numeric-string
+Parameter $right: numeric-string
 
 
 Returns: numeric-string
@@ -848,6 +1713,8 @@ Returns: numeric-string
 
 Subtracts the right operand from the left operand while preserving scale.
 
+Parameter $left: numeric-string
+Parameter $right: numeric-string
 
 
 Returns: numeric-string
@@ -857,6 +1724,8 @@ Returns: numeric-string
 
 Multiplies two numeric strings with deterministic rounding behaviour.
 
+Parameter $left: numeric-string
+Parameter $right: numeric-string
 
 
 Returns: numeric-string
@@ -866,6 +1735,8 @@ Returns: numeric-string
 
 Divides the left operand by the right operand while guarding against division by zero.
 
+Parameter $left: numeric-string
+Parameter $right: numeric-string
 
 
 Returns: numeric-string
@@ -875,11 +1746,15 @@ Returns: numeric-string
 
 Compares two numeric strings at the requested precision level.
 
+Parameter $left: numeric-string
+Parameter $right: numeric-string
+
 ### round
 `BcMath::round(string $value, int $scale): string`
 
 Rounds a numeric string to the provided scale using half-up semantics.
 
+Parameter $value: numeric-string
 
 
 Returns: numeric-string
@@ -889,6 +1764,9 @@ Returns: numeric-string
 
 Determines the scale required to safely compare the provided operands.
 
+Parameter $first: numeric-string
+Parameter $second: numeric-string
+
 ## SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance
 Immutable representation of a tolerance ratio expressed as a decimal value between 0 and 1.
 
@@ -896,6 +1774,8 @@ Immutable representation of a tolerance ratio expressed as a decimal value betwe
 
 ### fromNumericString
 `DecimalTolerance::fromNumericString(string $ratio, ?int $scale = null): self`
+
+Parameter $ratio: numeric-string
 
 ### zero
 `DecimalTolerance::zero(): self`
@@ -914,11 +1794,17 @@ Returns: numeric-string
 ### compare
 `DecimalTolerance::compare(string $value, ?int $scale = null): int`
 
+Parameter $value: numeric-string
+
 ### isGreaterThanOrEqual
 `DecimalTolerance::isGreaterThanOrEqual(string $value, ?int $scale = null): bool`
 
+Parameter $value: numeric-string
+
 ### isLessThanOrEqual
 `DecimalTolerance::isLessThanOrEqual(string $value, ?int $scale = null): bool`
+
+Parameter $value: numeric-string
 
 ### percentage
 `DecimalTolerance::percentage(int $scale = 2): string`
@@ -930,42 +1816,6 @@ Returns: numeric-string
 
 Returns: numeric-string
 
-## SomeWork\P2PPathFinder\Domain\ValueObject\ToleranceWindow
-Represents a normalized tolerance window with deterministic heuristics.
-
-### Public methods
-
-### fromStrings
-`ToleranceWindow::fromStrings(string $minimum, string $maximum): self`
-
-### normalizeTolerance
-`ToleranceWindow::normalizeTolerance(string $value, string $context): string`
-
-Returns: numeric-string
-
-### minimum
-`ToleranceWindow::minimum(): string`
-
-Returns: numeric-string
-
-### maximum
-`ToleranceWindow::maximum(): string`
-
-Returns: numeric-string
-
-### heuristicTolerance
-`ToleranceWindow::heuristicTolerance(): string`
-
-Returns: numeric-string
-
-### heuristicSource
-`ToleranceWindow::heuristicSource(): string`
-
-Returns: 'minimum'|'maximum'
-
-### scale
-`ToleranceWindow::scale(): int`
-
 ## SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate
 Value object encapsulating an exchange rate between two assets.
 
@@ -975,6 +1825,10 @@ Value object encapsulating an exchange rate between two assets.
 `ExchangeRate::fromString(string $baseCurrency, string $quoteCurrency, string $rate, int $scale = 8): self`
 
 Builds an exchange rate for the provided currency pair and numeric rate.
+
+Parameter $baseCurrency: non-empty-string
+Parameter $quoteCurrency: non-empty-string
+Parameter $rate: numeric-string
 
 ### convert
 `ExchangeRate::convert(SomeWork\P2PPathFinder\Domain\ValueObject\Money $money, ?int $scale = null): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
@@ -1020,6 +1874,10 @@ named constructors to guarantee validation and normalization of their internal s
 
 Creates a new money instance from raw string components.
 
+Parameter $currency: string — ISO-like currency symbol comprised of 3-12 alphabetic characters
+Parameter $amount: numeric-string — numeric string compatible with BCMath functions
+Parameter $scale: int — number of decimal digits to retain after normalization
+
 ### zero
 `Money::zero(string $currency, int $scale = 2): self`
 
@@ -1050,26 +1908,40 @@ Returns the scale (number of fractional digits) used for the amount.
 
 Adds another money value using a common scale.
 
+Parameter $other: self — money value expressed in the same currency
+Parameter $scale: int|null — optional explicit scale override
+
 ### subtract
 `Money::subtract(self $other, ?int $scale = null): self`
 
 Subtracts another money value using a common scale.
+
+Parameter $other: self — money value expressed in the same currency
+Parameter $scale: int|null — optional explicit scale override
 
 ### multiply
 `Money::multiply(string $multiplier, ?int $scale = null): self`
 
 Multiplies the amount by a scalar numeric multiplier.
 
+Parameter $multiplier: numeric-string — numeric multiplier compatible with BCMath
+Parameter $scale: int|null — optional explicit scale override
+
 ### divide
 `Money::divide(string $divisor, ?int $scale = null): self`
 
 Divides the amount by a scalar numeric divisor.
+
+Parameter $divisor: numeric-string — numeric divisor compatible with BCMath
+Parameter $scale: int|null — optional explicit scale override
 
 ### compare
 `Money::compare(self $other, ?int $scale = null): int`
 
 Compares two money values using the provided or derived scale.
 
+Parameter $other: self — money value expressed in the same currency
+Parameter $scale: int|null — optional explicit scale override
 
 
 Returns: int -1, 0 or 1 depending on the comparison result
@@ -1123,6 +1995,53 @@ Checks whether the provided amount falls within the configured bounds.
 `OrderBounds::clamp(SomeWork\P2PPathFinder\Domain\ValueObject\Money $amount): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
 
 Clamps the provided amount to the bounds and returns the adjusted value.
+
+## SomeWork\P2PPathFinder\Domain\ValueObject\ToleranceWindow
+Represents a normalized tolerance window with deterministic heuristics.
+
+### Public methods
+
+### fromStrings
+`ToleranceWindow::fromStrings(string $minimum, string $maximum): self`
+
+### normalizeTolerance
+`ToleranceWindow::normalizeTolerance(string $value, string $context): string`
+
+Normalizes a tolerance value ensuring it lies within the [0, 1) interval.
+
+
+Returns: numeric-string
+
+### minimum
+`ToleranceWindow::minimum(): string`
+
+Returns the lower relative tolerance bound expressed as a fraction.
+
+Returns: numeric-string
+
+### maximum
+`ToleranceWindow::maximum(): string`
+
+Returns the upper relative tolerance bound expressed as a fraction.
+
+Returns: numeric-string
+
+### heuristicTolerance
+`ToleranceWindow::heuristicTolerance(): string`
+
+Returns the tolerance used by heuristic consumers when no override is supplied.
+
+Returns: numeric-string
+
+### heuristicSource
+`ToleranceWindow::heuristicSource(): string`
+
+Returns the source of the heuristic tolerance value.
+
+Returns: 'minimum'|'maximum'
+
+### scale
+`ToleranceWindow::scale(): int`
 
 ## SomeWork\P2PPathFinder\Exception\ExceptionInterface
 Marker interface implemented by all library-specific exceptions.

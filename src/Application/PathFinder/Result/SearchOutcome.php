@@ -26,11 +26,13 @@ final class SearchOutcome
     }
 
     /**
-     * @return SearchOutcome<mixed>
+     * @return SearchOutcome<TPath>
+     *
+     * @psalm-return SearchOutcome<TPath>
      */
     public static function empty(SearchGuardReport $guardLimits): self
     {
-        /** @var SearchOutcome<mixed> $empty */
+        /** @var SearchOutcome<TPath> $empty */
         $empty = new self(PathResultSet::empty(), $guardLimits);
 
         return $empty;

@@ -44,35 +44,39 @@ final class PathResultSet implements IteratorAggregate, Countable, JsonSerializa
     }
 
     /**
-     * @return PathResultSet<mixed>
+     * @return PathResultSet<TPath>
+     *
+     * @psalm-return PathResultSet<TPath>
      */
     public static function empty(): self
     {
-        /** @var PathResultSet<mixed> $empty */
+        /** @var PathResultSet<TPath> $empty */
         $empty = new self([]);
 
         return $empty;
     }
 
     /**
-     * @template TCollected as mixed
+     * @template TIn of mixed
      *
-     * @param iterable<PathResultSetEntry<TCollected>> $entries
+     * @psalm-template TIn as mixed
      *
-     * @return PathResultSet<TCollected>
+     * @param iterable<PathResultSetEntry<TIn>> $entries
+     *
+     * @return PathResultSet<TIn>
      */
     public static function fromEntries(PathOrderStrategy $orderingStrategy, iterable $entries): self
     {
-        /** @var list<PathResultSetEntry<TCollected>> $collected */
+        /** @var list<PathResultSetEntry<TIn>> $collected */
         $collected = [];
         foreach ($entries as $entry) {
-            /* @var PathResultSetEntry<TCollected> $entry */
+            /* @var PathResultSetEntry<TIn> $entry */
             $collected[] = $entry;
         }
 
         $count = count($collected);
         if (0 === $count) {
-            /** @var PathResultSet<TCollected> $empty */
+            /** @var PathResultSet<TIn> $empty */
             $empty = self::empty();
 
             return $empty;
@@ -81,8 +85,8 @@ final class PathResultSet implements IteratorAggregate, Countable, JsonSerializa
         usort(
             $collected,
             /**
-             * @param PathResultSetEntry<TCollected> $left
-             * @param PathResultSetEntry<TCollected> $right
+             * @param PathResultSetEntry<TIn> $left
+             * @param PathResultSetEntry<TIn> $right
              */
             static fn (PathResultSetEntry $left, PathResultSetEntry $right): int => $orderingStrategy->compare(
                 $left->orderKey(),
@@ -90,7 +94,7 @@ final class PathResultSet implements IteratorAggregate, Countable, JsonSerializa
             ),
         );
 
-        /** @var list<TCollected> $paths */
+        /** @var list<TIn> $paths */
         $paths = [];
         $signatures = [];
 
@@ -108,7 +112,7 @@ final class PathResultSet implements IteratorAggregate, Countable, JsonSerializa
         }
 
         if ([] === $paths) {
-            /** @var PathResultSet<TCollected> $empty */
+            /** @var PathResultSet<TIn> $empty */
             $empty = self::empty();
 
             return $empty;
