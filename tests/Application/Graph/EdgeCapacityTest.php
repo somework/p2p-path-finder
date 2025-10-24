@@ -36,4 +36,20 @@ final class EdgeCapacityTest extends TestCase
 
         new EdgeCapacity(Money::fromString('EUR', '2', 2), Money::fromString('EUR', '1', 2));
     }
+
+    public function test_json_serialization_includes_minimum_and_maximum(): void
+    {
+        $capacity = new EdgeCapacity(
+            Money::fromString('USD', '1.00', 2),
+            Money::fromString('USD', '2.50', 2),
+        );
+
+        self::assertSame(
+            [
+                'min' => ['currency' => 'USD', 'amount' => '1.00', 'scale' => 2],
+                'max' => ['currency' => 'USD', 'amount' => '2.50', 'scale' => 2],
+            ],
+            $capacity->jsonSerialize(),
+        );
+    }
 }
