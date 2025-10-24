@@ -18,7 +18,7 @@ use function is_string;
 final class SearchState
 {
     /**
-     * @var array<string, bool>
+     * @var non-empty-array<string, bool>
      */
     private readonly array $visited;
 
@@ -48,21 +48,9 @@ final class SearchState
 
         BcMath::ensureNumeric($this->cost, $this->product);
 
-        if (!isset($visited[$this->node]) || true !== $visited[$this->node]) {
-            throw new InvalidArgumentException('Search states must mark the current node as visited.');
-        }
+        self::assertVisitedRegistry($visited, $this->node);
 
-        foreach ($visited as $key => $value) {
-            if (!is_string($key) || '' === $key) {
-                throw new InvalidArgumentException('Visited nodes must be indexed by non-empty strings.');
-            }
-
-            if (true !== $value) {
-                throw new InvalidArgumentException('Visited node markers must be set to true.');
-            }
-        }
-
-        /* @var array<string, bool> $visited */
+        /* @var non-empty-array<string, bool> $visited */
         $this->visited = $visited;
     }
 
@@ -137,6 +125,28 @@ final class SearchState
         );
     }
 
+    /**
+     * @param array<array-key, bool> $visited
+     *
+     * @psalm-assert non-empty-array<string, bool> $visited
+     */
+    private static function assertVisitedRegistry(array $visited, string $currentNode): void
+    {
+        if (!isset($visited[$currentNode]) || true !== $visited[$currentNode]) {
+            throw new InvalidArgumentException('Search states must mark the current node as visited.');
+        }
+
+        foreach ($visited as $key => $value) {
+            if (!is_string($key) || '' === $key) {
+                throw new InvalidArgumentException('Visited nodes must be indexed by non-empty strings.');
+            }
+
+            if (true !== $value) {
+                throw new InvalidArgumentException('Visited node markers must be set to true.');
+            }
+        }
+    }
+
     public function node(): string
     {
         return $this->node;
@@ -182,7 +192,7 @@ final class SearchState
     }
 
     /**
-     * @return array<string, bool>
+     * @return non-empty-array<string, bool>
      */
     public function visited(): array
     {
