@@ -296,7 +296,6 @@ final class PathFinderInternalsTest extends TestCase
 
     public function test_is_dominated_detects_matching_signature(): void
     {
-        $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
         $registry = SearchStateRegistry::withInitial(
             'USD',
             new SearchStateRecord(BcMath::normalize('1.0', self::SCALE), 2, 'sig'),
