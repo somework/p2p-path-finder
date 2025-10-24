@@ -8,20 +8,29 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 
 /**
  * @template TPath of mixed
+ *
+ * @psalm-template TPath as mixed
  */
 final class PathResultSetEntry
 {
     /**
-     * @param TPath $path
+     * @psalm-var TPath
      */
-    public function __construct(
-        private readonly mixed $path,
-        private readonly PathOrderKey $orderKey,
-    ) {
+    private readonly mixed $path;
+
+    private readonly PathOrderKey $orderKey;
+
+    /**
+     * @psalm-param TPath $path
+     */
+    public function __construct(mixed $path, PathOrderKey $orderKey)
+    {
+        $this->path = $path;
+        $this->orderKey = $orderKey;
     }
 
     /**
-     * @return TPath
+     * @psalm-return TPath
      */
     public function path(): mixed
     {

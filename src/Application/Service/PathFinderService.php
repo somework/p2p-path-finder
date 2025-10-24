@@ -251,11 +251,16 @@ final class PathFinderService
             return $empty;
         }
 
+        /** @var list<PathResultSetEntry<PathResult>> $resultEntries */
         $resultEntries = [];
         foreach ($materializedResults as $entry) {
-            $resultEntries[] = new PathResultSetEntry($entry->result(), $entry->orderKey());
+            /** @var PathResultSetEntry<PathResult> $resultEntry */
+            $resultEntry = new PathResultSetEntry($entry->result(), $entry->orderKey());
+
+            $resultEntries[] = $resultEntry;
         }
 
+        /** @var PathResultSet<PathResult> $resultSet */
         $resultSet = PathResultSet::fromEntries($this->orderingStrategy, $resultEntries);
 
         /** @var SearchOutcome<PathResult> $outcome */

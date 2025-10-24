@@ -418,6 +418,7 @@ final class PathFinder
      */
     private function finalizeResults(CandidateResultHeap $results): PathResultSet
     {
+        /** @var list<PathResultSetEntry<CandidatePath>> $entries */
         $entries = $this->collectResultEntries($results);
 
         /** @var PathResultSet<CandidatePath> $ordered */
@@ -431,13 +432,15 @@ final class PathFinder
      */
     private function collectResultEntries(CandidateResultHeap $results): array
     {
+        /** @var list<PathResultSetEntry<CandidatePath>> $collected */
         $collected = [];
         $clone = clone $results;
 
         while (!$clone->isEmpty()) {
             $entry = $clone->extract();
             $routeSignature = $this->routeSignature($entry->candidate()->edges());
-            $collected[] = new PathResultSetEntry(
+            /** @var PathResultSetEntry<CandidatePath> $resultEntry */
+            $resultEntry = new PathResultSetEntry(
                 $entry->candidate(),
                 new PathOrderKey(
                     $entry->priority()->cost(),
@@ -446,6 +449,8 @@ final class PathFinder
                     $entry->priority()->order(),
                 ),
             );
+
+            $collected[] = $resultEntry;
         }
 
         return $collected;

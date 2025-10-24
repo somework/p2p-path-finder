@@ -12,7 +12,6 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrat
 use Traversable;
 
 use function array_map;
-use function array_values;
 use function count;
 use function is_array;
 use function is_object;
@@ -23,6 +22,8 @@ use function usort;
  * Immutable collection of ordered path results.
  *
  * @template TPath of mixed
+ *
+ * @psalm-template TPath as mixed
  *
  * @implements IteratorAggregate<int, TPath>
  */
@@ -53,24 +54,24 @@ final class PathResultSet implements IteratorAggregate, Countable, JsonSerializa
     }
 
     /**
-     * @template TEntry of PathResultSetEntry<TPath>
+     * @template TCollected as mixed
      *
-     * @param iterable<TEntry> $entries
+     * @param iterable<PathResultSetEntry<TCollected>> $entries
      *
-     * @return PathResultSet<TPath>
+     * @return PathResultSet<TCollected>
      */
     public static function fromEntries(PathOrderStrategy $orderingStrategy, iterable $entries): self
     {
-        /** @var list<PathResultSetEntry<TPath>> $collected */
+        /** @var list<PathResultSetEntry<TCollected>> $collected */
         $collected = [];
         foreach ($entries as $entry) {
-            /* @var PathResultSetEntry<TPath> $entry */
+            /* @var PathResultSetEntry<TCollected> $entry */
             $collected[] = $entry;
         }
 
         $count = count($collected);
         if (0 === $count) {
-            /** @var PathResultSet<TPath> $empty */
+            /** @var PathResultSet<TCollected> $empty */
             $empty = self::empty();
 
             return $empty;
@@ -79,8 +80,8 @@ final class PathResultSet implements IteratorAggregate, Countable, JsonSerializa
         usort(
             $collected,
             /**
-             * @param PathResultSetEntry<TPath> $left
-             * @param PathResultSetEntry<TPath> $right
+             * @param PathResultSetEntry<TCollected> $left
+             * @param PathResultSetEntry<TCollected> $right
              */
             static fn (PathResultSetEntry $left, PathResultSetEntry $right): int => $orderingStrategy->compare(
                 $left->orderKey(),
@@ -88,7 +89,7 @@ final class PathResultSet implements IteratorAggregate, Countable, JsonSerializa
             ),
         );
 
-        /** @var list<TPath> $paths */
+        /** @var list<TCollected> $paths */
         $paths = [];
         $signatures = [];
 
@@ -106,16 +107,13 @@ final class PathResultSet implements IteratorAggregate, Countable, JsonSerializa
         }
 
         if ([] === $paths) {
-            /** @var PathResultSet<TPath> $empty */
+            /** @var PathResultSet<TCollected> $empty */
             $empty = self::empty();
 
             return $empty;
         }
 
-        /** @var list<TPath> $ordered */
-        $ordered = array_values($paths);
-
-        return new self($ordered);
+        return new self($paths);
     }
 
     /**
