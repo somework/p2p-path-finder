@@ -175,11 +175,6 @@ final class GraphEdge implements IteratorAggregate, JsonSerializable, ArrayAcces
      */
     public function jsonSerialize(): array
     {
-        $segments = [];
-        foreach ($this->segments as $segment) {
-            $segments[] = $segment->jsonSerialize();
-        }
-
         return [
             'from' => $this->from,
             'to' => $this->to,
@@ -210,7 +205,7 @@ final class GraphEdge implements IteratorAggregate, JsonSerializable, ArrayAcces
             'baseCapacity' => $this->baseCapacity->jsonSerialize(),
             'quoteCapacity' => $this->quoteCapacity->jsonSerialize(),
             'grossBaseCapacity' => $this->grossBaseCapacity->jsonSerialize(),
-            'segments' => $segments,
+            'segments' => $this->segments->jsonSerialize(),
         ];
     }
 }
