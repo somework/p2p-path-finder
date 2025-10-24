@@ -47,6 +47,10 @@ function normalizeDocComment(false|string|null $comment): string
     $lines = preg_split('/\r?\n/', $comment) ?: [];
     $stripped = [];
     $skipIndentedAnnotation = false;
+    $annotationState = [
+        'handledReturn' => false,
+        'handledParams' => [],
+    ];
     foreach ($lines as $line) {
         $line = trim($line);
         if (str_starts_with($line, '/**')) {
@@ -62,7 +66,7 @@ function normalizeDocComment(false|string|null $comment): string
             continue;
         }
         if (str_starts_with($line, '@')) {
-            $line = transformAnnotationLine($line);
+            $line = transformAnnotationLine($line, $annotationState);
             if (null === $line) {
                 $skipIndentedAnnotation = true;
                 continue;
@@ -79,7 +83,17 @@ function normalizeDocComment(false|string|null $comment): string
     return $text;
 }
 
-function transformAnnotationLine(string $line): ?string
+function formatAnnotationType(string $type): string
+{
+    return htmlspecialchars($type, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+function formatAnnotationDescription(string $description): string
+{
+    return htmlspecialchars($description, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+function transformAnnotationLine(string $line, array &$annotationState): ?string
 {
     if (str_starts_with($line, '@psalm-type ')) {
         return 'psalm-type '.substr($line, strlen('@psalm-type '));
@@ -89,8 +103,29 @@ function transformAnnotationLine(string $line): ?string
         return 'phpstan-type '.substr($line, strlen('@phpstan-type '));
     }
 
-    if (preg_match('/^@return\s+(.+)$/', $line, $matches)) {
-        return 'Returns: '.$matches[1];
+    if (preg_match('/^@(?:(psalm|phpstan)-)?param\s+([^$]+)\s+\$([A-Za-z0-9_]+)(.*)$/', $line, $matches)) {
+        $parameterName = $matches[3];
+        if (isset($annotationState['handledParams'][$parameterName])) {
+            return null;
+        }
+
+        $annotationState['handledParams'][$parameterName] = true;
+
+        $type = formatAnnotationType(trim($matches[2]));
+        $description = trim($matches[4]);
+        $suffix = '' === $description ? '' : ' — '.formatAnnotationDescription($description);
+
+        return sprintf('Parameter $%s: %s%s', $parameterName, $type, $suffix);
+    }
+
+    if (preg_match('/^@(?:(psalm|phpstan)-)?return\s+(.+)$/', $line, $matches)) {
+        if ($annotationState['handledReturn']) {
+            return null;
+        }
+
+        $annotationState['handledReturn'] = true;
+
+        return 'Returns: '.formatAnnotationType(trim($matches[2]));
     }
 
     return null;

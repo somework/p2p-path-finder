@@ -56,7 +56,7 @@ final class GuardedSearchExampleTest extends TestCase
 
         self::assertFalse($result->guardLimits()->anyLimitReached(), 'Guard limits should not be triggered for the example input.');
 
-        $paths = $result->paths();
+        $paths = $result->paths()->toArray();
         self::assertNotEmpty($paths, 'Example should yield at least one conversion path.');
 
         $firstPath = $paths[0];

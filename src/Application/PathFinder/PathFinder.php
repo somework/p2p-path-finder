@@ -10,10 +10,11 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Guard\SearchGuards;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidateHeapEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidatePriority;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidatePriorityQueue;
-use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidateResultEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSetEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\InsertionOrderCounter;
@@ -33,12 +34,10 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
-use function array_map;
 use function implode;
 use function sprintf;
 use function str_repeat;
 use function strtoupper;
-use function usort;
 
 /**
  * Implementation of a tolerance-aware best-path search through the trading graph.
@@ -310,7 +309,6 @@ final class PathFinder
             return $empty;
         }
 
-        /** @var list<CandidatePath> $finalized */
         $finalized = $this->finalizeResults($results);
 
         return new SearchOutcome($finalized, $guardLimits);
@@ -416,37 +414,34 @@ final class PathFinder
     }
 
     /**
-     * @return list<CandidatePath>
+     * @return PathResultSet<CandidatePath>
      */
-    private function finalizeResults(CandidateResultHeap $results): array
+    private function finalizeResults(CandidateResultHeap $results): PathResultSet
     {
+        /** @var list<PathResultSetEntry<CandidatePath>> $entries */
         $entries = $this->collectResultEntries($results);
-        $this->sortResultEntries($entries);
 
-        /** @var list<CandidatePath> $finalized */
-        $finalized = array_map(
-            static fn (CandidateResultEntry $entry): CandidatePath => $entry->candidate(),
-            $entries,
-        );
+        /** @var PathResultSet<CandidatePath> $ordered */
+        $ordered = PathResultSet::fromEntries($this->orderingStrategy, $entries);
 
-        return $finalized;
+        return $ordered;
     }
 
     /**
-     * @return list<CandidateResultEntry>
+     * @return list<PathResultSetEntry<CandidatePath>>
      */
     private function collectResultEntries(CandidateResultHeap $results): array
     {
+        /** @var list<PathResultSetEntry<CandidatePath>> $collected */
         $collected = [];
         $clone = clone $results;
 
         while (!$clone->isEmpty()) {
             $entry = $clone->extract();
             $routeSignature = $this->routeSignature($entry->candidate()->edges());
-            $collected[] = new CandidateResultEntry(
+            /** @var PathResultSetEntry<CandidatePath> $resultEntry */
+            $resultEntry = new PathResultSetEntry(
                 $entry->candidate(),
-                $entry->priority(),
-                $routeSignature,
                 new PathOrderKey(
                     $entry->priority()->cost(),
                     $entry->candidate()->hops(),
@@ -454,22 +449,11 @@ final class PathFinder
                     $entry->priority()->order(),
                 ),
             );
+
+            $collected[] = $resultEntry;
         }
 
         return $collected;
-    }
-
-    /**
-     * @param list<CandidateResultEntry> $entries
-     */
-    private function sortResultEntries(array &$entries): void
-    {
-        usort($entries, [$this, 'compareCandidateEntries']);
-    }
-
-    private function compareCandidateEntries(CandidateResultEntry $left, CandidateResultEntry $right): int
-    {
-        return $this->orderingStrategy->compare($left->orderKey(), $right->orderKey());
     }
 
     private function routeSignature(PathEdgeSequence $edges): string

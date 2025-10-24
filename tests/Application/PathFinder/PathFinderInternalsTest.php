@@ -368,21 +368,21 @@ final class PathFinderInternalsTest extends TestCase
         $this->invokeFinderMethod($finder, 'recordResult', [$heap, $this->buildCandidate('1.00', '1.00'), 0]);
         $this->invokeFinderMethod($finder, 'recordResult', [$heap, $this->buildCandidate('1.00', '1.50'), 1]);
 
-        /** @var list<CandidatePath> $finalizedCandidates */
         $finalizedCandidates = $this->invokeFinderMethod($finder, 'finalizeResults', [$heap]);
+        $finalizedArray = $finalizedCandidates->toArray();
         self::assertSame([
             BcMath::normalize('1.00', self::SCALE),
             BcMath::normalize('1.00', self::SCALE),
             BcMath::normalize('2.00', self::SCALE),
-        ], array_map(static fn (CandidatePath $candidate): string => $candidate->cost(), $finalizedCandidates));
+        ], array_map(static fn (CandidatePath $candidate): string => $candidate->cost(), $finalizedArray));
 
         self::assertSame(
             BcMath::normalize('1.00', self::SCALE),
-            $finalizedCandidates[0]->product(),
+            $finalizedArray[0]->product(),
         );
         self::assertSame(
             BcMath::normalize('1.50', self::SCALE),
-            $finalizedCandidates[1]->product(),
+            $finalizedArray[1]->product(),
         );
     }
 
@@ -636,7 +636,7 @@ final class PathFinderInternalsTest extends TestCase
             $constraints,
         );
 
-        self::assertSame([], $outcome->paths());
+        self::assertTrue($outcome->paths()->isEmpty());
         self::assertFalse($outcome->guardLimits()->expansionsReached());
         self::assertFalse($outcome->guardLimits()->visitedStatesReached());
     }
@@ -890,11 +890,24 @@ final class PathFinderInternalsTest extends TestCase
 
     private function buildCandidate(string $cost, string $product): CandidatePath
     {
+        static $identifier = 0;
+        ++$identifier;
+
+        $order = OrderFactory::buy('SRC', 'DST', '1.000', '1.000', '1.000', 3, 3);
+        $edge = PathEdge::create(
+            'SRC',
+            'DST_'.$identifier,
+            $order,
+            $order->effectiveRate(),
+            OrderSide::BUY,
+            BcMath::normalize('1.000000000000000000', self::SCALE),
+        );
+
         return CandidatePath::from(
             BcMath::normalize($cost, self::SCALE),
             BcMath::normalize($product, self::SCALE),
             1,
-            $this->dummyEdges(1),
+            PathEdgeSequence::fromList([$edge]),
         );
     }
 

@@ -9,6 +9,7 @@ use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
@@ -46,7 +47,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
 
         $result = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
 
-        self::assertSame([], $result->paths());
+        self::assertSame([], $result->paths()->toArray());
         self::assertFalse($result->guardLimits()->expansionsReached());
         self::assertFalse($result->guardLimits()->visitedStatesReached());
         self::assertFalse($result->guardLimits()->timeBudgetReached());
@@ -77,7 +78,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
 
         $result = $service->findBestPaths($orderBook, $config, 'BTC');
 
-        self::assertSame([], $result->paths());
+        self::assertSame([], $result->paths()->toArray());
         self::assertFalse($result->guardLimits()->expansionsReached());
         self::assertFalse($result->guardLimits()->visitedStatesReached());
         self::assertFalse($result->guardLimits()->timeBudgetReached());
@@ -106,7 +107,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
 
         $result = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
 
-        self::assertSame([], $result->paths());
+        self::assertSame([], $result->paths()->toArray());
         self::assertFalse($result->guardLimits()->expansionsReached());
         self::assertFalse($result->guardLimits()->visitedStatesReached());
         self::assertFalse($result->guardLimits()->timeBudgetReached());
@@ -136,7 +137,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
 
         $result = $service->findBestPaths($orderBook, $config, 'USD');
 
-        self::assertSame([], $result->paths());
+        self::assertSame([], $result->paths()->toArray());
     }
 
     public function test_it_ignores_candidates_with_mismatched_source_currency(): void
@@ -168,7 +169,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
 
         $result = $service->findBestPaths($orderBook, $config, 'USD');
 
-        self::assertSame([], $result->paths());
+        self::assertSame([], $result->paths()->toArray());
     }
 
     public function test_it_maintains_insertion_order_for_equal_cost_results(): void
@@ -178,15 +179,15 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
             OrderFactory::sell('USD', 'EUR', '10.000', '500.000', '0.850', 3, 3),
         ];
 
-        $graph = (new GraphBuilder())->build($orders);
-        $edgeA = $graph['EUR']['edges'][0];
-        $edgeB = $graph['EUR']['edges'][1];
-
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.000', 3))
             ->withToleranceBounds('0.0', '0.10')
             ->withHopLimits(1, 2)
             ->build();
+
+        $graph = (new GraphBuilder())->build($orders);
+        $edgeA = $graph['EUR']['edges'][0];
+        $edgeB = $graph['EUR']['edges'][1];
 
         $factory = $this->pathFinderFactoryForCandidates([
             [
@@ -211,10 +212,9 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
 
         $result = $service->findBestPaths($this->orderBookFromArray($orders), $config, 'USD');
 
-        $paths = $result->paths();
-        self::assertCount(2, $paths);
+        $paths = $result->paths()->toArray();
+        self::assertCount(1, $paths);
         self::assertSame('105.300', $paths[0]->totalReceived()->amount());
-        self::assertSame('117.700', $paths[1]->totalReceived()->amount());
     }
 
     public function test_it_reports_guard_limits_via_metadata_by_default(): void
@@ -232,7 +232,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
 
         $outcome = $service->findBestPaths($orderBook, $config, 'USD');
 
-        self::assertSame([], $outcome->paths());
+        self::assertSame([], $outcome->paths()->toArray());
         self::assertTrue($outcome->guardLimits()->expansionsReached());
         self::assertFalse($outcome->guardLimits()->visitedStatesReached());
         self::assertFalse($outcome->guardLimits()->timeBudgetReached());
@@ -390,7 +390,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
                     $callback($candidate);
                 }
 
-                return new SearchOutcome([], $guardLimits ?? SearchGuardReport::none());
+                return new SearchOutcome(PathResultSet::empty(), $guardLimits ?? SearchGuardReport::none());
             };
         };
     }

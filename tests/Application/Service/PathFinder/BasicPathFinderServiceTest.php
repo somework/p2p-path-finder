@@ -24,7 +24,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
      */
     private static function extractPaths(SearchOutcome $result): array
     {
-        return $result->paths();
+        return $result->paths()->toArray();
     }
 
     /**
@@ -562,8 +562,8 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         $bestPath = $service->findBestPath($orderBook, $config, 'USD');
 
         self::assertNotNull($bestPath);
-        self::assertNotSame([], $allResults->paths());
-        $first = $allResults->paths()[0];
+        self::assertNotSame([], $allResults->paths()->toArray());
+        $first = $allResults->paths()->toArray()[0];
 
         self::assertSame($first->totalReceived()->amount(), $bestPath->totalReceived()->amount());
         self::assertSame($first->legs()[0]->to(), $bestPath->legs()[0]->to());

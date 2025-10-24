@@ -5,17 +5,18 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Application\Service\PathFinder;
 
 use PHPUnit\Framework\TestCase;
-use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSetEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
+use SomeWork\P2PPathFinder\Application\Result\PathLegCollection;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
-use SomeWork\P2PPathFinder\Application\Service\MaterializedResult;
 use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
@@ -83,8 +84,8 @@ final class PathFinderServicePropertyTest extends TestCase
             $second = $this->service->findBestPaths($orderBook, $config, $scenario['target']);
 
             $encoder = $this->encodeResult();
-            $firstEncoded = array_map($encoder, $first->paths());
-            $secondEncoded = array_map($encoder, $second->paths());
+            $firstEncoded = array_map($encoder, $first->paths()->toArray());
+            $secondEncoded = array_map($encoder, $second->paths()->toArray());
 
             self::assertSame($firstEncoded, $secondEncoded, 'PathFinderService results must be deterministic.');
             self::assertCount(
@@ -104,7 +105,7 @@ final class PathFinderServicePropertyTest extends TestCase
                 );
             }
 
-            $keys = $this->buildSortKeys($first->paths());
+            $keys = $this->buildSortKeys($first->paths()->toArray());
             $sortedKeys = $keys;
             usort($sortedKeys, [$this, 'compareSortKeys']);
 
@@ -156,8 +157,8 @@ final class PathFinderServicePropertyTest extends TestCase
             $permuted = $this->service->findBestPaths($permutedOrderBook, $config, $scenario['target']);
 
             $encoder = $this->encodeResult();
-            $originalEncoded = array_map($encoder, $original->paths());
-            $permutedEncoded = array_map($encoder, $permuted->paths());
+            $originalEncoded = array_map($encoder, $original->paths()->toArray());
+            $permutedEncoded = array_map($encoder, $permuted->paths()->toArray());
 
             self::assertSame(
                 $originalEncoded,
@@ -186,55 +187,45 @@ final class PathFinderServicePropertyTest extends TestCase
             }
         };
 
-        $service = new PathFinderService($this->graphBuilder, orderingStrategy: $strategy);
-
-        $sorter = new ReflectionMethod(PathFinderService::class, 'sortMaterializedResults');
-        $sorter->setAccessible(true);
-
-        $firstResult = new PathResult(
-            Money::fromString('SRC', '1.0', 1),
-            Money::fromString('DST', '1.0', 1),
-            DecimalTolerance::zero(),
-        );
-        $secondResult = new PathResult(
-            Money::fromString('SRC', '1.0', 1),
-            Money::fromString('DST', '1.0', 1),
-            DecimalTolerance::zero(),
-        );
-        $thirdResult = new PathResult(
-            Money::fromString('SRC', '1.0', 1),
-            Money::fromString('DST', '1.0', 1),
-            DecimalTolerance::zero(),
-        );
-
         $entries = [
-            new MaterializedResult(
-                $firstResult,
+            new PathResultSetEntry(
+                new PathResult(
+                    Money::fromString('SRC', '1.0', 1),
+                    Money::fromString('DST', '1.0', 1),
+                    DecimalTolerance::zero(),
+                    $this->buildLegCollection(['SRC', 'ALP', 'DST']),
+                ),
                 new PathOrderKey('0.100000000000000000', 2, 'SRC->ALP->DST', 0),
             ),
-            new MaterializedResult(
-                $secondResult,
+            new PathResultSetEntry(
+                new PathResult(
+                    Money::fromString('SRC', '1.0', 1),
+                    Money::fromString('DST', '1.0', 1),
+                    DecimalTolerance::zero(),
+                    $this->buildLegCollection(['SRC', 'BET', 'DST']),
+                ),
                 new PathOrderKey('0.100000000000000000', 2, 'SRC->BET->DST', 1),
             ),
-            new MaterializedResult(
-                $thirdResult,
+            new PathResultSetEntry(
+                new PathResult(
+                    Money::fromString('SRC', '1.0', 1),
+                    Money::fromString('DST', '1.0', 1),
+                    DecimalTolerance::zero(),
+                    $this->buildLegCollection(['SRC', 'CHI', 'DST']),
+                ),
                 new PathOrderKey('0.100000000000000000', 2, 'SRC->CHI->DST', 2),
             ),
         ];
 
-        $sorter->invokeArgs($service, [&$entries]);
+        $resultSet = PathResultSet::fromEntries($strategy, $entries);
 
         self::assertSame(
             ['SRC->CHI->DST', 'SRC->BET->DST', 'SRC->ALP->DST'],
             array_map(
-                static fn (MaterializedResult $entry): string => $entry->orderKey()->routeSignature(),
-                $entries,
+                fn (PathResult $result): string => $this->routeSignatureFromLegs($result->legs()),
+                $resultSet->toArray(),
             ),
         );
-
-        foreach ($entries as $entry) {
-            self::assertSame([], $entry->orderKey()->payload(), 'Order key payload should remain empty.');
-        }
     }
 
     public function test_dataset_scenarios_remain_deterministic(): void
@@ -262,7 +253,7 @@ final class PathFinderServicePropertyTest extends TestCase
             $second = $this->service->findBestPaths($orderBook, $config, $scenario['target']);
 
             $encoder = $this->encodeResult();
-            self::assertSame(array_map($encoder, $first->paths()), array_map($encoder, $second->paths()));
+            self::assertSame(array_map($encoder, $first->paths()->toArray()), array_map($encoder, $second->paths()->toArray()));
             $this->assertGuardStatusEquals(
                 $first->guardLimits(),
                 $second->guardLimits(),
@@ -298,6 +289,29 @@ final class PathFinderServicePropertyTest extends TestCase
     private function encodeResult(): callable
     {
         return static fn (PathResult $result): string => serialize($result->jsonSerialize());
+    }
+
+    /**
+     * @param list<string> $nodes
+     */
+    private function buildLegCollection(array $nodes): PathLegCollection
+    {
+        $legs = [];
+        $lastIndex = count($nodes) - 1;
+
+        for ($index = 0; $index < $lastIndex; ++$index) {
+            $from = $nodes[$index];
+            $to = $nodes[$index + 1];
+
+            $legs[] = new PathLeg(
+                $from,
+                $to,
+                Money::fromString($from, '1.0', 1),
+                Money::fromString($to, '1.0', 1),
+            );
+        }
+
+        return PathLegCollection::fromList($legs);
     }
 
     /**

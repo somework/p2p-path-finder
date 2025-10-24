@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Result;
 
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 use function implode;
@@ -37,7 +38,7 @@ final class PathResultFormatter
     }
 
     /**
-     * @param list<PathResult> $results
+     * @param PathResultSet<PathResult> $results
      *
      * @return list<array{
      *     totalSpent: array{currency: string, amount: string, scale: int},
@@ -53,9 +54,9 @@ final class PathResultFormatter
      *     }>,
      * }>
      */
-    public function formatMachineCollection(array $results): array
+    public function formatMachineCollection(PathResultSet $results): array
     {
-        return array_map(fn (PathResult $result): array => $this->formatMachine($result), $results);
+        return array_map(fn (PathResult $result): array => $this->formatMachine($result), $results->toArray());
     }
 
     /**
@@ -89,10 +90,14 @@ final class PathResultFormatter
     }
 
     /**
-     * @param list<PathResult> $results
+     * @param PathResultSet<PathResult>|list<PathResult> $results
      */
-    public function formatHumanCollection(array $results): string
+    public function formatHumanCollection(array|PathResultSet $results): string
     {
+        if ($results instanceof PathResultSet) {
+            $results = $results->toArray();
+        }
+
         if ([] === $results) {
             return 'No paths available.';
         }

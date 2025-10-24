@@ -25,7 +25,7 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
      */
     private static function extractPaths(SearchOutcome $result): array
     {
-        return $result->paths();
+        return $result->paths()->toArray();
     }
 
     /**

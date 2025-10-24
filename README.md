@@ -300,7 +300,7 @@ if (!$resultOutcome->hasPaths()) {
     throw new InfeasiblePath('No viable routes found.');
 }
 
-$result = $resultOutcome->paths()[0];
+$result = $resultOutcome->paths()->toArray()[0];
 ```
 
 The resulting `SearchOutcome` contains `PathResult` objects ordered from lowest to highest cost.
@@ -382,7 +382,7 @@ $config = PathSearchConfig::builder()
 $resultOutcome = (new PathFinderService(new GraphBuilder()))
     ->findBestPaths($orderBook, $config, 'EUR');
 
-$topTwo = array_slice($resultOutcome->paths(), 0, 2);
+$topTwo = $resultOutcome->paths()->slice(0, 2);
 ```
 
 Because the tolerance window is narrow the service will only accept paths that stay close

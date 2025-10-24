@@ -34,7 +34,7 @@ final class PathFinderServiceEdgeCaseTest extends PathFinderServiceTestCase
         $result = $this->makeService()->findBestPaths($orderBook, $config, $targetAsset);
 
         self::assertFalse($result->hasPaths(), 'Edge-case fixtures should not leak partial paths.');
-        self::assertSame([], $result->paths());
+        self::assertSame([], $result->paths()->toArray());
 
         $guardLimits = $result->guardLimits();
         self::assertFalse($guardLimits->expansionsReached());
@@ -71,7 +71,7 @@ final class PathFinderServiceEdgeCaseTest extends PathFinderServiceTestCase
         $result = $this->makeService()->findBestPaths($orderBook, $config, $targetAsset);
 
         self::assertFalse($result->hasPaths(), 'Guard breaches should never surface partial paths.');
-        self::assertSame([], $result->paths());
+        self::assertSame([], $result->paths()->toArray());
 
         $guardLimits = $result->guardLimits();
         self::assertTrue($guardLimits->expansionsReached());
@@ -134,7 +134,7 @@ final class PathFinderServiceEdgeCaseTest extends PathFinderServiceTestCase
         $result = $this->makeService()->findBestPaths($orderBook, $config, 'DST');
 
         self::assertTrue($result->hasPaths());
-        $path = $result->paths()[0];
+        $path = $result->paths()->toArray()[0];
         self::assertCount(PathFinderEdgeCaseFixtures::LONG_CHAIN_SEGMENTS, $path->legs());
         self::assertFalse($result->guardLimits()->anyLimitReached());
     }

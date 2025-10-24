@@ -523,24 +523,21 @@ final class PathFinderHeuristicsTest extends TestCase
         ];
 
         foreach ($candidates as $candidate) {
-            $normalizedCost = BcMath::normalize($candidate['cost'], 18);
             $record->invoke(
                 $finder,
                 $heap,
-                CandidatePath::from(
-                    $normalizedCost,
-                    BcMath::div('1', $normalizedCost, 18),
-                    1,
-                    $this->dummyEdges(1),
-                ),
+                $this->buildCandidate($candidate['cost'], [[
+                    'from' => 'SRC',
+                    'to' => 'DST_'.$candidate['order'],
+                ]]),
                 $candidate['order'],
             );
         }
 
-        /** @var list<CandidatePath> $finalized */
         $finalized = $finalize->invoke($finder, $heap);
 
         self::assertCount(2, $finalized);
+        $finalized = $finalized->toArray();
         self::assertSame(BcMath::normalize('0.900', 18), $finalized[0]->cost());
         self::assertSame(BcMath::normalize('1.050', 18), $finalized[1]->cost());
     }
@@ -573,10 +570,10 @@ final class PathFinderHeuristicsTest extends TestCase
             );
         }
 
-        /** @var list<CandidatePath> $finalized */
         $finalized = $finalize->invoke($finder, $heap);
 
         self::assertCount(3, $finalized);
+        $finalized = $finalized->toArray();
         self::assertSame(0, $finalized[0]->hops());
         self::assertSame(1, $finalized[1]->hops());
         self::assertSame(2, $finalized[2]->hops());
@@ -657,10 +654,10 @@ final class PathFinderHeuristicsTest extends TestCase
         $finalize = new ReflectionMethod(PathFinder::class, 'finalizeResults');
         $finalize->setAccessible(true);
 
-        /** @var list<CandidatePath> $results */
         $results = $finalize->invoke($finder, $heap);
 
         self::assertCount(2, $results);
+        $results = $results->toArray();
         self::assertSame($lowCost, $results[0]->cost());
         self::assertSame($highCost, $results[1]->cost());
     }
@@ -694,8 +691,9 @@ final class PathFinderHeuristicsTest extends TestCase
         $finalize = new ReflectionMethod(PathFinder::class, 'finalizeResults');
         $finalize->setAccessible(true);
 
-        /** @var list<CandidatePath> $results */
         $results = $finalize->invoke($finder, $heap);
+
+        $results = $results->toArray();
 
         self::assertSame('MID_A', $results[0]->edges()[0]->to());
         self::assertSame('MID_B', $results[1]->edges()[0]->to());
