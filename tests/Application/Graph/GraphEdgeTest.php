@@ -19,36 +19,7 @@ final class GraphEdgeTest extends TestCase
 {
     public function test_it_rejects_non_edge_segment(): void
     {
-        $order = OrderFactory::sell(
-            base: 'USD',
-            quote: 'EUR',
-            minAmount: '1.000',
-            maxAmount: '5.000',
-            rate: '0.900',
-            amountScale: 3,
-            rateScale: 3,
-        );
-
-        $edge = fn (array $segments): GraphEdge => new GraphEdge(
-            from: 'USD',
-            to: 'EUR',
-            orderSide: OrderSide::SELL,
-            order: $order,
-            rate: $order->effectiveRate(),
-            baseCapacity: new EdgeCapacity(
-                Money::fromString('USD', '1.000', 3),
-                Money::fromString('USD', '5.000', 3),
-            ),
-            quoteCapacity: new EdgeCapacity(
-                Money::fromString('EUR', '0.900', 3),
-                Money::fromString('EUR', '4.500', 3),
-            ),
-            grossBaseCapacity: new EdgeCapacity(
-                Money::fromString('USD', '1.000', 3),
-                Money::fromString('USD', '5.000', 3),
-            ),
-            segments: $segments,
-        );
+        $edge = $this->createSellEdgeFactory();
 
         $validSegment = new EdgeSegment(
             true,
@@ -70,6 +41,41 @@ final class GraphEdgeTest extends TestCase
         $this->expectExceptionMessage('Graph edge segments must be instances of EdgeSegment.');
 
         $edge([$validSegment, 'not-a-segment']);
+    }
+
+    public function test_it_rejects_non_list_segment_payloads(): void
+    {
+        $edge = $this->createSellEdgeFactory();
+
+        $validSegment = new EdgeSegment(
+            true,
+            new EdgeCapacity(
+                Money::fromString('USD', '1.000', 3),
+                Money::fromString('USD', '3.000', 3),
+            ),
+            new EdgeCapacity(
+                Money::fromString('EUR', '0.900', 3),
+                Money::fromString('EUR', '2.700', 3),
+            ),
+            new EdgeCapacity(
+                Money::fromString('USD', '1.000', 3),
+                Money::fromString('USD', '3.000', 3),
+            ),
+        );
+
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Graph edge segments must be provided as a list.');
+
+        $edge(['segment' => $validSegment]);
+    }
+
+    public function test_it_accepts_empty_segment_payloads(): void
+    {
+        $edge = $this->createSellEdgeFactory();
+
+        $graphEdge = $edge([]);
+
+        self::assertSame([], $graphEdge->segments());
     }
 
     public function test_it_serializes_optional_and_mandatory_segments(): void
@@ -235,6 +241,43 @@ final class GraphEdgeTest extends TestCase
         $edge = $this->createEdgeFixture()['edge'];
 
         self::assertNull($edge['nonexistent']);
+    }
+
+    /**
+     * @return callable(array<array-key, mixed>): GraphEdge
+     */
+    private function createSellEdgeFactory(): callable
+    {
+        $order = OrderFactory::sell(
+            base: 'USD',
+            quote: 'EUR',
+            minAmount: '1.000',
+            maxAmount: '5.000',
+            rate: '0.900',
+            amountScale: 3,
+            rateScale: 3,
+        );
+
+        return static fn (array $segments): GraphEdge => new GraphEdge(
+            from: 'USD',
+            to: 'EUR',
+            orderSide: OrderSide::SELL,
+            order: $order,
+            rate: $order->effectiveRate(),
+            baseCapacity: new EdgeCapacity(
+                Money::fromString('USD', '1.000', 3),
+                Money::fromString('USD', '5.000', 3),
+            ),
+            quoteCapacity: new EdgeCapacity(
+                Money::fromString('EUR', '0.900', 3),
+                Money::fromString('EUR', '4.500', 3),
+            ),
+            grossBaseCapacity: new EdgeCapacity(
+                Money::fromString('USD', '1.000', 3),
+                Money::fromString('USD', '5.000', 3),
+            ),
+            segments: $segments,
+        );
     }
 
     /**

@@ -42,9 +42,7 @@ final class GraphEdge implements IteratorAggregate, JsonSerializable, ArrayAcces
         private readonly EdgeCapacity $grossBaseCapacity,
         array $segments = [],
     ) {
-        $this->segments = [] === $segments
-            ? EdgeSegmentCollection::empty()
-            : EdgeSegmentCollection::fromArray($segments);
+        $this->segments = EdgeSegmentCollection::fromArray($segments);
     }
 
     public function from(): string
