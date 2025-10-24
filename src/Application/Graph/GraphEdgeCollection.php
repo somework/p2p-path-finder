@@ -59,8 +59,8 @@ final class GraphEdgeCollection implements ArrayAccess, Countable, IteratorAggre
     }
 
     /**
-     * @param array<array-key, GraphEdge>              $edges
-     * @param callable(GraphEdge, GraphEdge): int|null $comparator
+     * @param array<array-key, GraphEdge>                                                     $edges
+     * @param (Closure(GraphEdge, GraphEdge): int)|(callable(GraphEdge, GraphEdge): int)|null $comparator
      */
     public static function fromArray(array $edges, ?callable $comparator = null): self
     {
