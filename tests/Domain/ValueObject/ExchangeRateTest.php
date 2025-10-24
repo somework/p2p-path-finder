@@ -60,6 +60,30 @@ final class ExchangeRateTest extends TestCase
         ExchangeRate::fromString('USD', 'EUR', $rate, 4);
     }
 
+    public function test_from_string_rejects_invalid_base_currency(): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Invalid currency "US$" supplied.');
+
+        ExchangeRate::fromString('US$', 'EUR', '1.0000', 4);
+    }
+
+    public function test_from_string_rejects_invalid_quote_currency(): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Invalid currency "EU?" supplied.');
+
+        ExchangeRate::fromString('USD', 'EU?', '1.0000', 4);
+    }
+
+    public function test_from_string_normalizes_currency_symbols(): void
+    {
+        $rate = ExchangeRate::fromString('usd', 'eur', '1.2345', 4);
+
+        self::assertSame('USD', $rate->baseCurrency());
+        self::assertSame('EUR', $rate->quoteCurrency());
+    }
+
     /**
      * @return iterable<array{string}>
      */
