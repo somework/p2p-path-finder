@@ -55,6 +55,9 @@ foreach ($result->paths() as $path) {
     );
 }
 
+// The PathResultSet returned by SearchOutcome::paths() is iterable and also exposes
+// helper methods like toArray() or jsonSerialize() when you need a plain list.
+
 $report = $result->guardLimits();
 printf(
     "Explored %d/%d states across %d/%d expansions in %.3fms\n",

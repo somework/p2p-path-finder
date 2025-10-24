@@ -435,7 +435,7 @@ Returns: Payload
 ### Public methods
 
 ### __construct
-`SearchOutcome::__construct(array $paths, SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport $guardLimits)`
+`SearchOutcome::__construct(SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet $paths, SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport $guardLimits)`
 
 ### empty
 `SearchOutcome::empty(SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport $guardLimits): self`
@@ -443,15 +443,48 @@ Returns: Payload
 Returns: SearchOutcome<mixed>
 
 ### paths
-`SearchOutcome::paths(): array`
+`SearchOutcome::paths(): SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet`
 
-Returns: list<TPath>
+Returns: PathResultSet<TPath>
 
 ### hasPaths
 `SearchOutcome::hasPaths(): bool`
 
 ### guardLimits
 `SearchOutcome::guardLimits(): SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport`
+
+## SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet
+Immutable, ordered collection of search results.
+
+### Public methods
+
+### empty
+`PathResultSet::empty(): self`
+
+Returns: PathResultSet<mixed>
+
+### fromEntries
+`PathResultSet::fromEntries(SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy $orderingStrategy, iterable $entries): self`
+
+Returns: PathResultSet<mixed>
+
+### toArray
+`PathResultSet::toArray(): array`
+
+Returns: list<TPath>
+
+### first
+`PathResultSet::first(): mixed`
+
+Returns: TPath|null
+
+### isEmpty
+`PathResultSet::isEmpty(): bool`
+
+### jsonSerialize
+`PathResultSet::jsonSerialize(): array`
+
+Returns: array
 
 ## SomeWork\P2PPathFinder\Application\Result\PathLeg
 Describes a single conversion leg in a path finder result.
@@ -573,7 +606,7 @@ fees: array<string, array{currency: string, amount: string, scale: int}>,
 }
 
 ### formatMachineCollection
-`PathResultFormatter::formatMachineCollection(array $results): array`
+`PathResultFormatter::formatMachineCollection(SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet $results): array`
 
 Returns: list<array{
 totalSpent: array{currency: string, amount: string, scale: int},
@@ -595,7 +628,7 @@ fees: array<string, array{currency: string, amount: string, scale: int}>,
 Produces a multi-line human readable summary of the conversion path.
 
 ### formatHumanCollection
-`PathResultFormatter::formatHumanCollection(array $results): string`
+`PathResultFormatter::formatHumanCollection(array|SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet $results): string`
 
 ## SomeWork\P2PPathFinder\Application\Service\PathFinderService
 High level facade orchestrating order filtering, graph building and path search.

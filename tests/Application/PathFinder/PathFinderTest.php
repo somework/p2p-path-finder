@@ -36,6 +36,7 @@ use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 use function array_column;
 use function array_key_last;
 use function array_reverse;
+use function array_slice;
 use function array_unique;
 use function count;
 use function implode;
@@ -61,7 +62,7 @@ final class PathFinderTest extends TestCase
     {
         return array_map(
             static fn (CandidatePath $path): array => $path->toArray(),
-            $searchResult->paths(),
+            $searchResult->paths()->toArray(),
         );
     }
 
@@ -199,7 +200,7 @@ final class PathFinderTest extends TestCase
 
         $finder = new PathFinder(maxHops: 4, tolerance: '0.999', topK: 2);
         $searchResult = $finder->findBestPaths($graph, 'RUB', 'IDR');
-        $results = $searchResult->paths();
+        $results = $searchResult->paths()->toArray();
 
         self::assertGreaterThanOrEqual(2, count($results));
         self::assertCount(2, $results);
@@ -208,9 +209,24 @@ final class PathFinderTest extends TestCase
 
         $finderWithBroaderLimit = new PathFinder(maxHops: 4, tolerance: '0.999', topK: 3);
         $extendedResults = $finderWithBroaderLimit->findBestPaths($graph, 'RUB', 'IDR');
-        $extendedPaths = $extendedResults->paths();
+        $extendedPaths = $extendedResults->paths()->toArray();
 
-        self::assertGreaterThan(2, count($extendedPaths));
+        self::assertGreaterThanOrEqual(count($results), count($extendedPaths));
+
+        $serializedBaseline = array_map('serialize', $results);
+        $serializedExtended = array_map('serialize', $extendedPaths);
+
+        self::assertSame(
+            $serializedBaseline,
+            array_slice($serializedExtended, 0, count($serializedBaseline)),
+            'Extended result set should begin with the baseline ordering.',
+        );
+
+        self::assertCount(
+            count(array_unique($serializedExtended)),
+            $extendedPaths,
+            'Extended result set should contain unique routes.',
+        );
     }
 
     public function test_it_preserves_discovery_order_for_equal_cost_candidates(): void
@@ -281,10 +297,11 @@ final class PathFinderTest extends TestCase
 
         $finalize = new ReflectionMethod(PathFinder::class, 'finalizeResults');
         $finalize->setAccessible(true);
-        /** @var list<CandidatePath> $finalized */
-        $finalized = $finalize->invoke($finder, $heap);
+        $finalizedSet = $finalize->invoke($finder, $heap);
 
-        self::assertCount(3, $finalized);
+        self::assertCount(3, $finalizedSet);
+
+        $finalized = $finalizedSet->toArray();
 
         $expectedHops = [1, 2, 2];
         foreach ($finalized as $index => $candidate) {
@@ -362,12 +379,11 @@ final class PathFinderTest extends TestCase
 
         $finalize = new ReflectionMethod(PathFinder::class, 'finalizeResults');
         $finalize->setAccessible(true);
-        /** @var list<CandidatePath> $finalized */
         $finalized = $finalize->invoke($finder, $heap);
 
         $signatures = array_map(
             static fn (CandidatePath $candidate): string => self::routeSignatureFromEdges($candidate->edges()),
-            $finalized,
+            $finalized->toArray(),
         );
 
         self::assertSame(
@@ -509,7 +525,7 @@ final class PathFinderTest extends TestCase
 
         $finder = new PathFinder(maxHops: 4, tolerance: '0.5', topK: 3);
         $outcome = $finder->findBestPaths($graph, 'RUB', 'IDR');
-        $paths = $outcome->paths();
+        $paths = $outcome->paths()->toArray();
 
         self::assertCount(2, $paths);
 
@@ -600,7 +616,7 @@ final class PathFinderTest extends TestCase
 
         self::assertCount(2, $evaluatedCandidates);
 
-        $paths = $outcome->paths();
+        $paths = $outcome->paths()->toArray();
 
         self::assertCount(2, $paths);
 
@@ -697,7 +713,7 @@ final class PathFinderTest extends TestCase
         $graph = self::graphFromArray($graph);
 
         $finder = new PathFinder(maxHops: 4, tolerance: '0.9', topK: 2);
-        $paths = $finder->findBestPaths($graph, 'SRC', 'TRG')->paths();
+        $paths = $finder->findBestPaths($graph, 'SRC', 'TRG')->paths()->toArray();
 
         self::assertCount(2, $paths);
 
@@ -771,7 +787,7 @@ final class PathFinderTest extends TestCase
         $graph = self::graphFromArray($graph);
 
         $finder = new PathFinder(maxHops: 4, tolerance: '0.9', topK: 3);
-        $paths = $finder->findBestPaths($graph, 'SRC', 'TRG')->paths();
+        $paths = $finder->findBestPaths($graph, 'SRC', 'TRG')->paths()->toArray();
 
         self::assertCount(2, $paths);
 
@@ -839,7 +855,7 @@ final class PathFinderTest extends TestCase
 
         $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 3);
         $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
-        $paths = $outcome->paths();
+        $paths = $outcome->paths()->toArray();
 
         self::assertCount(3, $paths);
 
@@ -879,7 +895,7 @@ final class PathFinderTest extends TestCase
 
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0', topK: 1);
         $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
-        $paths = $outcome->paths();
+        $paths = $outcome->paths()->toArray();
 
         self::assertCount(1, $paths);
 
@@ -920,7 +936,7 @@ final class PathFinderTest extends TestCase
 
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0', topK: 1);
         $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
-        $paths = $outcome->paths();
+        $paths = $outcome->paths()->toArray();
 
         self::assertCount(1, $paths);
 
@@ -963,7 +979,7 @@ final class PathFinderTest extends TestCase
         $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 1);
         $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
 
-        $paths = $outcome->paths();
+        $paths = $outcome->paths()->toArray();
 
         self::assertCount(1, $paths);
         $path = $paths[0];
@@ -1009,7 +1025,7 @@ final class PathFinderTest extends TestCase
         $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 1, maxVisitedStates: 2);
         $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
 
-        $paths = $outcome->paths();
+        $paths = $outcome->paths()->toArray();
         self::assertNotSame([], $paths);
         $report = $outcome->guardLimits();
         self::assertTrue($report->visitedStatesReached());
@@ -1055,7 +1071,7 @@ final class PathFinderTest extends TestCase
         $finder = new PathFinder(maxHops: 4, tolerance: '0.0', topK: 2, maxVisitedStates: 5);
         $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
 
-        $paths = $outcome->paths();
+        $paths = $outcome->paths()->toArray();
 
         self::assertCount(2, $paths);
 
@@ -1101,7 +1117,7 @@ final class PathFinderTest extends TestCase
         $finder = new PathFinder(maxHops: 4, tolerance: '0.0', topK: 1);
         $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
 
-        $paths = $outcome->paths();
+        $paths = $outcome->paths()->toArray();
         self::assertCount(1, $paths);
 
         $best = $paths[0];
@@ -1143,7 +1159,7 @@ final class PathFinderTest extends TestCase
         $graph = (new GraphBuilder())->build($orders);
         $finder = new PathFinder(maxHops: 4, tolerance: '0.0', topK: 4);
 
-        $paths = $finder->findBestPaths($graph, 'USD', 'JPY')->paths();
+        $paths = $finder->findBestPaths($graph, 'USD', 'JPY')->paths()->toArray();
 
         self::assertNotSame([], $paths);
 
@@ -1186,7 +1202,7 @@ final class PathFinderTest extends TestCase
             },
         );
 
-        $results = $searchResult->paths();
+        $results = $searchResult->paths()->toArray();
 
         self::assertNotSame([], $results);
         self::assertGreaterThanOrEqual(2, count($visitedCandidates));
@@ -1293,7 +1309,7 @@ final class PathFinderTest extends TestCase
         $finder = new PathFinder($maxHops, $tolerance);
         $result = $finder->findBestPaths($graph, $source, $target);
 
-        self::assertSame([], $result->paths());
+        self::assertSame([], $result->paths()->toArray());
         self::assertFalse($result->guardLimits()->expansionsReached());
         self::assertFalse($result->guardLimits()->visitedStatesReached());
     }
@@ -1648,7 +1664,7 @@ final class PathFinderTest extends TestCase
             },
         );
 
-        self::assertSame([], $searchResult->paths());
+        self::assertSame([], $searchResult->paths()->toArray());
         self::assertFalse($searchResult->guardLimits()->expansionsReached());
         self::assertFalse($searchResult->guardLimits()->visitedStatesReached());
         self::assertFalse($accepted);
@@ -1844,11 +1860,11 @@ final class PathFinderTest extends TestCase
 
         $firstPaths = array_map(
             static fn (CandidatePath $path): array => $path->toArray(),
-            $first->paths(),
+            $first->paths()->toArray(),
         );
         $secondPaths = array_map(
             static fn (CandidatePath $path): array => $path->toArray(),
-            $second->paths(),
+            $second->paths()->toArray(),
         );
 
         self::assertSame($firstPaths, $secondPaths, 'Extreme rate scenarios should produce deterministic outcomes.');
@@ -2024,7 +2040,7 @@ final class PathFinderTest extends TestCase
 
         $guardedResult = $guardedFinder->findBestPaths($graph, 'SRC', 'DST');
 
-        self::assertSame([], $guardedResult->paths());
+        self::assertSame([], $guardedResult->paths()->toArray());
         $expansionReport = $guardedResult->guardLimits();
         self::assertTrue($expansionReport->expansionsReached());
         self::assertFalse($expansionReport->visitedStatesReached());
@@ -2060,7 +2076,7 @@ final class PathFinderTest extends TestCase
 
         $guardedResult = $guardedFinder->findBestPaths($graph, 'SRC', 'DST');
 
-        self::assertSame([], $guardedResult->paths());
+        self::assertSame([], $guardedResult->paths()->toArray());
         self::assertFalse($guardedResult->guardLimits()->expansionsReached());
         self::assertTrue($guardedResult->guardLimits()->visitedStatesReached());
 

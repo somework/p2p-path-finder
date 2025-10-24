@@ -66,11 +66,11 @@ final class PathFinderPropertyTest extends TestCase
 
             $firstPaths = array_map(
                 static fn (CandidatePath $path): array => $path->toArray(),
-                $firstResult->paths(),
+                $firstResult->paths()->toArray(),
             );
             $secondPaths = array_map(
                 static fn (CandidatePath $path): array => $path->toArray(),
-                $secondResult->paths(),
+                $secondResult->paths()->toArray(),
             );
 
             self::assertSame($firstPaths, $secondPaths, 'PathFinder search should be deterministic.');
@@ -106,7 +106,7 @@ final class PathFinderPropertyTest extends TestCase
             );
             $permutedPaths = array_map(
                 static fn (CandidatePath $path): array => $path->toArray(),
-                $permutedOutcome->paths(),
+                $permutedOutcome->paths()->toArray(),
             );
 
             self::assertSame(
@@ -146,8 +146,8 @@ final class PathFinderPropertyTest extends TestCase
                 $scaledConstraints,
             );
 
-            $baselineSignatures = array_map([$this, 'routeSignature'], $baselineConstrained->paths());
-            $scaledSignatures = array_map([$this, 'routeSignature'], $scaledResult->paths());
+            $baselineSignatures = array_map([$this, 'routeSignature'], $baselineConstrained->paths()->toArray());
+            $scaledSignatures = array_map([$this, 'routeSignature'], $scaledResult->paths()->toArray());
 
             self::assertSame(
                 $baselineSignatures,
@@ -199,11 +199,11 @@ final class PathFinderPropertyTest extends TestCase
 
             $firstPaths = array_map(
                 static fn (CandidatePath $path): array => $path->toArray(),
-                $first->paths(),
+                $first->paths()->toArray(),
             );
             $secondPaths = array_map(
                 static fn (CandidatePath $path): array => $path->toArray(),
-                $second->paths(),
+                $second->paths()->toArray(),
             );
 
             self::assertSame($firstPaths, $secondPaths);

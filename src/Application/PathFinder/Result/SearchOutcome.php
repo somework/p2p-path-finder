@@ -10,16 +10,16 @@ namespace SomeWork\P2PPathFinder\Application\PathFinder\Result;
 final class SearchOutcome
 {
     /**
-     * @var list<TPath>
+     * @var PathResultSet<TPath>
      */
-    private readonly array $paths;
+    private readonly PathResultSet $paths;
 
     private readonly SearchGuardReport $guardLimits;
 
     /**
-     * @param list<TPath> $paths
+     * @param PathResultSet<TPath> $paths
      */
-    public function __construct(array $paths, SearchGuardReport $guardLimits)
+    public function __construct(PathResultSet $paths, SearchGuardReport $guardLimits)
     {
         $this->paths = $paths;
         $this->guardLimits = $guardLimits;
@@ -30,20 +30,23 @@ final class SearchOutcome
      */
     public static function empty(SearchGuardReport $guardLimits): self
     {
-        return new self([], $guardLimits);
+        /** @var SearchOutcome<mixed> $empty */
+        $empty = new self(PathResultSet::empty(), $guardLimits);
+
+        return $empty;
     }
 
     /**
-     * @return list<TPath>
+     * @return PathResultSet<TPath>
      */
-    public function paths(): array
+    public function paths(): PathResultSet
     {
         return $this->paths;
     }
 
     public function hasPaths(): bool
     {
-        return [] !== $this->paths;
+        return !$this->paths->isEmpty();
     }
 
     public function guardLimits(): SearchGuardReport

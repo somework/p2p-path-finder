@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Application\Result;
 
 use PHPUnit\Framework\TestCase;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSetEntry;
 use SomeWork\P2PPathFinder\Application\Result\MoneyMap;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
 use SomeWork\P2PPathFinder\Application\Result\PathLegCollection;
@@ -38,17 +42,23 @@ final class PathResultFormatterTest extends TestCase
         $formatter = new PathResultFormatter();
 
         $this->assertSame($result->jsonSerialize(), $formatter->formatMachine($result));
+
+        $collection = PathResultSet::fromEntries(
+            new CostHopsSignatureOrderingStrategy(18),
+            [new PathResultSetEntry($result, new PathOrderKey('0.1', 1, 'USD->EUR', 0))],
+        );
+
         $this->assertSame([
             $result->jsonSerialize(),
-        ], $formatter->formatMachineCollection([$result]));
+        ], $formatter->formatMachineCollection($collection));
 
         $expectedHuman = 'Total spent: USD 100.00; total received: EUR 95.00; total fees: USD 1.50; residual tolerance: 2.50%.'.PHP_EOL
             .'Legs:'.PHP_EOL
             .'  1. USD -> EUR | Spent USD 100.00 | Received EUR 95.00 | Fees USD 1.50';
 
         $this->assertSame($expectedHuman, $formatter->formatHuman($result));
-        $this->assertSame('Path 1:'.PHP_EOL.$expectedHuman, $formatter->formatHumanCollection([$result]));
-        $this->assertSame('No paths available.', $formatter->formatHumanCollection([]));
+        $this->assertSame('Path 1:'.PHP_EOL.$expectedHuman, $formatter->formatHumanCollection($collection));
+        $this->assertSame('No paths available.', $formatter->formatHumanCollection(PathResultSet::empty()));
     }
 
     public function test_formatting_without_fees(): void

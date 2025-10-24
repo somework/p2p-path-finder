@@ -64,7 +64,7 @@ final class PathFinderEdgeGuardsTest extends TestCase
             $constraints,
         );
 
-        self::assertSame([], $outcome->paths());
+        self::assertSame([], $outcome->paths()->toArray());
         $report = $outcome->guardLimits();
         self::assertFalse($report->expansionsReached());
         self::assertFalse($report->visitedStatesReached());
@@ -92,7 +92,7 @@ final class PathFinderEdgeGuardsTest extends TestCase
 
         $outcome = $finder->findBestPaths($graph, $source, $target);
 
-        self::assertSame([], $outcome->paths());
+        self::assertSame([], $outcome->paths()->toArray());
         $report = $outcome->guardLimits();
         self::assertFalse($report->expansionsReached());
         self::assertFalse($report->visitedStatesReached());
@@ -130,7 +130,7 @@ final class PathFinderEdgeGuardsTest extends TestCase
 
         $outcome = $finder->findBestPaths($graph, 'AAA', 'ZZZ');
 
-        self::assertSame([], $outcome->paths());
+        self::assertSame([], $outcome->paths()->toArray());
         self::assertFalse($outcome->guardLimits()->expansionsReached());
         self::assertFalse($outcome->guardLimits()->visitedStatesReached());
     }
@@ -152,7 +152,7 @@ final class PathFinderEdgeGuardsTest extends TestCase
 
         $outcome = $finder->findBestPaths($graph, 'AAA', 'BBB');
 
-        self::assertSame([], $outcome->paths());
+        self::assertSame([], $outcome->paths()->toArray());
         $report = $outcome->guardLimits();
         self::assertTrue($report->expansionsReached());
         self::assertFalse($report->visitedStatesReached());
@@ -177,7 +177,7 @@ final class PathFinderEdgeGuardsTest extends TestCase
 
         $outcome = $finder->findBestPaths($graph, 'AAA', 'BBB');
 
-        self::assertSame([], $outcome->paths());
+        self::assertSame([], $outcome->paths()->toArray());
         $report = $outcome->guardLimits();
         self::assertFalse($report->expansionsReached());
         self::assertTrue($report->visitedStatesReached());
@@ -220,7 +220,7 @@ final class PathFinderEdgeGuardsTest extends TestCase
         $graph = (new GraphBuilder())->build($orders);
         $finder = new PathFinder(maxHops: 3, tolerance: '0.0', topK: 2);
 
-        $paths = $finder->findBestPaths($graph, 'AAA', 'BBB')->paths();
+        $paths = $finder->findBestPaths($graph, 'AAA', 'BBB')->paths()->toArray();
 
         self::assertCount(1, $paths);
         $firstPath = $paths[0];
@@ -283,7 +283,7 @@ final class PathFinderEdgeGuardsTest extends TestCase
         $graph = (new GraphBuilder())->build($orders);
         $finder = new PathFinder(maxHops: 3, tolerance: '0.0', topK: 3);
 
-        $paths = $finder->findBestPaths($graph, 'AAA', 'BBB')->paths();
+        $paths = $finder->findBestPaths($graph, 'AAA', 'BBB')->paths()->toArray();
 
         self::assertCount(2, $paths);
         $costs = array_map(static fn (CandidatePath $path): string => $path->cost(), $paths);
@@ -347,7 +347,7 @@ final class PathFinderEdgeGuardsTest extends TestCase
         $graph = (new GraphBuilder())->build($orders);
         $finder = new PathFinder(maxHops: 3, tolerance: '0.0', topK: 3);
 
-        $paths = $finder->findBestPaths($graph, 'AAA', 'ZZZ')->paths();
+        $paths = $finder->findBestPaths($graph, 'AAA', 'ZZZ')->paths()->toArray();
 
         $costs = array_map(static fn (CandidatePath $path): string => $path->cost(), $paths);
 

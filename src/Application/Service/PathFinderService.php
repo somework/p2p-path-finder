@@ -13,6 +13,8 @@ use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSetEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
@@ -25,11 +27,9 @@ use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
-use function array_map;
 use function implode;
 use function sprintf;
 use function strtoupper;
-use function usort;
 
 /**
  * High level facade orchestrating order filtering, graph building and path search.
@@ -251,15 +251,17 @@ final class PathFinderService
             return $empty;
         }
 
-        $this->sortMaterializedResults($materializedResults);
+        $resultEntries = [];
+        foreach ($materializedResults as $entry) {
+            $resultEntries[] = new PathResultSetEntry($entry->result(), $entry->orderKey());
+        }
 
-        return new SearchOutcome(
-            array_map(
-                static fn (MaterializedResult $entry): PathResult => $entry->result(),
-                $materializedResults,
-            ),
-            $guardLimits,
-        );
+        $resultSet = PathResultSet::fromEntries($this->orderingStrategy, $resultEntries);
+
+        /** @var SearchOutcome<PathResult> $outcome */
+        $outcome = new SearchOutcome($resultSet, $guardLimits);
+
+        return $outcome;
     }
 
     private function assertGuardLimits(PathSearchConfig $config, SearchGuardReport $guardLimits): void
@@ -327,26 +329,12 @@ final class PathFinderService
     }
 
     /**
-     * @param list<MaterializedResult> $materializedResults
-     */
-    private function sortMaterializedResults(array &$materializedResults): void
-    {
-        usort(
-            $materializedResults,
-            fn (MaterializedResult $left, MaterializedResult $right): int => $this->orderingStrategy->compare(
-                $left->orderKey(),
-                $right->orderKey(),
-            ),
-        );
-    }
-
-    /**
      * @deprecated use {@see PathFinderService::findBestPaths()} instead
      */
     public function findBestPath(OrderBook $orderBook, PathSearchConfig $config, string $targetAsset): ?PathResult
     {
         $results = $this->findBestPaths($orderBook, $config, $targetAsset);
 
-        return $results->paths()[0] ?? null;
+        return $results->paths()->first();
     }
 }
