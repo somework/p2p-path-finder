@@ -82,4 +82,36 @@ final class PathResultSetTest extends TestCase
             $set->jsonSerialize(),
         );
     }
+
+    public function test_slice_returns_subset_preserving_order(): void
+    {
+        $strategy = new CostHopsSignatureOrderingStrategy(18);
+        $set = PathResultSet::fromEntries(
+            $strategy,
+            [
+                new PathResultSetEntry('first', new PathOrderKey('0.100000000000000000', 1, 'SRC->A->DST', 0)),
+                new PathResultSetEntry('second', new PathOrderKey('0.200000000000000000', 2, 'SRC->B->DST', 1)),
+                new PathResultSetEntry('third', new PathOrderKey('0.300000000000000000', 3, 'SRC->C->DST', 2)),
+            ],
+        );
+
+        self::assertSame(['first', 'second'], $set->slice(0, 2)->toArray());
+        self::assertSame(['second', 'third'], $set->slice(1)->toArray());
+    }
+
+    public function test_slice_returns_empty_set_for_out_of_bounds_offsets(): void
+    {
+        $strategy = new CostHopsSignatureOrderingStrategy(18);
+        $set = PathResultSet::fromEntries(
+            $strategy,
+            [
+                new PathResultSetEntry('only', new PathOrderKey('0.100000000000000000', 1, 'SRC->A->DST', 0)),
+            ],
+        );
+
+        $slice = $set->slice(5);
+
+        self::assertTrue($slice->isEmpty());
+        self::assertSame([], $slice->toArray());
+    }
 }

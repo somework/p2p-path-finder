@@ -12,6 +12,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrat
 use Traversable;
 
 use function array_map;
+use function array_slice;
 use function count;
 use function is_array;
 use function is_object;
@@ -140,6 +141,24 @@ final class PathResultSet implements IteratorAggregate, Countable, JsonSerializa
     public function toArray(): array
     {
         return $this->paths;
+    }
+
+    /**
+     * @return PathResultSet<TPath>
+     */
+    public function slice(int $offset, ?int $length = null): self
+    {
+        /** @var list<TPath> $sliced */
+        $sliced = array_slice($this->paths, $offset, $length);
+
+        if ([] === $sliced) {
+            /** @var PathResultSet<TPath> $empty */
+            $empty = self::empty();
+
+            return $empty;
+        }
+
+        return new self($sliced);
     }
 
     /**
