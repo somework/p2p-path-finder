@@ -7,25 +7,33 @@ namespace SomeWork\P2PPathFinder\Application\PathFinder;
 use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\Guard\SearchGuards;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidateHeapEntry;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidatePriority;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidatePriorityQueue;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidateResultEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\InsertionOrderCounter;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchQueueEntry;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchState;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriority;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriorityQueue;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRecord;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRegistry;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
-use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
-use SplPriorityQueue;
 
 use function array_map;
-use function array_values;
 use function implode;
 use function sprintf;
 use function str_repeat;
@@ -38,66 +46,6 @@ use function usort;
  * @psalm-type SpendRange = array{min: Money, max: Money}
  *
  * @phpstan-type SpendRange array{min: Money, max: Money}
- *
- * @psalm-type CandidateHeapEntry = array{
- *     candidate: CandidatePath,
- *     order: int,
- *     cost: numeric-string,
- * }
- *
- * @phpstan-type CandidateHeapEntry array{
- *     candidate: CandidatePath,
- *     order: int,
- *     cost: numeric-string,
- * }
- *
- * @psalm-type CandidateResultEntry = array{
- *     candidate: CandidatePath,
- *     order: int,
- *     cost: numeric-string,
- *     routeSignature: string,
- *     orderKey: PathOrderKey,
- * }
- *
- * @phpstan-type CandidateResultEntry array{
- *     candidate: CandidatePath,
- *     order: int,
- *     cost: string,
- *     routeSignature: string,
- *     orderKey: PathOrderKey,
- * }
- *
- * @psalm-type SearchQueueEntry = array{
- *     state: SearchState,
- *     priority: array{cost: numeric-string, order: int},
- * }
- *
- * @phpstan-type SearchQueueEntry array{
- *     state: SearchState,
- *     priority: array{cost: numeric-string, order: int},
- * }
- *
- * @psalm-type SearchState = array{
- *     node: string,
- *     cost: numeric-string,
- *     product: numeric-string,
- *     hops: int,
- *     path: PathEdgeSequence,
- *     amountRange: SpendRange|null,
- *     desiredAmount: Money|null,
- *     visited: array<string, bool>,
- * }
- *
- * @phpstan-type SearchState array{
- *     node: string,
- *     cost: numeric-string,
- *     product: numeric-string,
- *     hops: int,
- *     path: PathEdgeSequence,
- *     amountRange: SpendRange|null,
- *     desiredAmount: Money|null,
- *     visited: array<string, bool>,
- * }
  */
 final class PathFinder
 {
@@ -215,32 +163,30 @@ final class PathFinder
                 break;
             }
 
-            /** @var SearchState $state */
             $state = $queue->extract();
             $guards->recordExpansion();
 
-            if ($state['node'] === $target) {
-                /** @var numeric-string $candidateCost */
-                $candidateCost = $state['cost'];
-                /** @var numeric-string $candidateProduct */
-                $candidateProduct = $state['product'];
+            if ($state->node() === $target) {
+                $candidateCost = $state->cost();
+                $candidateProduct = $state->product();
 
                 BcMath::ensureNumeric($candidateCost, $candidateProduct);
 
                 $candidateRange = null;
-                if (null !== $state['amountRange']) {
+                $stateRange = $state->amountRange();
+                if (null !== $stateRange) {
                     $candidateRange = SpendConstraints::from(
-                        $state['amountRange']['min'],
-                        $state['amountRange']['max'],
-                        $state['desiredAmount'],
+                        $stateRange['min'],
+                        $stateRange['max'],
+                        $state->desiredAmount(),
                     );
                 }
 
                 $candidate = CandidatePath::from(
                     $candidateCost,
                     $candidateProduct,
-                    $state['path']->count(),
-                    $state['path'],
+                    $state->path()->count(),
+                    $state->path(),
                     $candidateRange,
                 );
 
@@ -252,17 +198,17 @@ final class PathFinder
                         $bestTargetCost = $candidate->cost();
                     }
 
-                    $this->recordResult($results, $candidate, $resultInsertionOrder++);
+                    $this->recordResult($results, $candidate, $resultInsertionOrder->next());
                 }
 
                 continue;
             }
 
-            if ($state['hops'] >= $this->maxHops) {
+            if ($state->hops() >= $this->maxHops) {
                 continue;
             }
 
-            $currentNode = $graph->node($state['node']);
+            $currentNode = $graph->node($state->node());
             if (null === $currentNode) {
                 continue;
             }
@@ -273,19 +219,17 @@ final class PathFinder
                     continue;
                 }
 
-                if (isset($state['visited'][$nextNode])) {
+                if ($state->hasVisited($nextNode)) {
                     continue;
                 }
 
                 $conversionRate = $this->edgeEffectiveConversionRate($edge);
-                /** @var numeric-string $conversionRate */
-                $conversionRate = $conversionRate;
                 if (1 !== BcMath::comp($conversionRate, '0', self::SCALE)) {
                     continue;
                 }
 
-                $currentRange = $state['amountRange'];
-                $currentDesired = $state['desiredAmount'];
+                $currentRange = $state->amountRange();
+                $currentDesired = $state->desiredAmount();
                 if (null !== $currentRange) {
                     $feasibleRange = $this->edgeSupportsAmount($edge, $currentRange);
                     if (null === $feasibleRange) {
@@ -306,19 +250,20 @@ final class PathFinder
                         : null;
                 }
 
-                $nextCost = BcMath::div($state['cost'], $conversionRate, self::SCALE);
-                $nextProduct = BcMath::mul($state['product'], $conversionRate, self::SCALE);
-                $nextHops = $state['hops'] + 1;
+                $nextCost = BcMath::div($state->cost(), $conversionRate, self::SCALE);
+                $nextProduct = BcMath::mul($state->product(), $conversionRate, self::SCALE);
+                $nextHops = $state->hops() + 1;
 
                 $signature = $this->stateSignature($nextRange, $nextDesired);
+                $candidateRecord = new SearchStateRecord($nextCost, $nextHops, $signature);
 
-                if ($this->isDominated($bestPerNode[$nextNode] ?? [], $nextCost, $nextHops, $signature)) {
+                if ($bestPerNode->isDominated($nextNode, $candidateRecord, self::SCALE)) {
                     continue;
                 }
 
                 if (
                     $visitedStates >= $this->maxVisitedStates
-                    && !$this->hasStateWithSignature($bestPerNode[$nextNode] ?? [], $signature)
+                    && !$bestPerNode->hasSignature($nextNode, $signature)
                 ) {
                     $visitedGuardReached = true;
                     continue;
@@ -333,36 +278,26 @@ final class PathFinder
                     }
                 }
 
-                $nextPath = $state['path']->append(PathEdge::fromGraphEdge($edge, $conversionRate));
-
-                $nextVisited = $state['visited'];
-                $nextVisited[$nextNode] = true;
-
-                $nextState = [
-                    'node' => $nextNode,
-                    'cost' => $nextCost,
-                    'product' => $nextProduct,
-                    'hops' => $nextHops,
-                    'path' => $nextPath,
-                    'amountRange' => $nextRange,
-                    'desiredAmount' => $nextDesired,
-                    'visited' => $nextVisited,
-                ];
+                $nextState = $state->transition(
+                    $nextNode,
+                    $nextCost,
+                    $nextProduct,
+                    PathEdge::fromGraphEdge($edge, $conversionRate),
+                    $nextRange,
+                    $nextDesired,
+                );
 
                 $visitedStates = max(
                     0,
-                    $visitedStates + $this->recordState(
-                        $bestPerNode,
-                        $nextNode,
-                        $nextCost,
-                        $nextHops,
-                        $nextRange,
-                        $nextDesired,
-                        $signature,
-                    ),
+                    $visitedStates + $bestPerNode->register($nextNode, $candidateRecord, self::SCALE),
                 );
 
-                $queue->insert($nextState, ['cost' => $nextCost, 'order' => $insertionOrder++]);
+                $queue->push(
+                    new SearchQueueEntry(
+                        $nextState,
+                        new SearchStatePriority($nextCost, $insertionOrder->next()),
+                    ),
+                );
             }
         }
 
@@ -379,68 +314,6 @@ final class PathFinder
         $finalized = $this->finalizeResults($results);
 
         return new SearchOutcome($finalized, $guardLimits);
-    }
-
-    /**
-     * @param list<array{cost: numeric-string, hops: int, signature: string}> $existing
-     * @param numeric-string                                                  $cost
-     */
-    private function isDominated(array $existing, string $cost, int $hops, string $signature): bool
-    {
-        foreach ($existing as $state) {
-            if ($state['signature'] !== $signature) {
-                continue;
-            }
-
-            if (
-                BcMath::comp($state['cost'], $cost, self::SCALE) <= 0
-                && $state['hops'] <= $hops
-            ) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @param array<string, list<array{cost: numeric-string, hops: int, signature: string}>> $registry
-     * @param array{min: Money, max: Money}|null                                             $range
-     * @param numeric-string                                                                 $cost
-     *
-     * @return int net change in the number of tracked states
-     */
-    private function recordState(
-        array &$registry,
-        string $node,
-        string $cost,
-        int $hops,
-        ?array $range,
-        ?Money $desired,
-        ?string $signature = null
-    ): int {
-        $signature ??= $this->stateSignature($range, $desired);
-        $existing = $registry[$node] ?? [];
-        $removed = 0;
-
-        foreach ($existing as $index => $state) {
-            if ($state['signature'] !== $signature) {
-                continue;
-            }
-
-            if (
-                BcMath::comp($cost, $state['cost'], self::SCALE) <= 0
-                && $hops <= $state['hops']
-            ) {
-                unset($existing[$index]);
-                ++$removed;
-            }
-        }
-
-        $existing[] = ['cost' => $cost, 'hops' => $hops, 'signature' => $signature];
-        $registry[$node] = array_values($existing);
-
-        return 1 - $removed;
     }
 
     /**
@@ -483,20 +356,6 @@ final class PathFinder
         return sprintf('%s:%s:%d', $normalized->currency(), $normalized->amount(), $scale);
     }
 
-    /**
-     * @param list<array{cost: numeric-string, hops: int, signature: string}> $existing
-     */
-    private function hasStateWithSignature(array $existing, string $signature): bool
-    {
-        foreach ($existing as $state) {
-            if ($state['signature'] === $signature) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     private function createQueue(): SearchStateQueue
     {
         return new SearchStateQueue(self::SCALE);
@@ -511,14 +370,12 @@ final class PathFinder
     {
         /** @var numeric-string $candidateCost */
         $candidateCost = $candidate->cost();
-        $entry = [
-            'candidate' => $candidate,
-            'order' => $order,
-            'cost' => $candidateCost,
-        ];
+        $entry = new CandidateHeapEntry(
+            $candidate,
+            new CandidatePriority($candidateCost, $order),
+        );
 
-        /* @var CandidateHeapEntry $entry */
-        $results->insert($entry, $entry);
+        $results->push($entry);
 
         if ($results->count() > $this->topK) {
             $results->extract();
@@ -528,7 +385,7 @@ final class PathFinder
     /**
      * @param array{min: Money, max: Money}|null $range
      *
-     * @return array{SearchStateQueue, CandidateResultHeap, array<string, list<array{cost: numeric-string, hops: int, signature: string}>>, int, int, int}
+     * @return array{SearchStateQueue, CandidateResultHeap, SearchStateRegistry, InsertionOrderCounter, InsertionOrderCounter, int}
      */
     private function initializeSearchStructures(string $source, ?array $range, ?Money $desiredSpend): array
     {
@@ -536,32 +393,24 @@ final class PathFinder
         $range = $range;
         $queue = $this->createQueue();
         $results = $this->createResultHeap();
-        $insertionOrder = 0;
-        $resultInsertionOrder = 0;
+        $insertionOrder = new InsertionOrderCounter();
+        $resultInsertionOrder = new InsertionOrderCounter();
 
-        $initialState = [
-            'node' => $source,
-            'cost' => $this->unitValue,
-            'product' => $this->unitValue,
-            'hops' => 0,
-            'path' => PathEdgeSequence::empty(),
-            'amountRange' => $range,
-            'desiredAmount' => $desiredSpend,
-            'visited' => [$source => true],
-        ];
+        $initialState = SearchState::bootstrap($source, $this->unitValue, $range, $desiredSpend);
+        $queue->push(
+            new SearchQueueEntry(
+                $initialState,
+                new SearchStatePriority($this->unitValue, $insertionOrder->next()),
+            ),
+        );
 
-        $queue->insert($initialState, ['cost' => $this->unitValue, 'order' => $insertionOrder++]);
+        $initialRecord = new SearchStateRecord(
+            $this->unitValue,
+            0,
+            $this->stateSignature($range, $desiredSpend),
+        );
 
-        /**
-         * @var array<string, list<array{cost: numeric-string, hops: int, signature: string}>> $bestPerNode
-         */
-        $bestPerNode = [
-            $source => [[
-                'cost' => $this->unitValue,
-                'hops' => 0,
-                'signature' => $this->stateSignature($range, $desiredSpend),
-            ]],
-        ];
+        $bestPerNode = SearchStateRegistry::withInitial($source, $initialRecord);
 
         return [$queue, $results, $bestPerNode, $insertionOrder, $resultInsertionOrder, 1];
     }
@@ -571,16 +420,12 @@ final class PathFinder
      */
     private function finalizeResults(CandidateResultHeap $results): array
     {
-        /** @var list<CandidateResultEntry> $entries */
         $entries = $this->collectResultEntries($results);
         $this->sortResultEntries($entries);
 
         /** @var list<CandidatePath> $finalized */
         $finalized = array_map(
-            /**
-             * @param CandidateResultEntry $entry
-             */
-            static fn (array $entry): CandidatePath => $entry['candidate'],
+            static fn (CandidateResultEntry $entry): CandidatePath => $entry->candidate(),
             $entries,
         );
 
@@ -592,23 +437,23 @@ final class PathFinder
      */
     private function collectResultEntries(CandidateResultHeap $results): array
     {
-        /**
-         * @var list<CandidateResultEntry> $collected
-         */
         $collected = [];
         $clone = clone $results;
 
         while (!$clone->isEmpty()) {
-            /** @var CandidateHeapEntry $entry */
             $entry = $clone->extract();
-            $entry['routeSignature'] = $this->routeSignature($entry['candidate']->edges());
-            $entry['orderKey'] = new PathOrderKey(
-                $entry['cost'],
-                $entry['candidate']->hops(),
-                $entry['routeSignature'],
-                $entry['order'],
+            $routeSignature = $this->routeSignature($entry->candidate()->edges());
+            $collected[] = new CandidateResultEntry(
+                $entry->candidate(),
+                $entry->priority(),
+                $routeSignature,
+                new PathOrderKey(
+                    $entry->priority()->cost(),
+                    $entry->candidate()->hops(),
+                    $routeSignature,
+                    $entry->priority()->order(),
+                ),
             );
-            $collected[] = $entry;
         }
 
         return $collected;
@@ -622,13 +467,9 @@ final class PathFinder
         usort($entries, [$this, 'compareCandidateEntries']);
     }
 
-    /**
-     * @param CandidateResultEntry $left
-     * @param CandidateResultEntry $right
-     */
-    private function compareCandidateEntries(array $left, array $right): int
+    private function compareCandidateEntries(CandidateResultEntry $left, CandidateResultEntry $right): int
     {
-        return $this->orderingStrategy->compare($left['orderKey'], $right['orderKey']);
+        return $this->orderingStrategy->compare($left->orderKey(), $right->orderKey());
     }
 
     private function routeSignature(PathEdgeSequence $edges): string
@@ -945,116 +786,101 @@ final class PathFinder
 
 /**
  * @internal
- *
- * @psalm-import-type SearchState from PathFinder
- * @psalm-import-type SearchQueueEntry from PathFinder
- *
- * @phpstan-import-type SearchState from PathFinder
- * @phpstan-import-type SearchQueueEntry from PathFinder
- *
- * @extends SplPriorityQueue<SearchQueueEntry, mixed>
  */
-final class SearchStateQueue extends SplPriorityQueue
+final class SearchStateQueue
 {
+    private SearchStatePriorityQueue $queue;
+
     public function __construct(private readonly int $scale)
     {
-        $this->setExtractFlags(self::EXTR_DATA);
+        $this->queue = new SearchStatePriorityQueue($this->scale);
     }
 
-    /**
-     * @phpstan-param SearchState                                            $value
-     * @phpstan-param array{cost: numeric-string, order: int}|SearchQueueEntry $priority
-     *
-     * @psalm-param SearchState                                               $value
-     * @psalm-param array{cost: numeric-string, order: int}|SearchQueueEntry $priority
-     */
-    public function insert($value, $priority): true
+    public function __clone()
     {
-        if (isset($priority['state'], $priority['priority'])) {
-            /** @var SearchQueueEntry $entry */
-            $entry = $priority;
-            $entry['state'] = $value;
-        } else {
-            /** @var SearchQueueEntry $entry */
-            $entry = [
-                'state' => $value,
-                'priority' => $priority,
-            ];
-        }
+        $this->queue = clone $this->queue;
+    }
 
-        /* @var SearchQueueEntry $entry */
-        parent::insert($entry, $entry);
+    public function insert(SearchQueueEntry $entry): true
+    {
+        $this->queue->insert($entry, $entry->priority());
 
         return true;
     }
 
-    /**
-     * @psalm-return SearchState
-     */
-    public function extract(): array
+    public function push(SearchQueueEntry $entry): void
     {
-        /** @var SearchQueueEntry $entry */
-        $entry = parent::extract();
-
-        /** @var SearchState $state */
-        $state = $entry['state'];
-
-        return $state;
+        $this->queue->insert($entry, $entry->priority());
     }
 
-    /**
-     * @phpstan-param SearchQueueEntry $priority1
-     * @phpstan-param SearchQueueEntry $priority2
-     *
-     * @psalm-param SearchQueueEntry $priority1
-     * @psalm-param SearchQueueEntry $priority2
-     */
-    public function compare($priority1, $priority2): int
+    public function extract(): SearchState
     {
-        $comparison = BcMath::comp($priority1['priority']['cost'], $priority2['priority']['cost'], $this->scale);
-        if (0 !== $comparison) {
-            return -$comparison;
-        }
+        /** @var SearchQueueEntry $entry */
+        $entry = $this->queue->extract();
 
-        return $priority2['priority']['order'] <=> $priority1['priority']['order'];
+        return $entry->state();
+    }
+
+    public function isEmpty(): bool
+    {
+        return 0 === $this->queue->count();
+    }
+
+    public function count(): int
+    {
+        return $this->queue->count();
+    }
+
+    public function compare(SearchStatePriority $priority1, SearchStatePriority $priority2): int
+    {
+        return $priority1->compare($priority2, $this->scale);
     }
 }
 
 /**
  * @internal
- *
- * @phpstan-import-type CandidateHeapEntry from PathFinder
- *
- * @extends SplPriorityQueue<CandidateHeapEntry, CandidateHeapEntry>
  */
-final class CandidateResultHeap extends SplPriorityQueue
+final class CandidateResultHeap
 {
+    private CandidatePriorityQueue $heap;
+
     public function __construct(private readonly int $scale)
     {
-        $this->setExtractFlags(self::EXTR_DATA);
+        $this->heap = new CandidatePriorityQueue($this->scale);
     }
 
-    /**
-     * @phpstan-param CandidateHeapEntry $priority1
-     * @phpstan-param CandidateHeapEntry $priority2
-     *
-     * @psalm-param CandidateHeapEntry $priority1
-     * @psalm-param CandidateHeapEntry $priority2
-     */
-    public function compare($priority1, $priority2): int
+    public function __clone()
     {
-        $leftCost = $priority1['cost'];
-        /** @var numeric-string $leftCost */
-        $leftCost = $leftCost;
-        $rightCost = $priority2['cost'];
-        /** @var numeric-string $rightCost */
-        $rightCost = $rightCost;
+        $this->heap = clone $this->heap;
+    }
 
-        $comparison = BcMath::comp($leftCost, $rightCost, $this->scale);
-        if (0 !== $comparison) {
-            return $comparison;
-        }
+    public function insert(CandidateHeapEntry $entry): true
+    {
+        $this->heap->insert($entry, $entry->priority());
 
-        return $priority1['order'] <=> $priority2['order'];
+        return true;
+    }
+
+    public function push(CandidateHeapEntry $entry): void
+    {
+        $this->heap->insert($entry, $entry->priority());
+    }
+
+    public function extract(): CandidateHeapEntry
+    {
+        /** @var CandidateHeapEntry $entry */
+        $entry = $this->heap->extract();
+
+        return $entry;
+    }
+
+    public function isEmpty(): bool
+    {
+        return 0 === $this->heap->count();
+    }
+
+    public function count(): int
+    {
+        return $this->heap->count();
     }
 }
