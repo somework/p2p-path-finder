@@ -46,6 +46,23 @@ final class GraphEdgeCollectionTest extends TestCase
         $collection[1];
     }
 
+    public function test_from_array_sorts_edges_using_canonical_order(): void
+    {
+        $first = $this->createEdgeForQuote('USD');
+        $second = $this->createEdgeForQuote('EUR');
+        $third = $this->createEdgeForQuote('USD');
+
+        $collection = GraphEdgeCollection::fromArray([$first, $third, $second]);
+
+        $expected = [$first, $third, $second];
+        usort($expected, GraphEdgeCollection::canonicalComparator());
+
+        self::assertSame($expected, $collection->toArray());
+
+        $serialized = array_map(static fn (GraphEdge $edge): array => $edge->jsonSerialize(), $expected);
+        self::assertSame($serialized, $collection->jsonSerialize());
+    }
+
     private function createEdge(): GraphEdge
     {
         $order = OrderFactory::sell(
@@ -93,6 +110,39 @@ final class GraphEdgeCollectionTest extends TestCase
                     ),
                 ),
             ],
+        );
+    }
+
+    private function createEdgeForQuote(string $quoteCurrency): GraphEdge
+    {
+        $order = OrderFactory::buy(
+            base: 'BTC',
+            quote: $quoteCurrency,
+            minAmount: '1.000',
+            maxAmount: '2.000',
+            rate: '2.000',
+            amountScale: 3,
+            rateScale: 3,
+        );
+
+        return new GraphEdge(
+            from: 'BTC',
+            to: $quoteCurrency,
+            orderSide: OrderSide::BUY,
+            order: $order,
+            rate: $order->effectiveRate(),
+            baseCapacity: new EdgeCapacity(
+                Money::fromString('BTC', '1.000', 3),
+                Money::fromString('BTC', '2.000', 3),
+            ),
+            quoteCapacity: new EdgeCapacity(
+                Money::fromString($quoteCurrency, '2.000', 3),
+                Money::fromString($quoteCurrency, '4.000', 3),
+            ),
+            grossBaseCapacity: new EdgeCapacity(
+                Money::fromString('BTC', '1.000', 3),
+                Money::fromString('BTC', '2.000', 3),
+            ),
         );
     }
 }

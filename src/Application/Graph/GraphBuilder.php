@@ -9,6 +9,9 @@ use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
+use function array_keys;
+use function sort;
+
 /**
  * Converts a collection of domain orders into a weighted directed graph representation.
  */
@@ -54,7 +57,10 @@ final class GraphBuilder
         }
 
         $nodes = [];
-        foreach ($currencies as $currency => $_) {
+        $currencyList = array_keys($currencies);
+        sort($currencyList);
+
+        foreach ($currencyList as $currency) {
             $nodes[] = new GraphNode(
                 $currency,
                 GraphEdgeCollection::fromArray($edges[$currency] ?? []),

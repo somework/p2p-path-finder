@@ -1022,15 +1022,15 @@ final class PathFinderTest extends TestCase
 
         $graph = self::graphFromArray($graph);
 
-        $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 1, maxVisitedStates: 2);
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 1, maxVisitedStates: 4);
         $outcome = $finder->findBestPaths($graph, 'SRC', 'TRG');
 
         $paths = $outcome->paths()->toArray();
         self::assertNotSame([], $paths);
         $report = $outcome->guardLimits();
         self::assertTrue($report->visitedStatesReached());
-        self::assertSame(2, $report->visitedStateLimit());
-        self::assertSame(2, $report->visitedStates());
+        self::assertSame(4, $report->visitedStateLimit());
+        self::assertSame(4, $report->visitedStates());
     }
 
     public function test_it_keeps_processing_guarded_states_with_matching_signatures(): void
