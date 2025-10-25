@@ -199,7 +199,7 @@ final class LegMaterializerTest extends TestCase
         ];
 
         $this->expectException(InvalidInput::class);
-        $this->expectExceptionMessageMatches('/^Path edge sequences must form a continuous chain\./');
+        $this->expectExceptionMessageMatches('/^Path edge sequences must form a continuous chain\b/');
 
         $materializer->materialize($this->pathEdges($misorderedEdges), $config->spendAmount(), $initialSeed, 'JPY');
     }

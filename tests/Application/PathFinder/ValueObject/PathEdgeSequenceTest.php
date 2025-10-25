@@ -86,7 +86,7 @@ final class PathEdgeSequenceTest extends TestCase
         })();
 
         $this->expectException(InvalidInput::class);
-        $this->expectExceptionMessageMatches('/^Path edge sequences must form a continuous chain\./');
+        $this->expectExceptionMessageMatches('/^Path edge sequences must form a continuous chain\b/');
 
         PathEdgeSequence::fromIterable($edges);
     }
