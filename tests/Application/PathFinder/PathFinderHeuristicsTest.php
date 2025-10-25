@@ -332,6 +332,11 @@ final class PathFinderHeuristicsTest extends TestCase
 
                 return FeeBreakdown::forQuote($fee->withScale($quoteAmount->scale()));
             }
+
+            public function fingerprint(): string
+            {
+                return 'fixed-quote:5.000000@6';
+            }
         };
 
         $order = OrderFactory::sell(

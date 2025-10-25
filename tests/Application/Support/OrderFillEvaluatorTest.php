@@ -65,6 +65,11 @@ final class OrderFillEvaluatorTest extends TestCase
 
                 return FeeBreakdown::forQuote($quoteFee);
             }
+
+            public function fingerprint(): string
+            {
+                return 'buy-percentage-quote:0.005';
+            }
         };
 
         $order = OrderFactory::buy(
@@ -117,6 +122,11 @@ final class OrderFillEvaluatorTest extends TestCase
                 $quoteFee = $quoteAmount->multiply('0.015', $quoteFeeScale)->withScale($quoteAmount->scale());
 
                 return FeeBreakdown::of($baseFee, $quoteFee);
+            }
+
+            public function fingerprint(): string
+            {
+                return 'sell-percentage-mixed:0.025:0.015';
             }
         };
 

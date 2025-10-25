@@ -2488,6 +2488,11 @@ final class PathFinderTest extends TestCase
 
                 return FeeBreakdown::forBase($fee);
             }
+
+            public function fingerprint(): string
+            {
+                return 'percentage-base:'.$this->percentage;
+            }
         };
     }
 
@@ -2506,6 +2511,11 @@ final class PathFinderTest extends TestCase
                 $quoteFee = $quoteAmount->multiply($this->quotePercentage, $quoteAmount->scale());
 
                 return FeeBreakdown::of($baseFee, $quoteFee);
+            }
+
+            public function fingerprint(): string
+            {
+                return 'percentage-mixed:'.$this->basePercentage.':'.$this->quotePercentage;
             }
         };
     }

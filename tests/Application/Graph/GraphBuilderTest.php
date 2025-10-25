@@ -1012,6 +1012,11 @@ final class GraphBuilderTest extends TestCase
 
                 return FeeBreakdown::forQuote($fee);
             }
+
+            public function fingerprint(): string
+            {
+                return 'percentage-quote:'.$this->percentage;
+            }
         };
     }
 
@@ -1027,6 +1032,11 @@ final class GraphBuilderTest extends TestCase
                 $fee = $baseAmount->multiply($this->percentage, $baseAmount->scale());
 
                 return FeeBreakdown::forBase($fee);
+            }
+
+            public function fingerprint(): string
+            {
+                return 'percentage-base:'.$this->percentage;
             }
         };
     }
@@ -1046,6 +1056,11 @@ final class GraphBuilderTest extends TestCase
                 $quoteFee = $quoteAmount->multiply($this->quotePercentage, $quoteAmount->scale());
 
                 return FeeBreakdown::of($baseFee, $quoteFee);
+            }
+
+            public function fingerprint(): string
+            {
+                return 'percentage-mixed:'.$this->basePercentage.':'.$this->quotePercentage;
             }
         };
     }
