@@ -12,7 +12,7 @@ final class InsertionOrderCounter
          */
         private int $value = 0
     ) {
-        /*
+        /**
          * @phpstan-ignore-next-line
          * @psalm-suppress DocblockTypeContradiction
          */

@@ -45,7 +45,7 @@ final class SearchState
             throw new InvalidArgumentException('Search states require a non-empty node identifier.');
         }
 
-        /*
+        /**
          * @phpstan-ignore-next-line
          * @psalm-suppress DocblockTypeContradiction
          */

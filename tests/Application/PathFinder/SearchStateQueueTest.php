@@ -60,11 +60,11 @@ final class SearchStateQueueTest extends TestCase
         self::assertSame(1, $queue->compare($alpha, $beta));
         self::assertSame(-1, $queue->compare($beta, $alpha));
 
-        $earlier = $this->priority(BcMath::normalize('0.030000000000000000', 18), 2, 'A->C', 1);
-        $later = $this->priority(BcMath::normalize('0.030000000000000000', 18), 2, 'A->C', 0);
+        $earlier = $this->priority(BcMath::normalize('0.030000000000000000', 18), 2, 'A->C', 0);
+        $later = $this->priority(BcMath::normalize('0.030000000000000000', 18), 2, 'A->C', 1);
 
-        self::assertSame(-1, $queue->compare($earlier, $later));
-        self::assertSame(1, $queue->compare($later, $earlier));
+        self::assertSame(1, $queue->compare($earlier, $later));
+        self::assertSame(-1, $queue->compare($later, $earlier));
     }
 
     public function test_compare_prefers_lexicographically_smaller_signature_on_equal_cost_and_hops(): void
