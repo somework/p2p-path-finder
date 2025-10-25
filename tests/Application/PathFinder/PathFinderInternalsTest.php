@@ -34,10 +34,11 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
-use function array_fill;
 use function array_is_list;
 use function array_map;
+use function chr;
 use function is_array;
+use function sprintf;
 use function str_repeat;
 
 final class PathFinderInternalsTest extends TestCase
@@ -893,10 +894,11 @@ final class PathFinderInternalsTest extends TestCase
         static $identifier = 0;
         ++$identifier;
 
-        $order = OrderFactory::buy('SRC', 'DST', '1.000', '1.000', '1.000', 3, 3);
+        $to = sprintf('DST%s', chr(65 + (($identifier - 1) % 26)));
+        $order = OrderFactory::buy('SRC', $to, '1.000', '1.000', '1.000', 3, 3);
         $edge = PathEdge::create(
             'SRC',
-            'DST_'.$identifier,
+            $to,
             $order,
             $order->effectiveRate(),
             OrderSide::BUY,
@@ -917,17 +919,26 @@ final class PathFinderInternalsTest extends TestCase
             return PathEdgeSequence::empty();
         }
 
-        $order = OrderFactory::buy('SRC', 'DST', '1.000', '1.000', '1.000', 3, 3);
-        $edge = PathEdge::create(
-            'SRC',
-            'DST',
-            $order,
-            $order->effectiveRate(),
-            OrderSide::BUY,
-            BcMath::normalize('1.000000000000000000', self::SCALE),
-        );
+        $edges = [];
+        $from = 'SRC';
 
-        return PathEdgeSequence::fromList(array_fill(0, $count, $edge));
+        for ($index = 0; $index < $count; ++$index) {
+            $to = sprintf('CUR%s', chr(65 + $index));
+            $order = OrderFactory::buy($from, $to, '1.000', '1.000', '1.000', 3, 3);
+
+            $edges[] = PathEdge::create(
+                $from,
+                $to,
+                $order,
+                $order->effectiveRate(),
+                OrderSide::BUY,
+                BcMath::normalize('1.000000000000000000', self::SCALE),
+            );
+
+            $from = $to;
+        }
+
+        return PathEdgeSequence::fromList($edges);
     }
 
     private function buildState(string $node): SearchState

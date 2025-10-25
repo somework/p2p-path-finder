@@ -24,9 +24,10 @@ use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 use SomeWork\P2PPathFinder\Tests\Fixture\FeePolicyFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
-use function array_pad;
+use function chr;
 use function count;
 use function is_array;
+use function sprintf;
 
 /**
  * @covers \SomeWork\P2PPathFinder\Application\Service\PathFinderService
@@ -35,6 +36,8 @@ use function is_array;
  */
 final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
 {
+    private const SCALE = 18;
+
     public function test_it_rejects_candidates_that_do_not_meet_minimum_hops(): void
     {
         $orderBook = $this->simpleEuroToUsdOrderBook();
@@ -414,7 +417,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
                         'order' => $edge->order(),
                         'rate' => $edge->rate(),
                         'orderSide' => $edge->orderSide(),
-                        'conversionRate' => BcMath::normalize('1.000000000000000000', 18),
+                        'conversionRate' => BcMath::normalize('1.000000000000000000', self::SCALE),
                     ];
                 }
 
@@ -423,35 +426,48 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
             $edges,
         );
 
-        if (count($normalized) !== $hops) {
-            $order = OrderFactory::sell('SRC', 'DST', '1.000', '1.000', '1.000', 3, 3);
-            $template = [
-                'from' => 'SRC',
-                'to' => 'DST',
+        $normalizedEdges = [];
+        $currentFrom = null;
+
+        foreach ($normalized as $index => $edge) {
+            $from = $edge['from'] ?? ($currentFrom ?? 'SRC');
+            $to = $edge['to'] ?? sprintf('TMP%s', chr(65 + ($index % 26)));
+            $orderSide = $edge['orderSide'] ?? OrderSide::SELL;
+
+            $order = $edge['order'] ?? match ($orderSide) {
+                OrderSide::BUY => OrderFactory::buy($from, $to, '1.000', '1.000', '1.000', 3, 3),
+                OrderSide::SELL => OrderFactory::sell($to, $from, '1.000', '1.000', '1.000', 3, 3),
+            };
+
+            $normalizedEdges[] = [
+                'from' => $from,
+                'to' => $to,
+                'order' => $order,
+                'rate' => $edge['rate'] ?? $order->effectiveRate(),
+                'orderSide' => $orderSide,
+                'conversionRate' => $edge['conversionRate'] ?? BcMath::normalize('1.000000000000000000', self::SCALE),
+            ];
+
+            $currentFrom = $to;
+        }
+
+        while (count($normalizedEdges) < $hops) {
+            $index = count($normalizedEdges);
+            $from = $currentFrom ?? 'SRC';
+            $to = sprintf('TMP%s', chr(65 + ($index % 26)));
+            $order = OrderFactory::sell($to, $from, '1.000', '1.000', '1.000', 3, 3);
+
+            $normalizedEdges[] = [
+                'from' => $from,
+                'to' => $to,
                 'order' => $order,
                 'rate' => $order->effectiveRate(),
                 'orderSide' => OrderSide::SELL,
-                'conversionRate' => BcMath::normalize('1.000000000000000000', 18),
+                'conversionRate' => BcMath::normalize('1.000000000000000000', self::SCALE),
             ];
 
-            $normalized = array_pad($normalized, $hops, $template);
+            $currentFrom = $to;
         }
-
-        $normalized = array_map(
-            static function (array $edge): array {
-                $order = $edge['order'] ?? OrderFactory::sell('SRC', 'DST', '1.000', '1.000', '1.000', 3, 3);
-
-                return $edge + [
-                    'from' => $edge['from'] ?? 'SRC',
-                    'to' => $edge['to'] ?? 'DST',
-                    'order' => $order,
-                    'rate' => $edge['rate'] ?? $order->effectiveRate(),
-                    'orderSide' => $edge['orderSide'] ?? OrderSide::SELL,
-                    'conversionRate' => $edge['conversionRate'] ?? BcMath::normalize('1.000000000000000000', 18),
-                ];
-            },
-            $normalized,
-        );
 
         return PathEdgeSequence::fromList(array_map(
             static fn (array $edge): PathEdge => PathEdge::create(
@@ -462,7 +478,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
                 $edge['orderSide'],
                 $edge['conversionRate'],
             ),
-            $normalized,
+            $normalizedEdges,
         ));
     }
 }

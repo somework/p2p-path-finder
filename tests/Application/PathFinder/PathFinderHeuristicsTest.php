@@ -27,13 +27,16 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
-use function array_fill;
+use function chr;
+use function sprintf;
 
 /**
  * @covers \SomeWork\P2PPathFinder\Application\PathFinder\PathFinder
  */
 final class PathFinderHeuristicsTest extends TestCase
 {
+    private const SCALE = 18;
+
     public function test_dominated_state_is_detected(): void
     {
         $registry = SearchStateRegistry::withInitial(
@@ -528,7 +531,7 @@ final class PathFinderHeuristicsTest extends TestCase
                 $heap,
                 $this->buildCandidate($candidate['cost'], [[
                     'from' => 'SRC',
-                    'to' => 'DST_'.$candidate['order'],
+                    'to' => 'DST'.chr(65 + $candidate['order']),
                 ]]),
                 $candidate['order'],
             );
@@ -678,11 +681,11 @@ final class PathFinderHeuristicsTest extends TestCase
 
         $first = $this->buildCandidate($cost, [[
             'from' => 'SRC',
-            'to' => 'MID_A',
+            'to' => 'MIDA',
         ]]);
         $second = $this->buildCandidate($cost, [[
             'from' => 'SRC',
-            'to' => 'MID_B',
+            'to' => 'MIDB',
         ]]);
 
         $recordResult->invokeArgs($finder, [$heap, $first, 0]);
@@ -695,8 +698,8 @@ final class PathFinderHeuristicsTest extends TestCase
 
         $results = $results->toArray();
 
-        self::assertSame('MID_A', $results[0]->edges()[0]->to());
-        self::assertSame('MID_B', $results[1]->edges()[0]->to());
+        self::assertSame('MIDA', $results[0]->edges()[0]->to());
+        self::assertSame('MIDB', $results[1]->edges()[0]->to());
     }
 
     private function searchState(string $node, string $cost, string $product, int $hops): SearchState
@@ -719,22 +722,31 @@ final class PathFinderHeuristicsTest extends TestCase
             return PathEdgeSequence::empty();
         }
 
-        $order = OrderFactory::buy('SRC', 'DST', '1.000', '1.000', '1.000', 3, 3);
-        $edge = PathEdge::create(
-            'SRC',
-            'DST',
-            $order,
-            $order->effectiveRate(),
-            OrderSide::BUY,
-            BcMath::normalize('1.000000000000000000', 18),
-        );
+        $edges = [];
+        $from = 'SRC';
 
-        return PathEdgeSequence::fromList(array_fill(0, $count, $edge));
+        for ($index = 0; $index < $count; ++$index) {
+            $to = sprintf('CUR%s', chr(65 + $index));
+            $order = OrderFactory::buy($from, $to, '1.000', '1.000', '1.000', 3, 3);
+
+            $edges[] = PathEdge::create(
+                $from,
+                $to,
+                $order,
+                $order->effectiveRate(),
+                OrderSide::BUY,
+                BcMath::normalize('1.000000000000000000', self::SCALE),
+            );
+
+            $from = $to;
+        }
+
+        return PathEdgeSequence::fromList($edges);
     }
 
     private function buildCandidate(string $cost, array $edges = []): CandidatePath
     {
-        $normalized = BcMath::normalize($cost, 18);
+        $normalized = BcMath::normalize($cost, self::SCALE);
 
         $edgeSequence = [] === $edges
             ? PathEdgeSequence::empty()
@@ -752,7 +764,7 @@ final class PathFinderHeuristicsTest extends TestCase
 
         return CandidatePath::from(
             $normalized,
-            BcMath::normalize('1.000000000000000000', 18),
+            BcMath::normalize('1.000000000000000000', self::SCALE),
             $edgeSequence->count(),
             $edgeSequence,
         );
@@ -767,15 +779,24 @@ final class PathFinderHeuristicsTest extends TestCase
     {
         return array_map(
             static function (array $edge): array {
-                $order = $edge['order'] ?? OrderFactory::buy('SRC', 'DST', '1.000', '1.000', '1.000', 3, 3);
+                $from = $edge['from'] ?? 'SRC';
+                $to = $edge['to'] ?? 'DST';
+                $side = $edge['orderSide'] ?? OrderSide::BUY;
+
+                $order = $edge['order'] ?? match ($side) {
+                    OrderSide::BUY => OrderFactory::buy($from, $to, '1.000', '1.000', '1.000', 3, 3),
+                    OrderSide::SELL => OrderFactory::sell($to, $from, '1.000', '1.000', '1.000', 3, 3),
+                };
+
+                $orderSide = $edge['orderSide'] ?? $order->side();
 
                 return $edge + [
-                    'from' => $edge['from'] ?? 'SRC',
-                    'to' => $edge['to'] ?? 'DST',
+                    'from' => $from,
+                    'to' => $to,
                     'order' => $order,
-                    'rate' => $order->effectiveRate(),
-                    'orderSide' => $edge['orderSide'] ?? OrderSide::BUY,
-                    'conversionRate' => $edge['conversionRate'] ?? BcMath::normalize('1.000000000000000000', 18),
+                    'rate' => $edge['rate'] ?? $order->effectiveRate(),
+                    'orderSide' => $orderSide,
+                    'conversionRate' => $edge['conversionRate'] ?? BcMath::normalize('1.000000000000000000', self::SCALE),
                 ];
             },
             $edges,

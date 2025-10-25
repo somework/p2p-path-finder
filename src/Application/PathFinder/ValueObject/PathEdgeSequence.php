@@ -56,6 +56,8 @@ final class PathEdgeSequence implements ArrayAccess, Countable, IteratorAggregat
             $list[] = $edge;
         }
 
+        self::assertValidChain($list);
+
         return new self($list);
     }
 
@@ -70,12 +72,22 @@ final class PathEdgeSequence implements ArrayAccess, Countable, IteratorAggregat
             }
         }
 
+        self::assertValidChain($edges);
+
         return new self($edges);
     }
 
     public function append(PathEdge $edge): self
     {
         $edges = $this->edges;
+
+        self::assertEdgeAlignment($edge);
+
+        $last = $this->last();
+        if ($last instanceof PathEdge) {
+            self::assertAdjacent($last, $edge);
+        }
+
         $edges[] = $edge;
 
         return new self($edges);
@@ -147,6 +159,57 @@ final class PathEdgeSequence implements ArrayAccess, Countable, IteratorAggregat
     public function toList(): array
     {
         return $this->edges;
+    }
+
+    /**
+     * @param list<PathEdge> $edges
+     */
+    private static function assertValidChain(array $edges): void
+    {
+        $previous = null;
+
+        foreach ($edges as $edge) {
+            self::assertEdgeAlignment($edge);
+
+            if ($previous instanceof PathEdge) {
+                self::assertAdjacent($previous, $edge);
+            }
+
+            $previous = $edge;
+        }
+    }
+
+    private static function assertEdgeAlignment(PathEdge $edge): void
+    {
+        $order = $edge->order();
+
+        if ($edge->orderSide() !== $order->side()) {
+            throw new InvalidInput('Path edge order side must match the underlying order.');
+        }
+
+        $pair = $order->assetPair();
+
+        [$expectedFrom, $expectedTo] = match ($edge->orderSide()) {
+            OrderSide::BUY => [$pair->base(), $pair->quote()],
+            OrderSide::SELL => [$pair->quote(), $pair->base()],
+        };
+
+        if ($edge->from() !== $expectedFrom || $edge->to() !== $expectedTo) {
+            throw new InvalidInput('Path edge endpoints must align with the underlying order asset pair and side.');
+        }
+
+        $rate = $edge->rate();
+
+        if ($rate->baseCurrency() !== $pair->base() || $rate->quoteCurrency() !== $pair->quote()) {
+            throw new InvalidInput('Path edge exchange rate currencies must match the order asset pair.');
+        }
+    }
+
+    private static function assertAdjacent(PathEdge $previous, PathEdge $edge): void
+    {
+        if ($previous->to() !== $edge->from()) {
+            throw new InvalidInput(sprintf('Path edge sequences must form a continuous chain. Expected "%s" to lead into "%s".', $previous->to(), $edge->from()));
+        }
     }
 
     /**
