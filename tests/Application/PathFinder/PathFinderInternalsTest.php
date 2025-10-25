@@ -17,6 +17,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidateHeapEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidatePriority;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\InsertionOrderCounter;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchBootstrap;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchQueueEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchState;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriority;
@@ -170,14 +171,16 @@ final class PathFinderInternalsTest extends TestCase
         ];
         $desired = CurrencyScenarioFactory::money('USD', '7.50', 2);
 
-        [
-            $queue,
-            $results,
-            $bestPerNode,
-            $insertionOrder,
-            $resultInsertionOrder,
-            $visitedStates,
-        ] = $this->invokeFinderMethod($finder, 'initializeSearchStructures', ['SRC', $range, $desired]);
+        $bootstrap = $this->invokeFinderMethod($finder, 'initializeSearchStructures', ['SRC', $range, $desired]);
+
+        self::assertInstanceOf(SearchBootstrap::class, $bootstrap);
+
+        $queue = $bootstrap->queue();
+        $results = $bootstrap->results();
+        $bestPerNode = $bootstrap->registry();
+        $insertionOrder = $bootstrap->insertionOrder();
+        $resultInsertionOrder = $bootstrap->resultInsertionOrder();
+        $visitedStates = $bootstrap->visitedStates();
 
         self::assertInstanceOf(SearchStateQueue::class, $queue);
         self::assertInstanceOf(CandidateResultHeap::class, $results);
