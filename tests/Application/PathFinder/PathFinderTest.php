@@ -325,7 +325,7 @@ final class PathFinderTest extends TestCase
         $strategy = new class implements PathOrderStrategy {
             public function compare(PathOrderKey $left, PathOrderKey $right): int
             {
-                $comparison = $right->routeSignature() <=> $left->routeSignature();
+                $comparison = $right->routeSignature()->compare($left->routeSignature());
                 if (0 !== $comparison) {
                     return $comparison;
                 }

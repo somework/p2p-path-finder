@@ -9,8 +9,10 @@ use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSetEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
@@ -178,7 +180,7 @@ final class PathFinderServicePropertyTest extends TestCase
         $strategy = new class implements PathOrderStrategy {
             public function compare(PathOrderKey $left, PathOrderKey $right): int
             {
-                $comparison = $right->routeSignature() <=> $left->routeSignature();
+                $comparison = $right->routeSignature()->compare($left->routeSignature());
                 if (0 !== $comparison) {
                     return $comparison;
                 }
@@ -195,7 +197,7 @@ final class PathFinderServicePropertyTest extends TestCase
                     DecimalTolerance::zero(),
                     $this->buildLegCollection(['SRC', 'ALP', 'DST']),
                 ),
-                new PathOrderKey('0.100000000000000000', 2, 'SRC->ALP->DST', 0),
+                new PathOrderKey(new PathCost('0.100000000000000000'), 2, new RouteSignature(['SRC', 'ALP', 'DST']), 0),
             ),
             new PathResultSetEntry(
                 new PathResult(
@@ -204,7 +206,7 @@ final class PathFinderServicePropertyTest extends TestCase
                     DecimalTolerance::zero(),
                     $this->buildLegCollection(['SRC', 'BET', 'DST']),
                 ),
-                new PathOrderKey('0.100000000000000000', 2, 'SRC->BET->DST', 1),
+                new PathOrderKey(new PathCost('0.100000000000000000'), 2, new RouteSignature(['SRC', 'BET', 'DST']), 1),
             ),
             new PathResultSetEntry(
                 new PathResult(
@@ -213,7 +215,7 @@ final class PathFinderServicePropertyTest extends TestCase
                     DecimalTolerance::zero(),
                     $this->buildLegCollection(['SRC', 'CHI', 'DST']),
                 ),
-                new PathOrderKey('0.100000000000000000', 2, 'SRC->CHI->DST', 2),
+                new PathOrderKey(new PathCost('0.100000000000000000'), 2, new RouteSignature(['SRC', 'CHI', 'DST']), 2),
             ),
         ];
 

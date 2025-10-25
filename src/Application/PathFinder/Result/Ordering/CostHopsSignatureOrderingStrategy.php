@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering;
 
 use Override;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 
 final class CostHopsSignatureOrderingStrategy implements PathOrderStrategy
 {
@@ -16,9 +15,7 @@ final class CostHopsSignatureOrderingStrategy implements PathOrderStrategy
     #[Override]
     public function compare(PathOrderKey $left, PathOrderKey $right): int
     {
-        BcMath::ensureNumeric($left->cost(), $right->cost());
-
-        $costComparison = BcMath::comp($left->cost(), $right->cost(), $this->costScale);
+        $costComparison = $left->cost()->compare($right->cost(), $this->costScale);
         if (0 !== $costComparison) {
             return $costComparison;
         }
@@ -28,7 +25,7 @@ final class CostHopsSignatureOrderingStrategy implements PathOrderStrategy
             return $hopComparison;
         }
 
-        $signatureComparison = $left->routeSignature() <=> $right->routeSignature();
+        $signatureComparison = $left->routeSignature()->compare($right->routeSignature());
         if (0 !== $signatureComparison) {
             return $signatureComparison;
         }

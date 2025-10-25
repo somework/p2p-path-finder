@@ -100,12 +100,13 @@ final class PathResultSet implements IteratorAggregate, Countable, JsonSerializa
 
         foreach ($collected as $entry) {
             $signature = $entry->orderKey()->routeSignature();
-            if ('' !== $signature) {
-                if (isset($signatures[$signature])) {
+            $signatureKey = $signature->value();
+            if ('' !== $signatureKey) {
+                if (isset($signatures[$signatureKey])) {
                     continue;
                 }
 
-                $signatures[$signature] = true;
+                $signatures[$signatureKey] = true;
             }
 
             $paths[] = $entry->path();

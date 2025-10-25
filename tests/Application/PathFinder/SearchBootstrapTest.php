@@ -9,6 +9,8 @@ use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\PathFinder\CandidateResultHeap;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidateHeapEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidatePriority;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\InsertionOrderCounter;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchBootstrap;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchQueueEntry;
@@ -36,7 +38,7 @@ final class SearchBootstrapTest extends TestCase
         $state = SearchState::bootstrap('SRC', BcMath::normalize('1', self::SCALE), null, null);
         $queue->push(new SearchQueueEntry(
             $state,
-            new SearchStatePriority($state->cost(), $state->hops(), '', $insertionOrder->next()),
+            new SearchStatePriority(new PathCost($state->cost()), $state->hops(), new RouteSignature([]), $insertionOrder->next()),
         ));
 
         $candidate = CandidatePath::from(
@@ -46,7 +48,7 @@ final class SearchBootstrapTest extends TestCase
             PathEdgeSequence::empty(),
             null,
         );
-        $results->push(new CandidateHeapEntry($candidate, new CandidatePriority($candidate->cost(), 1, 'sig:candidate', $resultInsertionOrder->next())));
+        $results->push(new CandidateHeapEntry($candidate, new CandidatePriority(new PathCost($candidate->cost()), 1, new RouteSignature(['sig:candidate']), $resultInsertionOrder->next())));
 
         $bootstrap = new SearchBootstrap($queue, $results, $registry, $insertionOrder, $resultInsertionOrder, 1);
         $clone = clone $bootstrap;
@@ -85,7 +87,7 @@ final class SearchBootstrapTest extends TestCase
         $state = SearchState::bootstrap('SRC', BcMath::normalize('1', self::SCALE), null, null);
         $queue->push(new SearchQueueEntry(
             $state,
-            new SearchStatePriority($state->cost(), $state->hops(), '', $insertionOrder->next()),
+            new SearchStatePriority(new PathCost($state->cost()), $state->hops(), new RouteSignature([]), $insertionOrder->next()),
         ));
 
         $this->expectException(InvalidArgumentException::class);
@@ -115,7 +117,7 @@ final class SearchBootstrapTest extends TestCase
         $state = SearchState::bootstrap('SRC', BcMath::normalize('1', self::SCALE), null, null);
         $queue->push(new SearchQueueEntry(
             $state,
-            new SearchStatePriority($state->cost(), $state->hops(), '', $insertionOrder->next()),
+            new SearchStatePriority(new PathCost($state->cost()), $state->hops(), new RouteSignature([]), $insertionOrder->next()),
         ));
 
         $this->expectException(InvalidArgumentException::class);

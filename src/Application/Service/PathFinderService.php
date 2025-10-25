@@ -11,8 +11,10 @@ use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSetEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
@@ -27,7 +29,6 @@ use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
-use function implode;
 use function sprintf;
 use function strtoupper;
 
@@ -227,7 +228,7 @@ final class PathFinderService
                 );
 
                 $orderKey = new PathOrderKey(
-                    $candidate->cost(),
+                    new PathCost($candidate->cost()),
                     $candidate->hops(),
                     $routeSignature,
                     $resultOrder,
@@ -313,15 +314,15 @@ final class PathFinderService
         return 'Search guard limit exceeded: '.implode(' and ', $breaches).'.';
     }
 
-    private function routeSignature(PathEdgeSequence $edges): string
+    private function routeSignature(PathEdgeSequence $edges): RouteSignature
     {
         if ($edges->isEmpty()) {
-            return '';
+            return new RouteSignature([]);
         }
 
         $first = $edges->first();
         if (null === $first) {
-            return '';
+            return new RouteSignature([]);
         }
 
         $nodes = [$first->from()];
@@ -330,7 +331,7 @@ final class PathFinderService
             $nodes[] = $edge->to();
         }
 
-        return implode('->', $nodes);
+        return new RouteSignature($nodes);
     }
 
     /**

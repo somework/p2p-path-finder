@@ -6,7 +6,9 @@ namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder\Result;
 
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSetEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
@@ -29,8 +31,8 @@ final class SearchOutcomeTest extends TestCase
         $paths = PathResultSet::fromEntries(
             new CostHopsSignatureOrderingStrategy(18),
             [
-                new PathResultSetEntry(['id' => 2], new PathOrderKey('2', 1, 'B', 1)),
-                new PathResultSetEntry(['id' => 1], new PathOrderKey('1', 1, 'A', 0)),
+                new PathResultSetEntry(['id' => 2], new PathOrderKey(new PathCost('2'), 1, new RouteSignature(['B']), 1)),
+                new PathResultSetEntry(['id' => 1], new PathOrderKey(new PathCost('1'), 1, new RouteSignature(['A']), 0)),
             ],
         );
         $status = SearchGuardReport::idle(25, 10);

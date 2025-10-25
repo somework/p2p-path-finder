@@ -6,7 +6,9 @@ namespace SomeWork\P2PPathFinder\Tests\Application\Result;
 
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSetEntry;
 use SomeWork\P2PPathFinder\Application\Result\MoneyMap;
@@ -45,7 +47,7 @@ final class PathResultFormatterTest extends TestCase
 
         $collection = PathResultSet::fromEntries(
             new CostHopsSignatureOrderingStrategy(18),
-            [new PathResultSetEntry($result, new PathOrderKey('0.1', 1, 'USD->EUR', 0))],
+            [new PathResultSetEntry($result, new PathOrderKey(new PathCost('0.1'), 1, new RouteSignature(['USD', 'EUR']), 0))],
         );
 
         $this->assertSame([
