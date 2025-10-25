@@ -24,12 +24,16 @@ final class SearchStatePriority
         private readonly string $routeSignature,
         private readonly int $order,
     ) {
-        /** @psalm-suppress DocblockTypeContradiction */
+        /*
+         * @psalm-suppress DocblockTypeContradiction
+         */
         if ($this->hops < 0) {
             throw new InvalidArgumentException('Queue priorities require a non-negative hop count.');
         }
 
-        /** @psalm-suppress DocblockTypeContradiction */
+        /*
+         * @psalm-suppress DocblockTypeContradiction
+         */
         if ($this->order < 0) {
             throw new InvalidArgumentException('Queue priorities require a non-negative insertion order.');
         }

@@ -45,8 +45,10 @@ final class SearchState
             throw new InvalidArgumentException('Search states require a non-empty node identifier.');
         }
 
-        /* @phpstan-ignore-next-line */
-        /** @psalm-suppress DocblockTypeContradiction */
+        /*
+         * @phpstan-ignore-next-line
+         * @psalm-suppress DocblockTypeContradiction
+         */
         if ($this->hops < 0) {
             throw new InvalidArgumentException('Search state hop counts must be non-negative.');
         }

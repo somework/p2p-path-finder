@@ -12,8 +12,10 @@ final class InsertionOrderCounter
          */
         private int $value = 0
     ) {
-        /* @phpstan-ignore-next-line */
-        /** @psalm-suppress DocblockTypeContradiction */
+        /*
+         * @phpstan-ignore-next-line
+         * @psalm-suppress DocblockTypeContradiction
+         */
         if ($this->value < 0) {
             throw new \InvalidArgumentException('Insertion counters must start at a non-negative value.');
         }
