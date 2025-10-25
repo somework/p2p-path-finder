@@ -174,6 +174,11 @@ final class OrderTest extends TestCase
             {
                 return FeeBreakdown::forQuote(Money::fromString('EUR', '5.000', 3));
             }
+
+            public function fingerprint(): string
+            {
+                return 'quote-mismatch:EUR:5.000@3';
+            }
         };
 
         $order = OrderFactory::buy(feePolicy: $policy);
@@ -190,6 +195,11 @@ final class OrderTest extends TestCase
             public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
             {
                 return FeeBreakdown::of(Money::fromString('ETH', '0.010', 3), null);
+            }
+
+            public function fingerprint(): string
+            {
+                return 'base-mismatch:ETH:0.010@3';
             }
         };
 
@@ -210,6 +220,11 @@ final class OrderTest extends TestCase
                     Money::fromString($baseAmount->currency(), '0.010', $baseAmount->scale()),
                     Money::fromString($quoteAmount->currency(), '5.000', $quoteAmount->scale()),
                 );
+            }
+
+            public function fingerprint(): string
+            {
+                return 'dual-component:0.010:5.000';
             }
         };
 
@@ -252,6 +267,11 @@ final class OrderTest extends TestCase
             {
                 return FeeBreakdown::forBase(Money::fromString('ETH', '0.010', 3));
             }
+
+            public function fingerprint(): string
+            {
+                return 'gross-base-mismatch:ETH:0.010@3';
+            }
         };
 
         $order = OrderFactory::buy(feePolicy: $policy);
@@ -287,6 +307,11 @@ final class OrderTest extends TestCase
             public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
             {
                 return FeeBreakdown::forQuote(CurrencyScenarioFactory::money('BTC', '1.000', 3));
+            }
+
+            public function fingerprint(): string
+            {
+                return 'quote-mismatch:BTC:1.000@3';
             }
         });
 
@@ -328,6 +353,11 @@ final class OrderTest extends TestCase
 
                 return FeeBreakdown::forQuote($fee);
             }
+
+            public function fingerprint(): string
+            {
+                return 'percentage-quote:'.$this->percentage;
+            }
         };
     }
 
@@ -344,6 +374,11 @@ final class OrderTest extends TestCase
 
                 return FeeBreakdown::forBase($fee);
             }
+
+            public function fingerprint(): string
+            {
+                return 'base-flat:'.$this->flatFee;
+            }
         };
     }
 
@@ -353,6 +388,11 @@ final class OrderTest extends TestCase
             public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
             {
                 throw new LogicException('Precomputed fees should prevent FeePolicy::calculate invocation.');
+            }
+
+            public function fingerprint(): string
+            {
+                return 'fail-on-calculate';
             }
         };
     }

@@ -9,6 +9,8 @@ use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
+use function implode;
+
 final class FeePolicyFactory
 {
     /**
@@ -27,6 +29,11 @@ final class FeePolicyFactory
                 $fee = $baseAmount->multiply($this->ratio, $feeScale)->withScale($baseAmount->scale());
 
                 return FeeBreakdown::forBase($fee);
+            }
+
+            public function fingerprint(): string
+            {
+                return implode(':', ['base-surcharge', $this->ratio, $this->scale]);
             }
         };
     }
@@ -52,6 +59,11 @@ final class FeePolicyFactory
                 $quoteFee = $quoteAmount->multiply($this->quoteRatio, $feeScale)->withScale($quoteAmount->scale());
 
                 return FeeBreakdown::of($baseFee, $quoteFee);
+            }
+
+            public function fingerprint(): string
+            {
+                return implode(':', ['base-quote-surcharge', $this->baseRatio, $this->quoteRatio, $this->scale]);
             }
         };
     }
@@ -86,6 +98,11 @@ final class FeePolicyFactory
                     ->withScale($quoteAmount->scale());
 
                 return FeeBreakdown::forQuote($fee);
+            }
+
+            public function fingerprint(): string
+            {
+                return implode(':', ['quote-percentage-fixed', $this->percentage, $this->fixed, $this->scale]);
             }
         };
     }

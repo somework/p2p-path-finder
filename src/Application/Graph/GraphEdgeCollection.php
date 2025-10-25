@@ -10,6 +10,7 @@ use Closure;
 use Countable;
 use IteratorAggregate;
 use JsonSerializable;
+use LogicException;
 use SomeWork\P2PPathFinder\Application\Support\GuardsArrayAccessOffset;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use Traversable;
@@ -17,8 +18,6 @@ use Traversable;
 use function array_is_list;
 use function count;
 use function implode;
-use function spl_object_hash;
-use function str_contains;
 
 /**
  * Immutable ordered collection of {@see GraphEdge} instances for a single origin currency.
@@ -225,12 +224,13 @@ final class GraphEdgeCollection implements ArrayAccess, Countable, IteratorAggre
 
         $feeKey = 'none';
         if (null !== $feePolicy) {
-            $class = $feePolicy::class;
-            $feeKey = $class;
-
-            if (str_contains($class, '@anonymous')) {
-                $feeKey .= '#'.spl_object_hash($feePolicy);
+            $fingerprint = $feePolicy->fingerprint();
+            /** @var string $fingerprint */
+            if ('' === $fingerprint) {
+                throw new LogicException('Fee policy fingerprint must not be empty.');
             }
+
+            $feeKey = implode('|', [$feePolicy::class, $fingerprint]);
         }
 
         return implode('|', [

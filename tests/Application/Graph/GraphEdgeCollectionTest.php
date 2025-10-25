@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\Graph;
 
+use LogicException;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity;
 use SomeWork\P2PPathFinder\Application\Graph\EdgeSegment;
 use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\Graph\GraphEdgeCollection;
+use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
+use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Tests\Fixture\FeePolicyFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
 final class GraphEdgeCollectionTest extends TestCase
@@ -61,6 +65,59 @@ final class GraphEdgeCollectionTest extends TestCase
 
         $serialized = array_map(static fn (GraphEdge $edge): array => $edge->jsonSerialize(), $expected);
         self::assertSame($serialized, $collection->jsonSerialize());
+    }
+
+    public function test_serialization_is_identical_for_permuted_edges_with_fees(): void
+    {
+        $first = GraphEdgeCollection::fromArray([
+            $this->createEdgeForQuote('USD', FeePolicyFactory::baseSurcharge('0.010')),
+            $this->createEdgeForQuote('USD', FeePolicyFactory::baseSurcharge('0.020')),
+            $this->createEdgeForQuote('USD', FeePolicyFactory::baseSurcharge('0.015')),
+        ]);
+
+        $second = GraphEdgeCollection::fromArray([
+            $this->createEdgeForQuote('USD', FeePolicyFactory::baseSurcharge('0.015')),
+            $this->createEdgeForQuote('USD', FeePolicyFactory::baseSurcharge('0.010')),
+            $this->createEdgeForQuote('USD', FeePolicyFactory::baseSurcharge('0.020')),
+        ]);
+
+        self::assertSame($first->jsonSerialize(), $second->jsonSerialize());
+    }
+
+    public function test_from_array_rejects_fee_policy_with_empty_fingerprint(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('Fee policy fingerprint must not be empty.');
+
+        GraphEdgeCollection::fromArray([
+            $this->createEdgeForQuote('USD', new class implements FeePolicy {
+                public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+                {
+                    return FeeBreakdown::none();
+                }
+
+                public function fingerprint(): string
+                {
+                    return '';
+                }
+            }),
+            $this->createEdgeForQuote('USD', FeePolicyFactory::baseSurcharge('0.005')),
+        ]);
+    }
+
+    public function test_from_array_sorts_edges_with_same_quote_by_fee_fingerprint(): void
+    {
+        $first = $this->createEdgeForQuote('USD', FeePolicyFactory::baseSurcharge('0.015'));
+        $second = $this->createEdgeForQuote('USD', FeePolicyFactory::baseSurcharge('0.020'));
+        $third = $this->createEdgeForQuote('USD', FeePolicyFactory::baseSurcharge('0.010'));
+
+        $collection = GraphEdgeCollection::fromArray([$first, $second, $third]);
+
+        self::assertSame([
+            $third,
+            $first,
+            $second,
+        ], $collection->toArray());
     }
 
     private function createEdge(): GraphEdge
@@ -113,7 +170,7 @@ final class GraphEdgeCollectionTest extends TestCase
         );
     }
 
-    private function createEdgeForQuote(string $quoteCurrency): GraphEdge
+    private function createEdgeForQuote(string $quoteCurrency, ?FeePolicy $feePolicy = null): GraphEdge
     {
         $order = OrderFactory::buy(
             base: 'BTC',
@@ -123,6 +180,7 @@ final class GraphEdgeCollectionTest extends TestCase
             rate: '2.000',
             amountScale: 3,
             rateScale: 3,
+            feePolicy: $feePolicy,
         );
 
         return new GraphEdge(

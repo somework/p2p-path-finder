@@ -18,6 +18,7 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 
+use function implode;
 use function max;
 use function sprintf;
 use function substr;
@@ -166,6 +167,11 @@ abstract class PathFinderServiceTestCase extends TestCase
 
                 return FeeBreakdown::forBase($fee);
             }
+
+            public function fingerprint(): string
+            {
+                return 'percentage-base:'.$this->percentage;
+            }
         };
     }
 
@@ -181,6 +187,11 @@ abstract class PathFinderServiceTestCase extends TestCase
                 $fee = $quoteAmount->multiply($this->percentage, $quoteAmount->scale());
 
                 return FeeBreakdown::forQuote($fee);
+            }
+
+            public function fingerprint(): string
+            {
+                return 'percentage-quote:'.$this->percentage;
             }
         };
     }
@@ -200,6 +211,11 @@ abstract class PathFinderServiceTestCase extends TestCase
                 $quoteFee = $quoteAmount->multiply($this->quotePercentage, $quoteAmount->scale());
 
                 return FeeBreakdown::of($baseFee, $quoteFee);
+            }
+
+            public function fingerprint(): string
+            {
+                return 'percentage-mixed:'.$this->basePercentage.':'.$this->quotePercentage;
             }
         };
     }
@@ -232,6 +248,11 @@ abstract class PathFinderServiceTestCase extends TestCase
                 $fee = $quoteAmount->multiply($this->lowPercentage, $scale);
 
                 return FeeBreakdown::forQuote($fee);
+            }
+
+            public function fingerprint(): string
+            {
+                return implode(':', ['tiered', $this->threshold, $this->lowPercentage, $this->highPercentage, $this->fixed]);
             }
         };
     }
