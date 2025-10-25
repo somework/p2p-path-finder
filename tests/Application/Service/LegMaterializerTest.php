@@ -21,6 +21,7 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Tests\Fixture\FeePolicyFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
@@ -197,9 +198,10 @@ final class LegMaterializerTest extends TestCase
             $graph['EUR']['edges'][0],
         ];
 
-        self::assertNull(
-            $materializer->materialize($this->pathEdges($misorderedEdges), $config->spendAmount(), $initialSeed, 'JPY')
-        );
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessageMatches('/^Path edge sequences must form a continuous chain\b/');
+
+        $materializer->materialize($this->pathEdges($misorderedEdges), $config->spendAmount(), $initialSeed, 'JPY');
     }
 
     public function test_materialize_consumes_tolerance_budget_on_initial_buy_leg(): void
