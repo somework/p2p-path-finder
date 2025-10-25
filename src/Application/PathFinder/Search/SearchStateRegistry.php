@@ -23,6 +23,11 @@ final class SearchStateRegistry
         return new self([$node => [$record]]);
     }
 
+    public function isEmpty(): bool
+    {
+        return [] === $this->records;
+    }
+
     /**
      * @return list<SearchStateRecord>
      */

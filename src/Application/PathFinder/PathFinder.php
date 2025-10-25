@@ -18,6 +18,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSetEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\InsertionOrderCounter;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchBootstrap;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchQueueEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchState;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriority;
@@ -143,14 +144,13 @@ final class PathFinder
             $desiredSpend = $spendConstraints->desired();
         }
 
-        [
-            $queue,
-            $results,
-            $bestPerNode,
-            $insertionOrder,
-            $resultInsertionOrder,
-            $visitedStates,
-        ] = $this->initializeSearchStructures($source, $range, $desiredSpend);
+        $bootstrap = $this->initializeSearchStructures($source, $range, $desiredSpend);
+        $queue = $bootstrap->queue();
+        $results = $bootstrap->results();
+        $bestPerNode = $bootstrap->registry();
+        $insertionOrder = $bootstrap->insertionOrder();
+        $resultInsertionOrder = $bootstrap->resultInsertionOrder();
+        $visitedStates = $bootstrap->visitedStates();
 
         $bestTargetCost = null;
 
@@ -387,10 +387,8 @@ final class PathFinder
 
     /**
      * @param array{min: Money, max: Money}|null $range
-     *
-     * @return array{SearchStateQueue, CandidateResultHeap, SearchStateRegistry, InsertionOrderCounter, InsertionOrderCounter, int}
      */
-    private function initializeSearchStructures(string $source, ?array $range, ?Money $desiredSpend): array
+    private function initializeSearchStructures(string $source, ?array $range, ?Money $desiredSpend): SearchBootstrap
     {
         /** @var array{min: Money, max: Money}|null $range */
         $range = $range;
@@ -415,7 +413,7 @@ final class PathFinder
 
         $bestPerNode = SearchStateRegistry::withInitial($source, $initialRecord);
 
-        return [$queue, $results, $bestPerNode, $insertionOrder, $resultInsertionOrder, 1];
+        return new SearchBootstrap($queue, $results, $bestPerNode, $insertionOrder, $resultInsertionOrder, 1);
     }
 
     /**
