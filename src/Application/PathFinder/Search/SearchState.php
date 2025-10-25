@@ -18,6 +18,11 @@ use function is_string;
 final class SearchState
 {
     /**
+     * @var int<0, max>
+     */
+    private readonly int $hops;
+
+    /**
      * @var non-empty-array<string, bool>
      */
     private readonly array $visited;
@@ -32,18 +37,16 @@ final class SearchState
         private readonly string $node,
         private readonly string $cost,
         private readonly string $product,
-        private readonly int $hops,
+        int $hops,
         private readonly PathEdgeSequence $path,
         private readonly ?array $amountRange,
         private readonly ?Money $desiredAmount,
         array $visited,
     ) {
+        $this->hops = self::guardNonNegative($hops, 'Search state hop counts must be non-negative.');
+
         if ('' === $this->node) {
             throw new InvalidArgumentException('Search states require a non-empty node identifier.');
-        }
-
-        if ($this->hops < 0) {
-            throw new InvalidArgumentException('Search state hop counts must be non-negative.');
         }
 
         BcMath::ensureNumeric($this->cost, $this->product);
@@ -83,6 +86,10 @@ final class SearchState
      * @param numeric-string                     $product
      * @param array{min: Money, max: Money}|null $amountRange
      * @param array<array-key, bool>             $visited
+     *
+     * @phpstan-param int<0, max> $hops
+     *
+     * @psalm-param int<0, max>   $hops
      */
     public static function fromComponents(
         string $node,
@@ -95,6 +102,22 @@ final class SearchState
         array $visited
     ): self {
         return new self($node, $cost, $product, $hops, $path, $amountRange, $desiredAmount, $visited);
+    }
+
+    /**
+     * @phpstan-assert int<0, max> $value
+     *
+     * @psalm-assert int<0, max> $value
+     *
+     * @return int<0, max>
+     */
+    private static function guardNonNegative(int $value, string $message): int
+    {
+        if ($value < 0) {
+            throw new InvalidArgumentException($message);
+        }
+
+        return $value;
     }
 
     /**
@@ -168,6 +191,11 @@ final class SearchState
         return $this->product;
     }
 
+    /**
+     * @phpstan-return int<0, max>
+     *
+     * @psalm-return int<0, max>
+     */
     public function hops(): int
     {
         return $this->hops;
