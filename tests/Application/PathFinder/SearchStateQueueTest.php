@@ -12,6 +12,9 @@ use SomeWork\P2PPathFinder\Application\PathFinder\SearchStateQueue;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 
+/**
+ * Search state priorities must order by cost, hop count, route signature, then insertion order.
+ */
 final class SearchStateQueueTest extends TestCase
 {
     public function test_insert_accepts_prepackaged_entries(): void
@@ -19,31 +22,60 @@ final class SearchStateQueueTest extends TestCase
         $queue = new SearchStateQueue(18);
 
         $stateA = $this->state('A', '0.100000000000000000');
-        $entryA = new SearchQueueEntry($stateA, new SearchStatePriority('0.100000000000000000', 1));
+        $entryA = new SearchQueueEntry(
+            $stateA,
+            $this->priority('0.100000000000000000', $stateA->hops(), '', 1),
+        );
         $queue->insert($entryA);
 
         $stateB = $this->state('B', '0.200000000000000000');
-        $queue->insert(new SearchQueueEntry($stateB, new SearchStatePriority('0.200000000000000000', 2)));
+        $queue->insert(new SearchQueueEntry(
+            $stateB,
+            $this->priority('0.200000000000000000', $stateB->hops(), '', 2),
+        ));
 
         self::assertSame($stateA, $queue->extract());
         self::assertSame($stateB, $queue->extract());
     }
 
-    public function test_compare_prefers_lower_cost_and_follows_fifo_on_ties(): void
+    public function test_compare_prefers_lower_cost_then_fewer_hops_signature_and_fifo(): void
     {
         $queue = new SearchStateQueue(18);
 
-        $lowerCost = new SearchStatePriority(BcMath::normalize('0.010000000000000000', 18), 0);
-        $higherCost = new SearchStatePriority(BcMath::normalize('0.020000000000000000', 18), 1);
+        $lowerCost = $this->priority(BcMath::normalize('0.010000000000000000', 18), 0, '', 0);
+        $higherCost = $this->priority(BcMath::normalize('0.020000000000000000', 18), 0, '', 1);
 
         self::assertSame(1, $queue->compare($lowerCost, $higherCost));
         self::assertSame(-1, $queue->compare($higherCost, $lowerCost));
 
-        $earlier = new SearchStatePriority(BcMath::normalize('0.030000000000000000', 18), 1);
-        $later = new SearchStatePriority(BcMath::normalize('0.030000000000000000', 18), 0);
+        $fewerHops = $this->priority(BcMath::normalize('0.030000000000000000', 18), 1, '', 1);
+        $moreHops = $this->priority(BcMath::normalize('0.030000000000000000', 18), 2, '', 0);
+
+        self::assertSame(1, $queue->compare($fewerHops, $moreHops));
+        self::assertSame(-1, $queue->compare($moreHops, $fewerHops));
+
+        $alpha = $this->priority(BcMath::normalize('0.030000000000000000', 18), 2, 'A->B', 1);
+        $beta = $this->priority(BcMath::normalize('0.030000000000000000', 18), 2, 'A->C', 0);
+
+        self::assertSame(1, $queue->compare($alpha, $beta));
+        self::assertSame(-1, $queue->compare($beta, $alpha));
+
+        $earlier = $this->priority(BcMath::normalize('0.030000000000000000', 18), 2, 'A->C', 1);
+        $later = $this->priority(BcMath::normalize('0.030000000000000000', 18), 2, 'A->C', 0);
 
         self::assertSame(-1, $queue->compare($earlier, $later));
         self::assertSame(1, $queue->compare($later, $earlier));
+    }
+
+    public function test_compare_prefers_lexicographically_smaller_signature_on_equal_cost_and_hops(): void
+    {
+        $queue = new SearchStateQueue(18);
+
+        $alpha = $this->priority(BcMath::normalize('0.050000000000000000', 18), 1, 'A->B', 0);
+        $beta = $this->priority(BcMath::normalize('0.050000000000000000', 18), 1, 'A->C', 1);
+
+        self::assertSame(1, $queue->compare($alpha, $beta));
+        self::assertSame(-1, $queue->compare($beta, $alpha));
     }
 
     private function state(string $node, string $cost): SearchState
@@ -58,5 +90,13 @@ final class SearchStateQueueTest extends TestCase
             null,
             [$node => true],
         );
+    }
+
+    /**
+     * @param numeric-string $cost
+     */
+    private function priority(string $cost, int $hops, string $signature, int $order): SearchStatePriority
+    {
+        return new SearchStatePriority($cost, $hops, $signature, $order);
     }
 }

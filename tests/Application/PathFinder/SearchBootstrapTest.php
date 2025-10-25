@@ -34,7 +34,10 @@ final class SearchBootstrapTest extends TestCase
         $resultInsertionOrder = new InsertionOrderCounter(3);
 
         $state = SearchState::bootstrap('SRC', BcMath::normalize('1', self::SCALE), null, null);
-        $queue->push(new SearchQueueEntry($state, new SearchStatePriority($state->cost(), $insertionOrder->next())));
+        $queue->push(new SearchQueueEntry(
+            $state,
+            new SearchStatePriority($state->cost(), $state->hops(), '', $insertionOrder->next()),
+        ));
 
         $candidate = CandidatePath::from(
             BcMath::normalize('0.5', self::SCALE),
@@ -80,7 +83,10 @@ final class SearchBootstrapTest extends TestCase
         $resultInsertionOrder = new InsertionOrderCounter();
 
         $state = SearchState::bootstrap('SRC', BcMath::normalize('1', self::SCALE), null, null);
-        $queue->push(new SearchQueueEntry($state, new SearchStatePriority($state->cost(), $insertionOrder->next())));
+        $queue->push(new SearchQueueEntry(
+            $state,
+            new SearchStatePriority($state->cost(), $state->hops(), '', $insertionOrder->next()),
+        ));
 
         $this->expectException(InvalidArgumentException::class);
         new SearchBootstrap($queue, $results, $registry, $insertionOrder, $resultInsertionOrder, 0);
@@ -107,7 +113,10 @@ final class SearchBootstrapTest extends TestCase
         $resultInsertionOrder = new InsertionOrderCounter();
 
         $state = SearchState::bootstrap('SRC', BcMath::normalize('1', self::SCALE), null, null);
-        $queue->push(new SearchQueueEntry($state, new SearchStatePriority($state->cost(), $insertionOrder->next())));
+        $queue->push(new SearchQueueEntry(
+            $state,
+            new SearchStatePriority($state->cost(), $state->hops(), '', $insertionOrder->next()),
+        ));
 
         $this->expectException(InvalidArgumentException::class);
 

@@ -294,7 +294,12 @@ final class PathFinder
                 $queue->push(
                     new SearchQueueEntry(
                         $nextState,
-                        new SearchStatePriority($nextCost, $insertionOrder->next()),
+                        new SearchStatePriority(
+                            $nextCost,
+                            $nextState->hops(),
+                            $this->routeSignature($nextState->path()),
+                            $insertionOrder->next(),
+                        ),
                     ),
                 );
             }
@@ -401,7 +406,12 @@ final class PathFinder
         $queue->push(
             new SearchQueueEntry(
                 $initialState,
-                new SearchStatePriority($this->unitValue, $insertionOrder->next()),
+                new SearchStatePriority(
+                    $this->unitValue,
+                    $initialState->hops(),
+                    $this->routeSignature($initialState->path()),
+                    $insertionOrder->next(),
+                ),
             ),
         );
 
@@ -778,6 +788,11 @@ final class SearchStateQueue
 {
     private SearchStatePriorityQueue $queue;
 
+    /**
+     * @phpstan-param positive-int $scale
+     *
+     * @psalm-param positive-int $scale
+     */
     public function __construct(private readonly int $scale)
     {
         $this->queue = new SearchStatePriorityQueue($this->scale);

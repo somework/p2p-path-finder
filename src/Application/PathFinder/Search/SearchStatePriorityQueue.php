@@ -14,6 +14,11 @@ use SplPriorityQueue;
  */
 final class SearchStatePriorityQueue extends SplPriorityQueue
 {
+    /**
+     * @phpstan-param positive-int $scale
+     *
+     * @psalm-param positive-int $scale
+     */
     public function __construct(private readonly int $scale)
     {
         $this->setExtractFlags(self::EXTR_DATA);
