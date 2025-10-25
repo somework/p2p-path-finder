@@ -76,9 +76,15 @@ final class GraphEdgeCollection implements ArrayAccess, Countable, IteratorAggre
         $normalized = [];
         $originCurrency = null;
 
-        $comparator = $comparator instanceof Closure
-            ? $comparator
-            : (null !== $comparator ? Closure::fromCallable($comparator) : self::canonicalComparator());
+        if ($comparator instanceof Closure) {
+            $resolvedComparator = $comparator;
+        } elseif (null !== $comparator) {
+            $resolvedComparator = Closure::fromCallable($comparator);
+        } else {
+            $resolvedComparator = self::canonicalComparator();
+        }
+
+        $comparator = $resolvedComparator;
 
         foreach ($edges as $edge) {
             if (!$edge instanceof GraphEdge) {
