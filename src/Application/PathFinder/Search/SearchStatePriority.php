@@ -10,6 +10,16 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 final class SearchStatePriority
 {
     /**
+     * @var int<0, max>
+     */
+    private readonly int $hops;
+
+    /**
+     * @var int<0, max>
+     */
+    private readonly int $order;
+
+    /**
      * @param numeric-string $cost
      *
      * @phpstan-param int        $hops
@@ -20,25 +30,12 @@ final class SearchStatePriority
      */
     public function __construct(
         private readonly string $cost,
-        private readonly int $hops,
+        int $hops,
         private readonly string $routeSignature,
-        private readonly int $order,
+        int $order,
     ) {
-        /**
-         * @phpstan-ignore-next-line
-         * @psalm-suppress DocblockTypeContradiction
-         */
-        if ($this->hops < 0) {
-            throw new InvalidArgumentException('Queue priorities require a non-negative hop count.');
-        }
-
-        /**
-         * @phpstan-ignore-next-line
-         * @psalm-suppress DocblockTypeContradiction
-         */
-        if ($this->order < 0) {
-            throw new InvalidArgumentException('Queue priorities require a non-negative insertion order.');
-        }
+        $this->hops = self::guardNonNegative($hops, 'Queue priorities require a non-negative hop count.');
+        $this->order = self::guardNonNegative($order, 'Queue priorities require a non-negative insertion order.');
 
         BcMath::ensureNumeric($this->cost, $this->cost);
     }
@@ -89,5 +86,21 @@ final class SearchStatePriority
         }
 
         return $other->order() <=> $this->order;
+    }
+
+    /**
+     * @phpstan-assert int<0, max> $value
+     *
+     * @psalm-assert int<0, max> $value
+     *
+     * @return int<0, max>
+     */
+    private static function guardNonNegative(int $value, string $message): int
+    {
+        if ($value < 0) {
+            throw new InvalidArgumentException($message);
+        }
+
+        return $value;
     }
 }
