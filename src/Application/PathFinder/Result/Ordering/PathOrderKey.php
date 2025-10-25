@@ -13,26 +13,17 @@ final class PathOrderKey
 {
     /**
      * @param Payload $payload
-     *
-     * @phpstan-param string $cost
-     *
-     * @psalm-param numeric-string $cost
      */
     public function __construct(
-        private readonly string $cost,
+        private readonly PathCost $cost,
         private readonly int $hops,
-        private readonly string $routeSignature,
+        private readonly RouteSignature $routeSignature,
         private readonly int $insertionOrder,
         private readonly array $payload = [],
     ) {
     }
 
-    /**
-     * @phpstan-return string
-     *
-     * @psalm-return numeric-string
-     */
-    public function cost(): string
+    public function cost(): PathCost
     {
         return $this->cost;
     }
@@ -42,7 +33,7 @@ final class PathOrderKey
         return $this->hops;
     }
 
-    public function routeSignature(): string
+    public function routeSignature(): RouteSignature
     {
         return $this->routeSignature;
     }

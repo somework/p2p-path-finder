@@ -16,6 +16,8 @@ use SomeWork\P2PPathFinder\Application\PathFinder\CandidateResultHeap;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidateHeapEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidatePriority;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\InsertionOrderCounter;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchBootstrap;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchQueueEntry;
@@ -395,9 +397,10 @@ final class PathFinderInternalsTest extends TestCase
         $clone = clone $heap;
         $remaining = $clone->extract();
 
-        self::assertSame(
-            $this->routeSignatureFromCandidate($alpha),
-            $this->routeSignatureFromCandidate($remaining->candidate()),
+        self::assertTrue(
+            $this->routeSignatureFromCandidate($alpha)->equals(
+                $this->routeSignatureFromCandidate($remaining->candidate()),
+            ),
         );
     }
 
@@ -605,15 +608,15 @@ final class PathFinderInternalsTest extends TestCase
 
         $queue->push(new SearchQueueEntry(
             $this->buildState('A'),
-            new SearchStatePriority(BcMath::normalize('0.8', self::SCALE), 0, '', 1),
+            new SearchStatePriority(new PathCost(BcMath::normalize('0.8', self::SCALE)), 0, new RouteSignature([]), 1),
         ));
         $queue->push(new SearchQueueEntry(
             $this->buildState('B'),
-            new SearchStatePriority(BcMath::normalize('0.5', self::SCALE), 0, '', 2),
+            new SearchStatePriority(new PathCost(BcMath::normalize('0.5', self::SCALE)), 0, new RouteSignature([]), 2),
         ));
         $queue->push(new SearchQueueEntry(
             $this->buildState('C'),
-            new SearchStatePriority(BcMath::normalize('0.5', self::SCALE), 0, '', 0),
+            new SearchStatePriority(new PathCost(BcMath::normalize('0.5', self::SCALE)), 0, new RouteSignature([]), 0),
         ));
 
         $first = $queue->extract();
@@ -638,7 +641,7 @@ final class PathFinderInternalsTest extends TestCase
         $heap->push(new CandidateHeapEntry(
             $first,
             new CandidatePriority(
-                $first->cost(),
+                new PathCost($first->cost()),
                 $first->hops(),
                 $this->routeSignatureFromCandidate($first),
                 0,
@@ -647,7 +650,7 @@ final class PathFinderInternalsTest extends TestCase
         $heap->push(new CandidateHeapEntry(
             $second,
             new CandidatePriority(
-                $second->cost(),
+                new PathCost($second->cost()),
                 $second->hops(),
                 $this->routeSignatureFromCandidate($second),
                 2,
@@ -656,7 +659,7 @@ final class PathFinderInternalsTest extends TestCase
         $heap->push(new CandidateHeapEntry(
             $third,
             new CandidatePriority(
-                $third->cost(),
+                new PathCost($third->cost()),
                 $third->hops(),
                 $this->routeSignatureFromCandidate($third),
                 1,
@@ -685,7 +688,7 @@ final class PathFinderInternalsTest extends TestCase
         $heap->push(new CandidateHeapEntry(
             $fewerHops,
             new CandidatePriority(
-                $fewerHops->cost(),
+                new PathCost($fewerHops->cost()),
                 $fewerHops->hops(),
                 $this->routeSignatureFromCandidate($fewerHops),
                 0,
@@ -694,7 +697,7 @@ final class PathFinderInternalsTest extends TestCase
         $heap->push(new CandidateHeapEntry(
             $moreHops,
             new CandidatePriority(
-                $moreHops->cost(),
+                new PathCost($moreHops->cost()),
                 $moreHops->hops(),
                 $this->routeSignatureFromCandidate($moreHops),
                 1,
@@ -718,7 +721,7 @@ final class PathFinderInternalsTest extends TestCase
         $heap->push(new CandidateHeapEntry(
             $alpha,
             new CandidatePriority(
-                $alpha->cost(),
+                new PathCost($alpha->cost()),
                 $alpha->hops(),
                 $this->routeSignatureFromCandidate($alpha),
                 0,
@@ -727,7 +730,7 @@ final class PathFinderInternalsTest extends TestCase
         $heap->push(new CandidateHeapEntry(
             $beta,
             new CandidatePriority(
-                $beta->cost(),
+                new PathCost($beta->cost()),
                 $beta->hops(),
                 $this->routeSignatureFromCandidate($beta),
                 1,
@@ -736,9 +739,10 @@ final class PathFinderInternalsTest extends TestCase
 
         $extracted = $heap->extract();
 
-        self::assertSame(
-            $this->routeSignatureFromCandidate($beta),
-            $this->routeSignatureFromCandidate($extracted->candidate()),
+        self::assertTrue(
+            $this->routeSignatureFromCandidate($beta)->equals(
+                $this->routeSignatureFromCandidate($extracted->candidate()),
+            ),
         );
     }
 
@@ -1053,16 +1057,16 @@ final class PathFinderInternalsTest extends TestCase
         );
     }
 
-    private function routeSignatureFromCandidate(CandidatePath $candidate): string
+    private function routeSignatureFromCandidate(CandidatePath $candidate): RouteSignature
     {
         $edges = $candidate->edges();
         if ($edges->isEmpty()) {
-            return '';
+            return new RouteSignature([]);
         }
 
         $first = $edges->first();
         if (null === $first) {
-            return '';
+            return new RouteSignature([]);
         }
 
         $nodes = [$first->from()];
@@ -1070,7 +1074,7 @@ final class PathFinderInternalsTest extends TestCase
             $nodes[] = $edge->to();
         }
 
-        return implode('->', $nodes);
+        return new RouteSignature($nodes);
     }
 
     private function dummyEdges(int $count): PathEdgeSequence

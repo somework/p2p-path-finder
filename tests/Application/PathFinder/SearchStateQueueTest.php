@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 
 use PHPUnit\Framework\TestCase;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchQueueEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchState;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriority;
 use SomeWork\P2PPathFinder\Application\PathFinder\SearchStateQueue;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
+
+use function explode;
 
 /**
  * Search state priorities must order by cost, hop count, route signature, then insertion order.
@@ -97,6 +101,8 @@ final class SearchStateQueueTest extends TestCase
      */
     private function priority(string $cost, int $hops, string $signature, int $order): SearchStatePriority
     {
-        return new SearchStatePriority($cost, $hops, $signature, $order);
+        $nodes = '' === $signature ? [] : explode('->', $signature);
+
+        return new SearchStatePriority(new PathCost($cost), $hops, new RouteSignature($nodes), $order);
     }
 }

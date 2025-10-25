@@ -8,6 +8,8 @@ use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchQueueEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchState;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriority;
@@ -600,9 +602,9 @@ final class PathFinderHeuristicsTest extends TestCase
                 1,
             ),
             new SearchStatePriority(
-                BcMath::normalize('1.500', 18),
+                new PathCost(BcMath::normalize('1.500', 18)),
                 1,
-                'SRC->high',
+                new RouteSignature(['SRC', 'high']),
                 0,
             ),
         ));
@@ -615,9 +617,9 @@ final class PathFinderHeuristicsTest extends TestCase
                 1,
             ),
             new SearchStatePriority(
-                BcMath::normalize('0.750', 18),
+                new PathCost(BcMath::normalize('0.750', 18)),
                 1,
-                'SRC->low',
+                new RouteSignature(['SRC', 'low']),
                 1,
             ),
         ));
@@ -640,9 +642,9 @@ final class PathFinderHeuristicsTest extends TestCase
                     2,
                 ),
                 'priority' => new SearchStatePriority(
-                    BcMath::normalize('0.500', 18),
+                    new PathCost(BcMath::normalize('0.500', 18)),
                     2,
-                    'SRC->A->C',
+                    new RouteSignature(['SRC', 'A', 'C']),
                     0,
                 ),
             ],
@@ -654,9 +656,9 @@ final class PathFinderHeuristicsTest extends TestCase
                     1,
                 ),
                 'priority' => new SearchStatePriority(
-                    BcMath::normalize('0.500', 18),
+                    new PathCost(BcMath::normalize('0.500', 18)),
                     1,
-                    'SRC->A',
+                    new RouteSignature(['SRC', 'A']),
                     1,
                 ),
             ],
@@ -668,9 +670,9 @@ final class PathFinderHeuristicsTest extends TestCase
                     2,
                 ),
                 'priority' => new SearchStatePriority(
-                    BcMath::normalize('0.500', 18),
+                    new PathCost(BcMath::normalize('0.500', 18)),
                     2,
-                    'SRC->A->B',
+                    new RouteSignature(['SRC', 'A', 'B']),
                     2,
                 ),
             ],
@@ -682,9 +684,9 @@ final class PathFinderHeuristicsTest extends TestCase
                     2,
                 ),
                 'priority' => new SearchStatePriority(
-                    BcMath::normalize('0.500', 18),
+                    new PathCost(BcMath::normalize('0.500', 18)),
                     2,
-                    'SRC->A->C',
+                    new RouteSignature(['SRC', 'A', 'C']),
                     3,
                 ),
             ],

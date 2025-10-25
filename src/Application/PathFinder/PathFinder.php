@@ -11,8 +11,10 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidateHeapEntry
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidatePriority;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidatePriorityQueue;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSetEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
@@ -35,7 +37,6 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
-use function implode;
 use function sprintf;
 use function str_repeat;
 use function strtoupper;
@@ -295,7 +296,7 @@ final class PathFinder
                     new SearchQueueEntry(
                         $nextState,
                         new SearchStatePriority(
-                            $nextCost,
+                            new PathCost($nextCost),
                             $nextState->hops(),
                             $this->routeSignature($nextState->path()),
                             $insertionOrder->next(),
@@ -376,7 +377,7 @@ final class PathFinder
         $entry = new CandidateHeapEntry(
             $candidate,
             new CandidatePriority(
-                $candidateCost,
+                new PathCost($candidateCost),
                 $candidate->hops(),
                 $this->routeSignature($candidate->edges()),
                 $order,
@@ -407,7 +408,7 @@ final class PathFinder
             new SearchQueueEntry(
                 $initialState,
                 new SearchStatePriority(
-                    $this->unitValue,
+                    new PathCost($this->unitValue),
                     $initialState->hops(),
                     $this->routeSignature($initialState->path()),
                     $insertionOrder->next(),
@@ -469,15 +470,15 @@ final class PathFinder
         return $collected;
     }
 
-    private function routeSignature(PathEdgeSequence $edges): string
+    private function routeSignature(PathEdgeSequence $edges): RouteSignature
     {
         if ($edges->isEmpty()) {
-            return '';
+            return new RouteSignature([]);
         }
 
         $first = $edges->first();
         if (null === $first) {
-            return '';
+            return new RouteSignature([]);
         }
 
         $nodes = [$first->from()];
@@ -486,7 +487,7 @@ final class PathFinder
             $nodes[] = $edge->to();
         }
 
-        return implode('->', $nodes);
+        return new RouteSignature($nodes);
     }
 
     /**

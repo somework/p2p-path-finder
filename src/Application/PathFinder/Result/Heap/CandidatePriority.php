@@ -5,17 +5,15 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap;
 
 use InvalidArgumentException;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
 
 final class CandidatePriority
 {
-    /**
-     * @param numeric-string $cost
-     */
     public function __construct(
-        private readonly string $cost,
+        private readonly PathCost $cost,
         private readonly int $hops,
-        private readonly string $routeSignature,
+        private readonly RouteSignature $routeSignature,
         private readonly int $order
     ) {
         if ($this->hops < 0) {
@@ -25,14 +23,9 @@ final class CandidatePriority
         if ($this->order < 0) {
             throw new InvalidArgumentException('Candidate priorities require a non-negative insertion order.');
         }
-
-        BcMath::ensureNumeric($this->cost, $this->cost);
     }
 
-    /**
-     * @return numeric-string
-     */
-    public function cost(): string
+    public function cost(): PathCost
     {
         return $this->cost;
     }
@@ -42,7 +35,7 @@ final class CandidatePriority
         return $this->hops;
     }
 
-    public function routeSignature(): string
+    public function routeSignature(): RouteSignature
     {
         return $this->routeSignature;
     }
@@ -54,7 +47,7 @@ final class CandidatePriority
 
     public function compare(self $other, int $scale): int
     {
-        $comparison = BcMath::comp($this->cost, $other->cost(), $scale);
+        $comparison = $this->cost->compare($other->cost(), $scale);
         if (0 !== $comparison) {
             return $comparison;
         }
@@ -64,7 +57,7 @@ final class CandidatePriority
             return $comparison;
         }
 
-        $comparison = $this->routeSignature <=> $other->routeSignature();
+        $comparison = $this->routeSignature->compare($other->routeSignature());
         if (0 !== $comparison) {
             return $comparison;
         }

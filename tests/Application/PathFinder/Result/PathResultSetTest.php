@@ -7,7 +7,9 @@ namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder\Result;
 use JsonSerializable;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSetEntry;
 
@@ -19,9 +21,9 @@ final class PathResultSetTest extends TestCase
         $set = PathResultSet::fromEntries(
             $strategy,
             [
-                new PathResultSetEntry('late', new PathOrderKey('0.300000000000000000', 3, 'SRC->C->DST', 2)),
-                new PathResultSetEntry('early', new PathOrderKey('0.100000000000000000', 1, 'SRC->A->DST', 0)),
-                new PathResultSetEntry('middle', new PathOrderKey('0.100000000000000000', 2, 'SRC->B->DST', 1)),
+                new PathResultSetEntry('late', new PathOrderKey(new PathCost('0.300000000000000000'), 3, new RouteSignature(['SRC', 'C', 'DST']), 2)),
+                new PathResultSetEntry('early', new PathOrderKey(new PathCost('0.100000000000000000'), 1, new RouteSignature(['SRC', 'A', 'DST']), 0)),
+                new PathResultSetEntry('middle', new PathOrderKey(new PathCost('0.100000000000000000'), 2, new RouteSignature(['SRC', 'B', 'DST']), 1)),
             ],
         );
 
@@ -35,9 +37,9 @@ final class PathResultSetTest extends TestCase
         $set = PathResultSet::fromEntries(
             $strategy,
             [
-                new PathResultSetEntry('worse duplicate', new PathOrderKey('0.300000000000000000', 3, 'SRC->A->DST', 2)),
-                new PathResultSetEntry('preferred duplicate', new PathOrderKey('0.100000000000000000', 1, 'SRC->A->DST', 0)),
-                new PathResultSetEntry('unique', new PathOrderKey('0.200000000000000000', 2, 'SRC->B->DST', 1)),
+                new PathResultSetEntry('worse duplicate', new PathOrderKey(new PathCost('0.300000000000000000'), 3, new RouteSignature(['SRC', 'A', 'DST']), 2)),
+                new PathResultSetEntry('preferred duplicate', new PathOrderKey(new PathCost('0.100000000000000000'), 1, new RouteSignature(['SRC', 'A', 'DST']), 0)),
+                new PathResultSetEntry('unique', new PathOrderKey(new PathCost('0.200000000000000000'), 2, new RouteSignature(['SRC', 'B', 'DST']), 1)),
             ],
         );
 
@@ -67,9 +69,9 @@ final class PathResultSetTest extends TestCase
         $set = PathResultSet::fromEntries(
             $strategy,
             [
-                new PathResultSetEntry($serializable, new PathOrderKey('0.100000000000000000', 1, 'SRC->A->DST', 0)),
-                new PathResultSetEntry($arrayConvertible, new PathOrderKey('0.200000000000000000', 1, 'SRC->B->DST', 1)),
-                new PathResultSetEntry(['type' => 'scalar'], new PathOrderKey('0.300000000000000000', 1, 'SRC->C->DST', 2)),
+                new PathResultSetEntry($serializable, new PathOrderKey(new PathCost('0.100000000000000000'), 1, new RouteSignature(['SRC', 'A', 'DST']), 0)),
+                new PathResultSetEntry($arrayConvertible, new PathOrderKey(new PathCost('0.200000000000000000'), 1, new RouteSignature(['SRC', 'B', 'DST']), 1)),
+                new PathResultSetEntry(['type' => 'scalar'], new PathOrderKey(new PathCost('0.300000000000000000'), 1, new RouteSignature(['SRC', 'C', 'DST']), 2)),
             ],
         );
 
@@ -89,9 +91,9 @@ final class PathResultSetTest extends TestCase
         $set = PathResultSet::fromEntries(
             $strategy,
             [
-                new PathResultSetEntry('first', new PathOrderKey('0.100000000000000000', 1, 'SRC->A->DST', 0)),
-                new PathResultSetEntry('second', new PathOrderKey('0.200000000000000000', 2, 'SRC->B->DST', 1)),
-                new PathResultSetEntry('third', new PathOrderKey('0.300000000000000000', 3, 'SRC->C->DST', 2)),
+                new PathResultSetEntry('first', new PathOrderKey(new PathCost('0.100000000000000000'), 1, new RouteSignature(['SRC', 'A', 'DST']), 0)),
+                new PathResultSetEntry('second', new PathOrderKey(new PathCost('0.200000000000000000'), 2, new RouteSignature(['SRC', 'B', 'DST']), 1)),
+                new PathResultSetEntry('third', new PathOrderKey(new PathCost('0.300000000000000000'), 3, new RouteSignature(['SRC', 'C', 'DST']), 2)),
             ],
         );
 
@@ -105,7 +107,7 @@ final class PathResultSetTest extends TestCase
         $set = PathResultSet::fromEntries(
             $strategy,
             [
-                new PathResultSetEntry('only', new PathOrderKey('0.100000000000000000', 1, 'SRC->A->DST', 0)),
+                new PathResultSetEntry('only', new PathOrderKey(new PathCost('0.100000000000000000'), 1, new RouteSignature(['SRC', 'A', 'DST']), 0)),
             ],
         );
 
