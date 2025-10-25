@@ -75,9 +75,12 @@ final class SearchBootstrapTest extends TestCase
     {
         $queue = new SearchStateQueue(self::SCALE);
         $results = new CandidateResultHeap(self::SCALE);
-        $registry = SearchStateRegistry::empty();
+        $registry = SearchStateRegistry::withInitial('SRC', new SearchStateRecord('1', 0, 'sig:src'));
         $insertionOrder = new InsertionOrderCounter();
         $resultInsertionOrder = new InsertionOrderCounter();
+
+        $state = SearchState::bootstrap('SRC', BcMath::normalize('1', self::SCALE), null, null);
+        $queue->push(new SearchQueueEntry($state, new SearchStatePriority($state->cost(), $insertionOrder->next())));
 
         $this->expectException(InvalidArgumentException::class);
         new SearchBootstrap($queue, $results, $registry, $insertionOrder, $resultInsertionOrder, 0);
