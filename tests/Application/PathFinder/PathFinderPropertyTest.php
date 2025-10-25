@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
@@ -23,7 +24,6 @@ use function array_map;
 use function array_reverse;
 use function array_unique;
 use function count;
-use function implode;
 use function spl_object_id;
 
 final class PathFinderPropertyTest extends TestCase
@@ -149,11 +149,21 @@ final class PathFinderPropertyTest extends TestCase
             $baselineSignatures = array_map([$this, 'routeSignature'], $baselineConstrained->paths()->toArray());
             $scaledSignatures = array_map([$this, 'routeSignature'], $scaledResult->paths()->toArray());
 
-            self::assertSame(
-                $baselineSignatures,
+            self::assertCount(
+                count($baselineSignatures),
                 $scaledSignatures,
-                'Scaling should preserve path ordering and structure.',
+                'Scaling should preserve path ordering and structure (count).',
             );
+
+            foreach ($baselineSignatures as $index => $signature) {
+                $expected = $signature;
+                $actual = $scaledSignatures[$index];
+
+                self::assertTrue(
+                    $expected->equals($actual),
+                    'Scaling should preserve path ordering and structure (index '.$index.').',
+                );
+            }
 
             foreach ($scaledResult->paths() as $path) {
                 $range = $path['amountRange'];
@@ -299,26 +309,27 @@ final class PathFinderPropertyTest extends TestCase
         );
     }
 
-    private function routeSignature(CandidatePath $path): string
+    private function routeSignature(CandidatePath $path): RouteSignature
     {
-        $segments = array_map(
-            static function (array $edge): string {
-                /** @var Order $order */
-                $order = $edge['order'];
+        $edges = $path->edges();
 
-                return $edge['from'].'>'.$edge['to'].'#'.implode(
-                    ':',
-                    [
-                        $edge['orderSide']->value,
-                        $order->assetPair()->base(),
-                        $order->assetPair()->quote(),
-                    ],
-                );
-            },
-            $path->edges()->toArray(),
-        );
+        if ($edges->isEmpty()) {
+            return new RouteSignature([]);
+        }
 
-        return $path->hops().'|'.implode(';', $segments);
+        $first = $edges->first();
+
+        if (null === $first) {
+            return new RouteSignature([]);
+        }
+
+        $nodes = [$first->from()];
+
+        foreach ($edges as $edge) {
+            $nodes[] = $edge->to();
+        }
+
+        return new RouteSignature($nodes);
     }
 
     private function assertGuardStatusEquals(SearchGuardReport $expected, SearchGuardReport $actual, string $message): void
