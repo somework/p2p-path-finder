@@ -370,7 +370,12 @@ final class PathFinder
         $candidateCost = $candidate->cost();
         $entry = new CandidateHeapEntry(
             $candidate,
-            new CandidatePriority($candidateCost, $order),
+            new CandidatePriority(
+                $candidateCost,
+                $candidate->hops(),
+                $this->routeSignature($candidate->edges()),
+                $order,
+            ),
         );
 
         $results->push($entry);
@@ -438,15 +443,15 @@ final class PathFinder
 
         while (!$clone->isEmpty()) {
             $entry = $clone->extract();
-            $routeSignature = $this->routeSignature($entry->candidate()->edges());
+            $priority = $entry->priority();
             /** @var PathResultSetEntry<CandidatePath> $resultEntry */
             $resultEntry = new PathResultSetEntry(
                 $entry->candidate(),
                 new PathOrderKey(
-                    $entry->priority()->cost(),
-                    $entry->candidate()->hops(),
-                    $routeSignature,
-                    $entry->priority()->order(),
+                    $priority->cost(),
+                    $priority->hops(),
+                    $priority->routeSignature(),
+                    $priority->order(),
                 ),
             );
 

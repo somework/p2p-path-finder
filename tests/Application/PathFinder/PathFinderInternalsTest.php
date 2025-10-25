@@ -359,6 +359,45 @@ final class PathFinderInternalsTest extends TestCase
         ], $costs);
     }
 
+    public function test_record_result_prefers_fewer_hops_when_costs_equal(): void
+    {
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.0', topK: 1);
+        /** @var CandidateResultHeap $heap */
+        $heap = $this->invokeFinderMethod($finder, 'createResultHeap');
+        $fewer = $this->buildCandidate('1.00', '1.00');
+        $more = $this->buildCandidateWithHops('1.00', '1.00', 2);
+
+        $this->invokeFinderMethod($finder, 'recordResult', [$heap, $fewer, 0]);
+        $this->invokeFinderMethod($finder, 'recordResult', [$heap, $more, 1]);
+
+        self::assertSame(1, $heap->count());
+        $clone = clone $heap;
+        $remaining = $clone->extract();
+
+        self::assertSame($fewer->hops(), $remaining->candidate()->hops());
+    }
+
+    public function test_record_result_prefers_smaller_signature_when_costs_and_hops_equal(): void
+    {
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 1);
+        /** @var CandidateResultHeap $heap */
+        $heap = $this->invokeFinderMethod($finder, 'createResultHeap');
+        $alpha = $this->buildCandidate('1.00', '1.00');
+        $beta = $this->buildCandidate('1.00', '1.00');
+
+        $this->invokeFinderMethod($finder, 'recordResult', [$heap, $alpha, 0]);
+        $this->invokeFinderMethod($finder, 'recordResult', [$heap, $beta, 1]);
+
+        self::assertSame(1, $heap->count());
+        $clone = clone $heap;
+        $remaining = $clone->extract();
+
+        self::assertSame(
+            $this->routeSignatureFromCandidate($alpha),
+            $this->routeSignatureFromCandidate($remaining->candidate()),
+        );
+    }
+
     public function test_finalize_results_orders_by_cost_then_insertion(): void
     {
         $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 3);
@@ -589,17 +628,36 @@ final class PathFinderInternalsTest extends TestCase
         /** @var CandidateResultHeap $heap */
         $heap = $this->invokeFinderMethod($finder, 'createResultHeap');
 
+        $first = $this->buildCandidate('1.00', '1.00');
+        $second = $this->buildCandidate('2.00', '0.50');
+        $third = $this->buildCandidate('1.00', '1.50');
+
         $heap->push(new CandidateHeapEntry(
-            $this->buildCandidate('1.00', '1.00'),
-            new CandidatePriority(BcMath::normalize('1.00', self::SCALE), 0),
+            $first,
+            new CandidatePriority(
+                $first->cost(),
+                $first->hops(),
+                $this->routeSignatureFromCandidate($first),
+                0,
+            ),
         ));
         $heap->push(new CandidateHeapEntry(
-            $this->buildCandidate('2.00', '0.50'),
-            new CandidatePriority(BcMath::normalize('2.00', self::SCALE), 2),
+            $second,
+            new CandidatePriority(
+                $second->cost(),
+                $second->hops(),
+                $this->routeSignatureFromCandidate($second),
+                2,
+            ),
         ));
         $heap->push(new CandidateHeapEntry(
-            $this->buildCandidate('1.00', '1.50'),
-            new CandidatePriority(BcMath::normalize('1.00', self::SCALE), 1),
+            $third,
+            new CandidatePriority(
+                $third->cost(),
+                $third->hops(),
+                $this->routeSignatureFromCandidate($third),
+                1,
+            ),
         ));
 
         $first = $heap->extract();
@@ -610,6 +668,75 @@ final class PathFinderInternalsTest extends TestCase
         self::assertSame(BcMath::normalize('1.00', self::SCALE), $second->candidate()->cost());
         self::assertSame(BcMath::normalize('1.00', self::SCALE), $third->candidate()->cost());
         self::assertSame(BcMath::normalize('1.50', self::SCALE), $second->candidate()->product());
+    }
+
+    public function test_create_result_heap_prefers_fewer_hops_on_equal_cost(): void
+    {
+        $finder = new PathFinder(maxHops: 3, tolerance: '0.0', topK: 3);
+        /** @var CandidateResultHeap $heap */
+        $heap = $this->invokeFinderMethod($finder, 'createResultHeap');
+
+        $fewerHops = $this->buildCandidate('1.00', '1.00');
+        $moreHops = $this->buildCandidateWithHops('1.00', '1.00', 2);
+
+        $heap->push(new CandidateHeapEntry(
+            $fewerHops,
+            new CandidatePriority(
+                $fewerHops->cost(),
+                $fewerHops->hops(),
+                $this->routeSignatureFromCandidate($fewerHops),
+                0,
+            ),
+        ));
+        $heap->push(new CandidateHeapEntry(
+            $moreHops,
+            new CandidatePriority(
+                $moreHops->cost(),
+                $moreHops->hops(),
+                $this->routeSignatureFromCandidate($moreHops),
+                1,
+            ),
+        ));
+
+        $extracted = $heap->extract();
+
+        self::assertSame($moreHops->hops(), $extracted->candidate()->hops());
+    }
+
+    public function test_create_result_heap_prefers_lexicographically_smaller_signature_on_equal_cost_and_hops(): void
+    {
+        $finder = new PathFinder(maxHops: 2, tolerance: '0.0', topK: 3);
+        /** @var CandidateResultHeap $heap */
+        $heap = $this->invokeFinderMethod($finder, 'createResultHeap');
+
+        $alpha = $this->buildCandidate('1.00', '1.00');
+        $beta = $this->buildCandidate('1.00', '1.00');
+
+        $heap->push(new CandidateHeapEntry(
+            $alpha,
+            new CandidatePriority(
+                $alpha->cost(),
+                $alpha->hops(),
+                $this->routeSignatureFromCandidate($alpha),
+                0,
+            ),
+        ));
+        $heap->push(new CandidateHeapEntry(
+            $beta,
+            new CandidatePriority(
+                $beta->cost(),
+                $beta->hops(),
+                $this->routeSignatureFromCandidate($beta),
+                1,
+            ),
+        ));
+
+        $extracted = $heap->extract();
+
+        self::assertSame(
+            $this->routeSignatureFromCandidate($beta),
+            $this->routeSignatureFromCandidate($extracted->candidate()),
+        );
     }
 
     public function test_find_best_paths_skips_edges_with_unknown_target_nodes(): void
@@ -911,6 +1038,36 @@ final class PathFinderInternalsTest extends TestCase
             1,
             PathEdgeSequence::fromList([$edge]),
         );
+    }
+
+    private function buildCandidateWithHops(string $cost, string $product, int $hops): CandidatePath
+    {
+        return CandidatePath::from(
+            BcMath::normalize($cost, self::SCALE),
+            BcMath::normalize($product, self::SCALE),
+            $hops,
+            $this->dummyEdges($hops),
+        );
+    }
+
+    private function routeSignatureFromCandidate(CandidatePath $candidate): string
+    {
+        $edges = $candidate->edges();
+        if ($edges->isEmpty()) {
+            return '';
+        }
+
+        $first = $edges->first();
+        if (null === $first) {
+            return '';
+        }
+
+        $nodes = [$first->from()];
+        foreach ($edges as $edge) {
+            $nodes[] = $edge->to();
+        }
+
+        return implode('->', $nodes);
     }
 
     private function dummyEdges(int $count): PathEdgeSequence

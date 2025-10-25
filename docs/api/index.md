@@ -655,7 +655,7 @@ Returns: SearchOutcome&lt;CandidatePath&gt;
 ### Public methods
 
 ### __construct
-`CandidatePriority::__construct(string $cost, int $order)`
+`CandidatePriority::__construct(string $cost, int $hops, string $routeSignature, int $order)`
 
 Parameter $cost: numeric-string
 
@@ -663,6 +663,12 @@ Parameter $cost: numeric-string
 `CandidatePriority::cost(): string`
 
 Returns: numeric-string
+
+### hops
+`CandidatePriority::hops(): int`
+
+### routeSignature
+`CandidatePriority::routeSignature(): string`
 
 ### order
 `CandidatePriority::order(): int`
