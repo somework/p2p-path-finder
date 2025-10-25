@@ -605,15 +605,15 @@ final class PathFinderInternalsTest extends TestCase
 
         $queue->push(new SearchQueueEntry(
             $this->buildState('A'),
-            new SearchStatePriority(BcMath::normalize('0.8', self::SCALE), 1),
+            new SearchStatePriority(BcMath::normalize('0.8', self::SCALE), 0, '', 1),
         ));
         $queue->push(new SearchQueueEntry(
             $this->buildState('B'),
-            new SearchStatePriority(BcMath::normalize('0.5', self::SCALE), 2),
+            new SearchStatePriority(BcMath::normalize('0.5', self::SCALE), 0, '', 2),
         ));
         $queue->push(new SearchQueueEntry(
             $this->buildState('C'),
-            new SearchStatePriority(BcMath::normalize('0.5', self::SCALE), 0),
+            new SearchStatePriority(BcMath::normalize('0.5', self::SCALE), 0, '', 0),
         ));
 
         $first = $queue->extract();

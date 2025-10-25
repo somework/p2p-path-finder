@@ -599,7 +599,12 @@ final class PathFinderHeuristicsTest extends TestCase
                 BcMath::normalize('0.666', 18),
                 1,
             ),
-            new SearchStatePriority(BcMath::normalize('1.500', 18), 0),
+            new SearchStatePriority(
+                BcMath::normalize('1.500', 18),
+                1,
+                'SRC->high',
+                0,
+            ),
         ));
 
         $queue->push(new SearchQueueEntry(
@@ -609,28 +614,84 @@ final class PathFinderHeuristicsTest extends TestCase
                 BcMath::normalize('1.333', 18),
                 1,
             ),
-            new SearchStatePriority(BcMath::normalize('0.750', 18), 1),
+            new SearchStatePriority(
+                BcMath::normalize('0.750', 18),
+                1,
+                'SRC->low',
+                1,
+            ),
         ));
 
         self::assertSame('low', $queue->extract()->node());
     }
 
-    public function test_search_state_queue_prefers_earlier_insertion_when_costs_are_equal(): void
+    public function test_search_state_queue_orders_equal_cost_entries_by_hops_signature_then_fifo(): void
     {
         new PathFinder(maxHops: 1, tolerance: '0.0');
 
         $queue = new SearchStateQueue(18);
 
-        foreach (['first', 'second', 'third'] as $order => $label) {
-            $queue->push(new SearchQueueEntry(
-                $this->searchState(
-                    $label,
+        $entries = [
+            [
+                'state' => $this->searchState(
+                    'lexicographically-later',
+                    BcMath::normalize('0.500', 18),
+                    BcMath::normalize('2.000', 18),
+                    2,
+                ),
+                'priority' => new SearchStatePriority(
+                    BcMath::normalize('0.500', 18),
+                    2,
+                    'SRC->A->C',
+                    0,
+                ),
+            ],
+            [
+                'state' => $this->searchState(
+                    'fewer-hops',
                     BcMath::normalize('0.500', 18),
                     BcMath::normalize('2.000', 18),
                     1,
                 ),
-                new SearchStatePriority(BcMath::normalize('0.500', 18), $order),
-            ));
+                'priority' => new SearchStatePriority(
+                    BcMath::normalize('0.500', 18),
+                    1,
+                    'SRC->A',
+                    1,
+                ),
+            ],
+            [
+                'state' => $this->searchState(
+                    'lexicographically-first',
+                    BcMath::normalize('0.500', 18),
+                    BcMath::normalize('2.000', 18),
+                    2,
+                ),
+                'priority' => new SearchStatePriority(
+                    BcMath::normalize('0.500', 18),
+                    2,
+                    'SRC->A->B',
+                    2,
+                ),
+            ],
+            [
+                'state' => $this->searchState(
+                    'lexicographically-later-second',
+                    BcMath::normalize('0.500', 18),
+                    BcMath::normalize('2.000', 18),
+                    2,
+                ),
+                'priority' => new SearchStatePriority(
+                    BcMath::normalize('0.500', 18),
+                    2,
+                    'SRC->A->C',
+                    3,
+                ),
+            ],
+        ];
+
+        foreach ($entries as $entry) {
+            $queue->push(new SearchQueueEntry($entry['state'], $entry['priority']));
         }
 
         $extracted = [];
@@ -638,7 +699,15 @@ final class PathFinderHeuristicsTest extends TestCase
             $extracted[] = $queue->extract()->node();
         }
 
-        self::assertSame(['first', 'second', 'third'], $extracted);
+        self::assertSame(
+            [
+                'fewer-hops',
+                'lexicographically-first',
+                'lexicographically-later',
+                'lexicographically-later-second',
+            ],
+            $extracted,
+        );
     }
 
     public function test_finalize_results_sorts_candidates_by_cost(): void

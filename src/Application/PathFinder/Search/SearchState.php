@@ -32,6 +32,9 @@ final class SearchState
         private readonly string $node,
         private readonly string $cost,
         private readonly string $product,
+        /**
+         * @var int<0, max>
+         */
         private readonly int $hops,
         private readonly PathEdgeSequence $path,
         private readonly ?array $amountRange,
@@ -42,6 +45,8 @@ final class SearchState
             throw new InvalidArgumentException('Search states require a non-empty node identifier.');
         }
 
+        /* @phpstan-ignore-next-line */
+        /** @psalm-suppress DocblockTypeContradiction */
         if ($this->hops < 0) {
             throw new InvalidArgumentException('Search state hop counts must be non-negative.');
         }
@@ -83,6 +88,10 @@ final class SearchState
      * @param numeric-string                     $product
      * @param array{min: Money, max: Money}|null $amountRange
      * @param array<array-key, bool>             $visited
+     *
+     * @phpstan-param int<0, max> $hops
+     *
+     * @psalm-param int<0, max>   $hops
      */
     public static function fromComponents(
         string $node,
@@ -168,6 +177,11 @@ final class SearchState
         return $this->product;
     }
 
+    /**
+     * @phpstan-return int<0, max>
+     *
+     * @psalm-return int<0, max>
+     */
     public function hops(): int
     {
         return $this->hops;
