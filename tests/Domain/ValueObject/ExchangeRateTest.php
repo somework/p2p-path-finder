@@ -87,7 +87,7 @@ final class ExchangeRateTest extends TestCase
     /**
      * @return iterable<array{string}>
      */
-    public function invalidRateProvider(): iterable
+    public static function invalidRateProvider(): iterable
     {
         yield 'zero rate' => ['0'];
         yield 'negative rate' => ['-1.25'];

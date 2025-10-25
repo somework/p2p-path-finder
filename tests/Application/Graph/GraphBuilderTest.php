@@ -20,6 +20,11 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 
+use function serialize;
+
+use const JSON_PRETTY_PRINT;
+use const JSON_THROW_ON_ERROR;
+
 /**
  * @psalm-type GraphSegment = array{
  *     isMandatory: bool,
@@ -72,17 +77,20 @@ final class GraphBuilderTest extends TestCase
         $edges = $graph['BTC']['edges'];
         self::assertCount(2, $edges);
 
-        $primaryEdge = $edges[0];
-        $this->assertEdgeBasics($primaryEdge, 'BTC', 'USD', OrderSide::BUY, $orders['primaryBuyOrder']);
-        $this->assertEdgeCapacities($primaryEdge, 'BTC', '0.100', '1.000', 'USD', '3000.000', '30000.000');
-        $this->assertGrossBaseEqualsBase($primaryEdge);
-        self::assertSame([], $primaryEdge['segments']);
+        $quotes = array_map(static fn (array $edge): string => $edge['order']->assetPair()->quote(), $edges);
+        self::assertSame(['EUR', 'USD'], $quotes);
 
-        $secondaryEdge = $edges[1];
+        $secondaryEdge = $edges[0];
         $this->assertEdgeBasics($secondaryEdge, 'BTC', 'EUR', OrderSide::BUY, $orders['secondaryBuyOrder']);
         $this->assertEdgeCapacities($secondaryEdge, 'BTC', '0.200', '0.800', 'EUR', '5600.000', '22400.000');
         $this->assertGrossBaseEqualsBase($secondaryEdge);
         self::assertSame([], $secondaryEdge['segments']);
+
+        $primaryEdge = $edges[1];
+        $this->assertEdgeBasics($primaryEdge, 'BTC', 'USD', OrderSide::BUY, $orders['primaryBuyOrder']);
+        $this->assertEdgeCapacities($primaryEdge, 'BTC', '0.100', '1.000', 'USD', '3000.000', '30000.000');
+        $this->assertGrossBaseEqualsBase($primaryEdge);
+        self::assertSame([], $primaryEdge['segments']);
     }
 
     public function test_build_skips_entries_that_are_not_orders(): void
@@ -145,15 +153,373 @@ final class GraphBuilderTest extends TestCase
         $edges = $graph['USD']['edges'];
         self::assertCount(2, $edges);
 
-        $primaryEdge = $edges[0];
+        $serializedOrders = array_map(static fn (array $edge): string => serialize($edge['order']), $edges);
+        $sortedOrders = $serializedOrders;
+        sort($sortedOrders);
+        self::assertSame($sortedOrders, $serializedOrders);
+
+        $primaryEdge = $this->findEdgeByOrder($edges, $orders['primarySellOrder']);
         $this->assertEdgeBasics($primaryEdge, 'USD', 'ETH', OrderSide::SELL, $orders['primarySellOrder']);
         $this->assertEdgeCapacities($primaryEdge, 'ETH', '0.500', '2.000', 'USD', '750.000', '3000.000');
         self::assertSame([], $primaryEdge['segments']);
 
-        $secondaryEdge = $edges[1];
+        $secondaryEdge = $this->findEdgeByOrder($edges, $orders['secondarySellOrder']);
         $this->assertEdgeBasics($secondaryEdge, 'USD', 'LTC', OrderSide::SELL, $orders['secondarySellOrder']);
         $this->assertEdgeCapacities($secondaryEdge, 'LTC', '1.000', '4.000', 'USD', '90.000', '360.000');
         self::assertSame([], $secondaryEdge['segments']);
+    }
+
+    public function test_build_produces_canonical_serialization_for_permuted_orders(): void
+    {
+        $orders = [
+            $this->createOrder(OrderSide::BUY, 'AAA', 'USD', '0.100', '0.500', '2.000'),
+            $this->createOrder(OrderSide::BUY, 'AAA', 'EUR', '0.200', '0.600', '1.800'),
+            $this->createOrder(OrderSide::SELL, 'ETH', 'AAA', '0.300', '0.900', '1500'),
+            $this->createOrder(OrderSide::SELL, 'LTC', 'AAA', '1.000', '3.000', '90'),
+        ];
+
+        $graph = (new GraphBuilder())->build($orders);
+        $permutedGraph = (new GraphBuilder())->build([
+            $orders[3],
+            $orders[1],
+            $orders[0],
+            $orders[2],
+        ]);
+
+        $expected = $graph->jsonSerialize();
+
+        self::assertSame($expected, $permutedGraph->jsonSerialize());
+
+        self::assertSame([
+            'AAA',
+            'ETH',
+            'EUR',
+            'LTC',
+            'USD',
+        ], array_keys($expected));
+
+        $expectedJson = <<<'JSON'
+            {
+                "AAA": {
+                    "currency": "AAA",
+                    "edges": [
+                        {
+                            "from": "AAA",
+                            "to": "ETH",
+                            "orderSide": "sell",
+                            "order": {
+                                "side": "sell",
+                                "assetPair": {
+                                    "base": "ETH",
+                                    "quote": "AAA"
+                                },
+                                "bounds": {
+                                    "min": {
+                                        "currency": "ETH",
+                                        "amount": "0.300",
+                                        "scale": 3
+                                    },
+                                    "max": {
+                                        "currency": "ETH",
+                                        "amount": "0.900",
+                                        "scale": 3
+                                    }
+                                },
+                                "effectiveRate": {
+                                    "baseCurrency": "ETH",
+                                    "quoteCurrency": "AAA",
+                                    "value": "1500.000",
+                                    "scale": 3
+                                }
+                            },
+                            "rate": {
+                                "baseCurrency": "ETH",
+                                "quoteCurrency": "AAA",
+                                "value": "1500.000",
+                                "scale": 3
+                            },
+                            "baseCapacity": {
+                                "min": {
+                                    "currency": "ETH",
+                                    "amount": "0.300",
+                                    "scale": 3
+                                },
+                                "max": {
+                                    "currency": "ETH",
+                                    "amount": "0.900",
+                                    "scale": 3
+                                }
+                            },
+                            "quoteCapacity": {
+                                "min": {
+                                    "currency": "AAA",
+                                    "amount": "450.000",
+                                    "scale": 3
+                                },
+                                "max": {
+                                    "currency": "AAA",
+                                    "amount": "1350.000",
+                                    "scale": 3
+                                }
+                            },
+                            "grossBaseCapacity": {
+                                "min": {
+                                    "currency": "ETH",
+                                    "amount": "0.300",
+                                    "scale": 3
+                                },
+                                "max": {
+                                    "currency": "ETH",
+                                    "amount": "0.900",
+                                    "scale": 3
+                                }
+                            },
+                            "segments": []
+                        },
+                        {
+                            "from": "AAA",
+                            "to": "LTC",
+                            "orderSide": "sell",
+                            "order": {
+                                "side": "sell",
+                                "assetPair": {
+                                    "base": "LTC",
+                                    "quote": "AAA"
+                                },
+                                "bounds": {
+                                    "min": {
+                                        "currency": "LTC",
+                                        "amount": "1.000",
+                                        "scale": 3
+                                    },
+                                    "max": {
+                                        "currency": "LTC",
+                                        "amount": "3.000",
+                                        "scale": 3
+                                    }
+                                },
+                                "effectiveRate": {
+                                    "baseCurrency": "LTC",
+                                    "quoteCurrency": "AAA",
+                                    "value": "90.000",
+                                    "scale": 3
+                                }
+                            },
+                            "rate": {
+                                "baseCurrency": "LTC",
+                                "quoteCurrency": "AAA",
+                                "value": "90.000",
+                                "scale": 3
+                            },
+                            "baseCapacity": {
+                                "min": {
+                                    "currency": "LTC",
+                                    "amount": "1.000",
+                                    "scale": 3
+                                },
+                                "max": {
+                                    "currency": "LTC",
+                                    "amount": "3.000",
+                                    "scale": 3
+                                }
+                            },
+                            "quoteCapacity": {
+                                "min": {
+                                    "currency": "AAA",
+                                    "amount": "90.000",
+                                    "scale": 3
+                                },
+                                "max": {
+                                    "currency": "AAA",
+                                    "amount": "270.000",
+                                    "scale": 3
+                                }
+                            },
+                            "grossBaseCapacity": {
+                                "min": {
+                                    "currency": "LTC",
+                                    "amount": "1.000",
+                                    "scale": 3
+                                },
+                                "max": {
+                                    "currency": "LTC",
+                                    "amount": "3.000",
+                                    "scale": 3
+                                }
+                            },
+                            "segments": []
+                        },
+                        {
+                            "from": "AAA",
+                            "to": "EUR",
+                            "orderSide": "buy",
+                            "order": {
+                                "side": "buy",
+                                "assetPair": {
+                                    "base": "AAA",
+                                    "quote": "EUR"
+                                },
+                                "bounds": {
+                                    "min": {
+                                        "currency": "AAA",
+                                        "amount": "0.200",
+                                        "scale": 3
+                                    },
+                                    "max": {
+                                        "currency": "AAA",
+                                        "amount": "0.600",
+                                        "scale": 3
+                                    }
+                                },
+                                "effectiveRate": {
+                                    "baseCurrency": "AAA",
+                                    "quoteCurrency": "EUR",
+                                    "value": "1.800",
+                                    "scale": 3
+                                }
+                            },
+                            "rate": {
+                                "baseCurrency": "AAA",
+                                "quoteCurrency": "EUR",
+                                "value": "1.800",
+                                "scale": 3
+                            },
+                            "baseCapacity": {
+                                "min": {
+                                    "currency": "AAA",
+                                    "amount": "0.200",
+                                    "scale": 3
+                                },
+                                "max": {
+                                    "currency": "AAA",
+                                    "amount": "0.600",
+                                    "scale": 3
+                                }
+                            },
+                            "quoteCapacity": {
+                                "min": {
+                                    "currency": "EUR",
+                                    "amount": "0.360",
+                                    "scale": 3
+                                },
+                                "max": {
+                                    "currency": "EUR",
+                                    "amount": "1.080",
+                                    "scale": 3
+                                }
+                            },
+                            "grossBaseCapacity": {
+                                "min": {
+                                    "currency": "AAA",
+                                    "amount": "0.200",
+                                    "scale": 3
+                                },
+                                "max": {
+                                    "currency": "AAA",
+                                    "amount": "0.600",
+                                    "scale": 3
+                                }
+                            },
+                            "segments": []
+                        },
+                        {
+                            "from": "AAA",
+                            "to": "USD",
+                            "orderSide": "buy",
+                            "order": {
+                                "side": "buy",
+                                "assetPair": {
+                                    "base": "AAA",
+                                    "quote": "USD"
+                                },
+                                "bounds": {
+                                    "min": {
+                                        "currency": "AAA",
+                                        "amount": "0.100",
+                                        "scale": 3
+                                    },
+                                    "max": {
+                                        "currency": "AAA",
+                                        "amount": "0.500",
+                                        "scale": 3
+                                    }
+                                },
+                                "effectiveRate": {
+                                    "baseCurrency": "AAA",
+                                    "quoteCurrency": "USD",
+                                    "value": "2.000",
+                                    "scale": 3
+                                }
+                            },
+                            "rate": {
+                                "baseCurrency": "AAA",
+                                "quoteCurrency": "USD",
+                                "value": "2.000",
+                                "scale": 3
+                            },
+                            "baseCapacity": {
+                                "min": {
+                                    "currency": "AAA",
+                                    "amount": "0.100",
+                                    "scale": 3
+                                },
+                                "max": {
+                                    "currency": "AAA",
+                                    "amount": "0.500",
+                                    "scale": 3
+                                }
+                            },
+                            "quoteCapacity": {
+                                "min": {
+                                    "currency": "USD",
+                                    "amount": "0.200",
+                                    "scale": 3
+                                },
+                                "max": {
+                                    "currency": "USD",
+                                    "amount": "1.000",
+                                    "scale": 3
+                                }
+                            },
+                            "grossBaseCapacity": {
+                                "min": {
+                                    "currency": "AAA",
+                                    "amount": "0.100",
+                                    "scale": 3
+                                },
+                                "max": {
+                                    "currency": "AAA",
+                                    "amount": "0.500",
+                                    "scale": 3
+                                }
+                            },
+                            "segments": []
+                        }
+                    ]
+                },
+                "ETH": {
+                    "currency": "ETH",
+                    "edges": []
+                },
+                "EUR": {
+                    "currency": "EUR",
+                    "edges": []
+                },
+                "LTC": {
+                    "currency": "LTC",
+                    "edges": []
+                },
+                "USD": {
+                    "currency": "USD",
+                    "edges": []
+                }
+            }
+            JSON;
+
+        self::assertJsonStringEqualsJsonString(
+            $expectedJson,
+            json_encode($expected, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT),
+        );
     }
 
     public function test_constructor_preserves_injected_fill_evaluator(): void
@@ -582,6 +948,22 @@ final class GraphBuilderTest extends TestCase
     {
         self::assertTrue($edge['grossBaseCapacity']['min']->equals($edge['baseCapacity']['min']));
         self::assertTrue($edge['grossBaseCapacity']['max']->equals($edge['baseCapacity']['max']));
+    }
+
+    /**
+     * @param list<GraphEdge> $edges
+     *
+     * @return GraphEdge
+     */
+    private function findEdgeByOrder(array $edges, Order $order): array
+    {
+        foreach ($edges as $edge) {
+            if ($edge['order'] === $order) {
+                return $edge;
+            }
+        }
+
+        self::fail('Expected edge for order was not found.');
     }
 
     private function assertMoneyEquals(Money $actual, string $currency, string $amount): void

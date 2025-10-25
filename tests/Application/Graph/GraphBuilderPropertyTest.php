@@ -21,6 +21,7 @@ use function array_keys;
 use function array_unique;
 use function array_values;
 use function count;
+use function sort;
 
 final class GraphBuilderPropertyTest extends TestCase
 {
@@ -146,7 +147,10 @@ final class GraphBuilderPropertyTest extends TestCase
             $currencies[$to] = true;
         }
 
-        return array_keys($currencies);
+        $list = array_keys($currencies);
+        sort($list);
+
+        return $list;
     }
 
     /**

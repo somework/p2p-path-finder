@@ -214,7 +214,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
 
         $paths = $result->paths()->toArray();
         self::assertCount(1, $paths);
-        self::assertSame('105.300', $paths[0]->totalReceived()->amount());
+        self::assertSame('117.700', $paths[0]->totalReceived()->amount());
     }
 
     public function test_it_reports_guard_limits_via_metadata_by_default(): void

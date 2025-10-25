@@ -41,7 +41,7 @@ final class MoneyTest extends TestCase
     /**
      * @return iterable<string, array{string}>
      */
-    public function provideMalformedCurrencies(): iterable
+    public static function provideMalformedCurrencies(): iterable
     {
         yield 'too short' => ['US'];
         yield 'contains digits' => ['U5D'];
@@ -63,7 +63,7 @@ final class MoneyTest extends TestCase
     /**
      * @return iterable<string, array{string}>
      */
-    public function provideValidCurrencies(): iterable
+    public static function provideValidCurrencies(): iterable
     {
         yield 'lowercase' => ['usd'];
         yield 'uppercase' => ['JPY'];
@@ -120,7 +120,7 @@ final class MoneyTest extends TestCase
     /**
      * @return iterable<string, array{string}>
      */
-    public function provideInvalidDivisors(): iterable
+    public static function provideInvalidDivisors(): iterable
     {
         yield 'non-numeric' => ['foo'];
         yield 'zero' => ['0'];
