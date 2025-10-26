@@ -15,14 +15,10 @@ final class SearchStateRecord
     public function __construct(
         private readonly string $cost,
         private readonly int $hops,
-        private readonly string $signature
+        private readonly SearchStateSignature $signature
     ) {
         if ($this->hops < 0) {
             throw new InvalidArgumentException('Recorded hop counts must be non-negative.');
-        }
-
-        if ('' === $this->signature) {
-            throw new InvalidArgumentException('Search state signatures cannot be empty.');
         }
 
         BcMath::ensureNumeric($this->cost, $this->cost);
@@ -41,7 +37,7 @@ final class SearchStateRecord
         return $this->hops;
     }
 
-    public function signature(): string
+    public function signature(): SearchStateSignature
     {
         return $this->signature;
     }

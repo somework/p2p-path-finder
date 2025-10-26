@@ -31,22 +31,23 @@ final class SearchStateRecordCollection
 
     public static function withInitial(SearchStateRecord $record): self
     {
-        return new self([$record->signature() => $record]);
+        return new self([$record->signature()->value() => $record]);
     }
 
     public function register(SearchStateRecord $record, int $scale): int
     {
         $signature = $record->signature();
-        $existing = $this->records[$signature] ?? null;
+        $key = $signature->value();
+        $existing = $this->records[$key] ?? null;
 
         if (null === $existing) {
-            $this->records[$signature] = $record;
+            $this->records[$key] = $record;
 
             return 1;
         }
 
         if ($record->dominates($existing, $scale)) {
-            $this->records[$signature] = $record;
+            $this->records[$key] = $record;
         }
 
         return 0;
@@ -54,7 +55,8 @@ final class SearchStateRecordCollection
 
     public function isDominated(SearchStateRecord $record, int $scale): bool
     {
-        $existing = $this->records[$record->signature()] ?? null;
+        $key = $record->signature()->value();
+        $existing = $this->records[$key] ?? null;
 
         if (null === $existing) {
             return false;
@@ -63,9 +65,9 @@ final class SearchStateRecordCollection
         return $existing->dominates($record, $scale);
     }
 
-    public function hasSignature(string $signature): bool
+    public function hasSignature(SearchStateSignature $signature): bool
     {
-        return array_key_exists($signature, $this->records);
+        return array_key_exists($signature->value(), $this->records);
     }
 
     /**
