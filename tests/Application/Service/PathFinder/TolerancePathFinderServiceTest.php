@@ -21,7 +21,7 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
 final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
 {
     /**
-     * @param SearchOutcome<PathResult> $result
+     * @param SearchOutcome $result
      *
      * @return list<PathResult>
      */
@@ -31,7 +31,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
     }
 
     /**
-     * @param SearchOutcome<PathResult> $result
+     * @param SearchOutcome $result
      */
     private static function extractGuardLimits(SearchOutcome $result): SearchGuardReport
     {

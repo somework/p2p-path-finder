@@ -6,20 +6,24 @@ namespace SomeWork\P2PPathFinder\Application\PathFinder\Result;
 
 use JsonSerializable;
 
-/**
- * @template TPath of mixed
- */
 final class SearchOutcome implements JsonSerializable
 {
     /**
-     * @var PathResultSet<TPath>
+     * @var PathResultSet
+     *
+     * @phpstan-var PathResultSet<mixed>
+     * @psalm-var PathResultSet
      */
     private readonly PathResultSet $paths;
 
     private readonly SearchGuardReport $guardLimits;
 
     /**
-     * @param PathResultSet<TPath> $paths
+     * @param PathResultSet<mixed> $paths
+     *
+     * @psalm-param PathResultSet $paths
+     *
+     * @phpstan-param PathResultSet<mixed> $paths
      */
     public function __construct(PathResultSet $paths, SearchGuardReport $guardLimits)
     {
@@ -28,35 +32,32 @@ final class SearchOutcome implements JsonSerializable
     }
 
     /**
-     * @param PathResultSet<TPath> $paths
+     * @param PathResultSet<mixed> $paths
      *
-     * @return SearchOutcome<TPath>
+     * @psalm-param PathResultSet $paths
      *
-     * @psalm-return SearchOutcome<TPath>
+     * @phpstan-param PathResultSet<mixed> $paths
+     *
+     * @return SearchOutcome
      */
     public static function fromResultSet(PathResultSet $paths, SearchGuardReport $guardLimits): self
     {
-        /** @var SearchOutcome<TPath> $outcome */
-        $outcome = new self($paths, $guardLimits);
-
-        return $outcome;
+        return new self($paths, $guardLimits);
     }
 
     /**
-     * @return SearchOutcome<TPath>
-     *
-     * @psalm-return SearchOutcome<TPath>
+     * @return SearchOutcome
      */
     public static function empty(SearchGuardReport $guardLimits): self
     {
-        /** @var PathResultSet<TPath> $emptyPaths */
-        $emptyPaths = PathResultSet::empty();
-
-        return self::fromResultSet($emptyPaths, $guardLimits);
+        return self::fromResultSet(PathResultSet::empty(), $guardLimits);
     }
 
     /**
-     * @return PathResultSet<TPath>
+     * @return PathResultSet
+     *
+     * @phpstan-return PathResultSet<mixed>
+     * @psalm-return PathResultSet
      */
     public function paths(): PathResultSet
     {

@@ -18,7 +18,7 @@ use function count;
 final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 {
     /**
-     * @param SearchOutcome<PathResult> $result
+     * @param SearchOutcome $result
      *
      * @return list<PathResult>
      */
@@ -28,7 +28,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
     }
 
     /**
-     * @param SearchOutcome<PathResult> $result
+     * @param SearchOutcome $result
      */
     private static function extractGuardLimits(SearchOutcome $result): SearchGuardReport
     {
