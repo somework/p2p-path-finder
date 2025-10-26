@@ -31,6 +31,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendRange;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
@@ -53,10 +54,10 @@ final class PathFinderInternalsTest extends TestCase
     public function test_state_signature_normalizes_range_and_desired(): void
     {
         $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
-        $range = [
-            'min' => CurrencyScenarioFactory::money('USD', '1.5', 1),
-            'max' => CurrencyScenarioFactory::money('USD', '3.00', 2),
-        ];
+        $range = SpendRange::fromBounds(
+            CurrencyScenarioFactory::money('USD', '1.5', 1),
+            CurrencyScenarioFactory::money('USD', '3.00', 2),
+        );
         $desired = CurrencyScenarioFactory::money('USD', '2.250', 3);
 
         /** @var SearchStateSignature $signature */
@@ -86,10 +87,10 @@ final class PathFinderInternalsTest extends TestCase
     public function test_record_state_replaces_dominated_entries(): void
     {
         $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
-        $range = [
-            'min' => CurrencyScenarioFactory::money('USD', '1.00', 2),
-            'max' => CurrencyScenarioFactory::money('USD', '2.00', 2),
-        ];
+        $range = SpendRange::fromBounds(
+            CurrencyScenarioFactory::money('USD', '1.00', 2),
+            CurrencyScenarioFactory::money('USD', '2.00', 2),
+        );
         $signature = $this->invokeFinderMethod($finder, 'stateSignature', [$range, null]);
         $registry = SearchStateRegistry::withInitial(
             'USD',
@@ -113,10 +114,10 @@ final class PathFinderInternalsTest extends TestCase
     public function test_record_state_preserves_existing_when_new_state_has_higher_hops(): void
     {
         $finder = new PathFinder(maxHops: 3, tolerance: '0.0');
-        $range = [
-            'min' => CurrencyScenarioFactory::money('USD', '0.50', 2),
-            'max' => CurrencyScenarioFactory::money('USD', '3.00', 2),
-        ];
+        $range = SpendRange::fromBounds(
+            CurrencyScenarioFactory::money('USD', '0.50', 2),
+            CurrencyScenarioFactory::money('USD', '3.00', 2),
+        );
         $signature = $this->invokeFinderMethod($finder, 'stateSignature', [$range, null]);
         $registry = SearchStateRegistry::withInitial(
             'USD',
@@ -140,10 +141,10 @@ final class PathFinderInternalsTest extends TestCase
     public function test_record_state_preserves_existing_when_new_state_has_higher_cost(): void
     {
         $finder = new PathFinder(maxHops: 3, tolerance: '0.0');
-        $range = [
-            'min' => CurrencyScenarioFactory::money('USD', '0.50', 2),
-            'max' => CurrencyScenarioFactory::money('USD', '3.00', 2),
-        ];
+        $range = SpendRange::fromBounds(
+            CurrencyScenarioFactory::money('USD', '0.50', 2),
+            CurrencyScenarioFactory::money('USD', '3.00', 2),
+        );
         $signature = $this->invokeFinderMethod($finder, 'stateSignature', [$range, null]);
         $registry = SearchStateRegistry::withInitial(
             'USD',
@@ -167,10 +168,10 @@ final class PathFinderInternalsTest extends TestCase
     public function test_initialize_search_structures_sets_expected_defaults(): void
     {
         $finder = new PathFinder(maxHops: 3, tolerance: '0.0');
-        $range = [
-            'min' => CurrencyScenarioFactory::money('USD', '5.00', 2),
-            'max' => CurrencyScenarioFactory::money('USD', '10.00', 2),
-        ];
+        $range = SpendRange::fromBounds(
+            CurrencyScenarioFactory::money('USD', '5.00', 2),
+            CurrencyScenarioFactory::money('USD', '10.00', 2),
+        );
         $desired = CurrencyScenarioFactory::money('USD', '7.50', 2);
 
         $bootstrap = $this->invokeFinderMethod($finder, 'initializeSearchStructures', ['SRC', $range, $desired]);
@@ -209,7 +210,8 @@ final class PathFinderInternalsTest extends TestCase
         self::assertSame($unit, $state->product());
         self::assertInstanceOf(PathEdgeSequence::class, $state->path());
         self::assertTrue($state->path()->isEmpty());
-        self::assertSame($range, $state->amountRange());
+        self::assertInstanceOf(SpendRange::class, $state->amountRange());
+        self::assertSame($range->toBoundsArray(), $state->amountRange()?->toBoundsArray());
         self::assertSame($desired, $state->desiredAmount());
 
         self::assertTrue($bestPerNode->hasSignature('SRC', $signature));
@@ -223,10 +225,10 @@ final class PathFinderInternalsTest extends TestCase
     public function test_record_state_replaces_state_with_equal_hops_and_lower_cost(): void
     {
         $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
-        $range = [
-            'min' => CurrencyScenarioFactory::money('USD', '1.00', 2),
-            'max' => CurrencyScenarioFactory::money('USD', '2.00', 2),
-        ];
+        $range = SpendRange::fromBounds(
+            CurrencyScenarioFactory::money('USD', '1.00', 2),
+            CurrencyScenarioFactory::money('USD', '2.00', 2),
+        );
         $signature = $this->invokeFinderMethod($finder, 'stateSignature', [$range, null]);
         $registry = SearchStateRegistry::withInitial(
             'USD',
@@ -249,10 +251,10 @@ final class PathFinderInternalsTest extends TestCase
     public function test_record_state_respects_explicit_signature_override(): void
     {
         $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
-        $range = [
-            'min' => CurrencyScenarioFactory::money('USD', '1.00', 2),
-            'max' => CurrencyScenarioFactory::money('USD', '3.00', 2),
-        ];
+        $range = SpendRange::fromBounds(
+            CurrencyScenarioFactory::money('USD', '1.00', 2),
+            CurrencyScenarioFactory::money('USD', '3.00', 2),
+        );
         $providedSignature = SearchStateSignature::fromString('provided:signature');
         $registry = SearchStateRegistry::withInitial(
             'USD',
@@ -276,10 +278,10 @@ final class PathFinderInternalsTest extends TestCase
     public function test_record_state_replaces_equal_cost_with_fewer_hops(): void
     {
         $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
-        $range = [
-            'min' => CurrencyScenarioFactory::money('USD', '1.00', 2),
-            'max' => CurrencyScenarioFactory::money('USD', '3.00', 2),
-        ];
+        $range = SpendRange::fromBounds(
+            CurrencyScenarioFactory::money('USD', '1.00', 2),
+            CurrencyScenarioFactory::money('USD', '3.00', 2),
+        );
         $signature = $this->invokeFinderMethod($finder, 'stateSignature', [$range, null]);
         $cost = BcMath::normalize('1.750', self::SCALE);
         $registry = SearchStateRegistry::withInitial(
@@ -485,10 +487,10 @@ final class PathFinderInternalsTest extends TestCase
     {
         $finder = new PathFinder(maxHops: 3, tolerance: '0.0');
         $edge = $this->createSellEdge();
-        $range = [
-            'min' => CurrencyScenarioFactory::money('EUR', '100.00', 2),
-            'max' => CurrencyScenarioFactory::money('EUR', '120.00', 2),
-        ];
+        $range = SpendRange::fromBounds(
+            CurrencyScenarioFactory::money('EUR', '100.00', 2),
+            CurrencyScenarioFactory::money('EUR', '120.00', 2),
+        );
 
         self::assertNull($this->invokeFinderMethod($finder, 'edgeSupportsAmount', [$edge, $range]));
     }
@@ -497,46 +499,46 @@ final class PathFinderInternalsTest extends TestCase
     {
         $finder = new PathFinder(maxHops: 3, tolerance: '0.0');
         $edge = $this->createSellEdge();
-        $range = [
-            'min' => CurrencyScenarioFactory::money('EUR', '0.00', 2),
-            'max' => CurrencyScenarioFactory::money('EUR', '60.00', 2),
-        ];
+        $range = SpendRange::fromBounds(
+            CurrencyScenarioFactory::money('EUR', '0.00', 2),
+            CurrencyScenarioFactory::money('EUR', '60.00', 2),
+        );
 
         $supported = $this->invokeFinderMethod($finder, 'edgeSupportsAmount', [$edge, $range]);
 
-        self::assertNotNull($supported);
-        self::assertSame('10.00', $supported['min']->amount());
-        self::assertSame('55.00', $supported['max']->amount());
+        self::assertInstanceOf(SpendRange::class, $supported);
+        self::assertSame('10.00', $supported->min()->amount());
+        self::assertSame('55.00', $supported->max()->amount());
     }
 
     public function test_calculate_next_range_respects_conversion_direction(): void
     {
         $finder = new PathFinder(maxHops: 3, tolerance: '0.0');
         $edge = $this->createSellEdge();
-        $range = [
-            'min' => CurrencyScenarioFactory::money('EUR', '10.00', 2),
-            'max' => CurrencyScenarioFactory::money('EUR', '55.00', 2),
-        ];
+        $range = SpendRange::fromBounds(
+            CurrencyScenarioFactory::money('EUR', '10.00', 2),
+            CurrencyScenarioFactory::money('EUR', '55.00', 2),
+        );
 
         $nextRange = $this->invokeFinderMethod($finder, 'calculateNextRange', [$edge, $range]);
 
-        self::assertSame(BcMath::normalize('1.00', self::SCALE), $nextRange['min']->amount());
-        self::assertSame(BcMath::normalize('6.00', self::SCALE), $nextRange['max']->amount());
+        self::assertSame(BcMath::normalize('1.00', self::SCALE), $nextRange->min()->amount());
+        self::assertSame(BcMath::normalize('6.00', self::SCALE), $nextRange->max()->amount());
     }
 
     public function test_calculate_next_range_sorts_swapped_bounds(): void
     {
         $finder = new PathFinder(maxHops: 3, tolerance: '0.0');
         $edge = $this->createSellEdge();
-        $range = [
-            'min' => CurrencyScenarioFactory::money('EUR', '55.00', 2),
-            'max' => CurrencyScenarioFactory::money('EUR', '10.00', 2),
-        ];
+        $range = SpendRange::fromBounds(
+            CurrencyScenarioFactory::money('EUR', '55.00', 2),
+            CurrencyScenarioFactory::money('EUR', '10.00', 2),
+        );
 
         $nextRange = $this->invokeFinderMethod($finder, 'calculateNextRange', [$edge, $range]);
 
-        self::assertSame(BcMath::normalize('1.00', self::SCALE), $nextRange['min']->amount());
-        self::assertSame(BcMath::normalize('6.00', self::SCALE), $nextRange['max']->amount());
+        self::assertSame(BcMath::normalize('1.00', self::SCALE), $nextRange->min()->amount());
+        self::assertSame(BcMath::normalize('6.00', self::SCALE), $nextRange->max()->amount());
     }
 
     public function test_convert_edge_amount_clamps_and_converts(): void
@@ -585,10 +587,10 @@ final class PathFinderInternalsTest extends TestCase
     public function test_clamp_to_range_returns_bounds(): void
     {
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
-        $range = [
-            'min' => CurrencyScenarioFactory::money('JPY', '100', 0),
-            'max' => CurrencyScenarioFactory::money('JPY', '200', 0),
-        ];
+        $range = SpendRange::fromBounds(
+            CurrencyScenarioFactory::money('JPY', '100', 0),
+            CurrencyScenarioFactory::money('JPY', '200', 0),
+        );
 
         $below = CurrencyScenarioFactory::money('JPY', '50', 0);
         $above = CurrencyScenarioFactory::money('JPY', '500', 0);
@@ -845,18 +847,18 @@ final class PathFinderInternalsTest extends TestCase
     {
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
         $edge = $this->createSellEdge();
-        $range = [
-            'min' => CurrencyScenarioFactory::money('EUR', '20.00', 2),
-            'max' => CurrencyScenarioFactory::money('EUR', '10.00', 2),
-        ];
+        $range = SpendRange::fromBounds(
+            CurrencyScenarioFactory::money('EUR', '20.00', 2),
+            CurrencyScenarioFactory::money('EUR', '10.00', 2),
+        );
 
         $feasible = $this->invokeFinderMethod($finder, 'edgeSupportsAmount', [$edge, $range]);
 
-        self::assertNotNull($feasible);
-        self::assertSame('EUR', $feasible['min']->currency());
-        self::assertSame('10.00', $feasible['min']->amount());
-        self::assertSame('EUR', $feasible['max']->currency());
-        self::assertSame('20.00', $feasible['max']->amount());
+        self::assertInstanceOf(SpendRange::class, $feasible);
+        self::assertSame('EUR', $feasible->min()->currency());
+        self::assertSame('10.00', $feasible->min()->amount());
+        self::assertSame('EUR', $feasible->max()->currency());
+        self::assertSame('20.00', $feasible->max()->amount());
     }
 
     public function test_edge_supports_amount_rejects_positive_minimum_when_capacity_zero(): void
@@ -881,10 +883,10 @@ final class PathFinderInternalsTest extends TestCase
                 ],
             ],
         ]);
-        $range = [
-            'min' => CurrencyScenarioFactory::money('EUR', '2.00', 2),
-            'max' => CurrencyScenarioFactory::money('EUR', '4.00', 2),
-        ];
+        $range = SpendRange::fromBounds(
+            CurrencyScenarioFactory::money('EUR', '2.00', 2),
+            CurrencyScenarioFactory::money('EUR', '4.00', 2),
+        );
 
         self::assertNull($this->invokeFinderMethod($finder, 'edgeSupportsAmount', [$edge, $range]));
     }
@@ -923,16 +925,16 @@ final class PathFinderInternalsTest extends TestCase
                 'max' => Money::zero('USD', 2),
             ],
         ]);
-        $range = [
-            'min' => Money::zero('EUR', 2),
-            'max' => Money::zero('EUR', 2),
-        ];
+        $range = SpendRange::fromBounds(
+            Money::zero('EUR', 2),
+            Money::zero('EUR', 2),
+        );
 
         $feasible = $this->invokeFinderMethod($finder, 'edgeSupportsAmount', [$edge, $range]);
 
-        self::assertNotNull($feasible);
-        self::assertTrue($feasible['min']->isZero());
-        self::assertTrue($feasible['max']->isZero());
+        self::assertInstanceOf(SpendRange::class, $feasible);
+        self::assertTrue($feasible->min()->isZero());
+        self::assertTrue($feasible->max()->isZero());
     }
 
     public function test_convert_edge_amount_clamps_values_below_source_minimum(): void

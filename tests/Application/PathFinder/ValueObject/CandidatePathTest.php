@@ -180,7 +180,7 @@ final class CandidatePathTest extends TestCase
         self::assertSame('BBB', $payload['edges'][1]['from']);
         self::assertSame('CCC', $payload['edges'][1]['to']);
 
-        $range = $constraints->toRange();
+        $range = $constraints->range()->toBoundsArray();
         self::assertNotNull($payload['amountRange']);
         self::assertSame($range['min'], $payload['amountRange']['min']);
         self::assertSame($range['max'], $payload['amountRange']['max']);

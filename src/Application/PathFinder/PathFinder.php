@@ -32,6 +32,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendRange;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
@@ -44,10 +45,6 @@ use function strtoupper;
 
 /**
  * Implementation of a tolerance-aware best-path search through the trading graph.
- *
- * @psalm-type SpendRange = array{min: Money, max: Money}
- *
- * @phpstan-type SpendRange array{min: Money, max: Money}
  */
 final class PathFinder
 {
@@ -140,7 +137,7 @@ final class PathFinder
         $range = null;
         $desiredSpend = null;
         if (null !== $spendConstraints) {
-            $range = $spendConstraints->toRange();
+            $range = $spendConstraints->range();
             $desiredSpend = $spendConstraints->desired();
         }
 
@@ -175,8 +172,8 @@ final class PathFinder
                 $stateRange = $state->amountRange();
                 if (null !== $stateRange) {
                     $candidateRange = SpendConstraints::from(
-                        $stateRange['min'],
-                        $stateRange['max'],
+                        $stateRange->min(),
+                        $stateRange->max(),
                         $state->desiredAmount(),
                     );
                 }
@@ -320,10 +317,7 @@ final class PathFinder
         return new SearchOutcome($finalized, $guardLimits);
     }
 
-    /**
-     * @param array{min: Money, max: Money}|null $range
-     */
-    private function stateSignature(?array $range, ?Money $desired): SearchStateSignature
+    private function stateSignature(?SpendRange $range, ?Money $desired): SearchStateSignature
     {
         if (null === $range) {
             return SearchStateSignature::compose([
@@ -332,13 +326,14 @@ final class PathFinder
             ]);
         }
 
-        $scale = max($range['min']->scale(), $range['max']->scale());
+        $scale = $range->scale();
         if ($desired instanceof Money) {
             $scale = max($scale, $desired->scale());
         }
 
-        $minimum = $range['min']->withScale($scale);
-        $maximum = $range['max']->withScale($scale);
+        $normalizedRange = $range->withScale($scale);
+        $minimum = $normalizedRange->min();
+        $maximum = $normalizedRange->max();
 
         $rangeSignature = sprintf(
             '%s:%s:%s:%d',
@@ -397,13 +392,8 @@ final class PathFinder
         }
     }
 
-    /**
-     * @param array{min: Money, max: Money}|null $range
-     */
-    private function initializeSearchStructures(string $source, ?array $range, ?Money $desiredSpend): SearchBootstrap
+    private function initializeSearchStructures(string $source, ?SpendRange $range, ?Money $desiredSpend): SearchBootstrap
     {
-        /** @var array{min: Money, max: Money}|null $range */
-        $range = $range;
         $queue = $this->createQueue();
         $results = $this->createResultHeap();
         $insertionOrder = new InsertionOrderCounter();
@@ -496,19 +486,13 @@ final class PathFinder
         return new RouteSignature($nodes);
     }
 
-    /**
-     * @param SpendRange $range
-     *
-     * @return SpendRange|null
-     */
-    private function edgeSupportsAmount(GraphEdge $edge, array $range): ?array
+    private function edgeSupportsAmount(GraphEdge $edge, SpendRange $range): ?SpendRange
     {
         $isBuy = OrderSide::BUY === $edge->orderSide();
         $capacity = $isBuy ? $edge->grossBaseCapacity() : $edge->quoteCapacity();
 
         $scale = max(
-            $range['min']->scale(),
-            $range['max']->scale(),
+            $range->scale(),
             $capacity->min()->scale(),
             $capacity->max()->scale(),
         );
@@ -522,19 +506,16 @@ final class PathFinder
             );
         }
 
-        $requestedMin = $range['min']->withScale($scale);
-        $requestedMax = $range['max']->withScale($scale);
-
-        if ($requestedMin->greaterThan($requestedMax)) {
-            [$requestedMin, $requestedMax] = [$requestedMax, $requestedMin];
-        }
+        $normalizedRange = $range->withScale($scale);
+        $requestedMin = $normalizedRange->min();
+        $requestedMax = $normalizedRange->max();
 
         if ([] === $edge->segments()) {
             $minimum = $capacity->min()->withScale($scale);
             $maximum = $capacity->max()->withScale($scale);
         } else {
-            $minimum = Money::zero($requestedMin->currency(), $scale);
-            $maximum = Money::zero($requestedMin->currency(), $scale);
+            $minimum = Money::zero($normalizedRange->currency(), $scale);
+            $maximum = Money::zero($normalizedRange->currency(), $scale);
 
             foreach ($edge->segments() as $segment) {
                 $segmentCapacity = $isBuy ? $segment->grossBase() : $segment->quote();
@@ -547,7 +528,7 @@ final class PathFinder
         }
 
         if ($maximum->isZero()) {
-            $zero = Money::zero($requestedMin->currency(), $scale);
+            $zero = Money::zero($normalizedRange->currency(), $scale);
 
             if ($minimum->greaterThan($zero)) {
                 return null;
@@ -557,7 +538,7 @@ final class PathFinder
                 return null;
             }
 
-            return ['min' => $zero, 'max' => $zero];
+            return SpendRange::fromBounds($zero, $zero);
         }
 
         if ($requestedMax->lessThan($minimum) || $requestedMin->greaterThan($maximum)) {
@@ -567,24 +548,15 @@ final class PathFinder
         $lowerBound = $requestedMin->greaterThan($minimum) ? $requestedMin : $minimum;
         $upperBound = $requestedMax->lessThan($maximum) ? $requestedMax : $maximum;
 
-        return ['min' => $lowerBound, 'max' => $upperBound];
+        return SpendRange::fromBounds($lowerBound, $upperBound);
     }
 
-    /**
-     * @param SpendRange $range
-     *
-     * @return SpendRange
-     */
-    private function calculateNextRange(GraphEdge $edge, array $range): array
+    private function calculateNextRange(GraphEdge $edge, SpendRange $range): SpendRange
     {
-        $minimum = $this->convertEdgeAmount($edge, $range['min']);
-        $maximum = $this->convertEdgeAmount($edge, $range['max']);
+        $minimum = $this->convertEdgeAmount($edge, $range->min());
+        $maximum = $this->convertEdgeAmount($edge, $range->max());
 
-        if ($minimum->greaterThan($maximum)) {
-            [$minimum, $maximum] = [$maximum, $minimum];
-        }
-
-        return ['min' => $minimum, 'max' => $maximum];
+        return SpendRange::fromBounds($minimum, $maximum);
     }
 
     private function convertEdgeAmount(GraphEdge $edge, Money $current): Money
@@ -664,31 +636,15 @@ final class PathFinder
 
         $converted = $result->withScale($targetScale);
 
-        return $this->clampToRange($converted, ['min' => $targetMin, 'max' => $targetMax]);
+        return $this->clampToRange($converted, SpendRange::fromBounds($targetMin, $targetMax));
     }
 
     /**
-     * @param SpendRange $range
-     *
-     * @throws PrecisionViolation when normalization fails due to missing BCMath support
+     * @throws InvalidInput|PrecisionViolation when normalization fails or currencies mismatch
      */
-    private function clampToRange(Money $value, array $range): Money
+    private function clampToRange(Money $value, SpendRange $range): Money
     {
-        $scale = max($value->scale(), $range['min']->scale(), $range['max']->scale());
-
-        $normalizedValue = $value->withScale($scale);
-        $minimum = $range['min']->withScale($scale);
-        $maximum = $range['max']->withScale($scale);
-
-        if ($normalizedValue->lessThan($minimum)) {
-            return $minimum;
-        }
-
-        if ($normalizedValue->greaterThan($maximum)) {
-            return $maximum;
-        }
-
-        return $normalizedValue;
+        return $range->clamp($value);
     }
 
     /**
