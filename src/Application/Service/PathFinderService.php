@@ -130,15 +130,9 @@ final class PathFinderService
     {
         $config = $request->config();
         $targetAsset = $request->targetAsset();
-        $normalizedTargetAsset = trim($targetAsset);
-
-        if ('' === $normalizedTargetAsset) {
-            throw new InvalidInput('Target asset cannot be empty.');
-        }
-
         $orderBook = $request->orderBook();
         $sourceCurrency = strtoupper(trim($request->sourceAsset()));
-        $targetCurrency = strtoupper($normalizedTargetAsset);
+        $targetCurrency = $targetAsset;
         $requestedSpend = $request->spendAmount();
 
         $orders = $this->orderSpendAnalyzer->filterOrders($orderBook, $config);

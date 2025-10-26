@@ -12,6 +12,7 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function strtoupper;
+use function trim;
 
 /**
  * Immutable request DTO carrying the dependencies required to run a path search.
@@ -32,7 +33,13 @@ final class PathSearchRequest
         private readonly PathSearchConfig $config,
         string $targetAsset,
     ) {
-        $this->targetAsset = strtoupper($targetAsset);
+        $normalizedTargetAsset = trim($targetAsset);
+
+        if ('' === $normalizedTargetAsset) {
+            throw new InvalidInput('Target asset cannot be empty.');
+        }
+
+        $this->targetAsset = strtoupper($normalizedTargetAsset);
         $this->spendAmount = $config->spendAmount();
         $this->spendConstraints = SpendConstraints::from(
             $config->minimumSpendAmount(),

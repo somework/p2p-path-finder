@@ -265,7 +265,7 @@ use SomeWork\\P2PPathFinder\\Exception\\ExceptionInterface;
 use SomeWork\\P2PPathFinder\\Exception\\InvalidInput;
 use SomeWork\\P2PPathFinder\\Exception\\PrecisionViolation;
 
-$request = new PathSearchRequest($orderBook, $config, 'USDT');
+$request = new PathSearchRequest($orderBook, $config, '  usdt  '); // normalized to "USDT"
 
 try {
     $outcome = $service->findBestPaths($request);
@@ -323,7 +323,7 @@ $config = PathSearchConfig::builder()
     ->build();
 
 $service = new PathFinderService(new GraphBuilder());
-$request = new PathSearchRequest($orderBook, $config, 'USDT');
+$request = new PathSearchRequest($orderBook, $config, "  usdt  "); // normalized to "USDT"
 $resultOutcome = $service->findBestPaths($request);
 
 if (!$resultOutcome->hasPaths()) {
