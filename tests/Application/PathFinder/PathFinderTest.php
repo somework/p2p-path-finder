@@ -30,6 +30,7 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Tests\Application\Support\Harness\SearchQueueTieBreakHarness;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
@@ -248,6 +249,23 @@ final class PathFinderTest extends TestCase
         $direct = $results[0];
         self::assertSame('EUR', $direct['edges'][0]['from']);
         self::assertSame('USD', $direct['edges'][0]['to']);
+    }
+
+    public function test_it_orders_equal_cost_paths_by_hops_signature_and_discovery(): void
+    {
+        $finder = new PathFinder(maxHops: 4, tolerance: '0.0');
+
+        $extracted = SearchQueueTieBreakHarness::extractOrdering($finder);
+
+        self::assertSame(
+            [
+                ['signature' => 'SRC->ALPHA->OMEGA', 'hops' => 2],
+                ['signature' => 'SRC->ALPHA->OMEGA', 'hops' => 2],
+                ['signature' => 'SRC->BETA->OMEGA', 'hops' => 2],
+                ['signature' => 'SRC->ALPHA->MID->OMEGA', 'hops' => 3],
+            ],
+            $extracted,
+        );
     }
 
     public function test_finalize_results_orders_candidates_by_cost_hops_and_signature(): void

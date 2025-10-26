@@ -25,6 +25,15 @@ confidence.
 - Update the [CHANGELOG](CHANGELOG.md) for user-visible changes, especially when a new
   feature advances the path toward the `1.0.0-rc` milestone.
 
+- The path-finding search queue must resolve ties using the following precedence: lowest
+  cost → fewest hops → lexicographically smallest route signature → earliest discovery.
+  The regression suites enforce this via
+  `PathFinderInternalsTest::test_search_queue_tie_breaks_by_cost_hops_signature_then_discovery`
+  and
+  `PathFinderTest::test_it_orders_equal_cost_paths_by_hops_signature_and_discovery`.
+  Adjust those harnesses alongside any comparator changes to avoid accidental ordering
+  regressions.
+
 ### Mutation testing
 
 - Mutation testing is powered by [Infection](https://infection.github.io/) to ensure guard
