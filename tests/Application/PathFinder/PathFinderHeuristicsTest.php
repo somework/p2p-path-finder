@@ -98,10 +98,16 @@ final class PathFinderHeuristicsTest extends TestCase
         self::assertSame(0, $netChange);
         $records = $registry->recordsFor('USD');
         self::assertCount(2, $records);
-        self::assertSame('other-signature', $records[0]->signature());
+        $recordsBySignature = [];
+        foreach ($records as $record) {
+            $recordsBySignature[$record->signature()] = $record;
+        }
 
-        $replacement = $records[1];
-        self::assertSame($signature, $replacement->signature());
+        self::assertArrayHasKey('other-signature', $recordsBySignature);
+        self::assertSame(BcMath::normalize('3.000', 18), $recordsBySignature['other-signature']->cost());
+        self::assertSame(4, $recordsBySignature['other-signature']->hops());
+
+        $replacement = $recordsBySignature[$signature];
         self::assertSame(BcMath::normalize('1.500', 18), $replacement->cost());
         self::assertSame(1, $replacement->hops());
     }
@@ -134,10 +140,16 @@ final class PathFinderHeuristicsTest extends TestCase
         self::assertSame(0, $netChange);
         $records = $registry->recordsFor('USD');
         self::assertCount(2, $records);
-        self::assertSame($alternateSignature, $records[0]->signature());
+        $recordsBySignature = [];
+        foreach ($records as $record) {
+            $recordsBySignature[$record->signature()] = $record;
+        }
 
-        $replacement = $records[1];
-        self::assertSame($primarySignature, $replacement->signature());
+        self::assertArrayHasKey($alternateSignature, $recordsBySignature);
+        self::assertSame(BcMath::normalize('4.000', 18), $recordsBySignature[$alternateSignature]->cost());
+        self::assertSame(5, $recordsBySignature[$alternateSignature]->hops());
+
+        $replacement = $recordsBySignature[$primarySignature];
         self::assertSame(BcMath::normalize('1.250', 18), $replacement->cost());
         self::assertSame(2, $replacement->hops());
     }

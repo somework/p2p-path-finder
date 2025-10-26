@@ -76,6 +76,34 @@ final class SearchBootstrapTest extends TestCase
         self::assertSame(1, $clone->visitedStates());
     }
 
+    public function test_clone_registry_replacement_is_isolated(): void
+    {
+        $queue = new SearchStateQueue(self::SCALE);
+        $results = new CandidateResultHeap(self::SCALE);
+        $registry = SearchStateRegistry::withInitial('SRC', new SearchStateRecord('1', 0, 'sig:src'));
+        $insertionOrder = new InsertionOrderCounter();
+        $resultInsertionOrder = new InsertionOrderCounter();
+
+        $state = SearchState::bootstrap('SRC', BcMath::normalize('1', self::SCALE), null, null);
+        $queue->push(new SearchQueueEntry(
+            $state,
+            new SearchStatePriority(new PathCost($state->cost()), $state->hops(), new RouteSignature([]), $insertionOrder->next()),
+        ));
+
+        $bootstrap = new SearchBootstrap($queue, $results, $registry, $insertionOrder, $resultInsertionOrder, 1);
+        $clone = clone $bootstrap;
+
+        $clone->registry()->register('SRC', new SearchStateRecord('0.5', 0, 'sig:src'), self::SCALE);
+
+        $originalRecords = $bootstrap->registry()->recordsFor('SRC');
+        self::assertCount(1, $originalRecords);
+        self::assertSame('1', $originalRecords[0]->cost());
+
+        $cloneRecords = $clone->registry()->recordsFor('SRC');
+        self::assertCount(1, $cloneRecords);
+        self::assertSame('0.5', $cloneRecords[0]->cost());
+    }
+
     public function test_requires_positive_visited_state_counter(): void
     {
         $queue = new SearchStateQueue(self::SCALE);

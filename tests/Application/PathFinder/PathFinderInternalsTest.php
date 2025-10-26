@@ -123,15 +123,12 @@ final class PathFinderInternalsTest extends TestCase
             self::SCALE,
         );
 
-        self::assertSame(1, $delta);
+        self::assertSame(0, $delta);
         $records = $registry->recordsFor('USD');
-        self::assertCount(2, $records);
-        $costsByHops = [];
-        foreach ($records as $record) {
-            $costsByHops[$record->hops()] = $record->cost();
-        }
-        self::assertArrayHasKey(2, $costsByHops);
-        self::assertArrayHasKey(4, $costsByHops);
+        self::assertCount(1, $records);
+        self::assertSame(BcMath::normalize('1.2', self::SCALE), $records[0]->cost());
+        self::assertSame(2, $records[0]->hops());
+        self::assertSame($signature, $records[0]->signature());
     }
 
     public function test_record_state_preserves_existing_when_new_state_has_higher_cost(): void
@@ -153,15 +150,12 @@ final class PathFinderInternalsTest extends TestCase
             self::SCALE,
         );
 
-        self::assertSame(1, $delta);
+        self::assertSame(0, $delta);
         $records = $registry->recordsFor('USD');
-        self::assertCount(2, $records);
-        $costsByHops = [];
-        foreach ($records as $record) {
-            $costsByHops[$record->hops()] = $record->cost();
-        }
-        self::assertSame(BcMath::normalize('1.0', self::SCALE), $costsByHops[4]);
-        self::assertSame(BcMath::normalize('1.5', self::SCALE), $costsByHops[2]);
+        self::assertCount(1, $records);
+        self::assertSame(BcMath::normalize('1.0', self::SCALE), $records[0]->cost());
+        self::assertSame(4, $records[0]->hops());
+        self::assertSame($signature, $records[0]->signature());
     }
 
     public function test_initialize_search_structures_sets_expected_defaults(): void
@@ -298,6 +292,51 @@ final class PathFinderInternalsTest extends TestCase
         self::assertCount(1, $records);
         self::assertSame($cost, $records[0]->cost());
         self::assertSame(2, $records[0]->hops());
+    }
+
+    public function test_register_prunes_dominated_records_for_each_signature(): void
+    {
+        $registry = SearchStateRegistry::withInitial(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('1.0', self::SCALE), 2, 'sig:alpha'),
+        );
+
+        $firstDelta = $registry->register(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('2.0', self::SCALE), 3, 'sig:beta'),
+            self::SCALE,
+        );
+
+        $alphaReplacement = $registry->register(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('0.8', self::SCALE), 1, 'sig:alpha'),
+            self::SCALE,
+        );
+
+        $betaDominated = $registry->register(
+            'USD',
+            new SearchStateRecord(BcMath::normalize('2.5', self::SCALE), 4, 'sig:beta'),
+            self::SCALE,
+        );
+
+        self::assertSame(1, $firstDelta);
+        self::assertSame(0, $alphaReplacement);
+        self::assertSame(0, $betaDominated);
+
+        $records = $registry->recordsFor('USD');
+        self::assertCount(2, $records);
+        $recordsBySignature = [];
+        foreach ($records as $record) {
+            $recordsBySignature[$record->signature()] = $record;
+        }
+
+        self::assertArrayHasKey('sig:alpha', $recordsBySignature);
+        self::assertSame(BcMath::normalize('0.8', self::SCALE), $recordsBySignature['sig:alpha']->cost());
+        self::assertSame(1, $recordsBySignature['sig:alpha']->hops());
+
+        self::assertArrayHasKey('sig:beta', $recordsBySignature);
+        self::assertSame(BcMath::normalize('2.0', self::SCALE), $recordsBySignature['sig:beta']->cost());
+        self::assertSame(3, $recordsBySignature['sig:beta']->hops());
     }
 
     public function test_is_dominated_detects_matching_signature(): void
