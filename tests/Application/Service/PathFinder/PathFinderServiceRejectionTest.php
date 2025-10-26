@@ -28,7 +28,7 @@ final class PathFinderServiceRejectionTest extends PathFinderServiceTestCase
 
         $service = new PathFinderService(new GraphBuilder());
 
-        $result = $service->findBestPaths($orderBook, $config, 'USD');
+        $result = $service->findBestPaths($this->makeRequest($orderBook, $config, 'USD'));
 
         self::assertSame([], $result->paths()->toArray());
         self::assertFalse($result->guardLimits()->expansionsReached());
@@ -51,7 +51,7 @@ final class PathFinderServiceRejectionTest extends PathFinderServiceTestCase
 
         $service = new PathFinderService(new GraphBuilder());
 
-        $result = $service->findBestPaths($orderBook, $config, 'USD');
+        $result = $service->findBestPaths($this->makeRequest($orderBook, $config, 'USD'));
 
         self::assertSame([], $result->paths()->toArray());
         self::assertFalse($result->guardLimits()->expansionsReached());
@@ -80,7 +80,7 @@ final class PathFinderServiceRejectionTest extends PathFinderServiceTestCase
 
         $service = new PathFinderService(new GraphBuilder());
 
-        $result = $service->findBestPaths($orderBook, $config, 'BTC');
+        $result = $service->findBestPaths($this->makeRequest($orderBook, $config, 'BTC'));
 
         self::assertSame([], $result->paths()->toArray());
         self::assertFalse($result->guardLimits()->expansionsReached());
@@ -101,7 +101,7 @@ final class PathFinderServiceRejectionTest extends PathFinderServiceTestCase
 
         $service = new PathFinderService(new GraphBuilder());
 
-        $result = $service->findBestPaths($orderBook, $config, 'USD');
+        $result = $service->findBestPaths($this->makeRequest($orderBook, $config, 'USD'));
 
         self::assertSame([], $result->paths()->toArray());
         self::assertFalse($result->guardLimits()->expansionsReached());

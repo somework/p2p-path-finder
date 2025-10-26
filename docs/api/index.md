@@ -1498,6 +1498,39 @@ Immutable container representing a materialised path result and its ordering key
 ### orderKey
 `MaterializedResult::orderKey(): SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey`
 
+## SomeWork\P2PPathFinder\Application\Service\PathSearchRequest
+Immutable request DTO carrying the order book, search configuration and target asset for a
+service-level path search.
+
+### Public methods
+
+### __construct
+`PathSearchRequest::__construct(SomeWork\P2PPathFinder\Application\OrderBook\OrderBook $orderBook, SomeWork\P2PPathFinder\Application\Config\PathSearchConfig $config, string $targetAsset)`
+
+### orderBook
+`PathSearchRequest::orderBook(): SomeWork\P2PPathFinder\Application\OrderBook\OrderBook`
+
+### config
+`PathSearchRequest::config(): SomeWork\P2PPathFinder\Application\Config\PathSearchConfig`
+
+### targetAsset
+`PathSearchRequest::targetAsset(): string`
+
+### spendAmount
+`PathSearchRequest::spendAmount(): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
+
+### sourceAsset
+`PathSearchRequest::sourceAsset(): string`
+
+### minimumHops
+`PathSearchRequest::minimumHops(): int`
+
+### maximumHops
+`PathSearchRequest::maximumHops(): int`
+
+### spendConstraints
+`PathSearchRequest::spendConstraints(): SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints`
+
 ## SomeWork\P2PPathFinder\Application\Service\PathFinderService
 High level facade orchestrating order filtering, graph building and path search.
 
@@ -1507,7 +1540,7 @@ High level facade orchestrating order filtering, graph building and path search.
 `PathFinderService::__construct(SomeWork\P2PPathFinder\Application\Graph\GraphBuilder $graphBuilder, ?SomeWork\P2PPathFinder\Application\Service\OrderSpendAnalyzer $orderSpendAnalyzer = null, ?SomeWork\P2PPathFinder\Application\Service\LegMaterializer $legMaterializer = null, ?SomeWork\P2PPathFinder\Application\Service\ToleranceEvaluator $toleranceEvaluator = null, ?SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator $fillEvaluator = null, ?SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy $orderingStrategy = null, ?callable $pathFinderFactory = null)`
 
 ### findBestPaths
-`PathFinderService::findBestPaths(SomeWork\P2PPathFinder\Application\OrderBook\OrderBook $orderBook, SomeWork\P2PPathFinder\Application\Config\PathSearchConfig $config, string $targetAsset): SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome`
+`PathFinderService::findBestPaths(SomeWork\P2PPathFinder\Application\Service\PathSearchRequest $request): SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome`
 
 Searches for the best conversion paths from the configured spend asset to the target asset.
 

@@ -49,7 +49,7 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 2)
             ->build();
 
-        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'JPY');
+        $searchResult = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'JPY'));
         $results = self::extractPaths($searchResult);
 
         self::assertNotSame([], $results);
@@ -103,7 +103,7 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'BTC');
+        $searchResult = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'BTC'));
         $results = self::extractPaths($searchResult);
 
         self::assertNotSame([], $results);
@@ -139,7 +139,7 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $searchResult = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'USD'));
         $results = self::extractPaths($searchResult);
 
         self::assertNotSame([], $results);
@@ -179,7 +179,7 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $searchResult = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'USD'));
         $results = self::extractPaths($searchResult);
 
         self::assertNotSame([], $results);
@@ -225,7 +225,7 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 3)
             ->build();
 
-        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'JPY');
+        $searchResult = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'JPY'));
         $results = self::extractPaths($searchResult);
 
         self::assertNotSame([], $results);
@@ -283,7 +283,7 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 3)
             ->build();
 
-        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'JPY');
+        $searchResult = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'JPY'));
         $results = self::extractPaths($searchResult);
 
         self::assertNotSame([], $results);
@@ -325,7 +325,7 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $searchResult = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'USD'));
         $results = self::extractPaths($searchResult);
 
         self::assertNotSame([], $results);
@@ -355,7 +355,7 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $searchResult = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'USD'));
         $results = self::extractPaths($searchResult);
 
         self::assertNotSame([], $results);
@@ -405,7 +405,7 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 2)
             ->build();
 
-        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'BTC');
+        $searchResult = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'BTC'));
         $results = self::extractPaths($searchResult);
 
         self::assertNotSame([], $results);
@@ -462,7 +462,7 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 2)
             ->build();
 
-        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'BTC');
+        $searchResult = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'BTC'));
 
         self::assertSame([], self::extractPaths($searchResult));
         $guardLimits = self::extractGuardLimits($searchResult);
@@ -483,7 +483,7 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 2)
             ->build();
 
-        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'JPY');
+        $searchResult = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'JPY'));
         $results = self::extractPaths($searchResult);
 
         self::assertNotSame([], $results);
@@ -528,7 +528,7 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $searchResult = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'USD'));
 
         self::assertSame([], self::extractPaths($searchResult));
         $guardLimits = self::extractGuardLimits($searchResult);

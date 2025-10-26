@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Application\Service\PathFinder;
 
 use PHPUnit\Framework\TestCase;
+use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
+use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
@@ -33,6 +35,11 @@ abstract class PathFinderServiceTestCase extends TestCase
     protected function makeServiceWithFactory(callable $factory): PathFinderService
     {
         return new PathFinderService(new GraphBuilder(), pathFinderFactory: $factory);
+    }
+
+    protected function makeRequest(OrderBook $orderBook, PathSearchConfig $config, string $targetAsset): PathSearchRequest
+    {
+        return new PathSearchRequest($orderBook, $config, $targetAsset);
     }
 
     protected function createOrder(

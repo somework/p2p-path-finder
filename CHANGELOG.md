@@ -18,5 +18,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Breaking: `PathFinder::findBestPaths()` now consumes `SpendConstraints` and emits
   `CandidatePath` instances, replacing the previous associative array payloads.
   Custom callbacks or integrations must migrate to the new value objects.
+- Breaking: `PathFinderService::findBestPaths()` accepts a
+  `PathSearchRequest` encapsulating the order book, search configuration and
+  target asset. Update service integrations to construct and pass the DTO.
 
 [Unreleased]: https://github.com/somework/p2p-path-finder/compare/main...HEAD

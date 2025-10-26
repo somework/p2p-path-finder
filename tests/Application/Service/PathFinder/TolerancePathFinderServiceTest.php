@@ -51,7 +51,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $searchResult = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'USD'));
         $results = self::extractPaths($searchResult);
 
         self::assertNotSame([], $results);
@@ -86,7 +86,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $searchResult = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'USD'));
         $results = self::extractPaths($searchResult);
 
         self::assertNotSame([], $results);
@@ -153,7 +153,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits($hopLimits[0], $hopLimits[1])
             ->build();
 
-        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, $target);
+        $searchResult = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, $target));
 
         self::assertSame([], self::extractPaths($searchResult));
         $guardLimits = self::extractGuardLimits($searchResult);
@@ -241,7 +241,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(3, 3)
             ->build();
 
-        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'JPY');
+        $searchResult = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'JPY'));
 
         self::assertSame([], self::extractPaths($searchResult));
         $guardLimits = self::extractGuardLimits($searchResult);
@@ -264,7 +264,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $searchResult = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'USD'));
         $results = self::extractPaths($searchResult);
 
         self::assertNotSame([], $results);
@@ -291,7 +291,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $searchResult = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'USD'));
         $results = self::extractPaths($searchResult);
 
         self::assertNotSame([], $results);
@@ -318,7 +318,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $searchResult = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $searchResult = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'USD'));
         $results = self::extractPaths($searchResult);
 
         self::assertNotSame([], $results);
