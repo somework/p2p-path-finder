@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathFinder\Result;
 
+use JsonSerializable;
+
 /**
  * @template TPath of mixed
  */
-final class SearchOutcome
+final class SearchOutcome implements JsonSerializable
 {
     /**
      * @var PathResultSet<TPath>
@@ -26,16 +28,31 @@ final class SearchOutcome
     }
 
     /**
+     * @param PathResultSet<TPath> $paths
+     *
+     * @return SearchOutcome<TPath>
+     *
+     * @psalm-return SearchOutcome<TPath>
+     */
+    public static function fromResultSet(PathResultSet $paths, SearchGuardReport $guardLimits): self
+    {
+        /** @var SearchOutcome<TPath> $outcome */
+        $outcome = new self($paths, $guardLimits);
+
+        return $outcome;
+    }
+
+    /**
      * @return SearchOutcome<TPath>
      *
      * @psalm-return SearchOutcome<TPath>
      */
     public static function empty(SearchGuardReport $guardLimits): self
     {
-        /** @var SearchOutcome<TPath> $empty */
-        $empty = new self(PathResultSet::empty(), $guardLimits);
+        /** @var PathResultSet<TPath> $emptyPaths */
+        $emptyPaths = PathResultSet::empty();
 
-        return $empty;
+        return self::fromResultSet($emptyPaths, $guardLimits);
     }
 
     /**
@@ -54,5 +71,23 @@ final class SearchOutcome
     public function guardLimits(): SearchGuardReport
     {
         return $this->guardLimits;
+    }
+
+    /**
+     * @return array{
+     *     paths: list<mixed>,
+     *     guards: array{
+     *         limits: array{expansions: int, visited_states: int, time_budget_ms: int|null},
+     *         metrics: array{expansions: int, visited_states: int, elapsed_ms: float},
+     *         breached: array{expansions: bool, visited_states: bool, time_budget: bool, any: bool}
+     *     }
+     * }
+     */
+    public function jsonSerialize(): array
+    {
+        return [
+            'paths' => $this->paths->jsonSerialize(),
+            'guards' => $this->guardLimits->jsonSerialize(),
+        ];
     }
 }

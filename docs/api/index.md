@@ -850,6 +850,11 @@ Immutable snapshot describing how the search interacted with its guard rails.
 
 Parameter $paths: PathResultSet&lt;TPath&gt;
 
+### fromResultSet
+`SearchOutcome::fromResultSet(SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet $paths, SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport $guardLimits): self`
+
+Returns: SearchOutcome&lt;TPath&gt;
+
 ### empty
 `SearchOutcome::empty(SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport $guardLimits): self`
 
@@ -865,6 +870,11 @@ Returns: PathResultSet&lt;TPath&gt;
 
 ### guardLimits
 `SearchOutcome::guardLimits(): SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport`
+
+### jsonSerialize
+`SearchOutcome::jsonSerialize(): array`
+
+Returns a machine payload shaped as `['paths' => list<mixed>, 'guards' => SearchGuardReport::jsonSerialize()]`.
 
 ## SomeWork\P2PPathFinder\Application\PathFinder\Search\InsertionOrderCounter
 
