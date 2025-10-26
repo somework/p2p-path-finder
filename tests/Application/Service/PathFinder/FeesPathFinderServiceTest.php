@@ -19,8 +19,6 @@ use function sprintf;
 final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
 {
     /**
-     * @param SearchOutcome<PathResult> $result
-     *
      * @return list<PathResult>
      */
     private static function extractPaths(SearchOutcome $result): array
@@ -28,9 +26,6 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
         return $result->paths()->toArray();
     }
 
-    /**
-     * @param SearchOutcome<PathResult> $result
-     */
     private static function extractGuardLimits(SearchOutcome $result): SearchGuardReport
     {
         return $result->guardLimits();

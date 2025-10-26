@@ -60,6 +60,13 @@ foreach ($result->paths() as $path) {
 // The PathResultSet returned by SearchOutcome::paths() is iterable and also exposes
 // helper methods like toArray() or jsonSerialize() when you need a plain list.
 
+// When integrating with APIs you can serialise the whole outcome. The structure matches
+// ['paths' => $result->paths()->jsonSerialize(), 'guards' => $result->guardLimits()->jsonSerialize()].
+$payload = $result->jsonSerialize();
+
+assert(isset($payload['paths'], $payload['guards']));
+assert($payload['guards']['limits']['expansions'] >= $payload['guards']['metrics']['expansions']);
+
 $report = $result->guardLimits();
 printf(
     "Explored %d/%d states across %d/%d expansions in %.3fms\n",

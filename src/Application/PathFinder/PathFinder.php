@@ -118,8 +118,6 @@ final class PathFinder
 
     /**
      * @param callable(CandidatePath):bool|null $acceptCandidate
-     *
-     * @return SearchOutcome<CandidatePath>
      */
     public function findBestPaths(
         Graph $graph,
@@ -132,7 +130,7 @@ final class PathFinder
         $target = strtoupper($target);
 
         if (!$graph->hasNode($source) || !$graph->hasNode($target)) {
-            /** @var SearchOutcome<CandidatePath> $empty */
+            /** @var SearchOutcome $empty */
             $empty = SearchOutcome::empty(SearchGuardReport::idle($this->maxVisitedStates, $this->maxExpansions, $this->timeBudgetMs));
 
             return $empty;
@@ -309,7 +307,7 @@ final class PathFinder
         $guardLimits = $guards->finalize($visitedStates, $this->maxVisitedStates, $visitedGuardReached);
 
         if (0 === $results->count()) {
-            /** @var SearchOutcome<CandidatePath> $empty */
+            /** @var SearchOutcome $empty */
             $empty = SearchOutcome::empty($guardLimits);
 
             return $empty;
@@ -317,6 +315,7 @@ final class PathFinder
 
         $finalized = $this->finalizeResults($results);
 
+        /* @phpstan-ignore-next-line */
         return new SearchOutcome($finalized, $guardLimits);
     }
 

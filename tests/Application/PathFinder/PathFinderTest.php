@@ -48,8 +48,6 @@ final class PathFinderTest extends TestCase
     private const SCALE = 18;
 
     /**
-     * @param SearchOutcome<CandidatePath> $searchResult
-     *
      * @return list<array{
      *     cost: numeric-string,
      *     product: numeric-string,

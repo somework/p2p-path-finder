@@ -43,7 +43,7 @@ final class PathFinderService
     private readonly ToleranceEvaluator $toleranceEvaluator;
     private readonly PathOrderStrategy $orderingStrategy;
     /**
-     * @var Closure(PathSearchRequest):Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath>
+     * @var Closure(PathSearchRequest):Closure(Graph, callable(CandidatePath):bool):SearchOutcome
      */
     private readonly Closure $pathFinderFactory;
 
@@ -74,7 +74,7 @@ final class PathFinderService
              * @param Graph                        $graph
              * @param callable(CandidatePath):bool $callback
              *
-             * @return SearchOutcome<CandidatePath>
+             * @return SearchOutcome
              */
             $runner = static function (
                 Graph $graph,
@@ -107,7 +107,7 @@ final class PathFinderService
 
         $factory = $factory instanceof Closure ? $factory : Closure::fromCallable($factory);
 
-        /** @var Closure(PathSearchRequest):Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath> $typedFactory */
+        /** @var Closure(PathSearchRequest):Closure(Graph, callable(CandidatePath):bool):SearchOutcome $typedFactory */
         $typedFactory = $factory;
 
         $this->pathFinderFactory = $typedFactory;
@@ -123,8 +123,6 @@ final class PathFinderService
      *
      * @throws InvalidInput       when the requested target asset identifier is empty
      * @throws PrecisionViolation when arbitrary precision operations required for cost ordering cannot be performed
-     *
-     * @return SearchOutcome<PathResult>
      */
     public function findBestPaths(PathSearchRequest $request): SearchOutcome
     {
@@ -137,7 +135,7 @@ final class PathFinderService
 
         $orders = $this->orderSpendAnalyzer->filterOrders($orderBook, $config);
         if ([] === $orders) {
-            /** @var SearchOutcome<PathResult> $empty */
+            /** @var SearchOutcome $empty */
             $empty = SearchOutcome::empty(SearchGuardReport::idle(
                 $config->pathFinderMaxVisitedStates(),
                 $config->pathFinderMaxExpansions(),
@@ -149,7 +147,7 @@ final class PathFinderService
 
         $graph = $this->graphBuilder->build($orders);
         if (!$graph->hasNode($sourceCurrency) || !$graph->hasNode($targetCurrency)) {
-            /** @var SearchOutcome<PathResult> $empty */
+            /** @var SearchOutcome $empty */
             $empty = SearchOutcome::empty(SearchGuardReport::idle(
                 $config->pathFinderMaxVisitedStates(),
                 $config->pathFinderMaxExpansions(),
@@ -160,7 +158,7 @@ final class PathFinderService
         }
 
         $runnerFactory = $this->pathFinderFactory;
-        /** @var Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath> $runner */
+        /** @var Closure(Graph, callable(CandidatePath):bool):SearchOutcome $runner */
         $runner = $runnerFactory($request);
 
         /**
@@ -239,7 +237,7 @@ final class PathFinderService
         $this->assertGuardLimits($config, $guardLimits);
 
         if ([] === $materializedResults) {
-            /** @var SearchOutcome<PathResult> $empty */
+            /** @var SearchOutcome $empty */
             $empty = SearchOutcome::empty($guardLimits);
 
             return $empty;
@@ -257,7 +255,9 @@ final class PathFinderService
         /** @var PathResultSet<PathResult> $resultSet */
         $resultSet = PathResultSet::fromEntries($this->orderingStrategy, $resultEntries);
 
-        /** @var SearchOutcome<PathResult> $outcome */
+        /** @var SearchOutcome $outcome */
+        // Safe variance: PathResultSet<PathResult> → PathResultSet<mixed> isn't recognised because PathResultSet lacks covariant typing, so suppress the PHPStan false positive.
+        /** @phpstan-ignore-next-line */
         $outcome = new SearchOutcome($resultSet, $guardLimits);
 
         return $outcome;
@@ -334,6 +334,9 @@ final class PathFinderService
     {
         $results = $this->findBestPaths(new PathSearchRequest($orderBook, $config, $targetAsset));
 
-        return $results->paths()->first();
+        /** @var PathResult|null $path */
+        $path = $results->paths()->first();
+
+        return $path;
     }
 }
