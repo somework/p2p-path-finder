@@ -28,6 +28,8 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function sprintf;
+use function strtoupper;
+use function trim;
 
 /**
  * High level facade orchestrating order filtering, graph building and path search.
@@ -128,14 +130,15 @@ final class PathFinderService
     {
         $config = $request->config();
         $targetAsset = $request->targetAsset();
+        $normalizedTargetAsset = trim($targetAsset);
 
-        if ('' === $targetAsset) {
+        if ('' === $normalizedTargetAsset) {
             throw new InvalidInput('Target asset cannot be empty.');
         }
 
         $orderBook = $request->orderBook();
-        $sourceCurrency = $request->sourceAsset();
-        $targetCurrency = $targetAsset;
+        $sourceCurrency = strtoupper(trim($request->sourceAsset()));
+        $targetCurrency = strtoupper($normalizedTargetAsset);
         $requestedSpend = $request->spendAmount();
 
         $orders = $this->orderSpendAnalyzer->filterOrders($orderBook, $config);
