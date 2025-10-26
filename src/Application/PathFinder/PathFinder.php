@@ -118,8 +118,6 @@ final class PathFinder
 
     /**
      * @param callable(CandidatePath):bool|null $acceptCandidate
-     *
-     * @return SearchOutcome
      */
     public function findBestPaths(
         Graph $graph,
@@ -317,7 +315,7 @@ final class PathFinder
 
         $finalized = $this->finalizeResults($results);
 
-        /** @phpstan-ignore-next-line */
+        /* @phpstan-ignore-next-line */
         return new SearchOutcome($finalized, $guardLimits);
     }
 

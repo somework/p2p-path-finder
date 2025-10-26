@@ -9,9 +9,8 @@ use JsonSerializable;
 final class SearchOutcome implements JsonSerializable
 {
     /**
-     * @var PathResultSet
-     *
      * @phpstan-var PathResultSet<mixed>
+     *
      * @psalm-var PathResultSet
      */
     private readonly PathResultSet $paths;
@@ -21,9 +20,9 @@ final class SearchOutcome implements JsonSerializable
     /**
      * @param PathResultSet<mixed> $paths
      *
-     * @psalm-param PathResultSet $paths
-     *
      * @phpstan-param PathResultSet<mixed> $paths
+     *
+     * @psalm-param PathResultSet $paths
      */
     public function __construct(PathResultSet $paths, SearchGuardReport $guardLimits)
     {
@@ -34,29 +33,23 @@ final class SearchOutcome implements JsonSerializable
     /**
      * @param PathResultSet<mixed> $paths
      *
-     * @psalm-param PathResultSet $paths
-     *
      * @phpstan-param PathResultSet<mixed> $paths
      *
-     * @return SearchOutcome
+     * @psalm-param PathResultSet $paths
      */
     public static function fromResultSet(PathResultSet $paths, SearchGuardReport $guardLimits): self
     {
         return new self($paths, $guardLimits);
     }
 
-    /**
-     * @return SearchOutcome
-     */
     public static function empty(SearchGuardReport $guardLimits): self
     {
         return self::fromResultSet(PathResultSet::empty(), $guardLimits);
     }
 
     /**
-     * @return PathResultSet
-     *
      * @phpstan-return PathResultSet<mixed>
+     *
      * @psalm-return PathResultSet
      */
     public function paths(): PathResultSet

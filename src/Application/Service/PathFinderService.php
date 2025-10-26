@@ -123,8 +123,6 @@ final class PathFinderService
      *
      * @throws InvalidInput       when the requested target asset identifier is empty
      * @throws PrecisionViolation when arbitrary precision operations required for cost ordering cannot be performed
-     *
-     * @return SearchOutcome
      */
     public function findBestPaths(PathSearchRequest $request): SearchOutcome
     {
