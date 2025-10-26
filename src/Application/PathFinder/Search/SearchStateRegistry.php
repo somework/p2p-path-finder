@@ -7,10 +7,16 @@ namespace SomeWork\P2PPathFinder\Application\PathFinder\Search;
 final class SearchStateRegistry
 {
     /**
+     * @var array<string, SearchStateRecordCollection>
+     */
+    private array $records;
+
+    /**
      * @param array<string, SearchStateRecordCollection> $records
      */
-    private function __construct(private array $records)
+    private function __construct(array $records)
     {
+        $this->records = $records;
     }
 
     public static function empty(): self
@@ -75,9 +81,8 @@ final class SearchStateRegistry
 
     public function __clone()
     {
-        $this->records = array_map(
-            static fn (SearchStateRecordCollection $collection): SearchStateRecordCollection => clone $collection,
-            $this->records,
-        );
+        foreach ($this->records as $node => $collection) {
+            $this->records[$node] = clone $collection;
+        }
     }
 }

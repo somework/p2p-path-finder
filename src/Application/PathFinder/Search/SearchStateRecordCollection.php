@@ -12,10 +12,16 @@ use function array_key_exists;
 final class SearchStateRecordCollection
 {
     /**
+     * @var array<string, SearchStateRecord>
+     */
+    private array $records;
+
+    /**
      * @param array<string, SearchStateRecord> $records
      */
-    private function __construct(private array $records)
+    private function __construct(array $records)
     {
+        $this->records = $records;
     }
 
     public static function empty(): self
