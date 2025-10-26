@@ -66,7 +66,8 @@ final class SearchQueueTieBreakHarness
 
         $extracted = [];
         while (!$queue->isEmpty()) {
-            $state = $queue->extract();
+            $entry = $queue->extract();
+            $state = $entry instanceof SearchQueueEntry ? $entry->state() : $entry;
             $signature = self::routeSignature($finder, $state->path());
 
             $extracted[] = [
