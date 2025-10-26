@@ -7,7 +7,7 @@ namespace SomeWork\P2PPathFinder\Application\PathFinder\Search;
 final class SearchStateRegistry
 {
     /**
-     * @param array<string, list<SearchStateRecord>> $records
+     * @param array<string, SearchStateRecordCollection> $records
      */
     private function __construct(private array $records)
     {
@@ -20,7 +20,7 @@ final class SearchStateRegistry
 
     public static function withInitial(string $node, SearchStateRecord $record): self
     {
-        return new self([$node => [$record]]);
+        return new self([$node => SearchStateRecordCollection::withInitial($record)]);
     }
 
     public function isEmpty(): bool
@@ -33,54 +33,51 @@ final class SearchStateRegistry
      */
     public function recordsFor(string $node): array
     {
-        return $this->records[$node] ?? [];
+        $collection = $this->records[$node] ?? null;
+
+        if (null === $collection) {
+            return [];
+        }
+
+        return $collection->all();
     }
 
     public function register(string $node, SearchStateRecord $record, int $scale): int
     {
-        $existing = $this->records[$node] ?? [];
-        $removed = 0;
+        $collection = $this->records[$node] ?? SearchStateRecordCollection::empty();
+        $delta = $collection->register($record, $scale);
+        $this->records[$node] = $collection;
 
-        foreach ($existing as $index => $candidate) {
-            if ($candidate->signature() !== $record->signature()) {
-                continue;
-            }
-
-            if ($record->dominates($candidate, $scale)) {
-                unset($existing[$index]);
-                ++$removed;
-            }
-        }
-
-        $existing[] = $record;
-        $this->records[$node] = array_values($existing);
-
-        return 1 - $removed;
+        return $delta;
     }
 
     public function isDominated(string $node, SearchStateRecord $record, int $scale): bool
     {
-        foreach ($this->records[$node] ?? [] as $existing) {
-            if ($existing->signature() !== $record->signature()) {
-                continue;
-            }
+        $collection = $this->records[$node] ?? null;
 
-            if ($existing->dominates($record, $scale)) {
-                return true;
-            }
+        if (null === $collection) {
+            return false;
         }
 
-        return false;
+        return $collection->isDominated($record, $scale);
     }
 
     public function hasSignature(string $node, string $signature): bool
     {
-        foreach ($this->records[$node] ?? [] as $existing) {
-            if ($existing->signature() === $signature) {
-                return true;
-            }
+        $collection = $this->records[$node] ?? null;
+
+        if (null === $collection) {
+            return false;
         }
 
-        return false;
+        return $collection->hasSignature($signature);
+    }
+
+    public function __clone()
+    {
+        $this->records = array_map(
+            static fn (SearchStateRecordCollection $collection): SearchStateRecordCollection => clone $collection,
+            $this->records,
+        );
     }
 }
