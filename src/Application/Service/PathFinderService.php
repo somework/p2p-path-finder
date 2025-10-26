@@ -256,6 +256,7 @@ final class PathFinderService
         $resultSet = PathResultSet::fromEntries($this->orderingStrategy, $resultEntries);
 
         /** @var SearchOutcome $outcome */
+        // Safe variance: PathResultSet<PathResult> → PathResultSet<mixed> isn't recognised because PathResultSet lacks covariant typing, so suppress the PHPStan false positive.
         /** @phpstan-ignore-next-line */
         $outcome = new SearchOutcome($resultSet, $guardLimits);
 
