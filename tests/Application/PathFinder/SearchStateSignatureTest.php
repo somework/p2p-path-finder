@@ -85,13 +85,13 @@ final class SearchStateSignatureTest extends TestCase
 
     public function test_equals_and_compare(): void
     {
-        $alpha = SearchStateSignature::fromString('alpha');
-        $beta = SearchStateSignature::fromString('beta');
+        $alpha = SearchStateSignature::fromString('label:alpha');
+        $beta = SearchStateSignature::fromString('label:beta');
 
-        self::assertTrue($alpha->equals(SearchStateSignature::fromString('alpha')));
+        self::assertTrue($alpha->equals(SearchStateSignature::fromString('label:alpha')));
         self::assertFalse($alpha->equals($beta));
         self::assertSame(-1, $alpha->compare($beta));
         self::assertSame(1, $beta->compare($alpha));
-        self::assertSame(0, $alpha->compare(SearchStateSignature::fromString('alpha')));
+        self::assertSame(0, $alpha->compare(SearchStateSignature::fromString('label:alpha')));
     }
 }

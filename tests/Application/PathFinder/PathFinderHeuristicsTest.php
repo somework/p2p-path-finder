@@ -67,7 +67,7 @@ final class PathFinderHeuristicsTest extends TestCase
             new SearchStateRecord(
                 BcMath::normalize('0.750', 18),
                 1,
-                SearchStateSignature::fromString('signature-alpha'),
+                SearchStateSignature::fromString('signature:alpha'),
             ),
         );
 
@@ -76,7 +76,7 @@ final class PathFinderHeuristicsTest extends TestCase
             new SearchStateRecord(
                 BcMath::normalize('0.800', 18),
                 2,
-                SearchStateSignature::fromString('signature-beta'),
+                SearchStateSignature::fromString('signature:beta'),
             ),
             18,
         );
@@ -84,12 +84,12 @@ final class PathFinderHeuristicsTest extends TestCase
         $candidate = new SearchStateRecord(
             BcMath::normalize('0.900', 18),
             2,
-            SearchStateSignature::fromString('signature-beta'),
+            SearchStateSignature::fromString('signature:beta'),
         );
         $mismatch = new SearchStateRecord(
             BcMath::normalize('0.900', 18),
             2,
-            SearchStateSignature::fromString('signature-gamma'),
+            SearchStateSignature::fromString('signature:gamma'),
         );
 
         self::assertTrue($registry->isDominated('USD', $candidate, 18));
@@ -113,7 +113,7 @@ final class PathFinderHeuristicsTest extends TestCase
             new SearchStateRecord(
                 BcMath::normalize('3.000', 18),
                 4,
-                SearchStateSignature::fromString('other-signature'),
+                SearchStateSignature::fromString('other:signature'),
             ),
             18,
         );
@@ -132,9 +132,9 @@ final class PathFinderHeuristicsTest extends TestCase
             $recordsBySignature[$record->signature()->value()] = $record;
         }
 
-        self::assertArrayHasKey('other-signature', $recordsBySignature);
-        self::assertSame(BcMath::normalize('3.000', 18), $recordsBySignature['other-signature']->cost());
-        self::assertSame(4, $recordsBySignature['other-signature']->hops());
+        self::assertArrayHasKey('other:signature', $recordsBySignature);
+        self::assertSame(BcMath::normalize('3.000', 18), $recordsBySignature['other:signature']->cost());
+        self::assertSame(4, $recordsBySignature['other:signature']->hops());
 
         $replacement = $recordsBySignature[$signature->value()];
         self::assertSame(BcMath::normalize('1.500', 18), $replacement->cost());

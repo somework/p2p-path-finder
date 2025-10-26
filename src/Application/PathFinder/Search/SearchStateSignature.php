@@ -45,14 +45,16 @@ final class SearchStateSignature
             }
 
             $separatorPosition = strpos($segment, self::LABEL_SEPARATOR);
-            if (false !== $separatorPosition) {
-                if (0 === $separatorPosition) {
-                    throw new InvalidArgumentException('Search state signature segments require a label before the separator.');
-                }
+            if (false === $separatorPosition) {
+                throw new InvalidArgumentException('Search state signature segments require a label/value separator.');
+            }
 
-                if ($separatorPosition === strlen($segment) - 1) {
-                    throw new InvalidArgumentException('Search state signature segments require a value after the separator.');
-                }
+            if (0 === $separatorPosition) {
+                throw new InvalidArgumentException('Search state signature segments require a label before the separator.');
+            }
+
+            if ($separatorPosition === strlen($segment) - 1) {
+                throw new InvalidArgumentException('Search state signature segments require a value after the separator.');
             }
         }
 

@@ -253,7 +253,7 @@ final class PathFinderInternalsTest extends TestCase
             'min' => CurrencyScenarioFactory::money('USD', '1.00', 2),
             'max' => CurrencyScenarioFactory::money('USD', '3.00', 2),
         ];
-        $providedSignature = SearchStateSignature::fromString('provided-signature');
+        $providedSignature = SearchStateSignature::fromString('provided:signature');
         $registry = SearchStateRegistry::withInitial(
             'USD',
             new SearchStateRecord(BcMath::normalize('1.8', self::SCALE), 3, $providedSignature),
@@ -349,12 +349,12 @@ final class PathFinderInternalsTest extends TestCase
     {
         $registry = SearchStateRegistry::withInitial(
             'USD',
-            new SearchStateRecord(BcMath::normalize('1.0', self::SCALE), 2, SearchStateSignature::fromString('sig')),
+            new SearchStateRecord(BcMath::normalize('1.0', self::SCALE), 2, SearchStateSignature::fromString('sig:value')),
         );
 
         $dominated = $registry->isDominated(
             'USD',
-            new SearchStateRecord(BcMath::normalize('1.2', self::SCALE), 3, SearchStateSignature::fromString('sig')),
+            new SearchStateRecord(BcMath::normalize('1.2', self::SCALE), 3, SearchStateSignature::fromString('sig:value')),
             self::SCALE,
         );
 
@@ -362,7 +362,7 @@ final class PathFinderInternalsTest extends TestCase
         self::assertFalse(
             $registry->isDominated(
                 'USD',
-                new SearchStateRecord(BcMath::normalize('1.2', self::SCALE), 3, SearchStateSignature::fromString('other')),
+                new SearchStateRecord(BcMath::normalize('1.2', self::SCALE), 3, SearchStateSignature::fromString('other:value')),
                 self::SCALE,
             ),
         );
@@ -372,16 +372,16 @@ final class PathFinderInternalsTest extends TestCase
     {
         $registry = SearchStateRegistry::withInitial(
             'USD',
-            new SearchStateRecord('1', 1, SearchStateSignature::fromString('alpha')),
+            new SearchStateRecord('1', 1, SearchStateSignature::fromString('alpha:value')),
         );
         $registry->register(
             'USD',
-            new SearchStateRecord('2', 2, SearchStateSignature::fromString('beta')),
+            new SearchStateRecord('2', 2, SearchStateSignature::fromString('beta:value')),
             self::SCALE,
         );
 
-        self::assertTrue($registry->hasSignature('USD', SearchStateSignature::fromString('beta')));
-        self::assertFalse($registry->hasSignature('USD', SearchStateSignature::fromString('gamma')));
+        self::assertTrue($registry->hasSignature('USD', SearchStateSignature::fromString('beta:value')));
+        self::assertFalse($registry->hasSignature('USD', SearchStateSignature::fromString('gamma:value')));
     }
 
     public function test_record_result_enforces_top_k_limit(): void
