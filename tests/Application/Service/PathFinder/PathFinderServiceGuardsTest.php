@@ -17,6 +17,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
+use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
@@ -48,7 +49,8 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
             ->withHopLimits(2, 3)
             ->build();
 
-        $result = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $request = $this->makeRequest($orderBook, $config, 'USD');
+        $result = $this->makeService()->findBestPaths($request);
 
         self::assertSame([], $result->paths()->toArray());
         self::assertFalse($result->guardLimits()->expansionsReached());
@@ -79,7 +81,8 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 3)
             ->build();
 
-        $result = $service->findBestPaths($orderBook, $config, 'BTC');
+        $request = $this->makeRequest($orderBook, $config, 'BTC');
+        $result = $service->findBestPaths($request);
 
         self::assertSame([], $result->paths()->toArray());
         self::assertFalse($result->guardLimits()->expansionsReached());
@@ -108,7 +111,8 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $result = $this->makeService()->findBestPaths($orderBook, $config, 'USD');
+        $request = $this->makeRequest($orderBook, $config, 'USD');
+        $result = $this->makeService()->findBestPaths($request);
 
         self::assertSame([], $result->paths()->toArray());
         self::assertFalse($result->guardLimits()->expansionsReached());
@@ -138,7 +142,8 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
 
         $service = $this->makeServiceWithFactory($factory);
 
-        $result = $service->findBestPaths($orderBook, $config, 'USD');
+        $request = $this->makeRequest($orderBook, $config, 'USD');
+        $result = $service->findBestPaths($request);
 
         self::assertSame([], $result->paths()->toArray());
     }
@@ -170,7 +175,8 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
 
         $service = $this->makeServiceWithFactory($factory);
 
-        $result = $service->findBestPaths($orderBook, $config, 'USD');
+        $request = $this->makeRequest($orderBook, $config, 'USD');
+        $result = $service->findBestPaths($request);
 
         self::assertSame([], $result->paths()->toArray());
     }
@@ -212,8 +218,9 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
         ]);
 
         $service = $this->makeServiceWithFactory($factory);
-
-        $result = $service->findBestPaths($this->orderBookFromArray($orders), $config, 'USD');
+        $orderBook = $this->orderBookFromArray($orders);
+        $request = $this->makeRequest($orderBook, $config, 'USD');
+        $result = $service->findBestPaths($request);
 
         $paths = $result->paths()->toArray();
         self::assertCount(1, $paths);
@@ -233,7 +240,8 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 2)
             ->build();
 
-        $outcome = $service->findBestPaths($orderBook, $config, 'USD');
+        $request = $this->makeRequest($orderBook, $config, 'USD');
+        $outcome = $service->findBestPaths($request);
 
         self::assertSame([], $outcome->paths()->toArray());
         self::assertTrue($outcome->guardLimits()->expansionsReached());
@@ -259,7 +267,8 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
         $this->expectException(GuardLimitExceeded::class);
         $this->expectExceptionMessage('Search guard limit exceeded: expansions 200/200 and visited states 100/100.');
 
-        $service->findBestPaths($orderBook, $config, 'USD');
+        $request = $this->makeRequest($orderBook, $config, 'USD');
+        $service->findBestPaths($request);
     }
 
     public function test_it_describes_single_guard_limit_breach_when_throwing_exception(): void
@@ -280,7 +289,8 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
         $this->expectException(GuardLimitExceeded::class);
         $this->expectExceptionMessage('Search guard limit exceeded: expansions 200/200.');
 
-        $service->findBestPaths($orderBook, $config, 'USD');
+        $request = $this->makeRequest($orderBook, $config, 'USD');
+        $service->findBestPaths($request);
     }
 
     public function test_it_describes_visited_states_guard_limit_when_throwing_exception(): void
@@ -301,7 +311,8 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
         $this->expectException(GuardLimitExceeded::class);
         $this->expectExceptionMessage('Search guard limit exceeded: visited states 25/25.');
 
-        $service->findBestPaths($orderBook, $config, 'USD');
+        $request = $this->makeRequest($orderBook, $config, 'USD');
+        $service->findBestPaths($request);
     }
 
     public function test_it_reports_time_budget_guard_via_metadata(): void
@@ -318,7 +329,8 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
             ->withSearchTimeBudget(1)
             ->build();
 
-        $outcome = $service->findBestPaths($orderBook, $config, 'USD');
+        $request = $this->makeRequest($orderBook, $config, 'USD');
+        $outcome = $service->findBestPaths($request);
 
         $report = $outcome->guardLimits();
         self::assertTrue($report->timeBudgetReached());
@@ -346,7 +358,8 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
         $this->expectException(GuardLimitExceeded::class);
         $this->expectExceptionMessage('Search guard limit exceeded: elapsed 25.000ms/2ms.');
 
-        $service->findBestPaths($orderBook, $config, 'USD');
+        $request = $this->makeRequest($orderBook, $config, 'USD');
+        $service->findBestPaths($request);
     }
 
     private function simpleEuroToUsdOrderBook(): OrderBook
@@ -387,8 +400,8 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
             $candidates,
         );
 
-        return static function (PathSearchConfig $config) use ($normalized, $guardLimits): callable {
-            return static function (Graph $graph, string $source, string $target, ?SpendConstraints $range, callable $callback) use ($normalized, $guardLimits): SearchOutcome {
+        return static function (PathSearchRequest $request) use ($normalized, $guardLimits): callable {
+            return static function (Graph $graph, callable $callback) use ($normalized, $guardLimits): SearchOutcome {
                 foreach ($normalized as $candidate) {
                     $callback($candidate);
                 }

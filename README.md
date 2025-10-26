@@ -82,7 +82,7 @@ notice.【F:src/Application/Service/OrderSpendAnalyzer.php†L17-L23】【F:src/
 
 See [docs/guarded-search-example.md](docs/guarded-search-example.md) for a guided example
 that combines these invariants with guard-rail configuration and demonstrates the
-`PathFinderService::findBestPaths($orderBook, $config, 'BTC')` invocation flow.
+`PathFinderService::findBestPaths(new PathSearchRequest($orderBook, $config, 'BTC'))` invocation flow.
 
 ## Configuring a path search
 
@@ -235,12 +235,15 @@ throwable instead of metadata.
 Consumers can mix coarse- and fine-grained handling strategies:
 
 ```php
+use SomeWork\\P2PPathFinder\\Application\\Service\\PathSearchRequest;
 use SomeWork\\P2PPathFinder\\Exception\\ExceptionInterface;
 use SomeWork\\P2PPathFinder\\Exception\\InvalidInput;
 use SomeWork\\P2PPathFinder\\Exception\\PrecisionViolation;
 
+$request = new PathSearchRequest($orderBook, $config, 'USDT');
+
 try {
-    $outcome = $service->findBestPaths($orderBook, $config, 'USDT');
+    $outcome = $service->findBestPaths($request);
 
     $guardStatus = $outcome->guardLimits();
     if ($guardStatus->anyLimitReached()) {
@@ -267,6 +270,7 @@ use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
+use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
 use SomeWork\P2PPathFinder\Exception\InfeasiblePath;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
@@ -294,7 +298,8 @@ $config = PathSearchConfig::builder()
     ->build();
 
 $service = new PathFinderService(new GraphBuilder());
-$resultOutcome = $service->findBestPaths($orderBook, $config, 'USDT');
+$request = new PathSearchRequest($orderBook, $config, 'USDT');
+$resultOutcome = $service->findBestPaths($request);
 
 if (!$resultOutcome->hasPaths()) {
     throw new InfeasiblePath('No viable routes found.');
@@ -345,6 +350,7 @@ conversion.
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
+use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
@@ -379,8 +385,9 @@ $config = PathSearchConfig::builder()
     ->withHopLimits(2, 3)
     ->build();
 
+$request = new PathSearchRequest($orderBook, $config, 'EUR');
 $resultOutcome = (new PathFinderService(new GraphBuilder()))
-    ->findBestPaths($orderBook, $config, 'EUR');
+    ->findBestPaths($request);
 
 $topTwo = $resultOutcome->paths()->slice(0, 2);
 ```

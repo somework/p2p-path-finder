@@ -31,7 +31,7 @@ final class PathFinderServiceEdgeCaseTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 6)
             ->build();
 
-        $result = $this->makeService()->findBestPaths($orderBook, $config, $targetAsset);
+        $result = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, $targetAsset));
 
         self::assertFalse($result->hasPaths(), 'Edge-case fixtures should not leak partial paths.');
         self::assertSame([], $result->paths()->toArray());
@@ -68,7 +68,7 @@ final class PathFinderServiceEdgeCaseTest extends PathFinderServiceTestCase
             ->withSearchGuards($visitedLimit, $expansionLimit)
             ->build();
 
-        $result = $this->makeService()->findBestPaths($orderBook, $config, $targetAsset);
+        $result = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, $targetAsset));
 
         self::assertFalse($result->hasPaths(), 'Guard breaches should never surface partial paths.');
         self::assertSame([], $result->paths()->toArray());
@@ -108,7 +108,7 @@ final class PathFinderServiceEdgeCaseTest extends PathFinderServiceTestCase
         $this->expectException(GuardLimitExceeded::class);
 
         try {
-            $service->findBestPaths($orderBook, $config, $targetAsset);
+            $service->findBestPaths($this->makeRequest($orderBook, $config, $targetAsset));
         } catch (GuardLimitExceeded $exception) {
             self::assertStringContainsString('Search guard limit exceeded', $exception->getMessage());
             self::assertStringContainsString(
@@ -131,7 +131,7 @@ final class PathFinderServiceEdgeCaseTest extends PathFinderServiceTestCase
             ->withSearchGuards(2048, 2048)
             ->build();
 
-        $result = $this->makeService()->findBestPaths($orderBook, $config, 'DST');
+        $result = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'DST'));
 
         self::assertTrue($result->hasPaths());
         $path = $result->paths()->toArray()[0];

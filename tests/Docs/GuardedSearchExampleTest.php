@@ -9,6 +9,7 @@ use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
+use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
@@ -52,7 +53,8 @@ final class GuardedSearchExampleTest extends TestCase
             ->build();
 
         $service = new PathFinderService(new GraphBuilder());
-        $result = $service->findBestPaths($orderBook, $config, 'BTC');
+        $request = new PathSearchRequest($orderBook, $config, 'BTC');
+        $result = $service->findBestPaths($request);
 
         self::assertFalse($result->guardLimits()->anyLimitReached(), 'Guard limits should not be triggered for the example input.');
 

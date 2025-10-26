@@ -20,6 +20,7 @@ use SomeWork\P2PPathFinder\Application\Result\PathLeg;
 use SomeWork\P2PPathFinder\Application\Result\PathLegCollection;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
+use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
@@ -82,8 +83,9 @@ final class PathFinderServicePropertyTest extends TestCase
                 ->withResultLimit($scenario['topK'])
                 ->build();
 
-            $first = $this->service->findBestPaths($orderBook, $config, $scenario['target']);
-            $second = $this->service->findBestPaths($orderBook, $config, $scenario['target']);
+            $request = $this->request($orderBook, $config, $scenario['target']);
+            $first = $this->service->findBestPaths($request);
+            $second = $this->service->findBestPaths($request);
 
             $encoder = $this->encodeResult();
             $firstEncoded = array_map($encoder, $first->paths()->toArray());
@@ -155,8 +157,10 @@ final class PathFinderServicePropertyTest extends TestCase
                 ->withResultLimit($scenario['topK'])
                 ->build();
 
-            $original = $this->service->findBestPaths($orderBook, $config, $scenario['target']);
-            $permuted = $this->service->findBestPaths($permutedOrderBook, $config, $scenario['target']);
+            $originalRequest = $this->request($orderBook, $config, $scenario['target']);
+            $permutedRequest = $this->request($permutedOrderBook, $config, $scenario['target']);
+            $original = $this->service->findBestPaths($originalRequest);
+            $permuted = $this->service->findBestPaths($permutedRequest);
 
             $encoder = $this->encodeResult();
             $originalEncoded = array_map($encoder, $original->paths()->toArray());
@@ -251,8 +255,9 @@ final class PathFinderServicePropertyTest extends TestCase
                 ->withResultLimit($scenario['topK'])
                 ->build();
 
-            $first = $this->service->findBestPaths($orderBook, $config, $scenario['target']);
-            $second = $this->service->findBestPaths($orderBook, $config, $scenario['target']);
+            $request = $this->request($orderBook, $config, $scenario['target']);
+            $first = $this->service->findBestPaths($request);
+            $second = $this->service->findBestPaths($request);
 
             $encoder = $this->encodeResult();
             self::assertSame(array_map($encoder, $first->paths()->toArray()), array_map($encoder, $second->paths()->toArray()));
@@ -283,6 +288,11 @@ final class PathFinderServicePropertyTest extends TestCase
         }
 
         return $midpoint->withScale(max($scale, 3));
+    }
+
+    private function request(OrderBook $orderBook, PathSearchConfig $config, string $target): PathSearchRequest
+    {
+        return new PathSearchRequest($orderBook, $config, $target);
     }
 
     /**

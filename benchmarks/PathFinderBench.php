@@ -8,6 +8,7 @@ use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
+use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
@@ -84,7 +85,8 @@ class PathFinderBench
             ->withResultLimit(5)
             ->build();
 
-        $this->service->findBestPaths($orderBook, $config, 'BTC');
+        $request = new PathSearchRequest($orderBook, $config, 'BTC');
+        $this->service->findBestPaths($request);
     }
 
     /**
@@ -102,7 +104,8 @@ class PathFinderBench
             ->withResultLimit(3)
             ->build();
 
-        $this->service->findBestPaths($orderBook, $config, 'DST');
+        $request = new PathSearchRequest($orderBook, $config, 'DST');
+        $this->service->findBestPaths($request);
     }
 
     /**
@@ -119,7 +122,8 @@ class PathFinderBench
             ->withResultLimit($params['resultLimit'])
             ->build();
 
-        $this->service->findBestPaths($orderBook, $config, 'DST');
+        $request = new PathSearchRequest($orderBook, $config, 'DST');
+        $this->service->findBestPaths($request);
     }
 
     /**
@@ -137,7 +141,8 @@ class PathFinderBench
             ->withResultLimit($params['resultLimit'])
             ->build();
 
-        $this->service->findBestPaths($orderBook, $config, 'DST');
+        $request = new PathSearchRequest($orderBook, $config, 'DST');
+        $this->service->findBestPaths($request);
     }
 
     /**

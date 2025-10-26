@@ -21,16 +21,15 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
-use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
-use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function sprintf;
 use function strtoupper;
+use function trim;
 
 /**
  * High level facade orchestrating order filtering, graph building and path search.
@@ -44,7 +43,7 @@ final class PathFinderService
     private readonly ToleranceEvaluator $toleranceEvaluator;
     private readonly PathOrderStrategy $orderingStrategy;
     /**
-     * @var Closure(PathSearchConfig):Closure(Graph, string, string, ?SpendConstraints, callable(CandidatePath):bool):SearchOutcome<CandidatePath>
+     * @var Closure(PathSearchRequest):Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath>
      */
     private readonly Closure $pathFinderFactory;
 
@@ -68,21 +67,19 @@ final class PathFinderService
         $this->toleranceEvaluator = $toleranceEvaluator ?? new ToleranceEvaluator();
         $this->orderingStrategy = $orderingStrategy ?? new CostHopsSignatureOrderingStrategy(self::COST_SCALE);
         $strategy = $this->orderingStrategy;
-        $factory = $pathFinderFactory ?? static function (PathSearchConfig $config) use ($strategy): Closure {
+        $factory = $pathFinderFactory ?? static function (PathSearchRequest $request) use ($strategy): Closure {
+            $config = $request->config();
+
             /**
              * @param Graph                        $graph
-             * @param SpendConstraints|null        $constraints
              * @param callable(CandidatePath):bool $callback
              *
              * @return SearchOutcome<CandidatePath>
              */
             $runner = static function (
                 Graph $graph,
-                string $source,
-                string $target,
-                ?SpendConstraints $constraints,
                 callable $callback,
-            ) use ($config, $strategy): SearchOutcome {
+            ) use ($config, $strategy, $request): SearchOutcome {
                 $pathFinder = new PathFinder(
                     $config->maximumHops(),
                     $config->pathFinderTolerance(),
@@ -96,7 +93,13 @@ final class PathFinderService
                 /** @var callable(CandidatePath):bool $callback */
                 $callback = $callback;
 
-                return $pathFinder->findBestPaths($graph, $source, $target, $constraints, $callback);
+                return $pathFinder->findBestPaths(
+                    $graph,
+                    $request->sourceAsset(),
+                    $request->targetAsset(),
+                    $request->spendConstraints(),
+                    $callback,
+                );
             };
 
             return $runner;
@@ -104,7 +107,7 @@ final class PathFinderService
 
         $factory = $factory instanceof Closure ? $factory : Closure::fromCallable($factory);
 
-        /** @var Closure(PathSearchConfig):Closure(Graph, string, string, ?SpendConstraints, callable(CandidatePath):bool):SearchOutcome<CandidatePath> $typedFactory */
+        /** @var Closure(PathSearchRequest):Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath> $typedFactory */
         $typedFactory = $factory;
 
         $this->pathFinderFactory = $typedFactory;
@@ -123,15 +126,20 @@ final class PathFinderService
      *
      * @return SearchOutcome<PathResult>
      */
-    public function findBestPaths(OrderBook $orderBook, PathSearchConfig $config, string $targetAsset): SearchOutcome
+    public function findBestPaths(PathSearchRequest $request): SearchOutcome
     {
-        if ('' === $targetAsset) {
+        $config = $request->config();
+        $targetAsset = $request->targetAsset();
+        $normalizedTargetAsset = trim($targetAsset);
+
+        if ('' === $normalizedTargetAsset) {
             throw new InvalidInput('Target asset cannot be empty.');
         }
 
-        $sourceCurrency = $config->spendAmount()->currency();
-        $targetCurrency = strtoupper($targetAsset);
-        $requestedSpend = $config->spendAmount();
+        $orderBook = $request->orderBook();
+        $sourceCurrency = strtoupper(trim($request->sourceAsset()));
+        $targetCurrency = strtoupper($normalizedTargetAsset);
+        $requestedSpend = $request->spendAmount();
 
         $orders = $this->orderSpendAnalyzer->filterOrders($orderBook, $config);
         if ([] === $orders) {
@@ -158,10 +166,8 @@ final class PathFinderService
         }
 
         $runnerFactory = $this->pathFinderFactory;
-        /**
-         * @var Closure(Graph, string, string, ?SpendConstraints, callable(CandidatePath):bool):SearchOutcome<CandidatePath> $runner
-         */
-        $runner = $runnerFactory($config);
+        /** @var Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath> $runner */
+        $runner = $runnerFactory($request);
 
         /**
          * @var list<MaterializedResult> $materializedResults
@@ -170,15 +176,8 @@ final class PathFinderService
         $resultOrder = 0;
         $searchResult = $runner(
             $graph,
-            $sourceCurrency,
-            $targetCurrency,
-            SpendConstraints::from(
-                $config->minimumSpendAmount(),
-                $config->maximumSpendAmount(),
-                $requestedSpend,
-            ),
-            function (CandidatePath $candidate) use (&$materializedResults, &$resultOrder, $config, $sourceCurrency, $targetCurrency, $requestedSpend) {
-                if ($candidate->hops() < $config->minimumHops() || $candidate->hops() > $config->maximumHops()) {
+            function (CandidatePath $candidate) use (&$materializedResults, &$resultOrder, $request, $requestedSpend, $sourceCurrency, $targetCurrency, $config) {
+                if ($candidate->hops() < $request->minimumHops() || $candidate->hops() > $request->maximumHops()) {
                     return false;
                 }
 
@@ -339,7 +338,7 @@ final class PathFinderService
      */
     public function findBestPath(OrderBook $orderBook, PathSearchConfig $config, string $targetAsset): ?PathResult
     {
-        $results = $this->findBestPaths($orderBook, $config, $targetAsset);
+        $results = $this->findBestPaths(new PathSearchRequest($orderBook, $config, $targetAsset));
 
         return $results->paths()->first();
     }
