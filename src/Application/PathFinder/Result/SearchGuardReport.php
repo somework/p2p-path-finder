@@ -4,11 +4,20 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathFinder\Result;
 
+use JsonSerializable;
+
 /**
  * Immutable snapshot describing how the search interacted with its guard rails.
  */
-final class SearchGuardReport
+final class SearchGuardReport implements JsonSerializable
 {
+    /**
+     * @psalm-type SearchGuardReportJson = array{
+     *     limits: array{expansions: int, visited_states: int, time_budget_ms: int|null},
+     *     metrics: array{expansions: int, visited_states: int, elapsed_ms: float},
+     *     breached: array{expansions: bool, visited_states: bool, time_budget: bool, any: bool}
+     * }
+     */
     private readonly bool $expansionsReached;
 
     private readonly bool $visitedStatesReached;
@@ -49,12 +58,61 @@ final class SearchGuardReport
         $this->timeBudgetLimit = $timeBudgetLimit;
     }
 
+    public static function fromMetrics(
+        int $expansions,
+        int $visitedStates,
+        float $elapsedMilliseconds,
+        int $expansionLimit,
+        int $visitedStateLimit,
+        ?int $timeBudgetLimit,
+        bool $expansionLimitReached = false,
+        bool $visitedStatesReached = false,
+        bool $timeBudgetReached = false,
+    ): self {
+        if ($expansions < 0) {
+            $expansions = 0;
+        }
+
+        if ($visitedStates < 0) {
+            $visitedStates = 0;
+        }
+
+        if ($elapsedMilliseconds < 0.0) {
+            $elapsedMilliseconds = 0.0;
+        }
+
+        if ($expansionLimit < 0) {
+            $expansionLimit = 0;
+        }
+
+        if ($visitedStateLimit < 0) {
+            $visitedStateLimit = 0;
+        }
+
+        if (null !== $timeBudgetLimit && $timeBudgetLimit < 0) {
+            $timeBudgetLimit = 0;
+        }
+
+        $expansionLimitReached = $expansionLimitReached || ($expansionLimit > 0 && $expansions >= $expansionLimit);
+        $visitedStatesReached = $visitedStatesReached || ($visitedStateLimit > 0 && $visitedStates >= $visitedStateLimit);
+        $timeBudgetReached = $timeBudgetReached || (null !== $timeBudgetLimit && $elapsedMilliseconds >= (float) $timeBudgetLimit);
+
+        return new self(
+            expansionsReached: $expansionLimitReached,
+            visitedStatesReached: $visitedStatesReached,
+            timeBudgetReached: $timeBudgetReached,
+            expansions: $expansions,
+            visitedStates: $visitedStates,
+            elapsedMilliseconds: $elapsedMilliseconds,
+            expansionLimit: $expansionLimit,
+            visitedStateLimit: $visitedStateLimit,
+            timeBudgetLimit: $timeBudgetLimit,
+        );
+    }
+
     public static function idle(int $maxVisitedStates, int $maxExpansions, ?int $timeBudgetMs = null): self
     {
-        return new self(
-            expansionsReached: false,
-            visitedStatesReached: false,
-            timeBudgetReached: false,
+        return self::fromMetrics(
             expansions: 0,
             visitedStates: 0,
             elapsedMilliseconds: 0.0,
@@ -66,7 +124,7 @@ final class SearchGuardReport
 
     public static function none(): self
     {
-        return new self(false, false, false, 0, 0, 0.0, 0, 0, null);
+        return self::fromMetrics(0, 0, 0.0, 0, 0, null);
     }
 
     public function expansionsReached(): bool
@@ -117,5 +175,34 @@ final class SearchGuardReport
     public function timeBudgetLimit(): ?int
     {
         return $this->timeBudgetLimit;
+    }
+
+    /**
+     * @return array{
+     *     limits: array{expansions: int, visited_states: int, time_budget_ms: int|null},
+     *     metrics: array{expansions: int, visited_states: int, elapsed_ms: float},
+     *     breached: array{expansions: bool, visited_states: bool, time_budget: bool, any: bool}
+     * }
+     */
+    public function jsonSerialize(): array
+    {
+        return [
+            'limits' => [
+                'expansions' => $this->expansionLimit,
+                'visited_states' => $this->visitedStateLimit,
+                'time_budget_ms' => $this->timeBudgetLimit,
+            ],
+            'metrics' => [
+                'expansions' => $this->expansions,
+                'visited_states' => $this->visitedStates,
+                'elapsed_ms' => $this->elapsedMilliseconds,
+            ],
+            'breached' => [
+                'expansions' => $this->expansionsReached,
+                'visited_states' => $this->visitedStatesReached,
+                'time_budget' => $this->timeBudgetReached,
+                'any' => $this->anyLimitReached(),
+            ],
+        ];
     }
 }

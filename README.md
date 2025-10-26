@@ -132,8 +132,33 @@ $config = PathSearchConfig::builder()
 
 Guard-limit breaches are reported via `SearchOutcome::guardLimits()` metadata by default.
 The returned `SearchGuardReport` exposes both boolean guard flags and the actual expansion,
-visited-state and elapsed-time counters for observability. To escalate breaches to
-exceptions instead, call `withGuardLimitException()`:
+visited-state and elapsed-time counters for observability. Internally the engine
+normalises those counters through `SearchGuardReport::fromMetrics(...)`, which also powers
+the JSON payload emitted by `json_encode($report)`. The serialised structure is stable and
+includes both the configured limits and the counters that triggered the guard rails:
+
+```json
+{
+  "limits": {
+    "expansions": 25000,
+    "visited_states": 10000,
+    "time_budget_ms": 50
+  },
+  "metrics": {
+    "expansions": 18342,
+    "visited_states": 9421,
+    "elapsed_ms": 47.8
+  },
+  "breached": {
+    "expansions": false,
+    "visited_states": false,
+    "time_budget": false,
+    "any": false
+  }
+}
+```
+
+To escalate breaches to exceptions instead, call `withGuardLimitException()`:
 
 ```php
 $config = PathSearchConfig::builder()

@@ -75,22 +75,22 @@ final class SearchGuards
     public function finalize(int $visitedStates, int $visitedStateLimit, bool $visitedGuardReached): SearchGuardReport
     {
         $now = ($this->clock)();
-        $elapsedMilliseconds = max(0.0, ($now - $this->startedAt) * 1000.0);
+        $elapsedMilliseconds = ($now - $this->startedAt) * 1000.0;
 
         if (null !== $this->timeBudgetMs && !$this->timeBudgetReached && $elapsedMilliseconds >= (float) $this->timeBudgetMs) {
             $this->timeBudgetReached = true;
         }
 
-        return new SearchGuardReport(
-            expansionsReached: $this->expansionLimitReached,
-            visitedStatesReached: $visitedGuardReached,
-            timeBudgetReached: $this->timeBudgetReached,
+        return SearchGuardReport::fromMetrics(
             expansions: $this->expansions,
             visitedStates: $visitedStates,
             elapsedMilliseconds: $elapsedMilliseconds,
             expansionLimit: $this->maxExpansions,
             visitedStateLimit: $visitedStateLimit,
             timeBudgetLimit: $this->timeBudgetMs,
+            expansionLimitReached: $this->expansionLimitReached,
+            visitedStatesReached: $visitedGuardReached,
+            timeBudgetReached: $this->timeBudgetReached,
         );
     }
 }
