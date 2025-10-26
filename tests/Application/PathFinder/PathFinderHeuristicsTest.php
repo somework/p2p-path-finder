@@ -208,12 +208,15 @@ final class PathFinderHeuristicsTest extends TestCase
         $signatureMethod = new ReflectionMethod(PathFinder::class, 'stateSignature');
         $signatureMethod->setAccessible(true);
 
-        $range = SpendRange::fromBounds(
-            CurrencyScenarioFactory::money('EUR', '1.00', 2),
-            CurrencyScenarioFactory::money('EUR', '5.0000', 4),
-        );
         $desired = CurrencyScenarioFactory::money('EUR', '2.500', 3);
-        $signature = $signatureMethod->invoke($finder, $range, $desired);
+        $signature = $signatureMethod->invoke(
+            $finder,
+            SpendRange::fromBounds(
+                CurrencyScenarioFactory::money('EUR', '1.00', 2),
+                CurrencyScenarioFactory::money('EUR', '5.0000', 4),
+            ),
+            $desired,
+        );
 
         $registry = SearchStateRegistry::withInitial(
             'EUR',
@@ -236,14 +239,17 @@ final class PathFinderHeuristicsTest extends TestCase
         $method = new ReflectionMethod(PathFinder::class, 'stateSignature');
         $method->setAccessible(true);
 
-        $range = SpendRange::fromBounds(
-            CurrencyScenarioFactory::money('USD', '1.0', 1),
-            CurrencyScenarioFactory::money('USD', '5.0000', 4),
-        );
         $desired = CurrencyScenarioFactory::money('USD', '2.50', 2);
 
         /** @var SearchStateSignature $signature */
-        $signature = $method->invoke($finder, $range, $desired);
+        $signature = $method->invoke(
+            $finder,
+            SpendRange::fromBounds(
+                CurrencyScenarioFactory::money('USD', '1.0', 1),
+                CurrencyScenarioFactory::money('USD', '5.0000', 4),
+            ),
+            $desired,
+        );
 
         self::assertInstanceOf(SearchStateSignature::class, $signature);
         self::assertSame('range:USD:1.0000:5.0000:4|desired:USD:2.5000:4', $signature->value());
@@ -267,13 +273,11 @@ final class PathFinderHeuristicsTest extends TestCase
         $method = new ReflectionMethod(PathFinder::class, 'edgeSupportsAmount');
         $method->setAccessible(true);
 
-        $range = SpendRange::fromBounds(
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
+        $result = $method->invoke($finder, $edge, SpendRange::fromBounds(
             CurrencyScenarioFactory::money('EUR', '1.000', 3),
             CurrencyScenarioFactory::money('EUR', '2.000', 3),
-        );
-
-        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
-        $result = $method->invoke($finder, $edge, $range);
+        ));
 
         self::assertNull($result);
     }
@@ -296,13 +300,11 @@ final class PathFinderHeuristicsTest extends TestCase
         $method = new ReflectionMethod(PathFinder::class, 'edgeSupportsAmount');
         $method->setAccessible(true);
 
-        $range = SpendRange::fromBounds(
-            CurrencyScenarioFactory::money('EUR', '0', 3),
-            CurrencyScenarioFactory::money('EUR', '0', 3),
-        );
-
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
-        $result = $method->invoke($finder, $edge, $range);
+        $result = $method->invoke($finder, $edge, SpendRange::fromBounds(
+            CurrencyScenarioFactory::money('EUR', '0', 3),
+            CurrencyScenarioFactory::money('EUR', '0', 3),
+        ));
 
         self::assertInstanceOf(SpendRange::class, $result);
         self::assertSame('0.000', $result->min()->amount());
