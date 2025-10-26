@@ -34,6 +34,7 @@ use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Tests\Application\Support\Harness\SearchQueueTieBreakHarness;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
@@ -665,6 +666,22 @@ final class PathFinderInternalsTest extends TestCase
         self::assertSame('C', $first->node());
         self::assertSame('B', $second->node());
         self::assertSame('A', $third->node());
+    }
+
+    public function test_search_queue_tie_breaks_by_cost_hops_signature_then_discovery(): void
+    {
+        $finder = new PathFinder(maxHops: 4, tolerance: '0.0');
+        $extracted = SearchQueueTieBreakHarness::extractOrdering($finder);
+
+        self::assertSame(
+            [
+                ['signature' => 'SRC->ALPHA->OMEGA', 'hops' => 2],
+                ['signature' => 'SRC->ALPHA->OMEGA', 'hops' => 2],
+                ['signature' => 'SRC->BETA->OMEGA', 'hops' => 2],
+                ['signature' => 'SRC->ALPHA->MID->OMEGA', 'hops' => 3],
+            ],
+            $extracted,
+        );
     }
 
     public function test_create_result_heap_orders_by_cost_and_insertion(): void
