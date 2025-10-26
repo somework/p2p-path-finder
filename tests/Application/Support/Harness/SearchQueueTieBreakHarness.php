@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Application\Support\Harness;
 
 use ReflectionMethod;
+use ReflectionProperty;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
@@ -12,6 +13,8 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchBootstrap;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchQueueEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchState;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriority;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriorityQueue;
+use SomeWork\P2PPathFinder\Application\PathFinder\SearchStateQueue;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
@@ -37,7 +40,7 @@ final class SearchQueueTieBreakHarness
         $insertionOrder = $bootstrap->insertionOrder();
 
         // Drop the bootstrap state so only seeded candidates affect the ordering under test.
-        $queue->extract();
+        self::extractQueueEntry($queue);
 
         $tieCost = BcMath::normalize('0.5', self::SCALE);
 
@@ -45,6 +48,8 @@ final class SearchQueueTieBreakHarness
             self::buildStateForRoute(['SRC', 'ALPHA', 'OMEGA'], $tieCost),
             self::buildStateForRoute(['SRC', 'BETA', 'OMEGA'], $tieCost),
             self::buildStateForRoute(['SRC', 'ALPHA', 'MID', 'OMEGA'], $tieCost),
+            // Intentionally repeat the alpha route to verify discovery-order (FIFO) tie-breaking
+            // when cost, hops, and signature are identical.
             self::buildStateForRoute(['SRC', 'ALPHA', 'OMEGA'], $tieCost),
         ];
 
@@ -66,8 +71,8 @@ final class SearchQueueTieBreakHarness
 
         $extracted = [];
         while (!$queue->isEmpty()) {
-            $entry = $queue->extract();
-            $state = $entry instanceof SearchQueueEntry ? $entry->state() : $entry;
+            $entry = self::extractQueueEntry($queue);
+            $state = $entry->state();
             $signature = self::routeSignature($finder, $state->path());
 
             $extracted[] = [
@@ -135,5 +140,19 @@ final class SearchQueueTieBreakHarness
         $signature = $reflection->invoke($finder, $path);
 
         return $signature;
+    }
+
+    private static function extractQueueEntry(SearchStateQueue $queue): SearchQueueEntry
+    {
+        $reflection = new ReflectionProperty(SearchStateQueue::class, 'queue');
+        $reflection->setAccessible(true);
+
+        /** @var SearchStatePriorityQueue $priorityQueue */
+        $priorityQueue = $reflection->getValue($queue);
+
+        /** @var SearchQueueEntry $entry */
+        $entry = $priorityQueue->extract();
+
+        return $entry;
     }
 }
