@@ -13,6 +13,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchQueueEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchState;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriority;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
@@ -124,7 +125,7 @@ final class SearchQueueTieBreakHarness
         );
     }
 
-    private static function routeSignature(PathFinder $finder, $path): RouteSignature
+    private static function routeSignature(PathFinder $finder, PathEdgeSequence $path): RouteSignature
     {
         $reflection = new ReflectionMethod(PathFinder::class, 'routeSignature');
         $reflection->setAccessible(true);
