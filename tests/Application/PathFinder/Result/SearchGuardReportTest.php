@@ -107,4 +107,81 @@ final class SearchGuardReportTest extends TestCase
         self::assertFalse($time->expansionsReached());
         self::assertFalse($time->visitedStatesReached());
     }
+
+    public function test_from_metrics_normalizes_counters_and_detects_breaches(): void
+    {
+        $report = SearchGuardReport::fromMetrics(
+            expansions: 11,
+            visitedStates: 6,
+            elapsedMilliseconds: 15.5,
+            expansionLimit: 10,
+            visitedStateLimit: 5,
+            timeBudgetLimit: 15,
+        );
+
+        self::assertTrue($report->expansionsReached());
+        self::assertTrue($report->visitedStatesReached());
+        self::assertTrue($report->timeBudgetReached());
+        self::assertSame(11, $report->expansions());
+        self::assertSame(6, $report->visitedStates());
+        self::assertSame(10, $report->expansionLimit());
+        self::assertSame(5, $report->visitedStateLimit());
+        self::assertSame(15, $report->timeBudgetLimit());
+        self::assertEqualsWithDelta(15.5, $report->elapsedMilliseconds(), 0.0001);
+    }
+
+    public function test_from_metrics_respects_external_guard_flags(): void
+    {
+        $report = SearchGuardReport::fromMetrics(
+            expansions: 2,
+            visitedStates: 3,
+            elapsedMilliseconds: 1.0,
+            expansionLimit: 10,
+            visitedStateLimit: 5,
+            timeBudgetLimit: null,
+            expansionLimitReached: true,
+            visitedStatesReached: true,
+        );
+
+        self::assertTrue($report->expansionsReached());
+        self::assertTrue($report->visitedStatesReached());
+        self::assertFalse($report->timeBudgetReached());
+    }
+
+    public function test_json_serialization_exposes_counters_and_limits(): void
+    {
+        $report = SearchGuardReport::fromMetrics(
+            expansions: 4,
+            visitedStates: 7,
+            elapsedMilliseconds: 2.5,
+            expansionLimit: 10,
+            visitedStateLimit: 20,
+            timeBudgetLimit: 15,
+            timeBudgetReached: true,
+        );
+
+        $payload = $report->jsonSerialize();
+
+        self::assertSame(
+            [
+                'limits' => [
+                    'expansions' => 10,
+                    'visited_states' => 20,
+                    'time_budget_ms' => 15,
+                ],
+                'metrics' => [
+                    'expansions' => 4,
+                    'visited_states' => 7,
+                    'elapsed_ms' => 2.5,
+                ],
+                'breached' => [
+                    'expansions' => false,
+                    'visited_states' => false,
+                    'time_budget' => true,
+                    'any' => true,
+                ],
+            ],
+            $payload,
+        );
+    }
 }

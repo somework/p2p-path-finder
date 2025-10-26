@@ -18,7 +18,14 @@ final class SearchOutcomeTest extends TestCase
 {
     public function test_empty_factory_returns_result_without_paths(): void
     {
-        $status = new SearchGuardReport(false, true, false, 0, 25, 0.0, 10, 25, null);
+        $status = SearchGuardReport::fromMetrics(
+            expansions: 0,
+            visitedStates: 25,
+            elapsedMilliseconds: 0.0,
+            expansionLimit: 10,
+            visitedStateLimit: 25,
+            timeBudgetLimit: null,
+        );
         $outcome = SearchOutcome::empty($status);
 
         self::assertTrue($outcome->paths()->isEmpty());

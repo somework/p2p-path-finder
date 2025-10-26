@@ -799,6 +799,9 @@ Immutable snapshot describing how the search interacted with its guard rails.
 ### __construct
 `SearchGuardReport::__construct(bool $expansionsReached, bool $visitedStatesReached, bool $timeBudgetReached, int $expansions, int $visitedStates, float $elapsedMilliseconds, int $expansionLimit, int $visitedStateLimit, ?int $timeBudgetLimit)`
 
+### fromMetrics
+`SearchGuardReport::fromMetrics(int $expansions, int $visitedStates, float $elapsedMilliseconds, int $expansionLimit, int $visitedStateLimit, ?int $timeBudgetLimit, bool $expansionLimitReached = false, bool $visitedStatesReached = false, bool $timeBudgetReached = false): self`
+
 ### idle
 `SearchGuardReport::idle(int $maxVisitedStates, int $maxExpansions, ?int $timeBudgetMs = null): self`
 
@@ -834,6 +837,9 @@ Immutable snapshot describing how the search interacted with its guard rails.
 
 ### timeBudgetLimit
 `SearchGuardReport::timeBudgetLimit(): ?int`
+
+### jsonSerialize
+`SearchGuardReport::jsonSerialize(): array`
 
 ## SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome
 
