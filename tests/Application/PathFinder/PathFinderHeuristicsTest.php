@@ -15,6 +15,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchState;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriority;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRecord;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRegistry;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateSignature;
 use SomeWork\P2PPathFinder\Application\PathFinder\SearchStateQueue;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
@@ -43,10 +44,18 @@ final class PathFinderHeuristicsTest extends TestCase
     {
         $registry = SearchStateRegistry::withInitial(
             'USD',
-            new SearchStateRecord(BcMath::normalize('1.000', 18), 1, 'range:null|desired:null'),
+            new SearchStateRecord(
+                BcMath::normalize('1.000', 18),
+                1,
+                SearchStateSignature::fromString('range:null|desired:null'),
+            ),
         );
 
-        $candidate = new SearchStateRecord(BcMath::normalize('1.250', 18), 3, 'range:null|desired:null');
+        $candidate = new SearchStateRecord(
+            BcMath::normalize('1.250', 18),
+            3,
+            SearchStateSignature::fromString('range:null|desired:null'),
+        );
 
         self::assertTrue($registry->isDominated('USD', $candidate, 18));
     }
@@ -55,17 +64,33 @@ final class PathFinderHeuristicsTest extends TestCase
     {
         $registry = SearchStateRegistry::withInitial(
             'USD',
-            new SearchStateRecord(BcMath::normalize('0.750', 18), 1, 'signature-alpha'),
+            new SearchStateRecord(
+                BcMath::normalize('0.750', 18),
+                1,
+                SearchStateSignature::fromString('signature:alpha'),
+            ),
         );
 
         $registry->register(
             'USD',
-            new SearchStateRecord(BcMath::normalize('0.800', 18), 2, 'signature-beta'),
+            new SearchStateRecord(
+                BcMath::normalize('0.800', 18),
+                2,
+                SearchStateSignature::fromString('signature:beta'),
+            ),
             18,
         );
 
-        $candidate = new SearchStateRecord(BcMath::normalize('0.900', 18), 2, 'signature-beta');
-        $mismatch = new SearchStateRecord(BcMath::normalize('0.900', 18), 2, 'signature-gamma');
+        $candidate = new SearchStateRecord(
+            BcMath::normalize('0.900', 18),
+            2,
+            SearchStateSignature::fromString('signature:beta'),
+        );
+        $mismatch = new SearchStateRecord(
+            BcMath::normalize('0.900', 18),
+            2,
+            SearchStateSignature::fromString('signature:gamma'),
+        );
 
         self::assertTrue($registry->isDominated('USD', $candidate, 18));
         self::assertFalse($registry->isDominated('USD', $mismatch, 18));
@@ -85,7 +110,11 @@ final class PathFinderHeuristicsTest extends TestCase
         );
         $registry->register(
             'USD',
-            new SearchStateRecord(BcMath::normalize('3.000', 18), 4, 'other-signature'),
+            new SearchStateRecord(
+                BcMath::normalize('3.000', 18),
+                4,
+                SearchStateSignature::fromString('other:signature'),
+            ),
             18,
         );
 
@@ -100,14 +129,14 @@ final class PathFinderHeuristicsTest extends TestCase
         self::assertCount(2, $records);
         $recordsBySignature = [];
         foreach ($records as $record) {
-            $recordsBySignature[$record->signature()] = $record;
+            $recordsBySignature[$record->signature()->value()] = $record;
         }
 
-        self::assertArrayHasKey('other-signature', $recordsBySignature);
-        self::assertSame(BcMath::normalize('3.000', 18), $recordsBySignature['other-signature']->cost());
-        self::assertSame(4, $recordsBySignature['other-signature']->hops());
+        self::assertArrayHasKey('other:signature', $recordsBySignature);
+        self::assertSame(BcMath::normalize('3.000', 18), $recordsBySignature['other:signature']->cost());
+        self::assertSame(4, $recordsBySignature['other:signature']->hops());
 
-        $replacement = $recordsBySignature[$signature];
+        $replacement = $recordsBySignature[$signature->value()];
         self::assertSame(BcMath::normalize('1.500', 18), $replacement->cost());
         self::assertSame(1, $replacement->hops());
     }
@@ -119,7 +148,7 @@ final class PathFinderHeuristicsTest extends TestCase
         $signatureMethod = new ReflectionMethod(PathFinder::class, 'stateSignature');
         $signatureMethod->setAccessible(true);
         $primarySignature = $signatureMethod->invoke($finder, null, null);
-        $alternateSignature = $primarySignature.'-alt';
+        $alternateSignature = SearchStateSignature::fromString($primarySignature->value().'-alt');
 
         $registry = SearchStateRegistry::withInitial(
             'USD',
@@ -142,14 +171,17 @@ final class PathFinderHeuristicsTest extends TestCase
         self::assertCount(2, $records);
         $recordsBySignature = [];
         foreach ($records as $record) {
-            $recordsBySignature[$record->signature()] = $record;
+            $recordsBySignature[$record->signature()->value()] = $record;
         }
 
-        self::assertArrayHasKey($alternateSignature, $recordsBySignature);
-        self::assertSame(BcMath::normalize('4.000', 18), $recordsBySignature[$alternateSignature]->cost());
-        self::assertSame(5, $recordsBySignature[$alternateSignature]->hops());
+        self::assertArrayHasKey($alternateSignature->value(), $recordsBySignature);
+        self::assertSame(
+            BcMath::normalize('4.000', 18),
+            $recordsBySignature[$alternateSignature->value()]->cost(),
+        );
+        self::assertSame(5, $recordsBySignature[$alternateSignature->value()]->hops());
 
-        $replacement = $recordsBySignature[$primarySignature];
+        $replacement = $recordsBySignature[$primarySignature->value()];
         self::assertSame(BcMath::normalize('1.250', 18), $replacement->cost());
         self::assertSame(2, $replacement->hops());
     }
@@ -188,7 +220,12 @@ final class PathFinderHeuristicsTest extends TestCase
         );
 
         self::assertTrue($registry->hasSignature('EUR', $signature));
-        self::assertFalse($registry->hasSignature('EUR', $signature.'-mismatch'));
+        self::assertFalse(
+            $registry->hasSignature(
+                'EUR',
+                SearchStateSignature::fromString($signature->value().'-mismatch'),
+            ),
+        );
     }
 
     public function test_state_signature_normalizes_range_and_desired_amounts(): void
@@ -204,9 +241,11 @@ final class PathFinderHeuristicsTest extends TestCase
         ];
         $desired = CurrencyScenarioFactory::money('USD', '2.50', 2);
 
+        /** @var SearchStateSignature $signature */
         $signature = $method->invoke($finder, $range, $desired);
 
-        self::assertSame('range:USD:1.0000:5.0000:4|desired:USD:2.5000:4', $signature);
+        self::assertInstanceOf(SearchStateSignature::class, $signature);
+        self::assertSame('range:USD:1.0000:5.0000:4|desired:USD:2.5000:4', $signature->value());
     }
 
     public function test_edge_supports_amount_rejects_positive_spend_when_edge_only_supports_zero(): void

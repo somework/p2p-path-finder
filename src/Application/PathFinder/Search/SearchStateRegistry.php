@@ -68,7 +68,7 @@ final class SearchStateRegistry
         return $collection->isDominated($record, $scale);
     }
 
-    public function hasSignature(string $node, string $signature): bool
+    public function hasSignature(string $node, SearchStateSignature $signature): bool
     {
         $collection = $this->records[$node] ?? null;
 

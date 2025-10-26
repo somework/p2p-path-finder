@@ -27,6 +27,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriority;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriorityQueue;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRecord;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRegistry;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateSignature;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
@@ -322,10 +323,13 @@ final class PathFinder
     /**
      * @param array{min: Money, max: Money}|null $range
      */
-    private function stateSignature(?array $range, ?Money $desired): string
+    private function stateSignature(?array $range, ?Money $desired): SearchStateSignature
     {
         if (null === $range) {
-            return 'range:null|desired:'.$this->moneySignature($desired);
+            return SearchStateSignature::compose([
+                'range' => 'null',
+                'desired' => $this->moneySignature($desired),
+            ]);
         }
 
         $scale = max($range['min']->scale(), $range['max']->scale());
@@ -344,7 +348,10 @@ final class PathFinder
             $scale,
         );
 
-        return 'range:'.$rangeSignature.'|desired:'.$this->moneySignature($desired, $scale);
+        return SearchStateSignature::compose([
+            'range' => $rangeSignature,
+            'desired' => $this->moneySignature($desired, $scale),
+        ]);
     }
 
     private function moneySignature(?Money $amount, ?int $scale = null): string

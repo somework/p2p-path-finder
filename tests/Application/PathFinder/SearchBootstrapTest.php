@@ -18,6 +18,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchState;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriority;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRecord;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRegistry;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateSignature;
 use SomeWork\P2PPathFinder\Application\PathFinder\SearchStateQueue;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
@@ -31,7 +32,10 @@ final class SearchBootstrapTest extends TestCase
     {
         $queue = new SearchStateQueue(self::SCALE);
         $results = new CandidateResultHeap(self::SCALE);
-        $registry = SearchStateRegistry::withInitial('SRC', new SearchStateRecord('1', 0, 'sig:src'));
+        $registry = SearchStateRegistry::withInitial(
+            'SRC',
+            new SearchStateRecord('1', 0, SearchStateSignature::fromString('sig:src')),
+        );
         $insertionOrder = new InsertionOrderCounter();
         $resultInsertionOrder = new InsertionOrderCounter(3);
 
@@ -69,8 +73,14 @@ final class SearchBootstrapTest extends TestCase
         self::assertSame(4, $clone->resultInsertionOrder()->next());
         self::assertSame(4, $bootstrap->resultInsertionOrder()->next());
 
-        $clone->registry()->register('DST', new SearchStateRecord('2', 1, 'sig:dst'), self::SCALE);
-        self::assertFalse($bootstrap->registry()->hasSignature('DST', 'sig:dst'));
+        $clone->registry()->register(
+            'DST',
+            new SearchStateRecord('2', 1, SearchStateSignature::fromString('sig:dst')),
+            self::SCALE,
+        );
+        self::assertFalse(
+            $bootstrap->registry()->hasSignature('DST', SearchStateSignature::fromString('sig:dst')),
+        );
 
         self::assertSame(1, $bootstrap->visitedStates());
         self::assertSame(1, $clone->visitedStates());
@@ -80,7 +90,10 @@ final class SearchBootstrapTest extends TestCase
     {
         $queue = new SearchStateQueue(self::SCALE);
         $results = new CandidateResultHeap(self::SCALE);
-        $registry = SearchStateRegistry::withInitial('SRC', new SearchStateRecord('1', 0, 'sig:src'));
+        $registry = SearchStateRegistry::withInitial(
+            'SRC',
+            new SearchStateRecord('1', 0, SearchStateSignature::fromString('sig:src')),
+        );
         $insertionOrder = new InsertionOrderCounter();
         $resultInsertionOrder = new InsertionOrderCounter();
 
@@ -93,7 +106,11 @@ final class SearchBootstrapTest extends TestCase
         $bootstrap = new SearchBootstrap($queue, $results, $registry, $insertionOrder, $resultInsertionOrder, 1);
         $clone = clone $bootstrap;
 
-        $clone->registry()->register('SRC', new SearchStateRecord('0.5', 0, 'sig:src'), self::SCALE);
+        $clone->registry()->register(
+            'SRC',
+            new SearchStateRecord('0.5', 0, SearchStateSignature::fromString('sig:src')),
+            self::SCALE,
+        );
 
         $originalRecords = $bootstrap->registry()->recordsFor('SRC');
         self::assertCount(1, $originalRecords);
@@ -108,7 +125,10 @@ final class SearchBootstrapTest extends TestCase
     {
         $queue = new SearchStateQueue(self::SCALE);
         $results = new CandidateResultHeap(self::SCALE);
-        $registry = SearchStateRegistry::withInitial('SRC', new SearchStateRecord('1', 0, 'sig:src'));
+        $registry = SearchStateRegistry::withInitial(
+            'SRC',
+            new SearchStateRecord('1', 0, SearchStateSignature::fromString('sig:src')),
+        );
         $insertionOrder = new InsertionOrderCounter();
         $resultInsertionOrder = new InsertionOrderCounter();
 
@@ -126,7 +146,10 @@ final class SearchBootstrapTest extends TestCase
     {
         $queue = new SearchStateQueue(self::SCALE);
         $results = new CandidateResultHeap(self::SCALE);
-        $registry = SearchStateRegistry::withInitial('SRC', new SearchStateRecord('1', 0, 'sig:src'));
+        $registry = SearchStateRegistry::withInitial(
+            'SRC',
+            new SearchStateRecord('1', 0, SearchStateSignature::fromString('sig:src')),
+        );
         $insertionOrder = new InsertionOrderCounter();
         $resultInsertionOrder = new InsertionOrderCounter();
 
