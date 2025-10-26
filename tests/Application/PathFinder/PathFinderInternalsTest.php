@@ -251,10 +251,6 @@ final class PathFinderInternalsTest extends TestCase
     public function test_record_state_respects_explicit_signature_override(): void
     {
         $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
-        $range = SpendRange::fromBounds(
-            CurrencyScenarioFactory::money('USD', '1.00', 2),
-            CurrencyScenarioFactory::money('USD', '3.00', 2),
-        );
         $providedSignature = SearchStateSignature::fromString('provided:signature');
         $registry = SearchStateRegistry::withInitial(
             'USD',
