@@ -311,25 +311,7 @@ final class PathFinderPropertyTest extends TestCase
 
     private function routeSignature(CandidatePath $path): RouteSignature
     {
-        $edges = $path->edges();
-
-        if ($edges->isEmpty()) {
-            return new RouteSignature([]);
-        }
-
-        $first = $edges->first();
-
-        if (null === $first) {
-            return new RouteSignature([]);
-        }
-
-        $nodes = [$first->from()];
-
-        foreach ($edges as $edge) {
-            $nodes[] = $edge->to();
-        }
-
-        return new RouteSignature($nodes);
+        return RouteSignature::fromPathEdgeSequence($path->edges());
     }
 
     private function assertGuardStatusEquals(SearchGuardReport $expected, SearchGuardReport $actual, string $message): void

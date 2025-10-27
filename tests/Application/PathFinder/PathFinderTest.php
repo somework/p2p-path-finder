@@ -17,6 +17,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\CandidateResultHeap;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
@@ -40,7 +41,6 @@ use function array_reverse;
 use function array_slice;
 use function array_unique;
 use function count;
-use function implode;
 use function in_array;
 
 final class PathFinderTest extends TestCase
@@ -410,22 +410,7 @@ final class PathFinderTest extends TestCase
 
     private static function routeSignatureFromEdges(PathEdgeSequence $edges): string
     {
-        if ($edges->isEmpty()) {
-            return '';
-        }
-
-        $first = $edges->first();
-        if (null === $first) {
-            return '';
-        }
-
-        $nodes = [$first->from()];
-
-        foreach ($edges as $edge) {
-            $nodes[] = $edge->to();
-        }
-
-        return implode('->', $nodes);
+        return RouteSignature::fromPathEdgeSequence($edges)->value();
     }
 
     private static function stubCandidateEdge(string $from, string $to): PathEdge
