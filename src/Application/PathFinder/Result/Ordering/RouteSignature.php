@@ -7,10 +7,8 @@ namespace SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
-use function count;
 use function implode;
 use function is_int;
-use function is_string;
 use function sprintf;
 use function trim;
 
@@ -24,7 +22,7 @@ final class RouteSignature
     private readonly string $value;
 
     /**
-     * @param iterable<string> $nodes
+     * @param iterable<array-key, string> $nodes
      *
      * @throws InvalidInput when any node is empty after trimming whitespace
      */
@@ -35,9 +33,9 @@ final class RouteSignature
             $node = trim($node);
 
             if ('' === $node) {
-                $index = is_int($position) || is_string($position)
+                $index = is_int($position)
                     ? (string) $position
-                    : (string) count($normalized);
+                    : $position;
 
                 throw new InvalidInput(sprintf('Route signature nodes cannot be empty (index %s).', $index));
             }
