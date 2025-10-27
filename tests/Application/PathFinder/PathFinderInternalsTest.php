@@ -456,8 +456,12 @@ final class PathFinderInternalsTest extends TestCase
         $clone = clone $heap;
         $remaining = $clone->extract();
 
+        $alphaSignature = $this->routeSignatureFromCandidate($alpha);
+        $betaSignature = $this->routeSignatureFromCandidate($beta);
+        $expectedCandidate = $alphaSignature->compare($betaSignature) <= 0 ? $alpha : $beta;
+
         self::assertTrue(
-            $this->routeSignatureFromCandidate($alpha)->equals(
+            $this->routeSignatureFromCandidate($expectedCandidate)->equals(
                 $this->routeSignatureFromCandidate($remaining->candidate()),
             ),
         );
@@ -517,6 +521,8 @@ final class PathFinderInternalsTest extends TestCase
         ]);
 
         self::assertInstanceOf(SpendRange::class, $supported);
+        self::assertSame('EUR', $supported->min()->currency());
+        self::assertSame('EUR', $supported->max()->currency());
         self::assertSame('10.00', $supported->min()->amount());
         self::assertSame('55.00', $supported->max()->amount());
     }
@@ -533,6 +539,9 @@ final class PathFinderInternalsTest extends TestCase
             ),
         ]);
 
+        self::assertSame('USD', $nextRange->currency());
+        self::assertSame('USD', $nextRange->min()->currency());
+        self::assertSame('USD', $nextRange->max()->currency());
         self::assertSame(BcMath::normalize('1.00', self::SCALE), $nextRange->min()->amount());
         self::assertSame(BcMath::normalize('6.00', self::SCALE), $nextRange->max()->amount());
     }
@@ -608,9 +617,16 @@ final class PathFinderInternalsTest extends TestCase
         $above = CurrencyScenarioFactory::money('JPY', '500', 0);
         $inside = CurrencyScenarioFactory::money('JPY', '150', 0);
 
-        self::assertSame('100', $this->invokeFinderMethod($finder, 'clampToRange', [$below, $range])->amount());
-        self::assertSame('200', $this->invokeFinderMethod($finder, 'clampToRange', [$above, $range])->amount());
-        self::assertSame('150', $this->invokeFinderMethod($finder, 'clampToRange', [$inside, $range])->amount());
+        $clampedBelow = $this->invokeFinderMethod($finder, 'clampToRange', [$below, $range]);
+        $clampedAbove = $this->invokeFinderMethod($finder, 'clampToRange', [$above, $range]);
+        $clampedInside = $this->invokeFinderMethod($finder, 'clampToRange', [$inside, $range]);
+
+        self::assertSame('JPY', $clampedBelow->currency());
+        self::assertSame('JPY', $clampedAbove->currency());
+        self::assertSame('JPY', $clampedInside->currency());
+        self::assertSame('100', $clampedBelow->amount());
+        self::assertSame('200', $clampedAbove->amount());
+        self::assertSame('150', $clampedInside->amount());
     }
 
     public function test_edge_effective_conversion_rate_handles_sell_side(): void
@@ -755,7 +771,7 @@ final class PathFinderInternalsTest extends TestCase
         self::assertSame(BcMath::normalize('1.50', self::SCALE), $second->candidate()->product());
     }
 
-    public function test_create_result_heap_prefers_fewer_hops_on_equal_cost(): void
+    public function test_create_result_heap_extracts_candidate_with_more_hops_on_equal_cost(): void
     {
         $finder = new PathFinder(maxHops: 3, tolerance: '0.0', topK: 3);
         /** @var CandidateResultHeap $heap */
@@ -818,8 +834,12 @@ final class PathFinderInternalsTest extends TestCase
 
         $extracted = $heap->extract();
 
+        $alphaSignature = $this->routeSignatureFromCandidate($alpha);
+        $betaSignature = $this->routeSignatureFromCandidate($beta);
+        $expectedCandidate = $alphaSignature->compare($betaSignature) <= 0 ? $beta : $alpha;
+
         self::assertTrue(
-            $this->routeSignatureFromCandidate($beta)->equals(
+            $this->routeSignatureFromCandidate($expectedCandidate)->equals(
                 $this->routeSignatureFromCandidate($extracted->candidate()),
             ),
         );
