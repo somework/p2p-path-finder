@@ -832,15 +832,24 @@ final class PathFinderInternalsTest extends TestCase
             ),
         ));
 
-        $extracted = $heap->extract();
+        $rejected = $heap->extract();
+
+        self::assertSame(1, $heap->count());
+        $remaining = $heap->extract();
 
         $alphaSignature = $this->routeSignatureFromCandidate($alpha);
         $betaSignature = $this->routeSignatureFromCandidate($beta);
-        $expectedCandidate = $alphaSignature->compare($betaSignature) <= 0 ? $beta : $alpha;
+        $expectedCandidate = $alphaSignature->compare($betaSignature) <= 0 ? $alpha : $beta;
+        $rejectedCandidate = $expectedCandidate === $alpha ? $beta : $alpha;
 
         self::assertTrue(
             $this->routeSignatureFromCandidate($expectedCandidate)->equals(
-                $this->routeSignatureFromCandidate($extracted->candidate()),
+                $this->routeSignatureFromCandidate($remaining->candidate()),
+            ),
+        );
+        self::assertTrue(
+            $this->routeSignatureFromCandidate($rejectedCandidate)->equals(
+                $this->routeSignatureFromCandidate($rejected->candidate()),
             ),
         );
     }
