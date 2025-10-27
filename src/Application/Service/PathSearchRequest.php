@@ -41,10 +41,11 @@ final class PathSearchRequest
 
         $this->targetAsset = strtoupper($normalizedTargetAsset);
         $this->spendAmount = $config->spendAmount();
-        $this->spendConstraints = SpendConstraints::from(
-            $config->minimumSpendAmount(),
-            $config->maximumSpendAmount(),
-            $this->spendAmount,
+        $this->spendConstraints = SpendConstraints::fromScalars(
+            $this->spendAmount->currency(),
+            $config->minimumSpendAmount()->amount(),
+            $config->maximumSpendAmount()->amount(),
+            $this->spendAmount->amount(),
         );
     }
 

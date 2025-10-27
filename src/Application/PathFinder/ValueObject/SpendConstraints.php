@@ -8,11 +8,15 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
+use function str_starts_with;
+
 /**
  * Represents the spend boundaries propagated through the search graph.
  */
 final class SpendConstraints
 {
+    private const SCALAR_SCALE = 18;
+
     private readonly SpendRange $range;
     private readonly ?Money $desired;
 
@@ -41,6 +45,32 @@ final class SpendConstraints
         }
 
         return new self($range, $normalizedDesired);
+    }
+
+    /**
+     * @param numeric-string      $min
+     * @param numeric-string      $max
+     * @param numeric-string|null $desired
+     *
+     * @throws InvalidInput|PrecisionViolation
+     */
+    public static function fromScalars(string $currency, string $min, string $max, ?string $desired = null): self
+    {
+        $lowerBound = Money::fromString($currency, $min, self::SCALAR_SCALE);
+        $upperBound = Money::fromString($currency, $max, self::SCALAR_SCALE);
+
+        $desiredAmount = null;
+        if (null !== $desired) {
+            $desiredAmount = Money::fromString($currency, $desired, self::SCALAR_SCALE);
+        }
+
+        foreach ([$lowerBound, $upperBound, $desiredAmount] as $value) {
+            if (null !== $value && str_starts_with($value->amount(), '-')) {
+                throw new InvalidInput('Spend constraints cannot contain negative values.');
+            }
+        }
+
+        return self::from($lowerBound, $upperBound, $desiredAmount);
     }
 
     public function min(): Money
