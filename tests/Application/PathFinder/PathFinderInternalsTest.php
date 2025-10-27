@@ -51,6 +51,8 @@ final class PathFinderInternalsTest extends TestCase
 {
     private const SCALE = 18;
 
+    private int $nextCandidateIdentifier = 0;
+
     public function test_state_signature_normalizes_range_and_desired(): void
     {
         $finder = new PathFinder(maxHops: 2, tolerance: '0.0');
@@ -1136,8 +1138,7 @@ final class PathFinderInternalsTest extends TestCase
 
     private function buildCandidate(string $cost, string $product): CandidatePath
     {
-        static $identifier = 0;
-        ++$identifier;
+        $identifier = ++$this->nextCandidateIdentifier;
 
         $to = sprintf('DST%s', chr(65 + (($identifier - 1) % 26)));
         $order = OrderFactory::buy('SRC', $to, '1.000', '1.000', '1.000', 3, 3);
