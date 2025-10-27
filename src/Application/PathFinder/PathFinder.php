@@ -468,22 +468,7 @@ final class PathFinder
 
     private function routeSignature(PathEdgeSequence $edges): RouteSignature
     {
-        if ($edges->isEmpty()) {
-            return new RouteSignature([]);
-        }
-
-        $first = $edges->first();
-        if (null === $first) {
-            return new RouteSignature([]);
-        }
-
-        $nodes = [$first->from()];
-
-        foreach ($edges as $edge) {
-            $nodes[] = $edge->to();
-        }
-
-        return new RouteSignature($nodes);
+        return RouteSignature::fromPathEdgeSequence($edges);
     }
 
     private function edgeSupportsAmount(GraphEdge $edge, SpendRange $range): ?SpendRange

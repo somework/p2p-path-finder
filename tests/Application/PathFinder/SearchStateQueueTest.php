@@ -13,6 +13,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriority;
 use SomeWork\P2PPathFinder\Application\PathFinder\SearchStateQueue;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 use function explode;
 
@@ -80,6 +81,25 @@ final class SearchStateQueueTest extends TestCase
 
         self::assertSame(1, $queue->compare($alpha, $beta));
         self::assertSame(-1, $queue->compare($beta, $alpha));
+    }
+
+    public function test_compare_returns_zero_for_identical_priorities(): void
+    {
+        $queue = new SearchStateQueue(18);
+
+        $first = $this->priority(BcMath::normalize('0.030000000000000000', 18), 2, 'A->B->C', 5);
+        $second = $this->priority(BcMath::normalize('0.030000000000000000', 18), 2, 'A->B->C', 5);
+
+        self::assertSame(0, $queue->compare($first, $second));
+        self::assertSame(0, $queue->compare($second, $first));
+    }
+
+    public function test_priority_rejects_blank_route_nodes(): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Route signature nodes cannot be empty (index 1).');
+
+        $this->priority(BcMath::normalize('0.010000000000000000', 18), 1, 'SRC-> ', 0);
     }
 
     private function state(string $node, string $cost): SearchState

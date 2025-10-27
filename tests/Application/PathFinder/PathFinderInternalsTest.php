@@ -1171,22 +1171,7 @@ final class PathFinderInternalsTest extends TestCase
 
     private function routeSignatureFromCandidate(CandidatePath $candidate): RouteSignature
     {
-        $edges = $candidate->edges();
-        if ($edges->isEmpty()) {
-            return new RouteSignature([]);
-        }
-
-        $first = $edges->first();
-        if (null === $first) {
-            return new RouteSignature([]);
-        }
-
-        $nodes = [$first->from()];
-        foreach ($edges as $edge) {
-            $nodes[] = $edge->to();
-        }
-
-        return new RouteSignature($nodes);
+        return RouteSignature::fromPathEdgeSequence($candidate->edges());
     }
 
     private function dummyEdges(int $count): PathEdgeSequence
