@@ -1195,6 +1195,17 @@ Represents the spend boundaries propagated through the search graph.
 ### from
 `SpendConstraints::from(SomeWork\P2PPathFinder\Domain\ValueObject\Money $min, SomeWork\P2PPathFinder\Domain\ValueObject\Money $max, ?SomeWork\P2PPathFinder\Domain\ValueObject\Money $desired = null): self`
 
+### fromScalars
+`SpendConstraints::fromScalars(string $currency, numeric-string $min, numeric-string $max, ?numeric-string $desired = null): self`
+
+Instantiate constraints directly from normalized scalar inputs. For example:
+
+```
+$constraints = SpendConstraints::fromScalars('USD', '95.00', '105.00', '100.00');
+```
+
+All amounts are rounded half-up to 18 decimal places and validated for non-negative values.
+
 ### min
 `SpendConstraints::min(): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
 
