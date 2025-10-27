@@ -7,6 +7,7 @@ namespace SomeWork\P2PPathFinder\Application\PathFinder\Search;
 use InvalidArgumentException;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendRange;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
@@ -28,10 +29,9 @@ final class SearchState
     private readonly array $visited;
 
     /**
-     * @param numeric-string                     $cost
-     * @param numeric-string                     $product
-     * @param array<array-key, bool>             $visited
-     * @param array{min: Money, max: Money}|null $amountRange
+     * @param numeric-string         $cost
+     * @param numeric-string         $product
+     * @param array<array-key, bool> $visited
      */
     private function __construct(
         private readonly string $node,
@@ -39,7 +39,7 @@ final class SearchState
         private readonly string $product,
         int $hops,
         private readonly PathEdgeSequence $path,
-        private readonly ?array $amountRange,
+        private readonly ?SpendRange $amountRange,
         private readonly ?Money $desiredAmount,
         array $visited,
     ) {
@@ -58,13 +58,12 @@ final class SearchState
     }
 
     /**
-     * @param numeric-string                     $unitValue
-     * @param array{min: Money, max: Money}|null $amountRange
+     * @param numeric-string $unitValue
      */
     public static function bootstrap(
         string $node,
         string $unitValue,
-        ?array $amountRange,
+        ?SpendRange $amountRange,
         ?Money $desiredAmount
     ): self {
         BcMath::ensureNumeric($unitValue);
@@ -82,10 +81,9 @@ final class SearchState
     }
 
     /**
-     * @param numeric-string                     $cost
-     * @param numeric-string                     $product
-     * @param array{min: Money, max: Money}|null $amountRange
-     * @param array<array-key, bool>             $visited
+     * @param numeric-string         $cost
+     * @param numeric-string         $product
+     * @param array<array-key, bool> $visited
      *
      * @phpstan-param int<0, max> $hops
      *
@@ -97,7 +95,7 @@ final class SearchState
         string $product,
         int $hops,
         PathEdgeSequence $path,
-        ?array $amountRange,
+        ?SpendRange $amountRange,
         ?Money $desiredAmount,
         array $visited
     ): self {
@@ -121,16 +119,15 @@ final class SearchState
     }
 
     /**
-     * @param numeric-string                     $nextCost
-     * @param numeric-string                     $nextProduct
-     * @param array{min: Money, max: Money}|null $amountRange
+     * @param numeric-string $nextCost
+     * @param numeric-string $nextProduct
      */
     public function transition(
         string $nextNode,
         string $nextCost,
         string $nextProduct,
         PathEdge $edge,
-        ?array $amountRange,
+        ?SpendRange $amountRange,
         ?Money $desiredAmount
     ): self {
         $visited = $this->visited;
@@ -206,10 +203,7 @@ final class SearchState
         return $this->path;
     }
 
-    /**
-     * @return array{min: Money, max: Money}|null
-     */
-    public function amountRange(): ?array
+    public function amountRange(): ?SpendRange
     {
         return $this->amountRange;
     }

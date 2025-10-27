@@ -13,14 +13,12 @@ use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
  */
 final class SpendConstraints
 {
-    private readonly Money $min;
-    private readonly Money $max;
+    private readonly SpendRange $range;
     private readonly ?Money $desired;
 
-    private function __construct(Money $min, Money $max, ?Money $desired)
+    private function __construct(SpendRange $range, ?Money $desired)
     {
-        $this->min = $min;
-        $this->max = $max;
+        $this->range = $range;
         $this->desired = $desired;
     }
 
@@ -29,29 +27,30 @@ final class SpendConstraints
      */
     public static function from(Money $min, Money $max, ?Money $desired = null): self
     {
-        self::assertCurrencyConsistency($min, $max, $desired);
+        $range = SpendRange::fromBounds($min, $max);
 
-        $scale = max($min->scale(), $max->scale(), $desired?->scale() ?? 0);
-        $normalizedMin = $min->withScale($scale);
-        $normalizedMax = $max->withScale($scale);
+        $normalizedDesired = null;
+        if (null !== $desired) {
+            if ($desired->currency() !== $range->currency()) {
+                throw new InvalidInput('Desired spend must use the same currency as the spend bounds.');
+            }
 
-        if ($normalizedMin->greaterThan($normalizedMax)) {
-            [$normalizedMin, $normalizedMax] = [$normalizedMax, $normalizedMin];
+            $scale = max($range->scale(), $desired->scale());
+            $range = $range->withScale($scale);
+            $normalizedDesired = $desired->withScale($scale);
         }
 
-        $normalizedDesired = null === $desired ? null : $desired->withScale($scale);
-
-        return new self($normalizedMin, $normalizedMax, $normalizedDesired);
+        return new self($range, $normalizedDesired);
     }
 
     public function min(): Money
     {
-        return $this->min;
+        return $this->range->min();
     }
 
     public function max(): Money
     {
-        return $this->max;
+        return $this->range->max();
     }
 
     public function desired(): ?Money
@@ -59,22 +58,8 @@ final class SpendConstraints
         return $this->desired;
     }
 
-    /**
-     * @return array{min: Money, max: Money}
-     */
-    public function toRange(): array
+    public function range(): SpendRange
     {
-        return ['min' => $this->min, 'max' => $this->max];
-    }
-
-    private static function assertCurrencyConsistency(Money $min, Money $max, ?Money $desired): void
-    {
-        if ($min->currency() !== $max->currency()) {
-            throw new InvalidInput('Spend constraint bounds must share the same currency.');
-        }
-
-        if (null !== $desired && $desired->currency() !== $min->currency()) {
-            throw new InvalidInput('Desired spend must use the same currency as the spend bounds.');
-        }
+        return $this->range;
     }
 }

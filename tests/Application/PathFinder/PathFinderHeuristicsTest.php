@@ -20,6 +20,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\SearchStateQueue;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendRange;
 use SomeWork\P2PPathFinder\Application\Service\LegMaterializer;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
@@ -207,12 +208,15 @@ final class PathFinderHeuristicsTest extends TestCase
         $signatureMethod = new ReflectionMethod(PathFinder::class, 'stateSignature');
         $signatureMethod->setAccessible(true);
 
-        $range = [
-            'min' => CurrencyScenarioFactory::money('EUR', '1.00', 2),
-            'max' => CurrencyScenarioFactory::money('EUR', '5.0000', 4),
-        ];
         $desired = CurrencyScenarioFactory::money('EUR', '2.500', 3);
-        $signature = $signatureMethod->invoke($finder, $range, $desired);
+        $signature = $signatureMethod->invoke(
+            $finder,
+            SpendRange::fromBounds(
+                CurrencyScenarioFactory::money('EUR', '1.00', 2),
+                CurrencyScenarioFactory::money('EUR', '5.0000', 4),
+            ),
+            $desired,
+        );
 
         $registry = SearchStateRegistry::withInitial(
             'EUR',
@@ -235,14 +239,17 @@ final class PathFinderHeuristicsTest extends TestCase
         $method = new ReflectionMethod(PathFinder::class, 'stateSignature');
         $method->setAccessible(true);
 
-        $range = [
-            'min' => CurrencyScenarioFactory::money('USD', '1.0', 1),
-            'max' => CurrencyScenarioFactory::money('USD', '5.0000', 4),
-        ];
         $desired = CurrencyScenarioFactory::money('USD', '2.50', 2);
 
         /** @var SearchStateSignature $signature */
-        $signature = $method->invoke($finder, $range, $desired);
+        $signature = $method->invoke(
+            $finder,
+            SpendRange::fromBounds(
+                CurrencyScenarioFactory::money('USD', '1.0', 1),
+                CurrencyScenarioFactory::money('USD', '5.0000', 4),
+            ),
+            $desired,
+        );
 
         self::assertInstanceOf(SearchStateSignature::class, $signature);
         self::assertSame('range:USD:1.0000:5.0000:4|desired:USD:2.5000:4', $signature->value());
@@ -266,13 +273,11 @@ final class PathFinderHeuristicsTest extends TestCase
         $method = new ReflectionMethod(PathFinder::class, 'edgeSupportsAmount');
         $method->setAccessible(true);
 
-        $range = [
-            'min' => CurrencyScenarioFactory::money('EUR', '1.000', 3),
-            'max' => CurrencyScenarioFactory::money('EUR', '2.000', 3),
-        ];
-
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
-        $result = $method->invoke($finder, $edge, $range);
+        $result = $method->invoke($finder, $edge, SpendRange::fromBounds(
+            CurrencyScenarioFactory::money('EUR', '1.000', 3),
+            CurrencyScenarioFactory::money('EUR', '2.000', 3),
+        ));
 
         self::assertNull($result);
     }
@@ -295,17 +300,15 @@ final class PathFinderHeuristicsTest extends TestCase
         $method = new ReflectionMethod(PathFinder::class, 'edgeSupportsAmount');
         $method->setAccessible(true);
 
-        $range = [
-            'min' => CurrencyScenarioFactory::money('EUR', '0', 3),
-            'max' => CurrencyScenarioFactory::money('EUR', '0', 3),
-        ];
-
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
-        $result = $method->invoke($finder, $edge, $range);
+        $result = $method->invoke($finder, $edge, SpendRange::fromBounds(
+            CurrencyScenarioFactory::money('EUR', '0', 3),
+            CurrencyScenarioFactory::money('EUR', '0', 3),
+        ));
 
-        self::assertNotNull($result);
-        self::assertSame('0.000', $result['min']->amount());
-        self::assertSame('0.000', $result['max']->amount());
+        self::assertInstanceOf(SpendRange::class, $result);
+        self::assertSame('0.000', $result->min()->amount());
+        self::assertSame('0.000', $result->max()->amount());
     }
 
     public function test_calculate_next_range_normalizes_descending_bounds(): void
@@ -326,10 +329,10 @@ final class PathFinderHeuristicsTest extends TestCase
         $method = new ReflectionMethod(PathFinder::class, 'calculateNextRange');
         $method->setAccessible(true);
 
-        $range = [
-            'min' => CurrencyScenarioFactory::money('EUR', '5.000', 3),
-            'max' => CurrencyScenarioFactory::money('EUR', '1.000', 3),
-        ];
+        $range = SpendRange::fromBounds(
+            CurrencyScenarioFactory::money('EUR', '5.000', 3),
+            CurrencyScenarioFactory::money('EUR', '1.000', 3),
+        );
 
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
         $result = $method->invoke($finder, $edge, $range);
@@ -337,17 +340,17 @@ final class PathFinderHeuristicsTest extends TestCase
         $convertMethod = new ReflectionMethod(PathFinder::class, 'convertEdgeAmount');
         $convertMethod->setAccessible(true);
 
-        $convertedMin = $convertMethod->invoke($finder, $edge, $range['min']);
-        $convertedMax = $convertMethod->invoke($finder, $edge, $range['max']);
+        $convertedMin = $convertMethod->invoke($finder, $edge, $range->min());
+        $convertedMax = $convertMethod->invoke($finder, $edge, $range->max());
 
         if ($convertedMin->greaterThan($convertedMax)) {
             [$convertedMin, $convertedMax] = [$convertedMax, $convertedMin];
         }
 
-        self::assertSame($convertedMin->amount(), $result['min']->amount());
-        self::assertSame($convertedMax->amount(), $result['max']->amount());
-        self::assertSame($convertedMin->currency(), $result['min']->currency());
-        self::assertSame($convertedMax->currency(), $result['max']->currency());
+        self::assertSame($convertedMin->amount(), $result->min()->amount());
+        self::assertSame($convertedMax->amount(), $result->max()->amount());
+        self::assertSame($convertedMin->currency(), $result->min()->currency());
+        self::assertSame($convertedMax->currency(), $result->max()->currency());
     }
 
     public function test_convert_edge_amount_returns_zero_when_edge_cannot_convert(): void
@@ -407,10 +410,10 @@ final class PathFinderHeuristicsTest extends TestCase
         $edge = $graph['USD']['edges'][0];
 
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
-        $range = [
-            'min' => $edge['quoteCapacity']['min'],
-            'max' => $edge['quoteCapacity']['max'],
-        ];
+        $range = SpendRange::fromBounds(
+            $edge['quoteCapacity']['min'],
+            $edge['quoteCapacity']['max'],
+        );
 
         $method = new ReflectionMethod(PathFinder::class, 'calculateNextRange');
         $method->setAccessible(true);
@@ -419,12 +422,12 @@ final class PathFinderHeuristicsTest extends TestCase
         $materializer = new LegMaterializer();
 
         foreach (['min', 'max'] as $bound) {
-            $baseAmount = $convertedRange[$bound];
+            $baseAmount = 'min' === $bound ? $convertedRange->min() : $convertedRange->max();
             $evaluation = $materializer->evaluateSellQuote($order, $baseAmount);
             $grossQuote = $evaluation['grossQuote']->withScale(
-                max($evaluation['grossQuote']->scale(), $range[$bound]->scale())
+                max($evaluation['grossQuote']->scale(), ('min' === $bound ? $range->min() : $range->max())->scale())
             );
-            $rangeComparable = $range[$bound]->withScale($grossQuote->scale());
+            $rangeComparable = ('min' === $bound ? $range->min() : $range->max())->withScale($grossQuote->scale());
 
             self::assertSame($rangeComparable->amount(), $grossQuote->amount());
         }
@@ -465,10 +468,10 @@ final class PathFinderHeuristicsTest extends TestCase
     {
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
-        $range = [
-            'min' => CurrencyScenarioFactory::money('USD', '1.00', 2),
-            'max' => CurrencyScenarioFactory::money('USD', '5.00', 2),
-        ];
+        $range = SpendRange::fromBounds(
+            CurrencyScenarioFactory::money('USD', '1.00', 2),
+            CurrencyScenarioFactory::money('USD', '5.00', 2),
+        );
 
         $method = new ReflectionMethod(PathFinder::class, 'clampToRange');
         $method->setAccessible(true);

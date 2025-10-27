@@ -110,7 +110,7 @@ final class CandidatePath implements ArrayAccess
             'product' => $this->product,
             'hops' => $this->hops,
             'edges' => $this->edges->toArray(),
-            'amountRange' => $this->range?->toRange(),
+            'amountRange' => $this->range?->range()->toBoundsArray(),
             'desiredAmount' => $this->range?->desired(),
             default => throw new LogicException(sprintf('Unknown candidate path attribute "%s".', $offset)),
         };
@@ -143,7 +143,7 @@ final class CandidatePath implements ArrayAccess
             'product' => $this->product,
             'hops' => $this->hops,
             'edges' => $this->edges->toArray(),
-            'amountRange' => $this->range?->toRange(),
+            'amountRange' => $this->range?->range()->toBoundsArray(),
             'desiredAmount' => $this->range?->desired(),
         ];
     }
