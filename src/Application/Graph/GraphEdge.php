@@ -93,6 +93,11 @@ final class GraphEdge implements IteratorAggregate, JsonSerializable, ArrayAcces
         return $this->segments->toArray();
     }
 
+    public function segmentCollection(): EdgeSegmentCollection
+    {
+        return $this->segments;
+    }
+
     public function getIterator(): Traversable
     {
         return $this->segments->getIterator();
