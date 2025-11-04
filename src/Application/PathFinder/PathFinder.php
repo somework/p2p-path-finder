@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathFinder;
 
+use SomeWork\P2PPathFinder\Application\Graph\EdgeSegmentCollection;
 use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\Guard\SearchGuards;
@@ -475,6 +476,10 @@ final class PathFinder
     {
         $isBuy = OrderSide::BUY === $edge->orderSide();
         $capacity = $isBuy ? $edge->grossBaseCapacity() : $edge->quoteCapacity();
+        $measure = $isBuy
+            ? EdgeSegmentCollection::MEASURE_GROSS_BASE
+            : EdgeSegmentCollection::MEASURE_QUOTE;
+        $segments = $edge->segmentCollection();
 
         $scale = max(
             $range->scale(),
@@ -482,34 +487,21 @@ final class PathFinder
             $capacity->max()->scale(),
         );
 
-        foreach ($edge->segments() as $segment) {
-            $segmentCapacity = $isBuy ? $segment->grossBase() : $segment->quote();
-            $scale = max(
-                $scale,
-                $segmentCapacity->min()->scale(),
-                $segmentCapacity->max()->scale(),
-            );
+        $totals = $segments->capacityTotals($measure, $scale);
+        if (null !== $totals) {
+            $scale = max($scale, $totals->scale());
         }
 
         $normalizedRange = $range->withScale($scale);
         $requestedMin = $normalizedRange->min();
         $requestedMax = $normalizedRange->max();
 
-        if ([] === $edge->segments()) {
+        if (null === $totals) {
             $minimum = $capacity->min()->withScale($scale);
             $maximum = $capacity->max()->withScale($scale);
         } else {
-            $minimum = Money::zero($normalizedRange->currency(), $scale);
-            $maximum = Money::zero($normalizedRange->currency(), $scale);
-
-            foreach ($edge->segments() as $segment) {
-                $segmentCapacity = $isBuy ? $segment->grossBase() : $segment->quote();
-                if ($segment->isMandatory()) {
-                    $minimum = $minimum->add($segmentCapacity->min()->withScale($scale));
-                }
-
-                $maximum = $maximum->add($segmentCapacity->max()->withScale($scale));
-            }
+            $minimum = $totals->mandatory()->withScale($scale);
+            $maximum = $totals->maximum()->withScale($scale);
         }
 
         if ($maximum->isZero()) {
