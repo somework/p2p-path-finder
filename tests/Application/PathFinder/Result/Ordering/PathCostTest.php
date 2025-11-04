@@ -6,6 +6,7 @@ namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder\Result\Ordering;
 
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 final class PathCostTest extends TestCase
 {
@@ -23,6 +24,17 @@ final class PathCostTest extends TestCase
 
         self::assertSame(0, $left->compare($right, 15));
         self::assertSame(-1, $left->compare($right));
+    }
+
+    public function test_compare_rejects_negative_scale(): void
+    {
+        $left = new PathCost('0.1');
+        $right = new PathCost('0.2');
+
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Scale cannot be negative.');
+
+        $left->compare($right, -1);
     }
 
     public function test_equals_uses_normalized_value(): void
