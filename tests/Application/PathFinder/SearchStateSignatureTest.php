@@ -17,11 +17,43 @@ final class SearchStateSignatureTest extends TestCase
         self::assertSame('range:null|desired:null', $signature->value());
     }
 
+    public function test_from_string_rejects_empty_value(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Search state signatures cannot be empty.');
+
+        SearchStateSignature::fromString('   ');
+    }
+
+    public function test_from_string_requires_label_separator(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Search state signature segments require a label/value separator.');
+
+        SearchStateSignature::fromString('label-without-separator');
+    }
+
+    public function test_from_string_requires_label_before_separator(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Search state signature segments require a label before the separator.');
+
+        SearchStateSignature::fromString(':missing-label');
+    }
+
     public function test_from_string_rejects_empty_segments(): void
     {
         $this->expectException(InvalidArgumentException::class);
 
         SearchStateSignature::fromString('range:null||desired:null');
+    }
+
+    public function test_from_string_rejects_blank_segments_after_trimming(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Search state signatures cannot contain blank segments.');
+
+        SearchStateSignature::fromString('range:null|   |desired:null');
     }
 
     public function test_from_string_rejects_leading_or_trailing_delimiters(): void
@@ -81,6 +113,14 @@ final class SearchStateSignatureTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         SearchStateSignature::compose(['ra|nge' => 'USD:1']);
+    }
+
+    public function test_compose_requires_segments(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Search state signatures require at least one segment.');
+
+        SearchStateSignature::compose([]);
     }
 
     public function test_equals_and_compare(): void

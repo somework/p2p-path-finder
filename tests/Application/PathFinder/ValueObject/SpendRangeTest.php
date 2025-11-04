@@ -25,6 +25,50 @@ final class SpendRangeTest extends TestCase
         self::assertSame(3, $range->max()->scale());
     }
 
+    public function test_with_scale_raises_scale_to_match_targets(): void
+    {
+        $range = SpendRange::fromBounds(
+            Money::fromString('USD', '1.00', 2),
+            Money::fromString('USD', '5.000', 3),
+        );
+
+        $rescaled = $range->withScale(5);
+
+        self::assertSame(5, $rescaled->scale());
+        self::assertSame('1.00000', $rescaled->min()->amount());
+        self::assertSame('5.00000', $rescaled->max()->amount());
+    }
+
+    public function test_normalize_with_raises_scale_to_cover_values(): void
+    {
+        $range = SpendRange::fromBounds(
+            Money::fromString('USD', '1.00', 2),
+            Money::fromString('USD', '5.00', 2),
+        );
+
+        $normalized = $range->normalizeWith(Money::fromString('USD', '3.0000', 4));
+
+        self::assertSame(4, $normalized->scale());
+        self::assertSame('1.0000', $normalized->min()->amount());
+        self::assertSame('5.0000', $normalized->max()->amount());
+    }
+
+    public function test_clamp_limits_values_outside_range(): void
+    {
+        $range = SpendRange::fromBounds(
+            Money::fromString('USD', '1.00', 2),
+            Money::fromString('USD', '5.00', 2),
+        );
+
+        $below = $range->clamp(Money::fromString('USD', '0.50', 2));
+        $above = $range->clamp(Money::fromString('USD', '7.00', 2));
+        $inside = $range->clamp(Money::fromString('USD', '3.000', 3));
+
+        self::assertSame('1.00', $below->amount());
+        self::assertSame('5.00', $above->amount());
+        self::assertSame('3.000', $inside->amount());
+    }
+
     public function test_from_array_requires_keys(): void
     {
         $this->expectException(InvalidInput::class);
@@ -55,5 +99,29 @@ final class SpendRangeTest extends TestCase
             'min' => Money::fromString('USD', '1', 0),
             'max' => Money::fromString('EUR', '1', 0),
         ]);
+    }
+
+    public function test_from_bounds_rejects_currency_mismatch(): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Spend ranges require matching currencies.');
+
+        SpendRange::fromBounds(
+            Money::fromString('USD', '1', 0),
+            Money::fromString('EUR', '1', 0),
+        );
+    }
+
+    public function test_normalize_with_rejects_mismatched_currency(): void
+    {
+        $range = SpendRange::fromBounds(
+            Money::fromString('USD', '1', 0),
+            Money::fromString('USD', '5', 0),
+        );
+
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Spend range operations require matching currencies.');
+
+        $range->normalizeWith(Money::fromString('EUR', '3', 0));
     }
 }
