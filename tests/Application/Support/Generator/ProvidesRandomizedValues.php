@@ -16,6 +16,7 @@ use function substr;
 
 use const PHP_INT_MAX;
 use const STR_PAD_LEFT;
+use const STR_PAD_RIGHT;
 
 /**
  * Common helpers for generator fixtures that rely on {@see Randomizer}.
@@ -78,7 +79,7 @@ trait ProvidesRandomizedValues
         $integer = (int) ($parts[0] ?? '0');
         $fraction = $parts[1] ?? '';
         $fraction = substr($fraction, 0, $scale);
-        $fraction = str_pad($fraction, $scale, '0', STR_PAD_LEFT);
+        $fraction = str_pad($fraction, $scale, '0', STR_PAD_RIGHT);
 
         return $integer * $this->powerOfTen($scale) + (int) $fraction;
     }
