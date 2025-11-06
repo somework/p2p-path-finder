@@ -9,9 +9,11 @@ use Random\Randomizer;
 use function chr;
 use function explode;
 use function intdiv;
+use function ltrim;
 use function max;
 use function ord;
 use function str_pad;
+use function str_starts_with;
 use function substr;
 
 use const PHP_INT_MAX;
@@ -75,12 +77,20 @@ trait ProvidesRandomizedValues
             return (int) $value;
         }
 
+        $isNegative = str_starts_with($value, '-');
+
+        if ($isNegative) {
+            $value = ltrim($value, '-');
+        }
+
         $parts = explode('.', $value, 2);
         $integer = (int) ($parts[0] ?? '0');
         $fraction = $parts[1] ?? '';
         $fraction = substr($fraction, 0, $scale);
         $fraction = str_pad($fraction, $scale, '0', STR_PAD_RIGHT);
 
-        return $integer * $this->powerOfTen($scale) + (int) $fraction;
+        $units = $integer * $this->powerOfTen($scale) + (int) $fraction;
+
+        return $isNegative ? -$units : $units;
     }
 }
