@@ -46,24 +46,40 @@ final class PathResultSetTest extends TestCase
         self::assertSame(['preferred duplicate', 'unique'], $set->toArray());
     }
 
+    public function test_it_discards_duplicates_while_preserving_payload_order_and_json_output(): void
+    {
+        $preferred = ['id' => 'preferred'];
+        $jsonSerializable = $this->createJsonSerializablePayload();
+        $arrayConvertible = $this->createArrayConvertiblePayload();
+
+        $strategy = new CostHopsSignatureOrderingStrategy(18);
+        $set = PathResultSet::fromEntries(
+            $strategy,
+            [
+                new PathResultSetEntry(['id' => 'discarded'], new PathOrderKey(new PathCost('0.400000000000000000'), 3, new RouteSignature(['SRC', 'A', 'DST']), 3)),
+                new PathResultSetEntry($preferred, new PathOrderKey(new PathCost('0.100000000000000000'), 1, new RouteSignature(['SRC', 'A', 'DST']), 0)),
+                new PathResultSetEntry($jsonSerializable, new PathOrderKey(new PathCost('0.150000000000000000'), 2, new RouteSignature(['SRC', 'B', 'DST']), 1)),
+                new PathResultSetEntry($arrayConvertible, new PathOrderKey(new PathCost('0.200000000000000000'), 2, new RouteSignature(['SRC', 'C', 'DST']), 2)),
+            ],
+        );
+
+        $expectedPayloads = [$preferred, $jsonSerializable, $arrayConvertible];
+
+        self::assertSame($expectedPayloads, $set->toArray());
+        self::assertSame(
+            [
+                $preferred,
+                ['type' => 'json'],
+                ['type' => 'array'],
+            ],
+            $set->jsonSerialize(),
+        );
+    }
+
     public function test_json_serialization_delegates_to_entries(): void
     {
-        $serializable = new class implements JsonSerializable {
-            public function jsonSerialize(): array
-            {
-                return ['type' => 'json'];
-            }
-        };
-
-        $arrayConvertible = new class {
-            /**
-             * @return array{type: string}
-             */
-            public function toArray(): array
-            {
-                return ['type' => 'array'];
-            }
-        };
+        $serializable = $this->createJsonSerializablePayload();
+        $arrayConvertible = $this->createArrayConvertiblePayload();
 
         $strategy = new CostHopsSignatureOrderingStrategy(18);
         $set = PathResultSet::fromEntries(
@@ -115,5 +131,28 @@ final class PathResultSetTest extends TestCase
 
         self::assertTrue($slice->isEmpty());
         self::assertSame([], $slice->toArray());
+    }
+
+    private function createJsonSerializablePayload(): JsonSerializable
+    {
+        return new class implements JsonSerializable {
+            public function jsonSerialize(): array
+            {
+                return ['type' => 'json'];
+            }
+        };
+    }
+
+    private function createArrayConvertiblePayload(): object
+    {
+        return new class {
+            /**
+             * @return array{type: string}
+             */
+            public function toArray(): array
+            {
+                return ['type' => 'array'];
+            }
+        };
     }
 }
