@@ -49,22 +49,8 @@ final class PathResultSetTest extends TestCase
     public function test_it_discards_duplicates_while_preserving_payload_order_and_json_output(): void
     {
         $preferred = ['id' => 'preferred'];
-        $jsonSerializable = new class implements JsonSerializable {
-            public function jsonSerialize(): array
-            {
-                return ['type' => 'json'];
-            }
-        };
-
-        $arrayConvertible = new class {
-            /**
-             * @return array{type: string}
-             */
-            public function toArray(): array
-            {
-                return ['type' => 'array'];
-            }
-        };
+        $jsonSerializable = $this->createJsonSerializablePayload();
+        $arrayConvertible = $this->createArrayConvertiblePayload();
 
         $strategy = new CostHopsSignatureOrderingStrategy(18);
         $set = PathResultSet::fromEntries(
@@ -92,22 +78,8 @@ final class PathResultSetTest extends TestCase
 
     public function test_json_serialization_delegates_to_entries(): void
     {
-        $serializable = new class implements JsonSerializable {
-            public function jsonSerialize(): array
-            {
-                return ['type' => 'json'];
-            }
-        };
-
-        $arrayConvertible = new class {
-            /**
-             * @return array{type: string}
-             */
-            public function toArray(): array
-            {
-                return ['type' => 'array'];
-            }
-        };
+        $serializable = $this->createJsonSerializablePayload();
+        $arrayConvertible = $this->createArrayConvertiblePayload();
 
         $strategy = new CostHopsSignatureOrderingStrategy(18);
         $set = PathResultSet::fromEntries(
@@ -159,5 +131,28 @@ final class PathResultSetTest extends TestCase
 
         self::assertTrue($slice->isEmpty());
         self::assertSame([], $slice->toArray());
+    }
+
+    private function createJsonSerializablePayload(): JsonSerializable
+    {
+        return new class implements JsonSerializable {
+            public function jsonSerialize(): array
+            {
+                return ['type' => 'json'];
+            }
+        };
+    }
+
+    private function createArrayConvertiblePayload(): object
+    {
+        return new class {
+            /**
+             * @return array{type: string}
+             */
+            public function toArray(): array
+            {
+                return ['type' => 'array'];
+            }
+        };
     }
 }
