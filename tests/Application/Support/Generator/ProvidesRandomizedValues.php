@@ -40,13 +40,7 @@ trait ProvidesRandomizedValues
 
     private function powerOfTen(int $scale): int
     {
-        $value = 1;
-
-        for ($index = 0; $index < $scale; ++$index) {
-            $value *= 10;
-        }
-
-        return $value;
+        return (int) (10 ** $scale);
     }
 
     private function safeUnitsUpperBound(int $scale, int $maxFactor = 9): int
@@ -55,7 +49,7 @@ trait ProvidesRandomizedValues
         $factor = max(1, intdiv(PHP_INT_MAX - 1, $base));
         $factor = max(1, min($maxFactor, $factor));
 
-        return max(1, $base * $factor);
+        return $base * $factor;
     }
 
     private function formatUnits(int $units, int $scale): string
