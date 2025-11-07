@@ -30,13 +30,27 @@ final class SearchStateSignatureFormatter
 
             $parts = explode(':', $segment, 2);
 
-            if (2 !== count($parts)) {
+            if (2 === count($parts)) {
+                [$label, $segmentValue] = $parts;
+                $label = trim($label);
+                $segmentValue = trim($segmentValue);
+
+                if ('' === $label) {
+                    continue;
+                }
+
+                $segments[$label] = $segmentValue;
+
                 continue;
             }
 
-            [$label, $segmentValue] = $parts;
-            $label = trim($label);
-            $segments[$label] = trim($segmentValue);
+            $label = trim($parts[0]);
+
+            if ('' === $label) {
+                continue;
+            }
+
+            $segments[$label] = '';
         }
 
         return $segments;
