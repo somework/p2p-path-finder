@@ -6,7 +6,13 @@ namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use Random\Engine\Mt19937;
+use Random\Randomizer;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateSignature;
+use SomeWork\P2PPathFinder\Tests\Application\Support\Generator\SearchStateSignatureGenerator;
+
+use function explode;
+use function trim;
 
 final class SearchStateSignatureTest extends TestCase
 {
@@ -133,5 +139,36 @@ final class SearchStateSignatureTest extends TestCase
         self::assertSame(-1, $alpha->compare($beta));
         self::assertSame(1, $beta->compare($alpha));
         self::assertSame(0, $alpha->compare(SearchStateSignature::fromString('label:alpha')));
+    }
+
+    /**
+     * @return iterable<string, array{SearchStateSignature, array<string, string>}>
+     */
+    public static function provideGeneratedSignatures(): iterable
+    {
+        for ($seed = 0; $seed < 64; ++$seed) {
+            $generator = new SearchStateSignatureGenerator(new Randomizer(new Mt19937($seed)));
+            [$signature, $segments] = $generator->signature();
+
+            yield 'seed-'.$seed => [$signature, $segments];
+        }
+    }
+
+    /**
+     * @dataProvider provideGeneratedSignatures
+     *
+     * @param array<string, string> $segments
+     */
+    public function test_generated_signatures_round_trip(SearchStateSignature $signature, array $segments): void
+    {
+        $trimmed = SearchStateSignature::fromString('  '.$signature->value().'  ');
+
+        self::assertSame($signature->value(), $trimmed->value());
+        self::assertSame($signature->value(), SearchStateSignature::compose($segments)->value());
+
+        foreach (explode('|', $signature->value()) as $segment) {
+            self::assertNotSame('', trim($segment));
+            self::assertMatchesRegularExpression('/^[^:]+:.+$/', $segment);
+        }
     }
 }
