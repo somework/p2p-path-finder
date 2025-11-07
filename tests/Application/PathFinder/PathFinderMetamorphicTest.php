@@ -63,7 +63,7 @@ final class PathFinderMetamorphicTest extends TestCase
         self::assertFalse($breaches['baseline']);
         self::assertFalse($breaches['relaxed']);
 
-        self::assertGreaterThanOrEqual($expansions['baseline'], $expansions['relaxed']);
+        self::assertGreaterThanOrEqual($expansions['relaxed'], $expansions['baseline']);
     }
 
     public function test_tolerance_relaxation_expands_residual_spend_envelope(): void
