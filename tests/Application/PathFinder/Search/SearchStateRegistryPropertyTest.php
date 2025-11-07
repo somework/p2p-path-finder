@@ -10,7 +10,11 @@ use Random\Randomizer;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRecord;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRegistry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateSignature;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateSignatureFormatter;
 use SomeWork\P2PPathFinder\Tests\Application\Support\Generator\SearchStateRecordGenerator;
+
+use function json_encode;
+use function reset;
 
 /**
  * Property tests ensuring registry pruning maintains dominance invariants.
@@ -59,7 +63,21 @@ final class SearchStateRegistryPropertyTest extends TestCase
             }
 
             foreach ($recordsBySignature as $signatureValue => $records) {
-                self::assertArrayHasKey($signatureValue, $stored, 'Expected stored record for signature.');
+                $encodedSegments = '';
+                $firstRecord = reset($records);
+                if ($firstRecord instanceof SearchStateRecord) {
+                    $segments = SearchStateSignatureFormatter::format($firstRecord->signature());
+                    $json = json_encode($segments);
+                    if (false !== $json) {
+                        $encodedSegments = ' segments='.$json;
+                    }
+                }
+
+                self::assertArrayHasKey(
+                    $signatureValue,
+                    $stored,
+                    'Expected stored record for signature: '.$signatureValue.$encodedSegments,
+                );
                 $current = $stored[$signatureValue];
 
                 foreach ($records as $record) {

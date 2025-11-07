@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 use Random\Engine\Mt19937;
 use Random\Randomizer;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateSignature;
+use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateSignatureFormatter;
 use SomeWork\P2PPathFinder\Tests\Application\Support\Generator\SearchStateSignatureGenerator;
 
 use function explode;
@@ -141,6 +142,29 @@ final class SearchStateSignatureTest extends TestCase
         self::assertSame(0, $alpha->compare(SearchStateSignature::fromString('label:alpha')));
     }
 
+    public function test_formatter_produces_human_readable_map(): void
+    {
+        $signature = SearchStateSignature::fromString('range:USD:1.000:5.000:3|desired:EUR:2.500:3|signature:SRC>USD>EUR');
+
+        self::assertSame(
+            [
+                'range' => 'USD:1.000:5.000:3',
+                'desired' => 'EUR:2.500:3',
+                'signature' => 'SRC>USD>EUR',
+            ],
+            SearchStateSignatureFormatter::format($signature),
+        );
+
+        self::assertSame(
+            [
+                'range' => 'USD:1.000:5.000:3',
+                'desired' => 'EUR:2.500:3',
+                'signature' => 'SRC>USD>EUR',
+            ],
+            SearchStateSignatureFormatter::format($signature->value()),
+        );
+    }
+
     /**
      * @return iterable<string, array{SearchStateSignature, array<string, string>}>
      */
@@ -165,6 +189,12 @@ final class SearchStateSignatureTest extends TestCase
 
         self::assertSame($signature->value(), $trimmed->value());
         self::assertSame($signature->value(), SearchStateSignature::compose($segments)->value());
+        self::assertSame($segments, SearchStateSignatureFormatter::format($signature));
+        self::assertSame($segments, SearchStateSignatureFormatter::format($trimmed));
+        self::assertSame(
+            $signature->value(),
+            SearchStateSignature::compose(SearchStateSignatureFormatter::format($signature))->value(),
+        );
 
         foreach (explode('|', $signature->value()) as $segment) {
             self::assertNotSame('', trim($segment));
