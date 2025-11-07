@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathFinder\Search;
 
+use function count;
 use function explode;
 use function trim;
 
@@ -27,7 +28,13 @@ final class SearchStateSignatureFormatter
                 continue;
             }
 
-            [$label, $segmentValue] = explode(':', $segment, 2);
+            $parts = explode(':', $segment, 2);
+
+            if (2 !== count($parts)) {
+                continue;
+            }
+
+            [$label, $segmentValue] = $parts;
             $label = trim($label);
             $segments[$label] = trim($segmentValue);
         }
