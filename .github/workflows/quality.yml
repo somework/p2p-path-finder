@@ -100,3 +100,68 @@ jobs:
           --progress=plain
           --assert="mean(variant.time.avg) <= mean(baseline.time.avg) +/- 20%"
           --assert="mean(variant.mem.peak) <= mean(baseline.mem.peak) +/- 20%"
+
+  artefacts:
+    name: Docs & performance artefacts
+    runs-on: ubuntu-latest
+    needs:
+      - phpbench
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: xdebug
+          extensions: bcmath
+          ini-values: memory_limit=-1
+      - uses: ramsey/composer-install@v3
+        with:
+          composer-options: --prefer-dist --no-interaction --no-progress
+          custom-cache-suffix: ${{ hashFiles('composer.json') }}
+      - name: Generate API documentation
+        run: composer phpdoc
+      - name: Upload PHPDoc artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phpdoc-md
+          path: docs/api
+          if-no-files-found: error
+      - name: Prepare PhpBench artefact bundle
+        run: |
+          set -o pipefail
+          mkdir -p build/phpbench
+          cp -R .phpbench/storage build/phpbench/
+          php -d memory_limit=-1 -d xdebug.mode=off vendor/bin/phpbench run \
+            --config=phpbench.json \
+            --ref=baseline \
+            --progress=plain \
+            --report=p2p_aggregate \
+            --iterations=1 \
+            --revs=1 | tee build/phpbench/p2p_aggregate.txt
+      - name: Upload PhpBench artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phpbench-baseline
+          path: build/phpbench
+          if-no-files-found: error
+      - name: Generate hotspot profiling traces
+        run: |
+          rm -rf .xdebug
+          mkdir -p .xdebug
+          php -d xdebug.mode=profile \
+            -d xdebug.start_with_request=yes \
+            -d xdebug.output_dir=.xdebug \
+            vendor/bin/phpbench run \
+              --config=phpbench.json \
+              --report=p2p_aggregate \
+              --filter=benchFindBottleneckMandatoryMinima \
+              --iterations=1 \
+              --revs=1
+          mkdir -p build/profiling
+          find .xdebug -type f -name 'cachegrind.out.*' -exec cp {} build/profiling/ \;
+      - name: Upload profiling artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hotspot-profiles
+          path: build/profiling
+          if-no-files-found: error
