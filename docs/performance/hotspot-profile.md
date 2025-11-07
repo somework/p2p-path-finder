@@ -37,7 +37,9 @@ included alongside the materialisation and graph construction code paths.
 
 Percentages below are inclusive – a parent function's time can exceed 100% when child
 costs are counted multiple times – so the tables should be interpreted as “share of
-work attributable to this component” rather than a disjoint partition.
+work attributable to this component” rather than a disjoint partition. For the DTO
+stack allocation breakdown and guard-rail behaviour that complements these hotspot
+figures, see [dto-stack-allocation.md](./dto-stack-allocation.md).
 
 ## Results summary
 
