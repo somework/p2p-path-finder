@@ -63,7 +63,7 @@ final class PathFinderMetamorphicTest extends TestCase
         self::assertFalse($breaches['baseline']);
         self::assertFalse($breaches['relaxed']);
 
-        self::assertGreaterThanOrEqual($expansions['relaxed'], $expansions['baseline']);
+        self::assertGreaterThanOrEqual($expansions['baseline'], $expansions['relaxed']);
     }
 
     public function test_tolerance_relaxation_expands_residual_spend_envelope(): void
@@ -140,6 +140,10 @@ final class PathFinderMetamorphicTest extends TestCase
      */
     private function reduceMinimum(array $values): string
     {
+        if ([] === $values) {
+            $this->fail('Expected at least one value to determine the minimum.');
+        }
+
         $minimum = $values[0];
 
         foreach ($values as $value) {
@@ -156,6 +160,10 @@ final class PathFinderMetamorphicTest extends TestCase
      */
     private function reduceMaximum(array $values): string
     {
+        if ([] === $values) {
+            $this->fail('Expected at least one value to determine the maximum.');
+        }
+
         $maximum = $values[0];
 
         foreach ($values as $value) {
