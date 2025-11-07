@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Benchmarks;
 
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
+use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
 use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
@@ -30,6 +33,8 @@ use SomeWork\P2PPathFinder\Tests\Fixture\BottleneckOrderBookFactory;
 class PathFinderBench
 {
     private PathFinderService $service;
+
+    private GraphBuilder $graphBuilder;
 
     /**
      * @var array<string, Money>
@@ -61,13 +66,23 @@ class PathFinderBench
      */
     private array $bottleneckOrderBooks = [];
 
+    /**
+     * @var array<string, Graph>
+     */
+    private array $canonicalGraphs = [];
+
     public function setUp(): void
     {
-        $this->service = new PathFinderService(new GraphBuilder());
+        $this->graphBuilder = new GraphBuilder();
+        $this->service = new PathFinderService($this->graphBuilder);
         $this->baseOrders = $this->createBaseOrderSet();
         $this->bottleneckOrderBooks = [
             'create' => BottleneckOrderBookFactory::create(),
             'createHighFanOut' => BottleneckOrderBookFactory::createHighFanOut(),
+        ];
+        $this->canonicalGraphs = [
+            'create' => $this->graphBuilder->build($this->bottleneckOrderBooks['create']),
+            'createHighFanOut' => $this->graphBuilder->build($this->bottleneckOrderBooks['createHighFanOut']),
         ];
     }
 
@@ -87,6 +102,51 @@ class PathFinderBench
 
         $request = new PathSearchRequest($orderBook, $config, 'BTC');
         $this->service->findBestPaths($request);
+    }
+
+    /**
+     * @param array{
+     *     graph: non-empty-string,
+     *     source: non-empty-string,
+     *     target: non-empty-string,
+     *     spendCurrency: non-empty-string,
+     *     spendMin: numeric-string,
+     *     spendMax: numeric-string,
+     *     spendDesired: numeric-string,
+     *     maxHops: int,
+     *     resultLimit: int,
+     *     tolerance: numeric-string,
+     *     maxExpansions: int,
+     *     maxVisited: int,
+     *     timeBudget?: int|null,
+     * } $params
+     */
+    #[ParamProviders('provideTypedSearchStressScenarios')]
+    public function benchFindTypedSearchStress(array $params): void
+    {
+        $graph = $this->canonicalGraphs[$params['graph']];
+        $constraints = SpendConstraints::fromScalars(
+            $params['spendCurrency'],
+            $params['spendMin'],
+            $params['spendMax'],
+            $params['spendDesired'],
+        );
+
+        $pathFinder = new PathFinder(
+            maxHops: $params['maxHops'],
+            tolerance: $params['tolerance'],
+            topK: $params['resultLimit'],
+            maxExpansions: $params['maxExpansions'],
+            maxVisitedStates: $params['maxVisited'],
+            timeBudgetMs: $params['timeBudget'] ?? null,
+        );
+
+        $pathFinder->findBestPaths(
+            $graph,
+            $params['source'],
+            $params['target'],
+            $constraints,
+        );
     }
 
     /**
@@ -223,6 +283,58 @@ class PathFinderBench
             'maxHop' => 4,
             'resultLimit' => 5,
             'factory' => 'createHighFanOut',
+        ];
+    }
+
+    /**
+     * @return iterable<string, array{
+     *     graph: non-empty-string,
+     *     source: non-empty-string,
+     *     target: non-empty-string,
+     *     spendCurrency: non-empty-string,
+     *     spendMin: numeric-string,
+     *     spendMax: numeric-string,
+     *     spendDesired: numeric-string,
+     *     maxHops: int,
+     *     resultLimit: int,
+     *     tolerance: numeric-string,
+     *     maxExpansions: int,
+     *     maxVisited: int,
+     *     timeBudget?: int|null,
+     * }>
+     */
+    public function provideTypedSearchStressScenarios(): iterable
+    {
+        yield 'canonical-high-fanout-tight-range' => [
+            'graph' => 'createHighFanOut',
+            'source' => 'SRC',
+            'target' => 'DST',
+            'spendCurrency' => 'SRC',
+            'spendMin' => '250.000000',
+            'spendMax' => '251.500000',
+            'spendDesired' => '250.750000',
+            'maxHops' => 6,
+            'resultLimit' => 8,
+            'tolerance' => '0.000000',
+            'maxExpansions' => 400000,
+            'maxVisited' => 400000,
+            'timeBudget' => null,
+        ];
+
+        yield 'canonical-high-fanout-ultra-tight' => [
+            'graph' => 'createHighFanOut',
+            'source' => 'SRC',
+            'target' => 'DST',
+            'spendCurrency' => 'SRC',
+            'spendMin' => '250.100000',
+            'spendMax' => '250.600000',
+            'spendDesired' => '250.250000',
+            'maxHops' => 6,
+            'resultLimit' => 8,
+            'tolerance' => '0.000000',
+            'maxExpansions' => 400000,
+            'maxVisited' => 400000,
+            'timeBudget' => null,
         ];
     }
 
