@@ -33,7 +33,7 @@ vendor/bin/phpbench run \
 
 Baseline measurements were taken from the PhpBench run above executed against
 `ba12fff04cf4d427244b6ef7701f6c1e1f1b7a38`, while the "current" column reflects
-the same command on `HEAD` after the DTO stack refactor.【05c934†L1-L16】【1e19cd†L1-L16】
+the same command on `HEAD` after the DTO stack refactor.
 
 The high fan-out dataset benefits from the tighter DTO lifecycle, shaving
 ≈23 % from the steady-state runtime, while the hop-3 fixture regresses by about
@@ -47,7 +47,7 @@ refactor. Re-running the scenarios and inspecting the guard report confirms that
 no limits were tripped and that the search only performed a single expansion for
 both datasets. The guard budgets (`250 000` expansions / visited states, no time
 budget) therefore continue to provide ample headroom while keeping GC pressure
-predictable.【0cfc1e†L1-L9】
+predictable.
 
 Keep these limits in sync with any future fixture or DTO changes so that GC and
 allocation tracking reflects real-world guard behaviour.
