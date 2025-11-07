@@ -46,6 +46,26 @@
                     }
                 }
             ]
+        },
+        "p2p_typed_search_stress": {
+            "generator": "component",
+            "title": "Typed search pipeline stress scenarios",
+            "filter": "subject_name = 'benchFindTypedSearchStress'",
+            "components": [
+                {
+                    "component": "table_aggregate",
+                    "partition": [
+                        "variant_name"
+                    ],
+                    "row": {
+                        "set": "first(partition['variant_name'])",
+                        "mode": "mode(partition['result_time_avg']) as time",
+                        "mean": "mean(partition['result_time_avg']) as time",
+                        "rstdev": "rstdev(partition['result_time_avg'])",
+                        "mem_peak": "max(partition['result_mem_peak']) as memory"
+                    }
+                }
+            ]
         }
     }
 }
