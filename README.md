@@ -42,15 +42,18 @@ or swap in a different search algorithm) without leaking implementation details.
 
 The package intentionally keeps its entry points compact:
 
+* `PathSearchRequest` is the mandatory DTO passed to
+  `PathFinderService::findBestPaths()`. It normalises the target asset, derives spend
+  constraints and ensures callers supply all dependencies required to launch a search.
 * `PathFinderService` orchestrates filtering, graph construction and search. It is the
   primary façade exposed to consumers integrating the library into their own
   applications.【F:src/Application/Service/PathFinderService.php†L41-L165】
 * `PathSearchConfig` represents the declarative inputs accepted by the search engine. The
   builder surfaced via `PathSearchConfig::builder()` is part of the supported API and
   allows consumers to construct validated configurations fluently.【F:src/Application/Config/PathSearchConfig.php†L35-L266】
-* Result aggregates under `SomeWork\P2PPathFinder\Application\Result` (such as `PathResult`
-  and `PathLeg`) are designed to be consumed directly by callers processing search
-  outcomes.【F:src/Application/Result/PathResult.php†L17-L120】【F:src/Application/Result/PathLeg.php†L17-L80】
+* `SearchOutcome::paths()` returns a `PathResultSet`, an immutable collection that
+  provides iteration, slicing and `jsonSerialize()`/`toArray()` helpers so you can pipe the
+  results straight into response DTOs or JSON encoders.【F:src/Application/PathFinder/Result/SearchOutcome.php†L9-L71】【F:src/Application/PathFinder/Result/PathResultSet.php†L1-L205】
 
 Support services that exist only to back the façade&mdash;for example
 `OrderSpendAnalyzer`, `LegMaterializer` and `ToleranceEvaluator`&mdash;are marked with
@@ -80,80 +83,122 @@ notice.【F:src/Application/Service/OrderSpendAnalyzer.php†L17-L23】【F:src/
   visited states and elapsed milliseconds, and participates in the same metadata/exception
   pathways as the other guard knobs.【F:src/Application/Config/PathSearchConfigBuilder.php†L89-L129】【F:src/Application/PathFinder/PathFinder.php†L206-L407】【F:tests/Application/Service/PathFinder/PathFinderServiceGuardsTest.php†L235-L309】
 
+```php
+use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
+use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
+
+// Assume $pathFinderService, $orderBook and $spendMoney were injected by your framework.
+
+$config = PathSearchConfig::builder()
+    ->withSpendAmount($spendMoney)
+    ->withToleranceBounds('0.05', '0.10')
+    ->withHopLimits(1, 3)
+    ->build();
+
+$request = new PathSearchRequest($orderBook, $config, 'BTC');
+$outcome = $pathFinderService->findBestPaths($request);
+
+foreach ($outcome->paths() as $path) {
+    // $path is a PathResult implementing JsonSerializable.
+    $payload = $path->jsonSerialize();
+}
+
+$report = $outcome->guardLimits();
+if ($report->anyLimitReached()) {
+    // React to guard-rail breaches (expansion/visit limits or time budget).
+}
+
+$guardPayload = $report->jsonSerialize();
+```
+
 See [docs/guarded-search-example.md](docs/guarded-search-example.md) for a guided example
 that combines these invariants with guard-rail configuration and demonstrates the
 `PathFinderService::findBestPaths(new PathSearchRequest($orderBook, $config, 'BTC'))` invocation flow.
 
 ## Configuring a path search
 
-`PathSearchConfig` captures the parameters used during graph exploration. You can build it
-manually or use the fluent builder:
+`PathSearchConfig` captures the parameters used during graph exploration. Build the
+configuration fluently, wrap it in a `PathSearchRequest` and iterate the resulting
+`PathResultSet` and guard report:
 
 ```php
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
-use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
+use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+
+// Assume $pathFinderService and $orderBook were injected by your framework.
 
 $config = PathSearchConfig::builder()
     ->withSpendAmount(Money::fromString('USD', '100.00', 2))
-    ->withToleranceBounds('0.05', '0.10') // -5%/+10% relative tolerance window
-    ->withHopLimits(1, 3)             // allow between 1 and 3 conversions
+    ->withToleranceBounds('0.05', '0.10')
+    ->withHopLimits(1, 3)
+    ->withSearchGuards(10000, 25000) // visited states, expansions
+    ->withSearchTimeBudget(50)
     ->build();
+
+$request = new PathSearchRequest($orderBook, $config, 'BTC');
+$outcome = $pathFinderService->findBestPaths($request);
+
+$paths = [];
+foreach ($outcome->paths() as $result) {
+    // Each PathResult is JsonSerializable; store it as an array payload.
+    $paths[] = $result->jsonSerialize();
+}
+
+$guardReport = $outcome->guardLimits()->jsonSerialize();
+if ($guardReport['breached']['any']) {
+    // Decide how to surface guard-rail breaches to callers.
+}
 ```
 
 `withToleranceBounds()` accepts only numeric-string values. Providing a string keeps the
-original precision intact when it is passed to `PathFinder`:
+original precision intact when it is passed to `PathFinder`. Pair those boundaries with
+`withGuardLimitException()` when you want guard-limit breaches to throw instead of being
+reported through metadata.
 
-```php
-$config = PathSearchConfig::builder()
-    ->withSpendAmount(Money::fromString('USD', '100.00', 2))
-    ->withToleranceBounds('0.0', '0.999999999999999999')
-    ->withHopLimits(1, 3)
-    ->build();
-
-// `PathFinder` receives the tolerance as the exact string value.
-```
-
-You can also guard against runaway searches by configuring the optional search guard
-limits and wall-clock budget. These guardrails are applied directly to the underlying
-`PathFinder` instance:
-
-```php
-$config = PathSearchConfig::builder()
-    ->withSpendAmount(Money::fromString('USD', '100.00', 2))
-    ->withToleranceBounds('0.02', '0.10')
-    ->withHopLimits(1, 4)
-    ->withSearchGuards(10000, 25000) // visited states, expansions
-    ->withSearchTimeBudget(50) // optional 50ms wall-clock budget
-    ->build();
-
-// The search honours the configured guard thresholds.
-```
-
-Guard-limit breaches are reported via `SearchOutcome::guardLimits()` metadata by default.
-The returned `SearchGuardReport` exposes both boolean guard flags and the actual expansion,
-visited-state and elapsed-time counters for observability. Internally the engine
-normalises those counters through `SearchGuardReport::fromMetrics(...)`, which also powers
-the JSON payload emitted by `json_encode($report)`. The serialised structure is stable and
-includes both the configured limits and the counters that triggered the guard rails:
+`SearchOutcome::jsonSerialize()` returns the materialised paths alongside the serialized
+`SearchGuardReport`. The structure mirrors the guard terminology:
 
 ```json
 {
-  "limits": {
-    "expansions": 25000,
-    "visited_states": 10000,
-    "time_budget_ms": 50
-  },
-  "metrics": {
-    "expansions": 18342,
-    "visited_states": 9421,
-    "elapsed_ms": 47.8
-  },
-  "breached": {
-    "expansions": false,
-    "visited_states": false,
-    "time_budget": false,
-    "any": false
+  "paths": [
+    {
+      "totalSpent": {"currency": "USD", "amount": "100.00", "scale": 2},
+      "totalReceived": {"currency": "BTC", "amount": "0.00420000", "scale": 8},
+      "residualTolerance": "0.075000000000000000",
+      "feeBreakdown": {
+        "USD": {"currency": "USD", "amount": "0.75", "scale": 2}
+      },
+      "legs": [
+        {
+          "from": "USD",
+          "to": "BTC",
+          "spent": {"currency": "USD", "amount": "100.00", "scale": 2},
+          "received": {"currency": "BTC", "amount": "0.00420000", "scale": 8},
+          "fees": {}
+        }
+      ]
+    }
+  ],
+  "guards": {
+    "limits": {
+      "expansions": 25000,
+      "visited_states": 10000,
+      "time_budget_ms": 50
+    },
+    "metrics": {
+      "expansions": 874,
+      "visited_states": 1623,
+      "elapsed_ms": 12.4
+    },
+    "breached": {
+      "expansions": false,
+      "visited_states": false,
+      "time_budget": false,
+      "any": false
+    }
   }
 }
 ```
