@@ -50,7 +50,7 @@ final class SearchStateSignatureFormatter
                 continue;
             }
 
-            $segments[$label] = '';
+            continue;
         }
 
         return $segments;
