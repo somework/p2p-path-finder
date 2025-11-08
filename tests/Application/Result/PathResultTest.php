@@ -154,13 +154,20 @@ final class PathResultTest extends TestCase
             ]),
         );
 
-        $fees = $result->feeBreakdown()->toArray();
+        $fees = $result->feeBreakdown();
 
         $this->assertCount(2, $fees);
-        $this->assertSame('0.500', $fees['USD']->amount());
-        $this->assertSame(3, $fees['USD']->scale());
-        $this->assertSame('1.00', $fees['EUR']->amount());
-        $this->assertSame(2, $fees['EUR']->scale());
+
+        $usdFee = $fees->get('USD');
+        $eurFee = $fees->get('EUR');
+
+        self::assertNotNull($usdFee);
+        self::assertNotNull($eurFee);
+
+        $this->assertSame('0.500', $usdFee->amount());
+        $this->assertSame(3, $usdFee->scale());
+        $this->assertSame('1.00', $eurFee->amount());
+        $this->assertSame(2, $eurFee->scale());
 
         $this->assertSame([
             'feeBreakdown' => [

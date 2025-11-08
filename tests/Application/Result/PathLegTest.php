@@ -50,9 +50,12 @@ final class PathLegTest extends TestCase
             ], true),
         );
 
-        $fees = $leg->fees()->toArray();
-        $this->assertSame(['USD'], array_keys($fees));
-        $this->assertSame('1.50', $fees['USD']->amount());
+        $fees = $leg->fees();
+        $this->assertSame(['USD'], array_keys($fees->toArray()));
+
+        $usdFee = $fees->get('USD');
+        self::assertNotNull($usdFee);
+        $this->assertSame('1.50', $usdFee->amount());
     }
 
     public function test_zero_fee_entries_do_not_interrupt_later_fees(): void
@@ -69,10 +72,17 @@ final class PathLegTest extends TestCase
             ], true),
         );
 
-        $fees = $leg->fees()->toArray();
-        $this->assertSame(['EUR', 'USD'], array_keys($fees));
-        $this->assertSame('0.25', $fees['EUR']->amount());
-        $this->assertSame('0.75', $fees['USD']->amount());
+        $fees = $leg->fees();
+        $this->assertSame(['EUR', 'USD'], array_keys($fees->toArray()));
+
+        $eurFee = $fees->get('EUR');
+        $usdFee = $fees->get('USD');
+
+        self::assertNotNull($eurFee);
+        self::assertNotNull($usdFee);
+
+        $this->assertSame('0.25', $eurFee->amount());
+        $this->assertSame('0.75', $usdFee->amount());
     }
 
     public function test_empty_asset_symbol_throws_exception(): void
