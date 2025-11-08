@@ -134,7 +134,8 @@ final class PathFinderServiceEdgeCaseTest extends PathFinderServiceTestCase
         $result = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'DST'));
 
         self::assertTrue($result->hasPaths());
-        $path = $result->paths()->toArray()[0];
+        $path = $result->paths()->first();
+        self::assertNotNull($path);
         self::assertCount(PathFinderEdgeCaseFixtures::LONG_CHAIN_SEGMENTS, $path->legs());
         self::assertFalse($result->guardLimits()->anyLimitReached());
     }
