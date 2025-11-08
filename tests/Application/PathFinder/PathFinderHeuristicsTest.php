@@ -830,8 +830,8 @@ final class PathFinderHeuristicsTest extends TestCase
 
         $results = $results->toArray();
 
-        self::assertSame('MIDA', $results[0]->edges()[0]->to());
-        self::assertSame('MIDB', $results[1]->edges()[0]->to());
+        self::assertSame('MIDA', $results[0]->edges()->at(0)->to());
+        self::assertSame('MIDB', $results[1]->edges()->at(0)->to());
     }
 
     private function searchState(string $node, string $cost, string $product, int $hops): SearchState

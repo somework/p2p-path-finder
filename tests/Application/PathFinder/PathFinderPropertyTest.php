@@ -10,6 +10,7 @@ use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
@@ -63,14 +64,8 @@ final class PathFinderPropertyTest extends TestCase
                 'Repeated search invocations must share guard metadata.',
             );
 
-            $firstPaths = array_map(
-                static fn (CandidatePath $path): array => $path->toArray(),
-                $firstResult->paths()->toArray(),
-            );
-            $secondPaths = array_map(
-                static fn (CandidatePath $path): array => $path->toArray(),
-                $secondResult->paths()->toArray(),
-            );
+            $firstPaths = self::extractPaths($firstResult);
+            $secondPaths = self::extractPaths($secondResult);
 
             self::assertSame($firstPaths, $secondPaths, 'PathFinder search should be deterministic.');
 
@@ -103,10 +98,7 @@ final class PathFinderPropertyTest extends TestCase
                 $scenario['source'],
                 $scenario['target'],
             );
-            $permutedPaths = array_map(
-                static fn (CandidatePath $path): array => $path->toArray(),
-                $permutedOutcome->paths()->toArray(),
-            );
+            $permutedPaths = self::extractPaths($permutedOutcome);
 
             self::assertSame(
                 $firstPaths,
@@ -165,16 +157,23 @@ final class PathFinderPropertyTest extends TestCase
             }
 
             foreach ($scaledResult->paths() as $path) {
-                $range = $path['amountRange'];
-                $desired = $path['desiredAmount'];
-
-                if (null === $range || null === $desired) {
+                if (!$path instanceof CandidatePath) {
                     continue;
                 }
 
-                $scale = max($range['min']->scale(), $range['max']->scale(), $desired->scale());
-                $minimum = $range['min']->withScale($scale);
-                $maximum = $range['max']->withScale($scale);
+                $constraints = $path->range();
+                $desired = $constraints?->desired();
+
+                if (null === $constraints || null === $desired) {
+                    continue;
+                }
+
+                $minimum = $constraints->min();
+                $maximum = $constraints->max();
+
+                $scale = max($minimum->scale(), $maximum->scale(), $desired->scale());
+                $minimum = $minimum->withScale($scale);
+                $maximum = $maximum->withScale($scale);
                 $normalizedDesired = $desired->withScale($scale);
 
                 self::assertGreaterThanOrEqual(
@@ -206,14 +205,8 @@ final class PathFinderPropertyTest extends TestCase
             $first = $finder->findBestPaths($graph, $scenario['source'], $scenario['target']);
             $second = $finder->findBestPaths($graph, $scenario['source'], $scenario['target']);
 
-            $firstPaths = array_map(
-                static fn (CandidatePath $path): array => $path->toArray(),
-                $first->paths()->toArray(),
-            );
-            $secondPaths = array_map(
-                static fn (CandidatePath $path): array => $path->toArray(),
-                $second->paths()->toArray(),
-            );
+            $firstPaths = self::extractPaths($first);
+            $secondPaths = self::extractPaths($second);
 
             self::assertSame($firstPaths, $secondPaths);
             $this->assertGuardStatusEquals(
@@ -308,6 +301,17 @@ final class PathFinderPropertyTest extends TestCase
     private function routeSignature(CandidatePath $path): RouteSignature
     {
         return RouteSignature::fromPathEdgeSequence($path->edges());
+    }
+
+    /**
+     * @return list<array{cost: numeric-string, product: numeric-string, hops: int, edges: list<array{from: string, to: string, order: Order, rate: \SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}>, amountRange: array{min: \SomeWork\P2PPathFinder\Domain\ValueObject\Money, max: \SomeWork\P2PPathFinder\Domain\ValueObject\Money}|null, desiredAmount: \SomeWork\P2PPathFinder\Domain\ValueObject\Money|null}>
+     */
+    private static function extractPaths(SearchOutcome $outcome): array
+    {
+        return array_map(
+            static fn (CandidatePath $path): array => $path->toArray(),
+            $outcome->paths()->toArray(),
+        );
     }
 
     private function assertGuardStatusEquals(SearchGuardReport $expected, SearchGuardReport $actual, string $message): void
