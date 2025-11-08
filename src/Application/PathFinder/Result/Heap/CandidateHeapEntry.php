@@ -6,6 +6,9 @@ namespace SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap;
 
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 
+/**
+ * @internal
+ */
 final class CandidateHeapEntry
 {
     public function __construct(
