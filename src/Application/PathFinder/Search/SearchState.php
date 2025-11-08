@@ -15,6 +15,8 @@ use function is_string;
 
 /**
  * Immutable representation of a search frontier state.
+ *
+ * @internal
  */
 final class SearchState
 {

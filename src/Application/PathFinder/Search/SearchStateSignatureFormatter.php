@@ -10,6 +10,8 @@ use function trim;
 
 /**
  * Converts {@see SearchStateSignature} instances into associative maps for logging and debugging.
+ *
+ * @internal
  */
 final class SearchStateSignatureFormatter
 {

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathFinder\Search;
 
+/**
+ * @internal
+ */
 final class InsertionOrderCounter
 {
     /**

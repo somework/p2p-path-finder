@@ -15,6 +15,9 @@ use function in_array;
 use function sprintf;
 use function usort;
 
+/**
+ * @internal
+ */
 final class SegmentPruner
 {
     /**

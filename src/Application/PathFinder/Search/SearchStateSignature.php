@@ -13,6 +13,9 @@ use function strlen;
 use function strpos;
 use function trim;
 
+/**
+ * @internal
+ */
 final class SearchStateSignature
 {
     private const SEGMENT_DELIMITER = '|';

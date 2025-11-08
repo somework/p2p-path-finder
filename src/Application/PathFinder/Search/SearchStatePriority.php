@@ -8,6 +8,9 @@ use InvalidArgumentException;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
 
+/**
+ * @internal
+ */
 final class SearchStatePriority
 {
     /**
