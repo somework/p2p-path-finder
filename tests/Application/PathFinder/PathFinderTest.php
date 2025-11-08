@@ -42,6 +42,7 @@ use function array_slice;
 use function array_unique;
 use function count;
 use function in_array;
+use function sprintf;
 
 final class PathFinderTest extends TestCase
 {
@@ -1581,7 +1582,7 @@ final class PathFinderTest extends TestCase
 
         self::assertNotNull($result['desiredAmount']);
 
-        $edge = $graph['EUR']['edges'][0];
+        $edge = $this->edge($graph, 'EUR', 0);
         $convertMethod = new ReflectionMethod(PathFinder::class, 'convertEdgeAmount');
         $convertMethod->setAccessible(true);
         $expectedDesired = $convertMethod->invoke($finder, $edge, $maximum);
@@ -2455,6 +2456,25 @@ final class PathFinderTest extends TestCase
                 rateScale: 2,
             ),
         ];
+    }
+
+    /**
+     * @return list<GraphEdge>
+     */
+    private function edges(Graph $graph, string $currency): array
+    {
+        $node = $graph->node($currency);
+        self::assertNotNull($node, sprintf('Graph is missing node for currency "%s".', $currency));
+
+        return $node->edges()->toArray();
+    }
+
+    private function edge(Graph $graph, string $currency, int $index): GraphEdge
+    {
+        $edges = $this->edges($graph, $currency);
+        self::assertArrayHasKey($index, $edges);
+
+        return $edges[$index];
     }
 
     /**

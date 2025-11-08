@@ -7,10 +7,12 @@ namespace SomeWork\P2PPathFinder\Tests\Application\Service;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
+use SomeWork\P2PPathFinder\Application\Result\MoneyMap;
 use SomeWork\P2PPathFinder\Application\Service\LegMaterializer;
 use SomeWork\P2PPathFinder\Application\Service\OrderSpendAnalyzer;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
@@ -25,6 +27,8 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Tests\Fixture\FeePolicyFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
+use function sprintf;
+
 final class LegMaterializerTest extends TestCase
 {
     public function test_it_materializes_multi_leg_path(): void
@@ -36,8 +40,8 @@ final class LegMaterializerTest extends TestCase
 
         $graph = (new GraphBuilder())->build($orders);
         $edges = [
-            $graph['EUR']['edges'][0],
-            $graph['USD']['edges'][0],
+            $this->edge($graph, 'EUR', 0),
+            $this->edge($graph, 'USD', 0),
         ];
 
         $config = PathSearchConfig::builder()
@@ -108,8 +112,8 @@ final class LegMaterializerTest extends TestCase
 
         $graph = (new GraphBuilder())->build($orders);
         $edges = [
-            $graph['USD']['edges'][0],
-            $graph['AAA']['edges'][0],
+            $this->edge($graph, 'USD', 0),
+            $this->edge($graph, 'AAA', 0),
         ];
 
         $config = PathSearchConfig::builder()
@@ -147,7 +151,7 @@ final class LegMaterializerTest extends TestCase
         $legs = $materialized['legs'];
         self::assertCount(2, $legs);
 
-        $firstLeg = $legs[0];
+        $firstLeg = $legs->at(0);
         self::assertSame('USD', $firstLeg->from());
         self::assertSame('AAA', $firstLeg->to());
         self::assertSame('104.082', $firstLeg->spent()->amount());
@@ -156,10 +160,10 @@ final class LegMaterializerTest extends TestCase
         self::assertSame('AAA', $firstLeg->received()->currency());
         $firstFees = $firstLeg->fees();
         self::assertCount(2, $firstFees);
-        self::assertSame('5.102', $firstFees['AAA']->amount());
-        self::assertSame('2.041', $firstFees['USD']->amount());
+        self::assertSame('5.102', $this->fee($firstFees, 'AAA')->amount());
+        self::assertSame('2.041', $this->fee($firstFees, 'USD')->amount());
 
-        $secondLeg = $legs[1];
+        $secondLeg = $legs->at(1);
         self::assertSame('AAA', $secondLeg->from());
         self::assertSame('EUR', $secondLeg->to());
         self::assertSame('96.939', $secondLeg->spent()->amount());
@@ -168,8 +172,8 @@ final class LegMaterializerTest extends TestCase
         self::assertSame('EUR', $secondLeg->received()->currency());
         $secondFees = $secondLeg->fees();
         self::assertCount(2, $secondFees);
-        self::assertSame('2.823', $secondFees['AAA']->amount());
-        self::assertSame('2.823', $secondFees['EUR']->amount());
+        self::assertSame('2.823', $this->fee($secondFees, 'AAA')->amount());
+        self::assertSame('2.823', $this->fee($secondFees, 'EUR')->amount());
     }
 
     public function test_it_rejects_non_contiguous_edge_sequences(): void
@@ -190,12 +194,12 @@ final class LegMaterializerTest extends TestCase
         $materializer = new LegMaterializer();
         $analyzer = new OrderSpendAnalyzer(null, $materializer);
 
-        $initialSeed = $analyzer->determineInitialSpendAmount($config, $graph['EUR']['edges'][0]);
+        $initialSeed = $analyzer->determineInitialSpendAmount($config, $this->edge($graph, 'EUR', 0));
         self::assertNotNull($initialSeed);
 
         $misorderedEdges = [
-            $graph['USD']['edges'][0],
-            $graph['EUR']['edges'][0],
+            $this->edge($graph, 'USD', 0),
+            $this->edge($graph, 'EUR', 0),
         ];
 
         $this->expectException(InvalidInput::class);
@@ -217,7 +221,7 @@ final class LegMaterializerTest extends TestCase
         );
 
         $graph = (new GraphBuilder())->build([$order]);
-        $edge = $graph['USD']['edges'][0];
+        $edge = $this->edge($graph, 'USD', 0);
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '40.000', 3))
@@ -249,8 +253,8 @@ final class LegMaterializerTest extends TestCase
 
         $graph = (new GraphBuilder())->build($orders);
         $edges = [
-            $graph['EUR']['edges'][0],
-            $graph['USD']['edges'][0],
+            $this->edge($graph, 'EUR', 0),
+            $this->edge($graph, 'USD', 0),
         ];
 
         $config = PathSearchConfig::builder()
@@ -380,8 +384,8 @@ final class LegMaterializerTest extends TestCase
         $mapArray = $map->toArray();
 
         self::assertSame(['AAA', 'ZZZ'], array_keys($mapArray));
-        self::assertSame('0.750', $map['AAA']->amount());
-        self::assertSame('1.250', $map['ZZZ']->amount());
+        self::assertSame('0.750', $this->fee($map, 'AAA')->amount());
+        self::assertSame('1.250', $this->fee($map, 'ZZZ')->amount());
 
         $zeroFees = FeeBreakdown::of(Money::zero('AAA', 3), Money::zero('BBB', 3));
         $zeroMap = $method->invoke($materializer, $zeroFees);
@@ -431,7 +435,7 @@ final class LegMaterializerTest extends TestCase
         );
 
         $graph = (new GraphBuilder())->build([$order]);
-        $edge = $graph['USD']['edges'][0];
+        $edge = $this->edge($graph, 'USD', 0);
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '100.000', 3))
@@ -478,8 +482,8 @@ final class LegMaterializerTest extends TestCase
 
         $graph = (new GraphBuilder())->build($orders);
         $edges = [
-            $graph['EUR']['edges'][0],
-            $graph['USD']['edges'][0],
+            $this->edge($graph, 'EUR', 0),
+            $this->edge($graph, 'USD', 0),
         ];
 
         $config = PathSearchConfig::builder()
@@ -513,7 +517,7 @@ final class LegMaterializerTest extends TestCase
         );
 
         $graph = (new GraphBuilder())->build([$order]);
-        $edge = $graph['USD']['edges'][0];
+        $edge = $this->edge($graph, 'USD', 0);
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '80.000', 3))
@@ -611,8 +615,8 @@ final class LegMaterializerTest extends TestCase
 
         $graph = (new GraphBuilder())->build($orders);
         $edges = [
-            $graph['USD']['edges'][0],
-            $graph['EUR']['edges'][0],
+            $this->edge($graph, 'USD', 0),
+            $this->edge($graph, 'EUR', 0),
         ];
 
         $config = PathSearchConfig::builder()
@@ -632,11 +636,12 @@ final class LegMaterializerTest extends TestCase
         self::assertNotNull($materialized);
         self::assertSame('USD', $materialized['totalSpent']->currency());
         self::assertSame($materialized['totalSpent']->amount(), $materialized['toleranceSpent']->amount());
-        self::assertCount(2, $materialized['legs']);
-        self::assertSame('USD', $materialized['legs'][0]->spent()->currency());
-        self::assertSame('EUR', $materialized['legs'][0]->received()->currency());
-        self::assertSame('EUR', $materialized['legs'][1]->spent()->currency());
-        self::assertSame('JPY', $materialized['legs'][1]->received()->currency());
+        $legs = $materialized['legs'];
+        self::assertCount(2, $legs);
+        self::assertSame('USD', $legs->at(0)->spent()->currency());
+        self::assertSame('EUR', $legs->at(0)->received()->currency());
+        self::assertSame('EUR', $legs->at(1)->spent()->currency());
+        self::assertSame('JPY', $legs->at(1)->received()->currency());
     }
 
     public function test_reduce_budget_handles_currency_mismatch_and_zero_clamp(): void
@@ -679,7 +684,7 @@ final class LegMaterializerTest extends TestCase
         );
 
         $graph = (new GraphBuilder())->build([$order]);
-        $edge = $graph['USD']['edges'][0];
+        $edge = $this->edge($graph, 'USD', 0);
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '120.000', 3))
@@ -769,6 +774,33 @@ final class LegMaterializerTest extends TestCase
             ),
             $edges,
         ));
+    }
+
+    /**
+     * @return list<GraphEdge>
+     */
+    private function edges(Graph $graph, string $currency): array
+    {
+        $node = $graph->node($currency);
+        self::assertNotNull($node, sprintf('Graph is missing node for currency "%s".', $currency));
+
+        return $node->edges()->toArray();
+    }
+
+    private function edge(Graph $graph, string $currency, int $index): GraphEdge
+    {
+        $edges = $this->edges($graph, $currency);
+        self::assertArrayHasKey($index, $edges);
+
+        return $edges[$index];
+    }
+
+    private function fee(MoneyMap $fees, string $currency): Money
+    {
+        $fee = $fees->get($currency);
+        self::assertNotNull($fee, sprintf('Missing fee for currency "%s".', $currency));
+
+        return $fee;
     }
 
     private function createOrder(OrderSide $side, string $base, string $quote, string $min, string $max, string $rate, int $rateScale): Order

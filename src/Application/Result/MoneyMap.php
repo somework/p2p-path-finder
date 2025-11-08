@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Result;
 
-use ArrayAccess;
 use ArrayIterator;
 use Countable;
 use IteratorAggregate;
 use JsonSerializable;
-use SomeWork\P2PPathFinder\Application\Support\GuardsArrayAccessOffset;
 use SomeWork\P2PPathFinder\Application\Support\SerializesMoney;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
@@ -22,12 +20,10 @@ use function ksort;
 /**
  * Immutable map keyed by currency codes with {@see Money} entries.
  *
- * @implements ArrayAccess<string, Money>
  * @implements IteratorAggregate<string, Money>
  */
-final class MoneyMap implements ArrayAccess, Countable, IteratorAggregate, JsonSerializable
+final class MoneyMap implements Countable, IteratorAggregate, JsonSerializable
 {
-    use GuardsArrayAccessOffset;
     use SerializesMoney;
 
     /**
@@ -187,35 +183,8 @@ final class MoneyMap implements ArrayAccess, Countable, IteratorAggregate, JsonS
         return $serialized;
     }
 
-    public function offsetExists(mixed $offset): bool
+    public function has(string $currency): bool
     {
-        $normalized = $this->normalizeStringOffset($offset);
-
-        if (null === $normalized) {
-            return false;
-        }
-
-        return isset($this->values[$normalized]);
-    }
-
-    public function offsetGet(mixed $offset): Money
-    {
-        $normalized = $this->normalizeStringOffset($offset);
-
-        if (null === $normalized || !isset($this->values[$normalized])) {
-            throw new InvalidInput('Money map index must be a known currency code.');
-        }
-
-        return $this->values[$normalized];
-    }
-
-    public function offsetSet(mixed $offset, mixed $value): void
-    {
-        throw new InvalidInput('MoneyMap is immutable.');
-    }
-
-    public function offsetUnset(mixed $offset): void
-    {
-        throw new InvalidInput('MoneyMap is immutable.');
+        return isset($this->values[$currency]);
     }
 }

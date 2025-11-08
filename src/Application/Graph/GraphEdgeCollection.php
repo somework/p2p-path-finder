@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Graph;
 
-use ArrayAccess;
 use ArrayIterator;
 use Closure;
 use Countable;
 use IteratorAggregate;
 use JsonSerializable;
 use LogicException;
-use SomeWork\P2PPathFinder\Application\Support\GuardsArrayAccessOffset;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use Traversable;
 
@@ -22,13 +20,10 @@ use function implode;
 /**
  * Immutable ordered collection of {@see GraphEdge} instances for a single origin currency.
  *
- * @implements ArrayAccess<int, GraphEdge>
  * @implements IteratorAggregate<int, GraphEdge>
  */
-final class GraphEdgeCollection implements ArrayAccess, Countable, IteratorAggregate, JsonSerializable
+final class GraphEdgeCollection implements Countable, IteratorAggregate, JsonSerializable
 {
-    use GuardsArrayAccessOffset;
-
     /**
      * @var list<GraphEdge>
      */
@@ -137,36 +132,18 @@ final class GraphEdgeCollection implements ArrayAccess, Countable, IteratorAggre
         return new ArrayIterator($this->edges);
     }
 
-    public function offsetExists(mixed $offset): bool
+    public function at(int $index): GraphEdge
     {
-        $normalized = $this->normalizeIntegerOffset($offset);
-
-        if (null === $normalized) {
-            return false;
-        }
-
-        return isset($this->edges[$normalized]);
-    }
-
-    public function offsetGet(mixed $offset): GraphEdge
-    {
-        $normalized = $this->normalizeIntegerOffset($offset);
-
-        if (null === $normalized || !isset($this->edges[$normalized])) {
+        if (!isset($this->edges[$index])) {
             throw new InvalidInput('Graph edge index must reference an existing position.');
         }
 
-        return $this->edges[$normalized];
+        return $this->edges[$index];
     }
 
-    public function offsetSet(mixed $offset, mixed $value): void
+    public function first(): ?GraphEdge
     {
-        throw new InvalidInput('GraphEdgeCollection is immutable.');
-    }
-
-    public function offsetUnset(mixed $offset): void
-    {
-        throw new InvalidInput('GraphEdgeCollection is immutable.');
+        return $this->edges[0] ?? null;
     }
 
     /**

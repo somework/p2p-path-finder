@@ -4,25 +4,20 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Graph;
 
-use ArrayAccess;
 use IteratorAggregate;
 use JsonSerializable;
-use LogicException;
 use SomeWork\P2PPathFinder\Application\Support\SerializesMoney;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use Traversable;
 
-use function in_array;
-
 /**
  * Immutable representation of a directed edge in the trading graph.
  *
  * @implements IteratorAggregate<int, EdgeSegment>
- * @implements ArrayAccess<string, mixed>
  */
-final class GraphEdge implements IteratorAggregate, JsonSerializable, ArrayAccess
+final class GraphEdge implements IteratorAggregate, JsonSerializable
 {
     use SerializesMoney;
 
@@ -101,56 +96,6 @@ final class GraphEdge implements IteratorAggregate, JsonSerializable, ArrayAcces
     public function getIterator(): Traversable
     {
         return $this->segments->getIterator();
-    }
-
-    public function offsetExists(mixed $offset): bool
-    {
-        return in_array($offset, [
-            'from',
-            'to',
-            'orderSide',
-            'order',
-            'rate',
-            'baseCapacity',
-            'quoteCapacity',
-            'grossBaseCapacity',
-            'segments',
-        ], true);
-    }
-
-    public function offsetGet(mixed $offset): mixed
-    {
-        return match ($offset) {
-            'from' => $this->from,
-            'to' => $this->to,
-            'orderSide' => $this->orderSide,
-            'order' => $this->order,
-            'rate' => $this->rate,
-            'baseCapacity' => [
-                'min' => $this->baseCapacity->min(),
-                'max' => $this->baseCapacity->max(),
-            ],
-            'quoteCapacity' => [
-                'min' => $this->quoteCapacity->min(),
-                'max' => $this->quoteCapacity->max(),
-            ],
-            'grossBaseCapacity' => [
-                'min' => $this->grossBaseCapacity->min(),
-                'max' => $this->grossBaseCapacity->max(),
-            ],
-            'segments' => $this->segments->jsonSerialize(),
-            default => null,
-        };
-    }
-
-    public function offsetSet(mixed $offset, mixed $value): void
-    {
-        throw new LogicException('Graph edges are immutable.');
-    }
-
-    public function offsetUnset(mixed $offset): void
-    {
-        throw new LogicException('Graph edges are immutable.');
     }
 
     /**

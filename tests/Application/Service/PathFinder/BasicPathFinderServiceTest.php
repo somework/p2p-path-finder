@@ -138,15 +138,15 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $legs = $result->legs();
         self::assertCount(2, $legs);
-        self::assertSame('EUR', $legs[0]->from());
-        self::assertSame('GBP', $legs[0]->to());
-        self::assertSame('100.000', $legs[0]->spent()->amount());
-        self::assertSame('125.000', $legs[0]->received()->amount());
+        self::assertSame('EUR', $legs->at(0)->from());
+        self::assertSame('GBP', $legs->at(0)->to());
+        self::assertSame('100.000', $legs->at(0)->spent()->amount());
+        self::assertSame('125.000', $legs->at(0)->received()->amount());
 
-        self::assertSame('GBP', $legs[1]->from());
-        self::assertSame('USD', $legs[1]->to());
-        self::assertSame('125.000', $legs[1]->spent()->amount());
-        self::assertSame('150.000', $legs[1]->received()->amount());
+        self::assertSame('GBP', $legs->at(1)->from());
+        self::assertSame('USD', $legs->at(1)->to());
+        self::assertSame('125.000', $legs->at(1)->spent()->amount());
+        self::assertSame('150.000', $legs->at(1)->received()->amount());
     }
 
     /**
@@ -176,15 +176,15 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         $legs = $result->legs();
         self::assertCount(2, $legs);
 
-        self::assertSame('EUR', $legs[0]->from());
-        self::assertSame('GBP', $legs[0]->to());
-        self::assertSame('100.000', $legs[0]->spent()->amount());
-        self::assertSame('142.900', $legs[0]->received()->amount());
+        self::assertSame('EUR', $legs->at(0)->from());
+        self::assertSame('GBP', $legs->at(0)->to());
+        self::assertSame('100.000', $legs->at(0)->spent()->amount());
+        self::assertSame('142.900', $legs->at(0)->received()->amount());
 
-        self::assertSame('GBP', $legs[1]->from());
-        self::assertSame('USD', $legs[1]->to());
-        self::assertSame('142.900', $legs[1]->spent()->amount());
-        self::assertSame('178.625', $legs[1]->received()->amount());
+        self::assertSame('GBP', $legs->at(1)->from());
+        self::assertSame('USD', $legs->at(1)->to());
+        self::assertSame('142.900', $legs->at(1)->spent()->amount());
+        self::assertSame('178.625', $legs->at(1)->received()->amount());
     }
 
     public function test_it_returns_multiple_paths_ordered_by_cost(): void
@@ -216,15 +216,15 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $firstLegs = $first->legs();
         self::assertCount(1, $firstLegs);
-        self::assertSame('EUR', $firstLegs[0]->from());
-        self::assertSame('USD', $firstLegs[0]->to());
+        self::assertSame('EUR', $firstLegs->at(0)->from());
+        self::assertSame('USD', $firstLegs->at(0)->to());
 
         $secondLegs = $second->legs();
         self::assertCount(2, $secondLegs);
-        self::assertSame('EUR', $secondLegs[0]->from());
-        self::assertSame('GBP', $secondLegs[0]->to());
-        self::assertSame('GBP', $secondLegs[1]->from());
-        self::assertSame('USD', $secondLegs[1]->to());
+        self::assertSame('EUR', $secondLegs->at(0)->from());
+        self::assertSame('GBP', $secondLegs->at(0)->to());
+        self::assertSame('GBP', $secondLegs->at(1)->from());
+        self::assertSame('USD', $secondLegs->at(1)->to());
     }
 
     public function test_it_preserves_result_insertion_order_when_costs_are_identical(): void
@@ -302,10 +302,10 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $legs = $best->legs();
         self::assertCount(2, $legs);
-        self::assertSame('EUR', $legs[0]->from());
-        self::assertSame('GBP', $legs[0]->to());
-        self::assertSame('GBP', $legs[1]->from());
-        self::assertSame('USD', $legs[1]->to());
+        self::assertSame('EUR', $legs->at(0)->from());
+        self::assertSame('GBP', $legs->at(0)->to());
+        self::assertSame('GBP', $legs->at(1)->from());
+        self::assertSame('USD', $legs->at(1)->to());
 
         foreach ($results as $result) {
             self::assertGreaterThanOrEqual(2, count($result->legs()));
@@ -566,8 +566,11 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         $top = $paths[0];
 
         self::assertSame($top->totalReceived()->amount(), $first->totalReceived()->amount());
-        self::assertSame($top->legs()[0]->to(), $first->legs()[0]->to());
-        self::assertCount(count($top->legs()), $first->legs());
+        $topFirstLeg = $top->legs()->at(0);
+        $firstFirstLeg = $first->legs()->at(0);
+
+        self::assertSame($topFirstLeg->to(), $firstFirstLeg->to());
+        self::assertCount($top->legs()->count(), $first->legs());
     }
 
     private function scenarioEuroToUsdToJpyBridge(): OrderBook

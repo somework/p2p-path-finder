@@ -8,6 +8,7 @@ use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
+use SomeWork\P2PPathFinder\Application\Result\MoneyMap;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Service\LegMaterializer;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
@@ -53,12 +54,11 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
         $legs = $result->legs();
         self::assertCount(2, $legs);
 
-        self::assertSame('112.233', $legs[0]->received()->amount());
-        $firstLegFees = $legs[0]->fees();
-        self::assertArrayHasKey('EUR', $firstLegFees);
-        self::assertSame('1.010', $firstLegFees['EUR']->amount());
+        self::assertSame('112.233', $legs->at(0)->received()->amount());
+        $firstLegFees = $legs->at(0)->fees();
+        self::assertSame('1.010', $this->fee($firstLegFees, 'EUR')->amount());
 
-        $grossFirstLegSpend = $legs[0]->spent();
+        $grossFirstLegSpend = $legs->at(0)->spent();
         $this->assertGrossWithinTolerance(
             $config->spendAmount(),
             $grossFirstLegSpend,
@@ -66,21 +66,18 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
             'Gross spend mismatch of %s exceeds tolerance.',
         );
 
-        self::assertSame('112.233', $legs[1]->spent()->amount());
-        self::assertSame('16498.251', $legs[1]->received()->amount());
-        $secondLegFees = $legs[1]->fees();
-        self::assertArrayHasKey('JPY', $secondLegFees);
-        self::assertSame('336.699', $secondLegFees['JPY']->amount());
+        self::assertSame('112.233', $legs->at(1)->spent()->amount());
+        self::assertSame('16498.251', $legs->at(1)->received()->amount());
+        $secondLegFees = $legs->at(1)->fees();
+        self::assertSame('336.699', $this->fee($secondLegFees, 'JPY')->amount());
 
         $rawWithoutFee = Money::fromString('JPY', '16834.950', 3);
-        self::assertTrue($legs[1]->received()->lessThan($rawWithoutFee));
+        self::assertTrue($legs->at(1)->received()->lessThan($rawWithoutFee));
 
         $feeBreakdown = $result->feeBreakdown();
         self::assertCount(2, $feeBreakdown);
-        self::assertArrayHasKey('EUR', $feeBreakdown);
-        self::assertArrayHasKey('JPY', $feeBreakdown);
-        self::assertSame('1.010', $feeBreakdown['EUR']->amount());
-        self::assertSame('336.699', $feeBreakdown['JPY']->amount());
+        self::assertSame('1.010', $this->fee($feeBreakdown, 'EUR')->amount());
+        self::assertSame('336.699', $this->fee($feeBreakdown, 'JPY')->amount());
 
         self::assertTrue($result->totalReceived()->lessThan($rawWithoutFee));
     }
@@ -109,16 +106,17 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
 
         $legs = $result->legs();
         self::assertCount(1, $legs);
-
-        $leg = $legs[0];
+        $leg = $legs->at(0);
         self::assertSame('USD', $leg->from());
         self::assertSame('BTC', $leg->to());
         self::assertSame('2.000', $leg->spent()->amount());
         self::assertSame('0.900', $leg->received()->amount());
 
         $fees = $leg->fees();
-        self::assertArrayHasKey('BTC', $fees);
-        self::assertSame('0.100', $fees['BTC']->amount());
+        self::assertTrue($fees->has('BTC'));
+        $btcFee = $fees->get('BTC');
+        self::assertNotNull($btcFee);
+        self::assertSame('0.100', $btcFee->amount());
     }
 
     /**
@@ -145,20 +143,18 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
 
         self::assertSame('EUR', $result->totalSpent()->currency());
         self::assertSame(
-            $legs[0]->spent()->withScale($result->totalSpent()->scale())->amount(),
+            $legs->at(0)->spent()->withScale($result->totalSpent()->scale())->amount(),
             $result->totalSpent()->amount(),
         );
         self::assertSame('0.020000000000000000', $result->residualTolerance()->ratio());
 
-        self::assertSame('102.000', $legs[0]->spent()->amount());
+        self::assertSame('102.000', $legs->at(0)->spent()->amount());
 
-        $fees = $legs[0]->fees();
-        self::assertArrayHasKey('EUR', $fees);
-        self::assertSame('2.000', $fees['EUR']->amount());
+        $fees = $legs->at(0)->fees();
+        self::assertSame('2.000', $this->fee($fees, 'EUR')->amount());
 
         $feeBreakdown = $result->feeBreakdown();
-        self::assertArrayHasKey('EUR', $feeBreakdown);
-        self::assertSame('2.000', $feeBreakdown['EUR']->amount());
+        self::assertSame('2.000', $this->fee($feeBreakdown, 'EUR')->amount());
     }
 
     /**
@@ -187,24 +183,19 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
 
         $legs = $result->legs();
         self::assertCount(1, $legs);
-
-        $leg = $legs[0];
+        $leg = $legs->at(0);
         self::assertSame('EUR', $leg->from());
         self::assertSame('USD', $leg->to());
         self::assertSame('102.000', $leg->spent()->amount());
         self::assertSame('114.000', $leg->received()->amount());
 
         $fees = $leg->fees();
-        self::assertArrayHasKey('EUR', $fees);
-        self::assertArrayHasKey('USD', $fees);
-        self::assertSame('2.000', $fees['EUR']->amount());
-        self::assertSame('6.000', $fees['USD']->amount());
+        self::assertSame('2.000', $this->fee($fees, 'EUR')->amount());
+        self::assertSame('6.000', $this->fee($fees, 'USD')->amount());
 
         $feeBreakdown = $result->feeBreakdown();
-        self::assertArrayHasKey('EUR', $feeBreakdown);
-        self::assertArrayHasKey('USD', $feeBreakdown);
-        self::assertSame('2.000', $feeBreakdown['EUR']->amount());
-        self::assertSame('6.000', $feeBreakdown['USD']->amount());
+        self::assertSame('2.000', $this->fee($feeBreakdown, 'EUR')->amount());
+        self::assertSame('6.000', $this->fee($feeBreakdown, 'USD')->amount());
     }
 
     /**
@@ -235,34 +226,30 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
         $legs = $result->legs();
         self::assertCount(2, $legs);
 
-        self::assertSame('EUR', $legs[0]->from());
-        self::assertSame('USD', $legs[0]->to());
-        self::assertSame('100.000', $legs[0]->spent()->amount());
-        self::assertSame('104.500', $legs[0]->received()->amount());
-        $firstLegFees = $legs[0]->fees();
-        self::assertArrayHasKey('USD', $firstLegFees);
-        self::assertSame('5.500', $firstLegFees['USD']->amount());
+        self::assertSame('EUR', $legs->at(0)->from());
+        self::assertSame('USD', $legs->at(0)->to());
+        self::assertSame('100.000', $legs->at(0)->spent()->amount());
+        self::assertSame('104.500', $legs->at(0)->received()->amount());
+        $firstLegFees = $legs->at(0)->fees();
+        self::assertSame('5.500', $this->fee($firstLegFees, 'USD')->amount());
 
-        self::assertSame('USD', $legs[1]->from());
-        self::assertSame('JPY', $legs[1]->to());
-        self::assertSame('104.500', $legs[1]->spent()->amount());
-        self::assertSame('15361.500', $legs[1]->received()->amount());
-        $secondLegFees = $legs[1]->fees();
-        self::assertArrayHasKey('JPY', $secondLegFees);
-        self::assertSame('313.500', $secondLegFees['JPY']->amount());
+        self::assertSame('USD', $legs->at(1)->from());
+        self::assertSame('JPY', $legs->at(1)->to());
+        self::assertSame('104.500', $legs->at(1)->spent()->amount());
+        self::assertSame('15361.500', $legs->at(1)->received()->amount());
+        $secondLegFees = $legs->at(1)->fees();
+        self::assertSame('313.500', $this->fee($secondLegFees, 'JPY')->amount());
 
         $rawUsdWithoutFee = Money::fromString('USD', '110.000', 3);
         $rawJpyWithoutFee = Money::fromString('JPY', '15675.000', 3);
 
-        self::assertTrue($legs[0]->received()->lessThan($rawUsdWithoutFee));
-        self::assertTrue($legs[1]->received()->lessThan($rawJpyWithoutFee));
+        self::assertTrue($legs->at(0)->received()->lessThan($rawUsdWithoutFee));
+        self::assertTrue($legs->at(1)->received()->lessThan($rawJpyWithoutFee));
         self::assertTrue($result->totalReceived()->lessThan($rawJpyWithoutFee));
 
         $feeBreakdown = $result->feeBreakdown();
-        self::assertArrayHasKey('USD', $feeBreakdown);
-        self::assertArrayHasKey('JPY', $feeBreakdown);
-        self::assertSame('5.500', $feeBreakdown['USD']->amount());
-        self::assertSame('313.500', $feeBreakdown['JPY']->amount());
+        self::assertSame('5.500', $this->fee($feeBreakdown, 'USD')->amount());
+        self::assertSame('313.500', $this->fee($feeBreakdown, 'JPY')->amount());
     }
 
     /**
@@ -286,16 +273,15 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
 
         $legs = $result->legs();
         self::assertCount(2, $legs);
-
-        $firstLeg = $legs[0];
-        $secondLeg = $legs[1];
+        $firstLeg = $legs->at(0);
+        $secondLeg = $legs->at(1);
 
         $maxSpend = $config->maximumSpendAmount()->withScale($firstLeg->spent()->scale());
         self::assertFalse($firstLeg->spent()->greaterThan($maxSpend));
         self::assertFalse($secondLeg->spent()->greaterThan($firstLeg->received()));
 
-        self::assertArrayHasKey('EUR', $firstLeg->fees());
-        self::assertArrayHasKey('USD', $secondLeg->fees());
+        $this->fee($firstLeg->fees(), 'EUR');
+        $this->fee($secondLeg->fees(), 'USD');
 
         $totalSpent = $result->totalSpent();
         self::assertSame($firstLeg->spent()->currency(), $totalSpent->currency());
@@ -330,11 +316,10 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
 
         $legs = $result->legs();
         self::assertCount(1, $legs);
-        self::assertSame('USD', $legs[0]->to());
-        self::assertSame('118.800', $legs[0]->received()->amount());
-        $fees = $legs[0]->fees();
-        self::assertArrayHasKey('USD', $fees);
-        self::assertSame('1.200', $fees['USD']->amount());
+        self::assertSame('USD', $legs->at(0)->to());
+        self::assertSame('118.800', $legs->at(0)->received()->amount());
+        $fees = $legs->at(0)->fees();
+        self::assertSame('1.200', $this->fee($fees, 'USD')->amount());
     }
 
     /**
@@ -358,8 +343,7 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
 
         $legs = $result->legs();
         self::assertCount(1, $legs);
-
-        $leg = $legs[0];
+        $leg = $legs->at(0);
         self::assertSame('EUR', $leg->from());
         self::assertSame('USD', $leg->to());
         self::assertCount(0, $leg->fees());
@@ -409,7 +393,8 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
         $legs = $result->legs();
         self::assertCount(2, $legs);
 
-        [$firstLeg, $secondLeg] = $legs;
+        $firstLeg = $legs->at(0);
+        $secondLeg = $legs->at(1);
 
         $comparisonScale = max($firstLeg->received()->scale(), $secondLeg->spent()->scale());
         $firstLegReceived = $firstLeg->received()->withScale($comparisonScale);
@@ -432,9 +417,8 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
         );
 
         $fees = $secondLeg->fees();
-        self::assertArrayHasKey('USD', $fees);
 
-        $quoteFee = $fees['USD'];
+        $quoteFee = $this->fee($fees, 'USD');
         self::assertTrue($quoteFee->greaterThan(Money::zero('USD', $quoteFee->scale())));
 
         $rawQuote = $secondLeg->spent()->subtract($quoteFee, max($secondLeg->spent()->scale(), $quoteFee->scale()));
@@ -488,10 +472,10 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
 
         $legs = $result->legs();
         self::assertCount(2, $legs);
-        self::assertSame('USD', $legs[0]->to());
-        self::assertSame('118.800', $legs[0]->received()->amount());
-        self::assertSame('JPY', $legs[1]->to());
-        self::assertSame('16632.000', $legs[1]->received()->amount());
+        self::assertSame('USD', $legs->at(0)->to());
+        self::assertSame('118.800', $legs->at(0)->received()->amount());
+        self::assertSame('JPY', $legs->at(1)->to());
+        self::assertSame('16632.000', $legs->at(1)->received()->amount());
     }
 
     public function test_it_refines_sell_legs_until_effective_quote_matches(): void
@@ -529,6 +513,14 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
         $guardLimits = self::extractGuardLimits($searchResult);
         self::assertFalse($guardLimits->expansionsReached());
         self::assertFalse($guardLimits->visitedStatesReached());
+    }
+
+    private function fee(MoneyMap $fees, string $currency): Money
+    {
+        $fee = $fees->get($currency);
+        self::assertNotNull($fee, sprintf('Missing fee for currency "%s".', $currency));
+
+        return $fee;
     }
 
     private function scenarioEurToJpyBridgeWithLegFees(): OrderBook

@@ -4,23 +4,17 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Graph;
 
-use ArrayAccess;
 use IteratorAggregate;
 use JsonSerializable;
-use LogicException;
-use SomeWork\P2PPathFinder\Application\Support\GuardsArrayAccessOffset;
 use Traversable;
 
 /**
  * Directed multigraph representation keyed by asset symbol.
  *
  * @implements IteratorAggregate<string, GraphNode>
- * @implements ArrayAccess<string, GraphNode>
  */
-final class Graph implements IteratorAggregate, JsonSerializable, ArrayAccess
+final class Graph implements IteratorAggregate, JsonSerializable
 {
-    use GuardsArrayAccessOffset;
-
     private readonly GraphNodeCollection $nodes;
 
     /**
@@ -51,38 +45,6 @@ final class Graph implements IteratorAggregate, JsonSerializable, ArrayAccess
     public function getIterator(): Traversable
     {
         return $this->nodes->getIterator();
-    }
-
-    public function offsetExists(mixed $offset): bool
-    {
-        $normalized = $this->normalizeStringOffset($offset);
-
-        if (null === $normalized) {
-            return false;
-        }
-
-        return $this->nodes->has($normalized);
-    }
-
-    public function offsetGet(mixed $offset): ?GraphNode
-    {
-        $normalized = $this->normalizeStringOffset($offset);
-
-        if (null === $normalized) {
-            return null;
-        }
-
-        return $this->nodes->get($normalized);
-    }
-
-    public function offsetSet(mixed $offset, mixed $value): void
-    {
-        throw new LogicException('Graph is immutable.');
-    }
-
-    public function offsetUnset(mixed $offset): void
-    {
-        throw new LogicException('Graph is immutable.');
     }
 
     /**

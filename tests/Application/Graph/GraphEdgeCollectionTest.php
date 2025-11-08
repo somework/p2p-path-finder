@@ -28,7 +28,7 @@ final class GraphEdgeCollectionTest extends TestCase
         self::assertNull($collection->originCurrency());
     }
 
-    public function test_offset_get_rejects_non_integer_offsets(): void
+    public function test_at_rejects_out_of_bounds_index(): void
     {
         $edge = $this->createEdge();
         $collection = GraphEdgeCollection::fromArray([$edge]);
@@ -36,18 +36,15 @@ final class GraphEdgeCollectionTest extends TestCase
         $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Graph edge index must reference an existing position.');
 
-        $collection['invalid'];
+        $collection->at(1);
     }
 
-    public function test_offset_get_rejects_out_of_bounds_index(): void
+    public function test_first_returns_first_edge(): void
     {
         $edge = $this->createEdge();
         $collection = GraphEdgeCollection::fromArray([$edge]);
 
-        $this->expectException(InvalidInput::class);
-        $this->expectExceptionMessage('Graph edge index must reference an existing position.');
-
-        $collection[1];
+        self::assertSame($edge, $collection->first());
     }
 
     public function test_from_array_sorts_edges_using_canonical_order(): void

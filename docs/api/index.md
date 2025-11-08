@@ -1601,9 +1601,6 @@ configured protections.
 
 Returns: SearchOutcome&lt;PathResult&gt;
 
-## SomeWork\P2PPathFinder\Application\Support\GuardsArrayAccessOffset
-Helper methods for normalizing array access offsets to primitive types.
-
 ## SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator
 Helper responsible for evaluating fills while accounting for order fees.
 

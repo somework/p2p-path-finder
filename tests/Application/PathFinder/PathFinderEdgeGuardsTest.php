@@ -16,6 +16,8 @@ use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
+use function sprintf;
+
 final class PathFinderEdgeGuardsTest extends TestCase
 {
     public function test_it_ignores_edges_with_non_positive_conversion_rate(): void
@@ -31,7 +33,7 @@ final class PathFinderEdgeGuardsTest extends TestCase
         );
 
         $graph = (new GraphBuilder())->build([$order]);
-        $edge = $graph['EUR']['edges'][0];
+        $edge = $this->edge($graph, 'EUR', 0);
 
         $mutatedEdge = new GraphEdge(
             $edge->from(),
@@ -355,5 +357,13 @@ final class PathFinderEdgeGuardsTest extends TestCase
             ['0.500000000000000000'],
             $costs,
         );
+    }
+
+    private function edge(Graph $graph, string $currency, int $index): GraphEdge
+    {
+        $node = $graph->node($currency);
+        self::assertNotNull($node, sprintf('Graph is missing node for currency "%s".', $currency));
+
+        return $node->edges()->at($index);
     }
 }

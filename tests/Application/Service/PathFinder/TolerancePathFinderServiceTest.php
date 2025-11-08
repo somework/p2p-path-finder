@@ -62,7 +62,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
 
         $legs = $result->legs();
         self::assertCount(1, $legs);
-        $leg = $legs[0];
+        $leg = $legs->at(0);
         self::assertSame('EUR', $leg->from());
         self::assertSame('USD', $leg->to());
         self::assertSame('102.000', $leg->spent()->withScale(3)->amount());
@@ -89,7 +89,7 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
 
         $legs = $result->legs();
         self::assertCount(1, $legs);
-        $leg = $legs[0];
+        $leg = $legs->at(0);
 
         $maximumSpend = $config->maximumSpendAmount()->withScale(3);
         self::assertSame($maximumSpend->amount(), $leg->spent()->withScale(3)->amount());
@@ -97,8 +97,9 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('116.572', $leg->received()->withScale(3)->amount());
 
         $legFees = $leg->fees();
-        self::assertArrayHasKey('EUR', $legFees);
-        self::assertSame('4.857', $legFees['EUR']->withScale(3)->amount());
+        $eurFee = $legFees->get('EUR');
+        self::assertNotNull($eurFee, 'Missing EUR fee.');
+        self::assertSame('4.857', $eurFee->withScale(3)->amount());
 
         self::assertSame($maximumSpend->amount(), $result->totalSpent()->withScale(3)->amount());
         self::assertSame(
