@@ -11,6 +11,8 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 /**
  * Helper responsible for evaluating fills while accounting for order fees.
+ *
+ * @internal
  */
 final class OrderFillEvaluator
 {
