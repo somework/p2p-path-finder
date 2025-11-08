@@ -5,65 +5,131 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Docs;
 
 use PHPUnit\Framework\TestCase;
-use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
-use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
-use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
-use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
-use SomeWork\P2PPathFinder\Domain\Order\Order;
-use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
-use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
-use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
+use RuntimeException;
+
+use function error_get_last;
+use function file_put_contents;
+use function ini_get;
+use function sprintf;
+
+use const PHP_EOL;
 
 /**
  * @coversNothing
  */
 final class GuardedSearchExampleTest extends TestCase
 {
+    private const DOCUMENTATION_PATH = __DIR__.'/../../docs/guarded-search-example.md';
+
     public function test_documentation_example_produces_route(): void
     {
-        $orderBook = new OrderBook([
-            new Order(
-                OrderSide::SELL,
-                AssetPair::fromString('USD', 'USDT'),
-                OrderBounds::from(
-                    Money::fromString('USD', '10.00', 2),
-                    Money::fromString('USD', '2500.00', 2),
-                ),
-                ExchangeRate::fromString('USD', 'USDT', '1.0001', 6),
-            ),
-            new Order(
-                OrderSide::SELL,
-                AssetPair::fromString('USDT', 'BTC'),
-                OrderBounds::from(
-                    Money::fromString('USDT', '100.00', 2),
-                    Money::fromString('USDT', '10000.00', 2),
-                ),
-                ExchangeRate::fromString('USDT', 'BTC', '0.000031', 8),
-            ),
-        ]);
+        $script = $this->createScriptFromDocumentation();
 
-        $config = PathSearchConfig::builder()
-            ->withSpendAmount(Money::fromString('USD', '100.00', 2))
-            ->withToleranceBounds('0.01', '0.05')
-            ->withHopLimits(1, 3)
-            ->withSearchGuards(20000, 50000)
-            ->build();
+        $output = $this->executeDocumentationScript($script);
 
-        $service = new PathFinderService(new GraphBuilder());
-        $request = new PathSearchRequest($orderBook, $config, 'BTC');
-        $result = $service->findBestPaths($request);
+        self::assertMatchesRegularExpression(
+            '/Found path with residual tolerance [0-9.]+% and \d+ segments/i',
+            $output,
+            'Guarded search walkthrough should discover at least one path.',
+        );
 
-        self::assertFalse($result->guardLimits()->anyLimitReached(), 'Guard limits should not be triggered for the example input.');
+        self::assertStringContainsString(
+            'Explored ',
+            $output,
+            'Guard metrics report should be printed by the walkthrough.',
+        );
+    }
 
-        $paths = $result->paths()->toArray();
-        self::assertNotEmpty($paths, 'Example should yield at least one conversion path.');
+    private function createScriptFromDocumentation(): string
+    {
+        $contents = file_get_contents(self::DOCUMENTATION_PATH);
 
-        $firstPath = $paths[0];
-        self::assertSame('USD', $firstPath->totalSpent()->currency());
-        self::assertSame('BTC', $firstPath->totalReceived()->currency());
-        self::assertCount(2, $firstPath->legs());
+        if (false === $contents) {
+            throw new RuntimeException('Unable to read guarded search documentation.');
+        }
+
+        $code = $this->extractPhpCodeBlock($contents);
+
+        return sprintf(
+            <<<'PHP'
+                <?php
+
+                declare(strict_types=1);
+
+                namespace {
+                %s
+                }
+                PHP,
+            rtrim($code).PHP_EOL,
+        );
+    }
+
+    private function extractPhpCodeBlock(string $markdown): string
+    {
+        if (1 !== preg_match('/```php\s+(.*?)```/s', $markdown, $matches)) {
+            throw new RuntimeException('Guarded search documentation is missing a PHP example block.');
+        }
+
+        return $matches[1];
+    }
+
+    private function executeDocumentationScript(string $script): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'guarded-search-doc-');
+
+        if (false === $path) {
+            throw new RuntimeException('Unable to create temporary script for documentation walkthrough.');
+        }
+
+        $bytesWritten = @file_put_contents($path, $script);
+
+        if (false === $bytesWritten) {
+            $error = error_get_last();
+
+            throw new RuntimeException(sprintf('Unable to write documentation walkthrough script to "%s": %s', $path, $error['message'] ?? 'unknown error'));
+        }
+
+        $previousZendAssertions = ini_get('zend.assertions');
+        $previousAssertActive = ini_get('assert.active');
+        $previousAssertException = ini_get('assert.exception');
+        $previousAssertWarning = ini_get('assert.warning');
+
+        ini_set('zend.assertions', '1');
+        ini_set('assert.active', '1');
+        ini_set('assert.exception', '1');
+        ini_set('assert.warning', '1');
+
+        $outputBufferLevel = ob_get_level();
+        ob_start();
+
+        try {
+            include $path;
+
+            $output = (string) ob_get_contents();
+        } finally {
+            while (ob_get_level() > $outputBufferLevel) {
+                ob_end_clean();
+            }
+
+            if (false !== $previousZendAssertions) {
+                ini_set('zend.assertions', (string) $previousZendAssertions);
+            }
+
+            if (false !== $previousAssertActive) {
+                ini_set('assert.active', (string) $previousAssertActive);
+            }
+
+            if (false !== $previousAssertException) {
+                ini_set('assert.exception', (string) $previousAssertException);
+            }
+
+            if (false !== $previousAssertWarning) {
+                ini_set('assert.warning', (string) $previousAssertWarning);
+            }
+
+            @unlink($path);
+        }
+
+        return $output;
     }
 }
