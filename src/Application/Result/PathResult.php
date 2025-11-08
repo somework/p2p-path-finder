@@ -91,7 +91,7 @@ final class PathResult implements JsonSerializable
      */
     public function legsAsArray(): array
     {
-        return $this->legs->toArray();
+        return $this->legs->all();
     }
 
     /**

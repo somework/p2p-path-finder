@@ -28,7 +28,7 @@ final class PathLegCollectionTest extends TestCase
         );
 
         $collection = PathLegCollection::fromList([$second, $first]);
-        $legs = $collection->toArray();
+        $legs = $collection->all();
 
         self::assertSame('USD', $legs[0]->from());
         self::assertSame('BTC', $legs[0]->to());

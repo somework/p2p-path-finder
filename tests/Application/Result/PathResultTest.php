@@ -193,7 +193,7 @@ final class PathResultTest extends TestCase
             DecimalTolerance::fromNumericString('0.0'),
         );
 
-        $this->assertSame([], $result->legs()->toArray());
+        $this->assertSame([], $result->legs()->all());
         $this->assertSame([], $result->feeBreakdown()->toArray());
 
         self::assertSame('0.00', $result->residualTolerancePercentage());

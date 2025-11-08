@@ -83,9 +83,17 @@ final class PathLegCollection implements Countable, IteratorAggregate, JsonSeria
     /**
      * @return list<PathLeg>
      */
-    public function toArray(): array
+    public function all(): array
     {
         return $this->legs;
+    }
+
+    /**
+     * @return list<PathLeg>
+     */
+    public function toArray(): array
+    {
+        return $this->all();
     }
 
     public function isEmpty(): bool
