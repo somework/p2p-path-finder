@@ -583,25 +583,6 @@ Returns: Traversable&lt;int, Order&gt;
 
 Returns: Generator&lt;int, Order&gt;
 
-## SomeWork\P2PPathFinder\Application\PathFinder\Guard\SearchGuards
-Coordinates wall-clock and expansion guard rails for the path search.
-
-### Public methods
-
-### __construct
-`SearchGuards::__construct(int $maxExpansions, ?int $timeBudgetMs = null, ?callable $clock = null)`
-
-Parameter $clock: Closure():float|callable():float|null
-
-### canExpand
-`SearchGuards::canExpand(): bool`
-
-### recordExpansion
-`SearchGuards::recordExpansion(): void`
-
-### finalize
-`SearchGuards::finalize(int $visitedStates, int $visitedStateLimit, bool $visitedGuardReached): SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport`
-
 ## SomeWork\P2PPathFinder\Application\PathFinder\PathFinder
 Implementation of a tolerance-aware best-path search through the trading graph.
 
