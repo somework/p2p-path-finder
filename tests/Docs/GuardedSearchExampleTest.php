@@ -7,6 +7,8 @@ namespace SomeWork\P2PPathFinder\Tests\Docs;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
+use function error_get_last;
+use function file_put_contents;
 use function ini_get;
 use function sprintf;
 
@@ -81,7 +83,13 @@ final class GuardedSearchExampleTest extends TestCase
             throw new RuntimeException('Unable to create temporary script for documentation walkthrough.');
         }
 
-        file_put_contents($path, $script);
+        $bytesWritten = @file_put_contents($path, $script);
+
+        if (false === $bytesWritten) {
+            $error = error_get_last();
+
+            throw new RuntimeException(sprintf('Unable to write documentation walkthrough script to "%s": %s', $path, $error['message'] ?? 'unknown error'));
+        }
 
         $previousZendAssertions = ini_get('zend.assertions');
         $previousAssertException = ini_get('assert.exception');
