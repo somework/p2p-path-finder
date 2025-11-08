@@ -14,6 +14,7 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 use Traversable;
 
+use function array_key_exists;
 use function count;
 use function ksort;
 
@@ -115,6 +116,11 @@ final class MoneyMap implements Countable, IteratorAggregate, JsonSerializable
         return new ArrayIterator($this->values);
     }
 
+    public function has(string $currency): bool
+    {
+        return array_key_exists($currency, $this->values);
+    }
+
     public function get(string $currency): ?Money
     {
         return $this->values[$currency] ?? null;
@@ -181,10 +187,5 @@ final class MoneyMap implements Countable, IteratorAggregate, JsonSerializable
         }
 
         return $serialized;
-    }
-
-    public function has(string $currency): bool
-    {
-        return isset($this->values[$currency]);
     }
 }
