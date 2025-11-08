@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathFinder\ValueObject;
 
-use ArrayAccess;
 use Countable;
 use IteratorAggregate;
 use LogicException;
@@ -22,10 +21,9 @@ use function sprintf;
 /**
  * Immutable sequence of {@see PathEdge} instances.
  *
- * @implements ArrayAccess<int, PathEdge>
  * @implements IteratorAggregate<int, PathEdge>
  */
-final class PathEdgeSequence implements ArrayAccess, Countable, IteratorAggregate
+final class PathEdgeSequence implements Countable, IteratorAggregate
 {
     /**
      * @param list<PathEdge> $edges
@@ -129,36 +127,26 @@ final class PathEdgeSequence implements ArrayAccess, Countable, IteratorAggregat
         return count($this->edges);
     }
 
-    public function offsetExists(mixed $offset): bool
-    {
-        return isset($this->edges[$offset]);
-    }
-
-    public function offsetGet(mixed $offset): PathEdge
-    {
-        if (!isset($this->edges[$offset])) {
-            throw new LogicException(sprintf('Undefined path edge at offset %s.', $offset));
-        }
-
-        return $this->edges[$offset];
-    }
-
-    public function offsetSet(mixed $offset, mixed $value): void
-    {
-        throw new LogicException('Path edge sequences are immutable.');
-    }
-
-    public function offsetUnset(mixed $offset): void
-    {
-        throw new LogicException('Path edge sequences are immutable.');
-    }
-
     /**
      * @return list<PathEdge>
      */
     public function toList(): array
     {
         return $this->edges;
+    }
+
+    public function at(int $index): PathEdge
+    {
+        if (!isset($this->edges[$index])) {
+            throw new LogicException(sprintf('Undefined path edge at offset %d.', $index));
+        }
+
+        return $this->edges[$index];
+    }
+
+    public function has(int $index): bool
+    {
+        return isset($this->edges[$index]);
     }
 
     /**

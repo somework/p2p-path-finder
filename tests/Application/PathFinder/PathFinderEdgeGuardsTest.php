@@ -11,6 +11,7 @@ use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\Graph\GraphNode;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
@@ -66,7 +67,7 @@ final class PathFinderEdgeGuardsTest extends TestCase
             $constraints,
         );
 
-        self::assertSame([], $outcome->paths()->toArray());
+        self::assertSame([], self::extractPaths($outcome));
         $report = $outcome->guardLimits();
         self::assertFalse($report->expansionsReached());
         self::assertFalse($report->visitedStatesReached());
@@ -94,7 +95,7 @@ final class PathFinderEdgeGuardsTest extends TestCase
 
         $outcome = $finder->findBestPaths($graph, $source, $target);
 
-        self::assertSame([], $outcome->paths()->toArray());
+        self::assertSame([], self::extractPaths($outcome));
         $report = $outcome->guardLimits();
         self::assertFalse($report->expansionsReached());
         self::assertFalse($report->visitedStatesReached());
@@ -132,7 +133,7 @@ final class PathFinderEdgeGuardsTest extends TestCase
 
         $outcome = $finder->findBestPaths($graph, 'AAA', 'ZZZ');
 
-        self::assertSame([], $outcome->paths()->toArray());
+        self::assertSame([], self::extractPaths($outcome));
         self::assertFalse($outcome->guardLimits()->expansionsReached());
         self::assertFalse($outcome->guardLimits()->visitedStatesReached());
     }
@@ -154,7 +155,7 @@ final class PathFinderEdgeGuardsTest extends TestCase
 
         $outcome = $finder->findBestPaths($graph, 'AAA', 'BBB');
 
-        self::assertSame([], $outcome->paths()->toArray());
+        self::assertSame([], self::extractPaths($outcome));
         $report = $outcome->guardLimits();
         self::assertTrue($report->expansionsReached());
         self::assertFalse($report->visitedStatesReached());
@@ -179,7 +180,7 @@ final class PathFinderEdgeGuardsTest extends TestCase
 
         $outcome = $finder->findBestPaths($graph, 'AAA', 'BBB');
 
-        self::assertSame([], $outcome->paths()->toArray());
+        self::assertSame([], self::extractPaths($outcome));
         $report = $outcome->guardLimits();
         self::assertFalse($report->expansionsReached());
         self::assertTrue($report->visitedStatesReached());
@@ -365,5 +366,16 @@ final class PathFinderEdgeGuardsTest extends TestCase
         self::assertNotNull($node, sprintf('Graph is missing node for currency "%s".', $currency));
 
         return $node->edges()->at($index);
+    }
+
+    /**
+     * @return list<array{cost: numeric-string, product: numeric-string, hops: int, edges: list<array{from: string, to: string, order: \SomeWork\P2PPathFinder\Domain\Order\Order, rate: \SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate, orderSide: \SomeWork\P2PPathFinder\Domain\Order\OrderSide, conversionRate: numeric-string}>, amountRange: array{min: Money, max: Money}|null, desiredAmount: Money|null}>
+     */
+    private static function extractPaths(SearchOutcome $outcome): array
+    {
+        return array_map(
+            static fn (CandidatePath $path): array => $path->toArray(),
+            $outcome->paths()->toArray(),
+        );
     }
 }

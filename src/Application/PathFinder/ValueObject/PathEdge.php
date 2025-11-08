@@ -4,21 +4,13 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathFinder\ValueObject;
 
-use ArrayAccess;
-use LogicException;
 use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 
-use function in_array;
-use function sprintf;
-
-/**
- * @implements ArrayAccess<string, mixed>
- */
-final class PathEdge implements ArrayAccess
+final class PathEdge
 {
     private function __construct(
         private readonly string $from,
@@ -105,33 +97,5 @@ final class PathEdge implements ArrayAccess
     public function conversionRate(): string
     {
         return $this->conversionRate;
-    }
-
-    public function offsetExists(mixed $offset): bool
-    {
-        return in_array($offset, ['from', 'to', 'order', 'rate', 'orderSide', 'conversionRate'], true);
-    }
-
-    public function offsetGet(mixed $offset): mixed
-    {
-        return match ($offset) {
-            'from' => $this->from,
-            'to' => $this->to,
-            'order' => $this->order,
-            'rate' => $this->rate,
-            'orderSide' => $this->orderSide,
-            'conversionRate' => $this->conversionRate,
-            default => throw new LogicException(sprintf('Unknown path edge attribute "%s".', $offset)),
-        };
-    }
-
-    public function offsetSet(mixed $offset, mixed $value): void
-    {
-        throw new LogicException('Path edges are immutable.');
-    }
-
-    public function offsetUnset(mixed $offset): void
-    {
-        throw new LogicException('Path edges are immutable.');
     }
 }

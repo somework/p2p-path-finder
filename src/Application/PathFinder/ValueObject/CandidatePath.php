@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathFinder\ValueObject;
 
-use ArrayAccess;
-use LogicException;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
@@ -13,16 +11,10 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
-use function in_array;
-use function sprintf;
-
 /**
  * Represents a candidate path discovered by the search algorithm.
  */
-/**
- * @implements ArrayAccess<string, mixed>
- */
-final class CandidatePath implements ArrayAccess
+final class CandidatePath
 {
     /**
      * @param numeric-string $cost    aggregate spend for the candidate path
@@ -92,38 +84,6 @@ final class CandidatePath implements ArrayAccess
     public function range(): ?SpendConstraints
     {
         return $this->range;
-    }
-
-    public function offsetExists(mixed $offset): bool
-    {
-        if (in_array($offset, ['amountRange', 'desiredAmount'], true)) {
-            return null !== $this->range;
-        }
-
-        return in_array($offset, ['cost', 'product', 'hops', 'edges'], true);
-    }
-
-    public function offsetGet(mixed $offset): mixed
-    {
-        return match ($offset) {
-            'cost' => $this->cost,
-            'product' => $this->product,
-            'hops' => $this->hops,
-            'edges' => $this->edges->toArray(),
-            'amountRange' => $this->range?->range()->toBoundsArray(),
-            'desiredAmount' => $this->range?->desired(),
-            default => throw new LogicException(sprintf('Unknown candidate path attribute "%s".', $offset)),
-        };
-    }
-
-    public function offsetSet(mixed $offset, mixed $value): void
-    {
-        throw new LogicException('Candidate paths are immutable.');
-    }
-
-    public function offsetUnset(mixed $offset): void
-    {
-        throw new LogicException('Candidate paths are immutable.');
     }
 
     /**
