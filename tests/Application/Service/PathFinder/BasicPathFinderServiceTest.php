@@ -489,9 +489,9 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
     }
 
     /**
-     * @testdox Provides only the leading result when calling the deprecated single-path helper
+     * @testdox Provides the leading result through PathResultSet::first()
      */
-    public function test_find_best_path_returns_first_materialized_result(): void
+    public function test_result_set_returns_first_materialized_result(): void
     {
         $orderBook = $this->scenarioCompetingGbpQuotes();
 
@@ -504,23 +504,25 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
 
         $service = $this->makeService();
 
-        $best = $service->findBestPath($orderBook, $config, 'USD');
-        self::assertNotNull($best);
+        $outcome = $service->findBestPaths($this->makeRequest($orderBook, $config, 'USD'));
+        $resultSet = $outcome->paths();
 
-        $allResults = $service->findBestPaths($this->makeRequest($orderBook, $config, 'USD'));
-        $paths = self::extractPaths($allResults);
+        $first = $resultSet->first();
+        self::assertNotNull($first);
+
+        $paths = $resultSet->toArray();
         self::assertNotSame([], $paths);
 
         self::assertSame(
             $paths[0]->jsonSerialize(),
-            $best->jsonSerialize(),
+            $first->jsonSerialize(),
         );
     }
 
     /**
-     * @testdox Deprecated single-path helper returns null when no candidates exist
+     * @testdox PathResultSet::first() returns null when no candidates exist
      */
-    public function test_find_best_path_returns_null_when_no_paths_exist(): void
+    public function test_result_set_returns_null_when_no_paths_exist(): void
     {
         $orderBook = $this->orderBook(
             $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '500.000', '0.900', 3),
@@ -532,12 +534,13 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withHopLimits(1, 1)
             ->build();
 
-        $service = $this->makeService();
+        $outcome = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'JPY'));
 
-        self::assertNull($service->findBestPath($orderBook, $config, 'JPY'));
+        self::assertSame([], $outcome->paths()->toArray());
+        self::assertNull($outcome->paths()->first());
     }
 
-    public function test_find_best_path_returns_first_materialized_route(): void
+    public function test_result_set_returns_first_materialized_route(): void
     {
         $orderBook = $this->orderBook(
             $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '500.000', '0.900', 3),
@@ -552,17 +555,19 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
             ->withResultLimit(3)
             ->build();
 
-        $service = $this->makeService();
-        $allResults = $service->findBestPaths($this->makeRequest($orderBook, $config, 'USD'));
-        $bestPath = $service->findBestPath($orderBook, $config, 'USD');
+        $outcome = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'USD'));
+        $resultSet = $outcome->paths();
 
-        self::assertNotNull($bestPath);
-        self::assertNotSame([], $allResults->paths()->toArray());
-        $first = $allResults->paths()->toArray()[0];
+        $first = $resultSet->first();
+        self::assertNotNull($first);
 
-        self::assertSame($first->totalReceived()->amount(), $bestPath->totalReceived()->amount());
-        self::assertSame($first->legs()[0]->to(), $bestPath->legs()[0]->to());
-        self::assertCount(count($first->legs()), $bestPath->legs());
+        $paths = $resultSet->toArray();
+        self::assertNotSame([], $paths);
+        $top = $paths[0];
+
+        self::assertSame($top->totalReceived()->amount(), $first->totalReceived()->amount());
+        self::assertSame($top->legs()[0]->to(), $first->legs()[0]->to());
+        self::assertCount(count($top->legs()), $first->legs());
     }
 
     private function scenarioEuroToUsdToJpyBridge(): OrderBook

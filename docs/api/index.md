@@ -1601,9 +1601,6 @@ configured protections.
 
 Returns: SearchOutcome&lt;PathResult&gt;
 
-### findBestPath
-`PathFinderService::findBestPath(SomeWork\P2PPathFinder\Application\OrderBook\OrderBook $orderBook, SomeWork\P2PPathFinder\Application\Config\PathSearchConfig $config, string $targetAsset): ?SomeWork\P2PPathFinder\Application\Result\PathResult`
-
 ## SomeWork\P2PPathFinder\Application\Support\GuardsArrayAccessOffset
 Helper methods for normalizing array access offsets to primitive types.
 
