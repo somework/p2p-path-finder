@@ -7,6 +7,9 @@ namespace SomeWork\P2PPathFinder\Application\PathFinder\Search;
 use InvalidArgumentException;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 
+/**
+ * @internal
+ */
 final class SearchStateRecord
 {
     /**

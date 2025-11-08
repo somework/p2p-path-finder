@@ -8,6 +8,9 @@ use InvalidArgumentException;
 use SomeWork\P2PPathFinder\Application\PathFinder\CandidateResultHeap;
 use SomeWork\P2PPathFinder\Application\PathFinder\SearchStateQueue;
 
+/**
+ * @internal
+ */
 final class SearchBootstrap
 {
     private SearchStateQueue $queue;
