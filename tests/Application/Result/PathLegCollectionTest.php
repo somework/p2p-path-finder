@@ -78,7 +78,7 @@ final class PathLegCollectionTest extends TestCase
         ]);
     }
 
-    public function test_it_rejects_non_integer_offsets(): void
+    public function test_at_rejects_out_of_bounds_index(): void
     {
         $collection = PathLegCollection::fromList([
             new PathLeg(
@@ -89,11 +89,14 @@ final class PathLegCollectionTest extends TestCase
             ),
         ]);
 
-        self::assertFalse(isset($collection['0']));
-
         $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Path leg index must reference an existing position.');
 
-        $collection['0'];
+        $collection->at(1);
+    }
+
+    public function test_first_returns_null_when_collection_empty(): void
+    {
+        self::assertNull(PathLegCollection::empty()->first());
     }
 }

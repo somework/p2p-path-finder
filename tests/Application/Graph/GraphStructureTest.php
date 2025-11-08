@@ -7,10 +7,13 @@ namespace SomeWork\P2PPathFinder\Tests\Application\Graph;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\Graph\GraphEdgeCollection;
 use SomeWork\P2PPathFinder\Application\Graph\GraphNode;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
+
+use function sprintf;
 
 final class GraphStructureTest extends TestCase
 {
@@ -35,7 +38,7 @@ final class GraphStructureTest extends TestCase
         $order = OrderFactory::buy(base: 'AAA', quote: 'BBB');
         $graph = (new GraphBuilder())->build([$order]);
 
-        $edge = $graph['AAA']['edges'][0];
+        $edge = $this->edge($graph, 'AAA', 0);
 
         $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Graph node currency must match edge origins.');
@@ -50,8 +53,8 @@ final class GraphStructureTest extends TestCase
 
         $graph = (new GraphBuilder())->build([$firstOrder, $secondOrder]);
 
-        $first = $graph['AAA']['edges'][0];
-        $second = $graph['BBB']['edges'][0];
+        $first = $this->edge($graph, 'AAA', 0);
+        $second = $this->edge($graph, 'BBB', 0);
 
         $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Graph edges must share the same origin currency.');
@@ -67,5 +70,13 @@ final class GraphStructureTest extends TestCase
         $this->expectExceptionMessageMatches('/Graph nodes must be unique per currency.*provided more than once/');
 
         new Graph([$node, $node]);
+    }
+
+    private function edge(Graph $graph, string $currency, int $index): GraphEdge
+    {
+        $node = $graph->node($currency);
+        self::assertNotNull($node, sprintf('Graph is missing node for currency "%s".', $currency));
+
+        return $node->edges()->at($index);
     }
 }

@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Graph;
 
-use ArrayAccess;
 use ArrayIterator;
 use Countable;
 use IteratorAggregate;
 use JsonSerializable;
-use SomeWork\P2PPathFinder\Application\Support\GuardsArrayAccessOffset;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use Traversable;
 
@@ -19,13 +17,10 @@ use function sprintf;
 /**
  * Immutable ordered collection of {@see GraphNode} instances keyed by currency.
  *
- * @implements ArrayAccess<string, GraphNode>
  * @implements IteratorAggregate<string, GraphNode>
  */
-final class GraphNodeCollection implements ArrayAccess, Countable, IteratorAggregate, JsonSerializable
+final class GraphNodeCollection implements Countable, IteratorAggregate, JsonSerializable
 {
-    use GuardsArrayAccessOffset;
-
     /**
      * @var array<string, GraphNode>
      */
@@ -104,38 +99,6 @@ final class GraphNodeCollection implements ArrayAccess, Countable, IteratorAggre
     public function getIterator(): Traversable
     {
         return new ArrayIterator($this->buildOrderedNodes());
-    }
-
-    public function offsetExists(mixed $offset): bool
-    {
-        $normalized = $this->normalizeStringOffset($offset);
-
-        if (null === $normalized) {
-            return false;
-        }
-
-        return isset($this->nodes[$normalized]);
-    }
-
-    public function offsetGet(mixed $offset): GraphNode
-    {
-        $normalized = $this->normalizeStringOffset($offset);
-
-        if (null === $normalized || !isset($this->nodes[$normalized])) {
-            throw new InvalidInput('Graph node currency must reference an existing node.');
-        }
-
-        return $this->nodes[$normalized];
-    }
-
-    public function offsetSet(mixed $offset, mixed $value): void
-    {
-        throw new InvalidInput('GraphNodeCollection is immutable.');
-    }
-
-    public function offsetUnset(mixed $offset): void
-    {
-        throw new InvalidInput('GraphNodeCollection is immutable.');
     }
 
     /**

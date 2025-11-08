@@ -149,32 +149,32 @@ final class GraphEdgeTest extends TestCase
         self::assertCount(2, $serialized['segments']);
     }
 
-    public function test_array_access_exposes_edge_metadata(): void
+    public function test_accessors_expose_edge_metadata(): void
     {
         $fixture = $this->createEdgeFixture();
         $edge = $fixture['edge'];
 
-        self::assertSame('USD', $edge['from']);
-        self::assertSame('EUR', $edge['to']);
-        self::assertSame(OrderSide::SELL, $edge['orderSide']);
-        self::assertSame($fixture['order'], $edge['order']);
-        self::assertSame($fixture['rate'], $edge['rate']);
+        self::assertSame('USD', $edge->from());
+        self::assertSame('EUR', $edge->to());
+        self::assertSame(OrderSide::SELL, $edge->orderSide());
+        self::assertSame($fixture['order'], $edge->order());
+        self::assertSame($fixture['rate'], $edge->rate());
 
-        $baseCapacity = $edge['baseCapacity'];
-        self::assertTrue($baseCapacity['min']->equals($fixture['baseCapacity']->min()));
-        self::assertTrue($baseCapacity['max']->equals($fixture['baseCapacity']->max()));
+        $baseCapacity = $edge->baseCapacity();
+        self::assertTrue($baseCapacity->min()->equals($fixture['baseCapacity']->min()));
+        self::assertTrue($baseCapacity->max()->equals($fixture['baseCapacity']->max()));
 
-        $quoteCapacity = $edge['quoteCapacity'];
-        self::assertTrue($quoteCapacity['min']->equals($fixture['quoteCapacity']->min()));
-        self::assertTrue($quoteCapacity['max']->equals($fixture['quoteCapacity']->max()));
+        $quoteCapacity = $edge->quoteCapacity();
+        self::assertTrue($quoteCapacity->min()->equals($fixture['quoteCapacity']->min()));
+        self::assertTrue($quoteCapacity->max()->equals($fixture['quoteCapacity']->max()));
 
-        $grossBaseCapacity = $edge['grossBaseCapacity'];
-        self::assertTrue($grossBaseCapacity['min']->equals($fixture['grossBaseCapacity']->min()));
-        self::assertTrue($grossBaseCapacity['max']->equals($fixture['grossBaseCapacity']->max()));
+        $grossBaseCapacity = $edge->grossBaseCapacity();
+        self::assertTrue($grossBaseCapacity->min()->equals($fixture['grossBaseCapacity']->min()));
+        self::assertTrue($grossBaseCapacity->max()->equals($fixture['grossBaseCapacity']->max()));
 
         self::assertSame([
             $fixture['segment']->jsonSerialize(),
-        ], $edge['segments']);
+        ], $edge->segmentCollection()->jsonSerialize());
     }
 
     public function test_json_serialization_includes_complete_payload(): void
@@ -236,11 +236,12 @@ final class GraphEdgeTest extends TestCase
         ], $serialized['segments']);
     }
 
-    public function test_array_access_returns_null_for_unknown_key(): void
+    public function test_segment_collection_exposes_edge_segments(): void
     {
-        $edge = $this->createEdgeFixture()['edge'];
+        $fixture = $this->createEdgeFixture();
+        $edge = $fixture['edge'];
 
-        self::assertNull($edge['nonexistent']);
+        self::assertSame([$fixture['segment']], $edge->segmentCollection()->toArray());
     }
 
     /**

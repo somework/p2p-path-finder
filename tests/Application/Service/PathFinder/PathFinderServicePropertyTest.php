@@ -71,11 +71,11 @@ final class PathFinderServicePropertyTest extends TestCase
             }
 
             $edges = $node->edges();
-            if ([] === $edges) {
+            if ($edges->isEmpty()) {
                 self::fail('Generated scenario must expose at least one outgoing edge from the source node.');
             }
 
-            $spendAmount = $this->deriveSpendAmount($edges[0]);
+            $spendAmount = $this->deriveSpendAmount($edges->at(0));
             $config = PathSearchConfig::builder()
                 ->withSpendAmount($spendAmount)
                 ->withToleranceBounds('0.0', $scenario['tolerance'])
@@ -145,11 +145,11 @@ final class PathFinderServicePropertyTest extends TestCase
             }
 
             $edges = $node->edges();
-            if ([] === $edges) {
+            if ($edges->isEmpty()) {
                 self::fail('Generated scenario must expose at least one outgoing edge from the source node.');
             }
 
-            $spendAmount = $this->deriveSpendAmount($edges[0]);
+            $spendAmount = $this->deriveSpendAmount($edges->at(0));
             $config = PathSearchConfig::builder()
                 ->withSpendAmount($spendAmount)
                 ->withToleranceBounds('0.0', $scenario['tolerance'])
@@ -246,10 +246,10 @@ final class PathFinderServicePropertyTest extends TestCase
 
             $edges = $node->edges();
 
-            self::assertNotSame([], $edges, 'Dataset scenario should expose source edges.');
+            self::assertFalse($edges->isEmpty(), 'Dataset scenario should expose source edges.');
 
             $config = PathSearchConfig::builder()
-                ->withSpendAmount($this->deriveSpendAmount($edges[0]))
+                ->withSpendAmount($this->deriveSpendAmount($edges->at(0)))
                 ->withToleranceBounds('0.0', $scenario['tolerance'])
                 ->withHopLimits(1, $scenario['maxHops'])
                 ->withResultLimit($scenario['topK'])

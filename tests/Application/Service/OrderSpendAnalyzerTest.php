@@ -7,12 +7,16 @@ namespace SomeWork\P2PPathFinder\Tests\Application\Service;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\Service\OrderSpendAnalyzer;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Fixture\FeePolicyFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
+
+use function sprintf;
 
 final class OrderSpendAnalyzerTest extends TestCase
 {
@@ -30,7 +34,7 @@ final class OrderSpendAnalyzerTest extends TestCase
         );
 
         $graph = (new GraphBuilder())->build([$order]);
-        $edge = $graph['EUR']['edges'][0];
+        $edge = $this->edge($graph, 'EUR', 0);
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.000', 3))
@@ -60,7 +64,7 @@ final class OrderSpendAnalyzerTest extends TestCase
         );
 
         $graph = (new GraphBuilder())->build([$order]);
-        $edge = $graph['USD']['edges'][0];
+        $edge = $this->edge($graph, 'USD', 0);
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '50.00', 2))
@@ -88,7 +92,7 @@ final class OrderSpendAnalyzerTest extends TestCase
         );
 
         $graph = (new GraphBuilder())->build([$order]);
-        $edge = $graph['EUR']['edges'][0];
+        $edge = $this->edge($graph, 'EUR', 0);
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '100.000', 3))
@@ -116,7 +120,7 @@ final class OrderSpendAnalyzerTest extends TestCase
         );
 
         $graph = (new GraphBuilder())->build([$order]);
-        $edge = $graph['USD']['edges'][0];
+        $edge = $this->edge($graph, 'USD', 0);
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '55.00', 2))
@@ -146,7 +150,7 @@ final class OrderSpendAnalyzerTest extends TestCase
         );
 
         $graph = (new GraphBuilder())->build([$order]);
-        $edge = $graph['USD']['edges'][0];
+        $edge = $this->edge($graph, 'USD', 0);
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '14000.00', 2))
@@ -176,7 +180,7 @@ final class OrderSpendAnalyzerTest extends TestCase
         );
 
         $graph = (new GraphBuilder())->build([$order]);
-        $edge = $graph['USD']['edges'][0];
+        $edge = $this->edge($graph, 'USD', 0);
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '14000.00', 2))
@@ -203,7 +207,7 @@ final class OrderSpendAnalyzerTest extends TestCase
         );
 
         $graph = (new GraphBuilder())->build([$order]);
-        $edge = $graph['EUR']['edges'][0];
+        $edge = $this->edge($graph, 'EUR', 0);
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('EUR', '200.00', 2))
@@ -234,7 +238,7 @@ final class OrderSpendAnalyzerTest extends TestCase
         );
 
         $graph = (new GraphBuilder())->build([$order]);
-        $edge = $graph['USD']['edges'][0];
+        $edge = $this->edge($graph, 'USD', 0);
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '100.00', 2))
@@ -262,7 +266,7 @@ final class OrderSpendAnalyzerTest extends TestCase
         );
 
         $graph = (new GraphBuilder())->build([$order]);
-        $edge = $graph['USD']['edges'][0];
+        $edge = $this->edge($graph, 'USD', 0);
 
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '150.00', 2))
@@ -460,5 +464,24 @@ final class OrderSpendAnalyzerTest extends TestCase
         );
 
         self::assertSame('USDT', $method->invoke(new OrderSpendAnalyzer(), $order));
+    }
+
+    /**
+     * @return list<GraphEdge>
+     */
+    private function edges(Graph $graph, string $currency): array
+    {
+        $node = $graph->node($currency);
+        self::assertNotNull($node, sprintf('Graph is missing node for currency "%s".', $currency));
+
+        return $node->edges()->toArray();
+    }
+
+    private function edge(Graph $graph, string $currency, int $index): GraphEdge
+    {
+        $edges = $this->edges($graph, $currency);
+        self::assertArrayHasKey($index, $edges);
+
+        return $edges[$index];
     }
 }

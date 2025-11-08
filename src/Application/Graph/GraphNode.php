@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Graph;
 
-use ArrayAccess;
 use IteratorAggregate;
 use JsonSerializable;
-use SomeWork\P2PPathFinder\Application\Support\GuardsArrayAccessOffset;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use Traversable;
 
@@ -15,12 +13,9 @@ use Traversable;
  * Represents a currency node and its outgoing edges within the trading graph.
  *
  * @implements IteratorAggregate<int, GraphEdge>
- * @implements ArrayAccess<string, mixed>
  */
-final class GraphNode implements IteratorAggregate, JsonSerializable, ArrayAccess
+final class GraphNode implements IteratorAggregate, JsonSerializable
 {
-    use GuardsArrayAccessOffset;
-
     private readonly GraphEdgeCollection $edges;
 
     /**
@@ -53,42 +48,6 @@ final class GraphNode implements IteratorAggregate, JsonSerializable, ArrayAcces
     public function getIterator(): Traversable
     {
         return $this->edges->getIterator();
-    }
-
-    public function offsetExists(mixed $offset): bool
-    {
-        $normalized = $this->normalizeStringOffset($offset);
-
-        if (null === $normalized) {
-            return false;
-        }
-
-        return 'currency' === $normalized || 'edges' === $normalized;
-    }
-
-    public function offsetGet(mixed $offset): mixed
-    {
-        $normalized = $this->normalizeStringOffset($offset);
-
-        if (null === $normalized) {
-            return null;
-        }
-
-        return match ($normalized) {
-            'currency' => $this->currency,
-            'edges' => $this->edges,
-            default => null,
-        };
-    }
-
-    public function offsetSet(mixed $offset, mixed $value): void
-    {
-        throw new InvalidInput('Graph nodes are immutable.');
-    }
-
-    public function offsetUnset(mixed $offset): void
-    {
-        throw new InvalidInput('Graph nodes are immutable.');
     }
 
     /**

@@ -6,7 +6,9 @@ namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
+use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
@@ -268,7 +270,7 @@ final class PathFinderHeuristicsTest extends TestCase
         );
 
         $graph = (new GraphBuilder())->build([$order]);
-        $edge = $graph['EUR']['edges'][0];
+        $edge = $this->edge($graph, 'EUR', 0);
 
         $method = new ReflectionMethod(PathFinder::class, 'edgeSupportsAmount');
         $method->setAccessible(true);
@@ -295,7 +297,7 @@ final class PathFinderHeuristicsTest extends TestCase
         );
 
         $graph = (new GraphBuilder())->build([$order]);
-        $edge = $graph['EUR']['edges'][0];
+        $edge = $this->edge($graph, 'EUR', 0);
 
         $method = new ReflectionMethod(PathFinder::class, 'edgeSupportsAmount');
         $method->setAccessible(true);
@@ -324,7 +326,7 @@ final class PathFinderHeuristicsTest extends TestCase
         );
 
         $graph = (new GraphBuilder())->build([$order]);
-        $edge = $graph['EUR']['edges'][0];
+        $edge = $this->edge($graph, 'EUR', 0);
 
         $method = new ReflectionMethod(PathFinder::class, 'calculateNextRange');
         $method->setAccessible(true);
@@ -366,7 +368,7 @@ final class PathFinderHeuristicsTest extends TestCase
         );
 
         $graph = (new GraphBuilder())->build([$order]);
-        $edge = $graph['EUR']['edges'][0];
+        $edge = $this->edge($graph, 'EUR', 0);
 
         $method = new ReflectionMethod(PathFinder::class, 'convertEdgeAmount');
         $method->setAccessible(true);
@@ -407,12 +409,12 @@ final class PathFinderHeuristicsTest extends TestCase
         );
 
         $graph = (new GraphBuilder())->build([$order]);
-        $edge = $graph['USD']['edges'][0];
+        $edge = $this->edge($graph, 'USD', 0);
 
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
         $range = SpendRange::fromBounds(
-            $edge['quoteCapacity']['min'],
-            $edge['quoteCapacity']['max'],
+            $edge->quoteCapacity()->min(),
+            $edge->quoteCapacity()->max(),
         );
 
         $method = new ReflectionMethod(PathFinder::class, 'calculateNextRange');
@@ -446,7 +448,7 @@ final class PathFinderHeuristicsTest extends TestCase
         );
 
         $graph = (new GraphBuilder())->build([$order]);
-        $edge = $graph['USD']['edges'][0];
+        $edge = $this->edge($graph, 'USD', 0);
 
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
 
@@ -931,5 +933,24 @@ final class PathFinderHeuristicsTest extends TestCase
             },
             $edges,
         );
+    }
+
+    /**
+     * @return list<GraphEdge>
+     */
+    private function edges(Graph $graph, string $currency): array
+    {
+        $node = $graph->node($currency);
+        self::assertNotNull($node, sprintf('Graph is missing node for currency "%s".', $currency));
+
+        return $node->edges()->toArray();
+    }
+
+    private function edge(Graph $graph, string $currency, int $index): GraphEdge
+    {
+        $edges = $this->edges($graph, $currency);
+        self::assertArrayHasKey($index, $edges);
+
+        return $edges[$index];
     }
 }

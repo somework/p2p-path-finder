@@ -15,7 +15,6 @@ use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Application\Support\Generator\PathFinderScenarioGenerator;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 use SomeWork\P2PPathFinder\Tests\Support\InfectionIterationLimiter;
@@ -248,17 +247,14 @@ final class PathFinderPropertyTest extends TestCase
         ];
     }
 
-    /**
-     * @param array{currency: string, edges: list<array{orderSide: OrderSide, grossBaseCapacity: array{min: Money, max: Money}, quoteCapacity: array{min: Money, max: Money}>}>} $graph
-     */
     private function deriveSpendConstraints(Graph $graph, string $source): SpendConstraints
     {
         $node = $graph->node($source);
         self::assertNotNull($node, 'Generated scenario must include a spend node.');
         $edges = $node->edges();
-        self::assertNotSame([], $edges, 'Generated scenario must include spendable edges.');
+        self::assertFalse($edges->isEmpty(), 'Generated scenario must include spendable edges.');
 
-        $edge = $edges[0];
+        $edge = $edges->at(0);
         $capacity = OrderSide::BUY === $edge->orderSide()
             ? $edge->grossBaseCapacity()
             : $edge->quoteCapacity();

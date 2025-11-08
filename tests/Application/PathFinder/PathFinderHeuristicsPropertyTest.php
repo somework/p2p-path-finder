@@ -51,36 +51,36 @@ final class PathFinderHeuristicsPropertyTest extends TestCase
             $graph = (new GraphBuilder())->build($orders);
 
             foreach ($graph as $node) {
-                foreach ($node['edges'] as $edge) {
-                    $sourceCapacity = OrderSide::BUY === $edge['orderSide']
-                        ? $edge['grossBaseCapacity']
-                        : $edge['quoteCapacity'];
-                    $targetCapacity = OrderSide::BUY === $edge['orderSide']
-                        ? $edge['quoteCapacity']
-                        : $edge['baseCapacity'];
+                foreach ($node->edges() as $edge) {
+                    $sourceCapacity = OrderSide::BUY === $edge->orderSide()
+                        ? $edge->grossBaseCapacity()
+                        : $edge->quoteCapacity();
+                    $targetCapacity = OrderSide::BUY === $edge->orderSide()
+                        ? $edge->quoteCapacity()
+                        : $edge->baseCapacity();
 
-                    $minSpend = $sourceCapacity['min'];
-                    $maxSpend = $sourceCapacity['max'];
+                    $minSpend = $sourceCapacity->min();
+                    $maxSpend = $sourceCapacity->max();
 
                     foreach ($this->sampleSpendAmounts($minSpend, $maxSpend) as $spend) {
                         $converted = $convertMethod->invoke($finder, $edge, $spend);
                         $expected = $this->interpolateCapacity(
                             $spend,
-                            $sourceCapacity['min'],
-                            $sourceCapacity['max'],
-                            $targetCapacity['min'],
-                            $targetCapacity['max']
+                            $sourceCapacity->min(),
+                            $sourceCapacity->max(),
+                            $targetCapacity->min(),
+                            $targetCapacity->max()
                         );
 
                         $comparisonScale = max(
                             $expected->scale(),
                             $converted->scale(),
-                            $targetCapacity['min']->scale(),
-                            $targetCapacity['max']->scale(),
+                            $targetCapacity->min()->scale(),
+                            $targetCapacity->max()->scale(),
                         );
 
-                        $minTarget = $targetCapacity['min']->withScale($comparisonScale);
-                        $maxTarget = $targetCapacity['max']->withScale($comparisonScale);
+                        $minTarget = $targetCapacity->min()->withScale($comparisonScale);
+                        $maxTarget = $targetCapacity->max()->withScale($comparisonScale);
                         $convertedComparable = $converted->withScale($comparisonScale);
                         $expectedComparable = $expected->withScale($comparisonScale);
 

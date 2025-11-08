@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Result;
 
-use ArrayAccess;
 use ArrayIterator;
 use Countable;
 use IteratorAggregate;
 use JsonSerializable;
-use SomeWork\P2PPathFinder\Application\Support\GuardsArrayAccessOffset;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use Traversable;
 
@@ -21,13 +19,10 @@ use function count;
 /**
  * Immutable ordered collection of {@see PathLeg} instances.
  *
- * @implements ArrayAccess<int, PathLeg>
  * @implements IteratorAggregate<int, PathLeg>
  */
-final class PathLegCollection implements ArrayAccess, Countable, IteratorAggregate, JsonSerializable
+final class PathLegCollection implements Countable, IteratorAggregate, JsonSerializable
 {
-    use GuardsArrayAccessOffset;
-
     /**
      * @var list<PathLeg>
      */
@@ -118,36 +113,18 @@ final class PathLegCollection implements ArrayAccess, Countable, IteratorAggrega
         return $serialized;
     }
 
-    public function offsetExists(mixed $offset): bool
+    public function at(int $index): PathLeg
     {
-        $normalized = $this->normalizeIntegerOffset($offset);
-
-        if (null === $normalized) {
-            return false;
-        }
-
-        return isset($this->legs[$normalized]);
-    }
-
-    public function offsetGet(mixed $offset): PathLeg
-    {
-        $normalized = $this->normalizeIntegerOffset($offset);
-
-        if (null === $normalized || !isset($this->legs[$normalized])) {
+        if (!isset($this->legs[$index])) {
             throw new InvalidInput('Path leg index must reference an existing position.');
         }
 
-        return $this->legs[$normalized];
+        return $this->legs[$index];
     }
 
-    public function offsetSet(mixed $offset, mixed $value): void
+    public function first(): ?PathLeg
     {
-        throw new InvalidInput('PathLegCollection is immutable.');
-    }
-
-    public function offsetUnset(mixed $offset): void
-    {
-        throw new InvalidInput('PathLegCollection is immutable.');
+        return $this->legs[0] ?? null;
     }
 
     /**

@@ -195,8 +195,8 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
             ->build();
 
         $graph = (new GraphBuilder())->build($orders);
-        $edgeA = $graph['EUR']['edges'][0];
-        $edgeB = $graph['EUR']['edges'][1];
+        $edgeA = $this->edge($graph, 'EUR', 0);
+        $edgeB = $this->edge($graph, 'EUR', 1);
 
         $factory = $this->pathFinderFactoryForCandidates([
             [
@@ -493,5 +493,24 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
             ),
             $normalizedEdges,
         ));
+    }
+
+    /**
+     * @return list<GraphEdge>
+     */
+    private function edges(Graph $graph, string $currency): array
+    {
+        $node = $graph->node($currency);
+        self::assertNotNull($node, sprintf('Graph is missing node for currency "%s".', $currency));
+
+        return $node->edges()->toArray();
+    }
+
+    private function edge(Graph $graph, string $currency, int $index): GraphEdge
+    {
+        $edges = $this->edges($graph, $currency);
+        self::assertArrayHasKey($index, $edges);
+
+        return $edges[$index];
     }
 }

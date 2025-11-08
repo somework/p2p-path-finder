@@ -7,7 +7,6 @@ namespace SomeWork\P2PPathFinder\Tests\Application\Result;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Result\MoneyMap;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
-use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 final class MoneyMapTest extends TestCase
 {
@@ -15,19 +14,17 @@ final class MoneyMapTest extends TestCase
     {
         $map = MoneyMap::fromList([Money::fromString('USD', '1', 2)]);
 
-        self::assertTrue(isset($map['USD']));
-        self::assertSame('USD', $map['USD']->currency());
+        self::assertTrue($map->has('USD'));
+        $usd = $map->get('USD');
+        self::assertNotNull($usd);
+        self::assertSame('USD', $usd->currency());
     }
 
-    public function test_it_rejects_non_string_offsets(): void
+    public function test_it_returns_null_for_unknown_currency(): void
     {
         $map = MoneyMap::fromList([Money::fromString('USD', '1', 2)]);
 
-        self::assertFalse(isset($map[0]));
-
-        $this->expectException(InvalidInput::class);
-        $this->expectExceptionMessage('Money map index must be a known currency code.');
-
-        $map[0];
+        self::assertFalse($map->has('EUR'));
+        self::assertNull($map->get('EUR'));
     }
 }
