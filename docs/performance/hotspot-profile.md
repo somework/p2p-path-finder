@@ -32,7 +32,7 @@ php -d xdebug.mode=profile \
 The generated Cachegrind artefacts can be inspected with `callgrind_annotate` or a
 small parser to surface the dominant functions. The profiling focuses on the legacy
 `bottleneck-hop-3` dataset and the `bottleneck-high-fanout-hop-4` dataset so that the
-critical queueing paths in [`src/Application/PathFinder/SearchStateQueue.php`](../../src/Application/PathFinder/SearchStateQueue.php) are
+critical queueing paths in [`src/Application/PathFinder/PathFinder.php`](../../src/Application/PathFinder/PathFinder.php#L727-L780) are
 included alongside the materialisation and graph construction code paths.
 
 Percentages below are inclusive – a parent function's time can exceed 100% when child
