@@ -56,7 +56,7 @@ final class BasicPathFinderServiceTest extends PathFinderServiceTestCase
         self::assertTrue($result->residualTolerance()->isZero());
         self::assertSame('0.000000000000000000', $result->residualTolerance()->ratio());
 
-        $legs = $result->legs()->toArray();
+        $legs = $result->legs()->all();
         self::assertCount(2, $legs);
 
         self::assertSame('EUR', $legs[0]->from());
