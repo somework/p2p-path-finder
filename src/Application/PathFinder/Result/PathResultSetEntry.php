@@ -10,6 +10,8 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
  * @template TPath of mixed
  *
  * @psalm-template TPath as mixed
+ *
+ * @internal
  */
 final class PathResultSetEntry
 {

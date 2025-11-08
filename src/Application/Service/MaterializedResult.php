@@ -9,6 +9,8 @@ use SomeWork\P2PPathFinder\Application\Result\PathResult;
 
 /**
  * Immutable container representing a materialised path result and its ordering key.
+ *
+ * @internal
  */
 final class MaterializedResult
 {
