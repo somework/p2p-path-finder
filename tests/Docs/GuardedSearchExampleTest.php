@@ -12,8 +12,6 @@ use function file_put_contents;
 use function ini_get;
 use function sprintf;
 
-use const ASSERT_ACTIVE;
-use const ASSERT_EXCEPTION;
 use const PHP_EOL;
 
 /**
@@ -92,16 +90,14 @@ final class GuardedSearchExampleTest extends TestCase
         }
 
         $previousZendAssertions = ini_get('zend.assertions');
+        $previousAssertActive = ini_get('assert.active');
         $previousAssertException = ini_get('assert.exception');
         $previousAssertWarning = ini_get('assert.warning');
-        $previousAssertActive = assert_options(ASSERT_ACTIVE);
-        $previousAssertExceptionOption = assert_options(ASSERT_EXCEPTION);
 
         ini_set('zend.assertions', '1');
+        ini_set('assert.active', '1');
         ini_set('assert.exception', '1');
         ini_set('assert.warning', '1');
-        assert_options(ASSERT_ACTIVE, 1);
-        assert_options(ASSERT_EXCEPTION, 1);
 
         $outputBufferLevel = ob_get_level();
         ob_start();
@@ -115,11 +111,12 @@ final class GuardedSearchExampleTest extends TestCase
                 ob_end_clean();
             }
 
-            assert_options(ASSERT_ACTIVE, $previousAssertActive);
-            assert_options(ASSERT_EXCEPTION, $previousAssertExceptionOption);
-
             if (false !== $previousZendAssertions) {
                 ini_set('zend.assertions', (string) $previousZendAssertions);
+            }
+
+            if (false !== $previousAssertActive) {
+                ini_set('assert.active', (string) $previousAssertActive);
             }
 
             if (false !== $previousAssertException) {
