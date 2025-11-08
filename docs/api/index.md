@@ -599,41 +599,6 @@ Parameter $tolerance: string — value in the [0, 1) range representing the acce
 
 Parameter $acceptCandidate: callable(CandidatePath):bool|null
 
-## SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidateHeapEntry
-
-### Public methods
-
-### __construct
-`CandidateHeapEntry::__construct(SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath $candidate, SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidatePriority $priority)`
-
-### candidate
-`CandidateHeapEntry::candidate(): SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath`
-
-### priority
-`CandidateHeapEntry::priority(): SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidatePriority`
-
-## SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidatePriority
-
-### Public methods
-
-### __construct
-`CandidatePriority::__construct(SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost $cost, int $hops, SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature $routeSignature, int $order)`
-
-### cost
-`CandidatePriority::cost(): SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost`
-
-### hops
-`CandidatePriority::hops(): int`
-
-### routeSignature
-`CandidatePriority::routeSignature(): SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature`
-
-### order
-`CandidatePriority::order(): int`
-
-### compare
-`CandidatePriority::compare(self $other, int $scale): int`
-
 ## SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy
 
 ### Public methods
