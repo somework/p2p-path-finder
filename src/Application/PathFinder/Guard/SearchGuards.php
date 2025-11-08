@@ -11,6 +11,8 @@ use function microtime;
 
 /**
  * Coordinates wall-clock and expansion guard rails for the path search.
+ *
+ * @internal
  */
 final class SearchGuards
 {
