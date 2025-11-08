@@ -8,7 +8,6 @@ use Closure;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
@@ -310,18 +309,5 @@ final class PathFinderService
     private function routeSignature(PathEdgeSequence $edges): RouteSignature
     {
         return RouteSignature::fromPathEdgeSequence($edges);
-    }
-
-    /**
-     * @deprecated use {@see PathFinderService::findBestPaths()} instead
-     */
-    public function findBestPath(OrderBook $orderBook, PathSearchConfig $config, string $targetAsset): ?PathResult
-    {
-        $results = $this->findBestPaths(new PathSearchRequest($orderBook, $config, $targetAsset));
-
-        /** @var PathResult|null $path */
-        $path = $results->paths()->first();
-
-        return $path;
     }
 }
