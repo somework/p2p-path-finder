@@ -10,9 +10,10 @@ behaviour of the bottleneck scenarios that exercise it.
 
 Two PhpBench runs were captured:
 
-1. **Baseline (pre-stack refactor)** – commit `ba12fff04cf4d427244b6ef7701f6c1e1f1b7a38`
-   which predates the DTO stack landing.
-2. **Current stack** – branch `work` (`HEAD`) containing the DTO stack changes.
+1. **Baseline (pre-stack refactor)** – commit `5c2eca3f8d5ca2c9bb6448b18994027196196283`
+   immediately before the materialised DTO stack landed.
+2. **Current stack** – commit `8cc21aadc8f8e791b2105ee0794839fca68b1c00` (`work` HEAD)
+   with the refactor in place.
 
 Each run executed the bottleneck mandatory minima subject with a single
 iteration and revision to surface peak allocation deltas:
@@ -21,26 +22,43 @@ iteration and revision to surface peak allocation deltas:
 vendor/bin/phpbench run \
     --config=phpbench.json \
     --report=p2p_bottleneck_breakdown \
-    --filter=benchFindBottleneckMandatoryMinima
+    --filter=benchFindBottleneckMandatoryMinima \
+    --iterations=1 \
+    --revs=1
 ```
 
 ## Allocation comparison
 
 | Scenario | Baseline mode | Current mode | Δ mode | Baseline mem_peak | Current mem_peak | Δ mem_peak |
 | --- | ---:| ---:| ---:| ---:| ---:| ---:|
-| `bottleneck-hop-3` | 4.271 ms | 4.246 ms | −0.025 ms | 5.496 MiB | 5.989 MiB | +0.493 MiB |
-| `bottleneck-high-fanout-hop-4` | 16.122 ms | 8.373 ms | −7.749 ms | 6.124 MiB | 6.156 MiB | +0.032 MiB |
+| `bottleneck-hop-3` | 2.827 ms | 3.901 ms | +1.074 ms | 5.497 MiB | 5.989 MiB | +0.492 MiB |
+| `bottleneck-high-fanout-hop-4` | 7.841 ms | 8.129 ms | +0.288 ms | 5.639 MiB | 6.156 MiB | +0.517 MiB |
 
 Baseline measurements were taken from the PhpBench run above executed against
-`ba12fff04cf4d427244b6ef7701f6c1e1f1b7a38`, while the "current" column reflects
-the same command on `HEAD` after the DTO stack refactor.
+`5c2eca3f8d5ca2c9bb6448b18994027196196283`, while the "current" column reflects
+the same command on `8cc21aadc8f8e791b2105ee0794839fca68b1c00` after the DTO
+stack refactor.
 
-The high fan-out dataset benefits from the tighter DTO lifecycle, shaving
-≈48 % from the steady-state runtime relative to the pre-stack baseline, while
-the hop-3 fixture now lands within the noise floor of the previous measurement
-(−0.025 ms). Peak allocation increases remain below 0.5 MiB in both scenarios,
-with the larger DTO stack still fitting comfortably inside the existing guard
-budgets.
+The stack-backed DTO flow reduces the amount of long-lived heap work—the peak
+allocation deltas stay within 0.52 MiB—while trading a ≈1.07 ms regression for
+the hop-3 fixture as the materialisation step now performs the ordering work
+eagerly. The high fan-out dataset remains stable, moving by only 0.29 ms with
+the larger DTO stack.
+
+## Regression guardrails
+
+Future DTO or fixture changes should remain within the following envelopes to
+avoid unexpected GC churn during the mandatory minima search benchmarks:
+
+| Scenario | Metric | Current measurement | Guardrail ceiling |
+| --- | --- | ---:| ---:|
+| `bottleneck-hop-3` | `mode` | 3.901 ms | 4.500 ms |
+| `bottleneck-hop-3` | `mem_peak` | 5.989 MiB | 6.500 MiB |
+| `bottleneck-high-fanout-hop-4` | `mode` | 8.129 ms | 9.000 ms |
+| `bottleneck-high-fanout-hop-4` | `mem_peak` | 6.156 MiB | 6.750 MiB |
+
+Re-run the benchmark command above after substantial DTO churn and flag any
+results outside these bounds for investigation.
 
 ## Guard-rail summary
 
