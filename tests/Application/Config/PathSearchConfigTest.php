@@ -9,7 +9,6 @@ use ReflectionProperty;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfigBuilder;
 use SomeWork\P2PPathFinder\Application\Config\SearchGuardConfig;
-use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ToleranceWindow;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
@@ -80,7 +79,7 @@ final class PathSearchConfigTest extends TestCase
             ToleranceWindow::fromStrings('0.0', '0.1'),
             1,
             2,
-            searchGuards: new SearchGuardConfig(PathFinder::DEFAULT_MAX_VISITED_STATES, 0),
+            searchGuards: new SearchGuardConfig(SearchGuardConfig::DEFAULT_MAX_VISITED_STATES, 0),
         );
     }
 
@@ -94,7 +93,7 @@ final class PathSearchConfigTest extends TestCase
             ToleranceWindow::fromStrings('0.0', '0.1'),
             1,
             2,
-            searchGuards: new SearchGuardConfig(0, PathFinder::DEFAULT_MAX_EXPANSIONS),
+            searchGuards: new SearchGuardConfig(0, SearchGuardConfig::DEFAULT_MAX_EXPANSIONS),
         );
     }
 
@@ -190,8 +189,8 @@ final class PathSearchConfigTest extends TestCase
             ->withHopLimits(1, 2)
             ->build();
 
-        self::assertSame(PathFinder::DEFAULT_MAX_EXPANSIONS, $config->pathFinderMaxExpansions());
-        self::assertSame(PathFinder::DEFAULT_MAX_VISITED_STATES, $config->pathFinderMaxVisitedStates());
+        self::assertSame(SearchGuardConfig::DEFAULT_MAX_EXPANSIONS, $config->pathFinderMaxExpansions());
+        self::assertSame(SearchGuardConfig::DEFAULT_MAX_VISITED_STATES, $config->pathFinderMaxVisitedStates());
         self::assertFalse($config->throwOnGuardLimit());
     }
 
@@ -239,8 +238,8 @@ final class PathSearchConfigTest extends TestCase
             1,
             2,
             searchGuards: new SearchGuardConfig(
-                PathFinder::DEFAULT_MAX_VISITED_STATES,
-                PathFinder::DEFAULT_MAX_EXPANSIONS,
+                SearchGuardConfig::DEFAULT_MAX_VISITED_STATES,
+                SearchGuardConfig::DEFAULT_MAX_EXPANSIONS,
                 1,
             ),
         );
@@ -259,8 +258,8 @@ final class PathSearchConfigTest extends TestCase
             1,
             2,
             searchGuards: new SearchGuardConfig(
-                PathFinder::DEFAULT_MAX_VISITED_STATES,
-                PathFinder::DEFAULT_MAX_EXPANSIONS,
+                SearchGuardConfig::DEFAULT_MAX_VISITED_STATES,
+                SearchGuardConfig::DEFAULT_MAX_EXPANSIONS,
                 0,
             ),
         );
@@ -449,8 +448,8 @@ final class PathSearchConfigTest extends TestCase
         );
 
         self::assertSame(1, $config->resultLimit());
-        self::assertSame(PathFinder::DEFAULT_MAX_EXPANSIONS, $config->pathFinderMaxExpansions());
-        self::assertSame(PathFinder::DEFAULT_MAX_VISITED_STATES, $config->pathFinderMaxVisitedStates());
+        self::assertSame(SearchGuardConfig::DEFAULT_MAX_EXPANSIONS, $config->pathFinderMaxExpansions());
+        self::assertSame(SearchGuardConfig::DEFAULT_MAX_VISITED_STATES, $config->pathFinderMaxVisitedStates());
     }
 
     public function test_builder_can_enable_guard_limit_exception(): void

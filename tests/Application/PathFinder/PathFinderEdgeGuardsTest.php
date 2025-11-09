@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 
 use PHPUnit\Framework\TestCase;
+use SomeWork\P2PPathFinder\Application\Config\SearchGuardConfig;
 use SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity;
 use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
@@ -99,8 +100,8 @@ final class PathFinderEdgeGuardsTest extends TestCase
         $report = $outcome->guardLimits();
         self::assertFalse($report->expansionsReached());
         self::assertFalse($report->visitedStatesReached());
-        self::assertSame(PathFinder::DEFAULT_MAX_EXPANSIONS, $report->expansionLimit());
-        self::assertSame(PathFinder::DEFAULT_MAX_VISITED_STATES, $report->visitedStateLimit());
+        self::assertSame(SearchGuardConfig::DEFAULT_MAX_EXPANSIONS, $report->expansionLimit());
+        self::assertSame(SearchGuardConfig::DEFAULT_MAX_VISITED_STATES, $report->visitedStateLimit());
         self::assertSame(0, $report->expansions());
         self::assertSame(0, $report->visitedStates());
     }
