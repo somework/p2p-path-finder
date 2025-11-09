@@ -383,9 +383,9 @@ $result = $resultOutcome->paths()->toArray()[0];
 
 The resulting `SearchOutcome` contains `PathResult` objects ordered from lowest to highest cost.
 When multiple candidates share the same cost the default strategy breaks ties by preferring fewer
-hops, then lexicographically smaller route signatures (for example `EUR->USD->GBP`), and finally
-the discovery order reported by the search. This deterministic cascade keeps results stable across
-processes.
+hops, then lexicographically smaller route signatures (for example `EUR->USD->GBP`) via the
+`RouteSignature::compare()` helper, and finally the discovery order reported by the search. This
+deterministic cascade keeps results stable across processes.
 
 `PathFinderService` accepts a configurable ordering strategy via its constructor. Implement
 `PathOrderStrategy::compare()` to inject your own prioritisation logic and pass it to the façade when
@@ -400,7 +400,7 @@ use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
 $ordering = new class implements PathOrderStrategy {
     public function compare(PathOrderKey $left, PathOrderKey $right): int
     {
-        return $left->routeSignature() <=> $right->routeSignature();
+        return $left->routeSignature()->compare($right->routeSignature());
     }
 };
 
