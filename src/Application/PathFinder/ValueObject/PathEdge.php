@@ -10,6 +10,11 @@ use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 
+/**
+ * Represents a single edge within a candidate path.
+ *
+ * @internal
+ */
 final class PathEdge
 {
     private function __construct(
