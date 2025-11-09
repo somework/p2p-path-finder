@@ -15,6 +15,8 @@ use function sprintf;
 
 /**
  * Immutable representation of spend bounds propagated through the search graph.
+ *
+ * @internal
  */
 final class SpendRange
 {

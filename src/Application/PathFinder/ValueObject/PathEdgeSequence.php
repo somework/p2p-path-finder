@@ -21,6 +21,8 @@ use function sprintf;
 /**
  * Immutable sequence of {@see PathEdge} instances.
  *
+ * @internal
+ *
  * @implements IteratorAggregate<int, PathEdge>
  */
 final class PathEdgeSequence implements Countable, IteratorAggregate

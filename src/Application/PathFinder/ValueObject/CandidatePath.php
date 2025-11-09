@@ -13,6 +13,8 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 /**
  * Represents a candidate path discovered by the search algorithm.
+ *
+ * @internal
  */
 final class CandidatePath
 {
