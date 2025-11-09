@@ -843,11 +843,13 @@ Parameter $desired: numeric-string|null
 ### max
 `SpendConstraints::max(): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
 
+### bounds
+`SpendConstraints::bounds(): array`
+
+Returns: array{min: Money, max: Money}
+
 ### desired
 `SpendConstraints::desired(): ?SomeWork\P2PPathFinder\Domain\ValueObject\Money`
-
-### range
-`SpendConstraints::range(): SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendRange`
 
 ## SomeWork\P2PPathFinder\Application\Result\MoneyMap
 Immutable map keyed by currency codes with {@see Money} entries.

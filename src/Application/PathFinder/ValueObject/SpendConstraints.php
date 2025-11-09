@@ -83,12 +83,26 @@ final class SpendConstraints
         return $this->range->max();
     }
 
+    /**
+     * @return array{min: Money, max: Money}
+     */
+    public function bounds(): array
+    {
+        return [
+            'min' => $this->range->min(),
+            'max' => $this->range->max(),
+        ];
+    }
+
     public function desired(): ?Money
     {
         return $this->desired;
     }
 
-    public function range(): SpendRange
+    /**
+     * @internal
+     */
+    public function internalRange(): SpendRange
     {
         return $this->range;
     }

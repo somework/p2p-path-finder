@@ -140,7 +140,7 @@ final class PathFinder
         $range = null;
         $desiredSpend = null;
         if (null !== $spendConstraints) {
-            $range = $spendConstraints->range();
+            $range = $spendConstraints->internalRange();
             $desiredSpend = $spendConstraints->desired();
         }
 
