@@ -48,22 +48,13 @@ final class PathFinderService
 
     public function __construct(
         private readonly GraphBuilder $graphBuilder,
-        ?OrderSpendAnalyzer $orderSpendAnalyzer = null,
-        ?LegMaterializer $legMaterializer = null,
-        ?ToleranceEvaluator $toleranceEvaluator = null,
-        ?OrderFillEvaluator $fillEvaluator = null,
         ?PathOrderStrategy $orderingStrategy = null,
         ?callable $pathFinderFactory = null,
     ) {
-        $fillEvaluator ??= new OrderFillEvaluator();
-
-        if (null === $legMaterializer) {
-            $legMaterializer = new LegMaterializer($fillEvaluator);
-        }
-
-        $this->legMaterializer = $legMaterializer;
-        $this->orderSpendAnalyzer = $orderSpendAnalyzer ?? new OrderSpendAnalyzer($fillEvaluator, $this->legMaterializer);
-        $this->toleranceEvaluator = $toleranceEvaluator ?? new ToleranceEvaluator();
+        $fillEvaluator = new OrderFillEvaluator();
+        $this->legMaterializer = new LegMaterializer($fillEvaluator);
+        $this->orderSpendAnalyzer = new OrderSpendAnalyzer($fillEvaluator, $this->legMaterializer);
+        $this->toleranceEvaluator = new ToleranceEvaluator();
         $this->orderingStrategy = $orderingStrategy ?? new CostHopsSignatureOrderingStrategy(self::COST_SCALE);
         $strategy = $this->orderingStrategy;
         $factory = $pathFinderFactory ?? static function (PathSearchRequest $request) use ($strategy): Closure {

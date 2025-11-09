@@ -48,7 +48,9 @@ The package intentionally keeps its entry points compact:
   constraints and ensures callers supply all dependencies required to launch a search.
 * `PathFinderService` orchestrates filtering, graph construction and search. It is the
   primary façade exposed to consumers integrating the library into their own
-  applications.【F:src/Application/Service/PathFinderService.php†L41-L165】
+  applications. The constructor accepts the public `GraphBuilder` plus optional ordering
+  and factory hooks while instantiating its internal helpers itself so the `@internal`
+  services remain encapsulated.【F:src/Application/Service/PathFinderService.php†L41-L165】
 * `PathSearchConfig` represents the declarative inputs accepted by the search engine. The
   builder surfaced via `PathSearchConfig::builder()` is part of the supported API and
   allows consumers to construct validated configurations fluently.【F:src/Application/Config/PathSearchConfig.php†L35-L266】
