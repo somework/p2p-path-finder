@@ -689,15 +689,15 @@ final class PathFinderInternalsTest extends TestCase
 
         $queue->push(new SearchQueueEntry(
             $this->buildState('A'),
-            new SearchStatePriority(new PathCost(BcMath::normalize('0.8', self::SCALE)), 0, new RouteSignature([]), 1),
+            new SearchStatePriority(new PathCost(BcMath::normalize('0.8', self::SCALE)), 0, RouteSignature::fromNodes([]), 1),
         ));
         $queue->push(new SearchQueueEntry(
             $this->buildState('B'),
-            new SearchStatePriority(new PathCost(BcMath::normalize('0.5', self::SCALE)), 0, new RouteSignature([]), 2),
+            new SearchStatePriority(new PathCost(BcMath::normalize('0.5', self::SCALE)), 0, RouteSignature::fromNodes([]), 2),
         ));
         $queue->push(new SearchQueueEntry(
             $this->buildState('C'),
-            new SearchStatePriority(new PathCost(BcMath::normalize('0.5', self::SCALE)), 0, new RouteSignature([]), 0),
+            new SearchStatePriority(new PathCost(BcMath::normalize('0.5', self::SCALE)), 0, RouteSignature::fromNodes([]), 0),
         ));
 
         $first = $queue->extract();

@@ -201,7 +201,7 @@ final class PathFinderServicePropertyTest extends TestCase
                     DecimalTolerance::zero(),
                     $this->buildLegCollection(['SRC', 'ALP', 'DST']),
                 ),
-                new PathOrderKey(new PathCost('0.100000000000000000'), 2, new RouteSignature(['SRC', 'ALP', 'DST']), 0),
+                new PathOrderKey(new PathCost('0.100000000000000000'), 2, RouteSignature::fromNodes(['SRC', 'ALP', 'DST']), 0),
             ),
             new PathResultSetEntry(
                 new PathResult(
@@ -210,7 +210,7 @@ final class PathFinderServicePropertyTest extends TestCase
                     DecimalTolerance::zero(),
                     $this->buildLegCollection(['SRC', 'BET', 'DST']),
                 ),
-                new PathOrderKey(new PathCost('0.100000000000000000'), 2, new RouteSignature(['SRC', 'BET', 'DST']), 1),
+                new PathOrderKey(new PathCost('0.100000000000000000'), 2, RouteSignature::fromNodes(['SRC', 'BET', 'DST']), 1),
             ),
             new PathResultSetEntry(
                 new PathResult(
@@ -219,7 +219,7 @@ final class PathFinderServicePropertyTest extends TestCase
                     DecimalTolerance::zero(),
                     $this->buildLegCollection(['SRC', 'CHI', 'DST']),
                 ),
-                new PathOrderKey(new PathCost('0.100000000000000000'), 2, new RouteSignature(['SRC', 'CHI', 'DST']), 2),
+                new PathOrderKey(new PathCost('0.100000000000000000'), 2, RouteSignature::fromNodes(['SRC', 'CHI', 'DST']), 2),
             ),
         ];
 

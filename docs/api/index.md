@@ -653,13 +653,10 @@ Returns: Payload
 
 ### Public methods
 
-### __construct
-`RouteSignature::__construct(iterable $nodes)`
+### fromNodes
+`RouteSignature::fromNodes(array $nodes): self`
 
-Parameter $nodes: iterable&lt;array-key, string&gt;
-
-### fromPathEdgeSequence
-`RouteSignature::fromPathEdgeSequence(SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence $edges): self`
+Parameter $nodes: list&lt;string&gt;
 
 ### nodes
 `RouteSignature::nodes(): array`

@@ -121,7 +121,7 @@ final class SearchStateQueueOrderingPropertyTest extends TestCase
                 $this->visitedRegistry($nodes),
             );
 
-            $signature = new RouteSignature($nodes);
+            $signature = RouteSignature::fromNodes($nodes);
             $priority = new SearchStatePriority(new PathCost($cost), $hops, $signature, $order);
             $entry = new SearchQueueEntry($state, $priority);
 

@@ -16,7 +16,7 @@ final class RouteSignatureTest extends TestCase
 {
     public function test_it_trims_and_joins_nodes(): void
     {
-        $signature = new RouteSignature(['  SRC ', 'MID', ' DST  ']);
+        $signature = RouteSignature::fromNodes(['  SRC ', 'MID', ' DST  ']);
 
         self::assertSame(['SRC', 'MID', 'DST'], $signature->nodes());
         self::assertSame('SRC->MID->DST', $signature->value());
@@ -27,7 +27,7 @@ final class RouteSignatureTest extends TestCase
         $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Route signature nodes cannot be empty (index 1).');
 
-        new RouteSignature(['SRC', '   ']);
+        RouteSignature::fromNodes(['SRC', '   ']);
     }
 
     public function test_it_can_be_created_from_path_edge_sequence(): void
@@ -48,7 +48,7 @@ final class RouteSignatureTest extends TestCase
 
     public function test_it_handles_empty_sequences(): void
     {
-        $signature = new RouteSignature([]);
+        $signature = RouteSignature::fromNodes([]);
 
         self::assertSame([], $signature->nodes());
         self::assertSame('', $signature->value());
@@ -56,12 +56,12 @@ final class RouteSignatureTest extends TestCase
 
     public function test_equals_and_compare_use_normalized_value(): void
     {
-        $alpha = new RouteSignature(['SRC', 'DST']);
-        $beta = new RouteSignature(['SRC', 'dst']);
-        $gamma = new RouteSignature(['SRC', 'BET']);
+        $alpha = RouteSignature::fromNodes(['SRC', 'DST']);
+        $beta = RouteSignature::fromNodes(['SRC', 'dst']);
+        $gamma = RouteSignature::fromNodes(['SRC', 'BET']);
 
-        self::assertTrue($alpha->equals(new RouteSignature(['SRC', 'DST'])));
-        self::assertSame(0, $alpha->compare(new RouteSignature(['SRC', 'DST'])));
+        self::assertTrue($alpha->equals(RouteSignature::fromNodes(['SRC', 'DST'])));
+        self::assertSame(0, $alpha->compare(RouteSignature::fromNodes(['SRC', 'DST'])));
         self::assertSame(1, $alpha->compare($gamma));
         self::assertSame(-1, $gamma->compare($alpha));
         self::assertFalse($alpha->equals($beta));

@@ -47,7 +47,7 @@ final class PathResultFormatterTest extends TestCase
 
         $collection = PathResultSet::fromEntries(
             new CostHopsSignatureOrderingStrategy(18),
-            [new PathResultSetEntry($result, new PathOrderKey(new PathCost('0.1'), 1, new RouteSignature(['USD', 'EUR']), 0))],
+            [new PathResultSetEntry($result, new PathOrderKey(new PathCost('0.1'), 1, RouteSignature::fromNodes(['USD', 'EUR']), 0))],
         );
 
         $this->assertSame([

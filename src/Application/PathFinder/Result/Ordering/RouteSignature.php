@@ -26,7 +26,7 @@ final class RouteSignature
      *
      * @throws InvalidInput when any node is empty after trimming whitespace
      */
-    public function __construct(iterable $nodes)
+    private function __construct(iterable $nodes)
     {
         $normalized = [];
         foreach ($nodes as $position => $node) {
@@ -47,6 +47,9 @@ final class RouteSignature
         $this->value = implode('->', $normalized);
     }
 
+    /**
+     * @internal
+     */
     public static function fromPathEdgeSequence(PathEdgeSequence $edges): self
     {
         if ($edges->isEmpty()) {
@@ -64,6 +67,14 @@ final class RouteSignature
             $nodes[] = $edge->to();
         }
 
+        return new self($nodes);
+    }
+
+    /**
+     * @param list<string> $nodes
+     */
+    public static function fromNodes(array $nodes): self
+    {
         return new self($nodes);
     }
 

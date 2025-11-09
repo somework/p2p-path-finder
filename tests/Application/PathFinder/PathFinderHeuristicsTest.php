@@ -660,7 +660,7 @@ final class PathFinderHeuristicsTest extends TestCase
             new SearchStatePriority(
                 new PathCost(BcMath::normalize('1.500', 18)),
                 1,
-                new RouteSignature(['SRC', 'high']),
+                RouteSignature::fromNodes(['SRC', 'high']),
                 0,
             ),
         ));
@@ -675,7 +675,7 @@ final class PathFinderHeuristicsTest extends TestCase
             new SearchStatePriority(
                 new PathCost(BcMath::normalize('0.750', 18)),
                 1,
-                new RouteSignature(['SRC', 'low']),
+                RouteSignature::fromNodes(['SRC', 'low']),
                 1,
             ),
         ));
@@ -700,7 +700,7 @@ final class PathFinderHeuristicsTest extends TestCase
                 'priority' => new SearchStatePriority(
                     new PathCost(BcMath::normalize('0.500', 18)),
                     2,
-                    new RouteSignature(['SRC', 'A', 'C']),
+                    RouteSignature::fromNodes(['SRC', 'A', 'C']),
                     0,
                 ),
             ],
@@ -714,7 +714,7 @@ final class PathFinderHeuristicsTest extends TestCase
                 'priority' => new SearchStatePriority(
                     new PathCost(BcMath::normalize('0.500', 18)),
                     1,
-                    new RouteSignature(['SRC', 'A']),
+                    RouteSignature::fromNodes(['SRC', 'A']),
                     1,
                 ),
             ],
@@ -728,7 +728,7 @@ final class PathFinderHeuristicsTest extends TestCase
                 'priority' => new SearchStatePriority(
                     new PathCost(BcMath::normalize('0.500', 18)),
                     2,
-                    new RouteSignature(['SRC', 'A', 'B']),
+                    RouteSignature::fromNodes(['SRC', 'A', 'B']),
                     2,
                 ),
             ],
@@ -742,7 +742,7 @@ final class PathFinderHeuristicsTest extends TestCase
                 'priority' => new SearchStatePriority(
                     new PathCost(BcMath::normalize('0.500', 18)),
                     2,
-                    new RouteSignature(['SRC', 'A', 'C']),
+                    RouteSignature::fromNodes(['SRC', 'A', 'C']),
                     3,
                 ),
             ],
