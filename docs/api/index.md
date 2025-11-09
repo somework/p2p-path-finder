@@ -658,8 +658,10 @@ Returns: Payload
 
 Parameter $nodes: iterable&lt;array-key, string&gt;
 
-### fromPathEdgeSequence
-`RouteSignature::fromPathEdgeSequence(SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence $edges): self`
+### fromNodes
+`RouteSignature::fromNodes(array $nodes): self`
+
+Parameter $nodes: list&lt;string&gt;
 
 ### nodes
 `RouteSignature::nodes(): array`
