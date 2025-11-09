@@ -111,6 +111,7 @@ final class PathFinderService
      * {@see SearchGuardReport::anyLimitReached()} to determine whether the search exhausted its
      * configured protections.
      *
+     * @throws GuardLimitExceeded when the search guard aborts the exploration before exhausting the configured constraints
      * @throws InvalidInput       when the requested target asset identifier is empty
      * @throws PrecisionViolation when arbitrary precision operations required for cost ordering cannot be performed
      */

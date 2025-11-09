@@ -78,6 +78,10 @@ printf(
 );
 ```
 
+If traversal exhausts any configured guard before returning control to your callback, the
+service raises a `GuardLimitExceeded` exception. Catch it at the integration boundary when
+you need to downgrade to cached quotes or emit partial telemetry while preserving uptime.
+
 Example output (values will vary by machine):
 
 ```
