@@ -8,6 +8,8 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 /**
  * Shared helpers for normalizing money value objects during serialization.
+ *
+ * @internal
  */
 trait SerializesMoney
 {

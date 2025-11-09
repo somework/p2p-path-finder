@@ -1183,9 +1183,6 @@ Immutable request DTO carrying the dependencies required to run a path search.
 ### spendConstraints
 `PathSearchRequest::spendConstraints(): SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints`
 
-## SomeWork\P2PPathFinder\Application\Support\SerializesMoney
-Shared helpers for normalizing money value objects during serialization.
-
 ## SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown
 Immutable value object describing the fee components for an order fill.
 
