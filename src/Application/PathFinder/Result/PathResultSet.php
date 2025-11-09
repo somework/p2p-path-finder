@@ -6,17 +6,21 @@ namespace SomeWork\P2PPathFinder\Application\PathFinder\Result;
 
 use ArrayIterator;
 use Countable;
+use InvalidArgumentException;
 use IteratorAggregate;
 use JsonSerializable;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
 use Traversable;
 
 use function array_map;
 use function array_slice;
 use function count;
+use function get_debug_type;
 use function is_array;
 use function is_object;
 use function method_exists;
+use function sprintf;
 use function usort;
 
 /**
@@ -64,6 +68,8 @@ final class PathResultSet implements IteratorAggregate, Countable, JsonSerializa
      * @param iterable<PathResultSetEntry<TIn>> $entries
      *
      * @return PathResultSet<TIn>
+     *
+     * @internal
      */
     public static function fromEntries(PathOrderStrategy $orderingStrategy, iterable $entries): self
     {
@@ -120,6 +126,41 @@ final class PathResultSet implements IteratorAggregate, Countable, JsonSerializa
         }
 
         return new self($paths);
+    }
+
+    /**
+     * @template TIn of mixed
+     *
+     * @psalm-template TIn as mixed
+     *
+     * @param iterable<TIn>                    $paths
+     * @param callable(TIn, int): PathOrderKey $orderKeyResolver
+     *
+     * @return PathResultSet<TIn>
+     */
+    public static function fromPaths(
+        PathOrderStrategy $orderingStrategy,
+        iterable $paths,
+        callable $orderKeyResolver,
+    ): self {
+        /** @var list<PathResultSetEntry<TIn>> $entries */
+        $entries = [];
+
+        $index = 0;
+        foreach ($paths as $path) {
+            $orderKey = $orderKeyResolver($path, $index);
+            if (!$orderKey instanceof PathOrderKey) {
+                throw new InvalidArgumentException(sprintf('Path order key resolver must return an instance of %s, %s returned.', PathOrderKey::class, get_debug_type($orderKey)));
+            }
+
+            /** @var PathResultSetEntry<TIn> $entry */
+            $entry = new PathResultSetEntry($path, $orderKey);
+
+            $entries[] = $entry;
+            ++$index;
+        }
+
+        return self::fromEntries($orderingStrategy, $entries);
     }
 
     /**

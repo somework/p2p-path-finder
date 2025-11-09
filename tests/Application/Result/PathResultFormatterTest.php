@@ -10,7 +10,6 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet;
-use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSetEntry;
 use SomeWork\P2PPathFinder\Application\Result\MoneyMap;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
 use SomeWork\P2PPathFinder\Application\Result\PathLegCollection;
@@ -45,9 +44,10 @@ final class PathResultFormatterTest extends TestCase
 
         $this->assertSame($result->jsonSerialize(), $formatter->formatMachine($result));
 
-        $collection = PathResultSet::fromEntries(
+        $collection = PathResultSet::fromPaths(
             new CostHopsSignatureOrderingStrategy(18),
-            [new PathResultSetEntry($result, new PathOrderKey(new PathCost('0.1'), 1, RouteSignature::fromNodes(['USD', 'EUR']), 0))],
+            [$result],
+            static fn (PathResult $path, int $index): PathOrderKey => new PathOrderKey(new PathCost('0.1'), 1, RouteSignature::fromNodes(['USD', 'EUR']), $index),
         );
 
         $this->assertSame([

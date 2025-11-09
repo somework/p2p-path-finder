@@ -14,7 +14,6 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet;
-use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSetEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
 use SomeWork\P2PPathFinder\Application\Result\PathLegCollection;
@@ -193,37 +192,37 @@ final class PathFinderServicePropertyTest extends TestCase
             }
         };
 
-        $entries = [
-            new PathResultSetEntry(
-                new PathResult(
-                    Money::fromString('SRC', '1.0', 1),
-                    Money::fromString('DST', '1.0', 1),
-                    DecimalTolerance::zero(),
-                    $this->buildLegCollection(['SRC', 'ALP', 'DST']),
-                ),
-                new PathOrderKey(new PathCost('0.100000000000000000'), 2, RouteSignature::fromNodes(['SRC', 'ALP', 'DST']), 0),
+        $paths = [
+            new PathResult(
+                Money::fromString('SRC', '1.0', 1),
+                Money::fromString('DST', '1.0', 1),
+                DecimalTolerance::zero(),
+                $this->buildLegCollection(['SRC', 'ALP', 'DST']),
             ),
-            new PathResultSetEntry(
-                new PathResult(
-                    Money::fromString('SRC', '1.0', 1),
-                    Money::fromString('DST', '1.0', 1),
-                    DecimalTolerance::zero(),
-                    $this->buildLegCollection(['SRC', 'BET', 'DST']),
-                ),
-                new PathOrderKey(new PathCost('0.100000000000000000'), 2, RouteSignature::fromNodes(['SRC', 'BET', 'DST']), 1),
+            new PathResult(
+                Money::fromString('SRC', '1.0', 1),
+                Money::fromString('DST', '1.0', 1),
+                DecimalTolerance::zero(),
+                $this->buildLegCollection(['SRC', 'BET', 'DST']),
             ),
-            new PathResultSetEntry(
-                new PathResult(
-                    Money::fromString('SRC', '1.0', 1),
-                    Money::fromString('DST', '1.0', 1),
-                    DecimalTolerance::zero(),
-                    $this->buildLegCollection(['SRC', 'CHI', 'DST']),
-                ),
-                new PathOrderKey(new PathCost('0.100000000000000000'), 2, RouteSignature::fromNodes(['SRC', 'CHI', 'DST']), 2),
+            new PathResult(
+                Money::fromString('SRC', '1.0', 1),
+                Money::fromString('DST', '1.0', 1),
+                DecimalTolerance::zero(),
+                $this->buildLegCollection(['SRC', 'CHI', 'DST']),
             ),
         ];
+        $orderKeys = [
+            new PathOrderKey(new PathCost('0.100000000000000000'), 2, RouteSignature::fromNodes(['SRC', 'ALP', 'DST']), 0),
+            new PathOrderKey(new PathCost('0.100000000000000000'), 2, RouteSignature::fromNodes(['SRC', 'BET', 'DST']), 1),
+            new PathOrderKey(new PathCost('0.100000000000000000'), 2, RouteSignature::fromNodes(['SRC', 'CHI', 'DST']), 2),
+        ];
 
-        $resultSet = PathResultSet::fromEntries($strategy, $entries);
+        $resultSet = PathResultSet::fromPaths(
+            $strategy,
+            $paths,
+            static fn (PathResult $result, int $index): PathOrderKey => $orderKeys[$index],
+        );
 
         self::assertSame(
             ['SRC->CHI->DST', 'SRC->BET->DST', 'SRC->ALP->DST'],

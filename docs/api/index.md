@@ -685,10 +685,11 @@ Immutable collection of ordered path results.
 
 Returns: PathResultSet&lt;TPath&gt;
 
-### fromEntries
-`PathResultSet::fromEntries(SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy $orderingStrategy, iterable $entries): self`
+### fromPaths
+`PathResultSet::fromPaths(SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy $orderingStrategy, iterable $paths, callable $orderKeyResolver): self`
 
-Parameter $entries: iterable&lt;PathResultSetEntry&lt;TIn&gt;&gt;
+Parameter $paths: iterable&lt;TIn&gt;
+Parameter $orderKeyResolver: callable(TIn, int): PathOrderKey
 
 Returns: PathResultSet&lt;TIn&gt;
 
