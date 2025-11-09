@@ -7,7 +7,6 @@ namespace SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
-use function array_values;
 use function implode;
 use function is_int;
 use function sprintf;
@@ -68,7 +67,7 @@ final class RouteSignature
             $nodes[] = $edge->to();
         }
 
-        return new self(array_values($nodes));
+        return new self($nodes);
     }
 
     /**
@@ -76,7 +75,7 @@ final class RouteSignature
      */
     public static function fromNodes(array $nodes): self
     {
-        return new self(array_values($nodes));
+        return new self($nodes);
     }
 
     /**
