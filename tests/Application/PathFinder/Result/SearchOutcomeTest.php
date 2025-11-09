@@ -38,8 +38,8 @@ final class SearchOutcomeTest extends TestCase
         $paths = PathResultSet::fromEntries(
             new CostHopsSignatureOrderingStrategy(18),
             [
-                new PathResultSetEntry(['id' => 2], new PathOrderKey(new PathCost('2'), 1, new RouteSignature(['B']), 1)),
-                new PathResultSetEntry(['id' => 1], new PathOrderKey(new PathCost('1'), 1, new RouteSignature(['A']), 0)),
+                new PathResultSetEntry(['id' => 2], new PathOrderKey(new PathCost('2'), 1, RouteSignature::fromNodes(['B']), 1)),
+                new PathResultSetEntry(['id' => 1], new PathOrderKey(new PathCost('1'), 1, RouteSignature::fromNodes(['A']), 0)),
             ],
         );
         $status = SearchGuardReport::idle(25, 10);
@@ -55,8 +55,8 @@ final class SearchOutcomeTest extends TestCase
         $paths = PathResultSet::fromEntries(
             new CostHopsSignatureOrderingStrategy(18),
             [
-                new PathResultSetEntry(['id' => 3], new PathOrderKey(new PathCost('2'), 1, new RouteSignature(['C']), 1)),
-                new PathResultSetEntry(['id' => 2], new PathOrderKey(new PathCost('1'), 1, new RouteSignature(['B']), 0)),
+                new PathResultSetEntry(['id' => 3], new PathOrderKey(new PathCost('2'), 1, RouteSignature::fromNodes(['C']), 1)),
+                new PathResultSetEntry(['id' => 2], new PathOrderKey(new PathCost('1'), 1, RouteSignature::fromNodes(['B']), 0)),
             ],
         );
         $status = SearchGuardReport::fromMetrics(

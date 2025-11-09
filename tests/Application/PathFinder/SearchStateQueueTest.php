@@ -123,6 +123,6 @@ final class SearchStateQueueTest extends TestCase
     {
         $nodes = '' === $signature ? [] : explode('->', $signature);
 
-        return new SearchStatePriority(new PathCost($cost), $hops, new RouteSignature($nodes), $order);
+        return new SearchStatePriority(new PathCost($cost), $hops, RouteSignature::fromNodes($nodes), $order);
     }
 }

@@ -26,7 +26,7 @@ final class RouteSignature
      *
      * @throws InvalidInput when any node is empty after trimming whitespace
      */
-    public function __construct(iterable $nodes)
+    private function __construct(iterable $nodes)
     {
         $normalized = [];
         foreach ($nodes as $position => $node) {

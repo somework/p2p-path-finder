@@ -118,7 +118,7 @@ final class SearchStateSignatureGenerator
 
         $node = $this->randomCurrencyCode();
 
-        return (new RouteSignature([$node]))->value();
+        return RouteSignature::fromNodes([$node])->value();
     }
 
     /**

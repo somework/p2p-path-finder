@@ -17,7 +17,7 @@ final class PathOrderKeyTest extends TestCase
         $key = new PathOrderKey(
             new PathCost('0.100000000000000000'),
             2,
-            new RouteSignature(['SRC', 'MID', 'DST']),
+            RouteSignature::fromNodes(['SRC', 'MID', 'DST']),
             17,
             $payload,
         );

@@ -653,11 +653,6 @@ Returns: Payload
 
 ### Public methods
 
-### __construct
-`RouteSignature::__construct(iterable $nodes)`
-
-Parameter $nodes: iterable&lt;array-key, string&gt;
-
 ### fromNodes
 `RouteSignature::fromNodes(array $nodes): self`
 

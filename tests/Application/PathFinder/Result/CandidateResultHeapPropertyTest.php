@@ -146,7 +146,7 @@ final class CandidateResultHeapPropertyTest extends TestCase
             $priority = new CandidatePriority(
                 new PathCost($cost),
                 $hops,
-                new RouteSignature($signatureNodes),
+                RouteSignature::fromNodes($signatureNodes),
                 $definition['order'],
             );
 
