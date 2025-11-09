@@ -105,7 +105,7 @@ final class CandidatePath
             'product' => $this->product,
             'hops' => $this->hops,
             'edges' => $this->edges->toArray(),
-            'amountRange' => $this->range?->range()->toBoundsArray(),
+            'amountRange' => $this->range?->bounds(),
             'desiredAmount' => $this->range?->desired(),
         ];
     }

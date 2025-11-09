@@ -12,7 +12,6 @@ use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SegmentPruner;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
-use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendRange;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Tests\Fixture\FeePolicyFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
@@ -98,11 +97,10 @@ final class PathFinderMetamorphicTest extends TestCase
             foreach ($outcome->paths() as $path) {
                 $range = $path->range();
                 self::assertInstanceOf(SpendConstraints::class, $range);
-                $bounds = $range->range();
-                self::assertInstanceOf(SpendRange::class, $bounds);
+                $bounds = $range->bounds();
 
-                $mins[] = $bounds->min()->withScale(18)->amount();
-                $maxes[] = $bounds->max()->withScale(18)->amount();
+                $mins[] = $bounds['min']->withScale(18)->amount();
+                $maxes[] = $bounds['max']->withScale(18)->amount();
             }
 
             self::assertNotSame([], $mins);

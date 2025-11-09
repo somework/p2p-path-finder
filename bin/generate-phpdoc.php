@@ -220,9 +220,14 @@ foreach ($classes as $class) {
             continue;
         }
 
+        $methodDocComment = $method->getDocComment();
+        if (false !== $methodDocComment && str_contains($methodDocComment, '@internal')) {
+            continue;
+        }
+
         $methodBuffer[] = '### '.$method->getName();
         $methodBuffer[] = '`'.$method->getDeclaringClass()->getShortName().'::'.describeMethodSignature($method).'`';
-        $doc = normalizeDocComment($method->getDocComment());
+        $doc = normalizeDocComment($methodDocComment);
         if ('' !== $doc) {
             $methodBuffer[] = '';
             $methodBuffer[] = $doc;
