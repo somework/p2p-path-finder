@@ -25,11 +25,12 @@ The codebase is intentionally split into two layers:
   * `OrderBook` and a small set of reusable `OrderFilterInterface` implementations used to
     prune irrelevant liquidity.
   * `GraphBuilder`, which converts domain orders into a weighted graph representation.
-  * `PathFinder`, implementing a tolerance-aware search strategy to pick the best route.
   * `PathFinderService`, a façade that applies filters, builds the search graph and returns
-    `PathResult` aggregates complete with `PathLeg` breakdowns.
+    `PathResult` aggregates complete with `PathLeg` breakdowns. It is backed by an internal
+    search engine that implements the tolerance-aware route discovery logic without being
+    part of the supported surface.
 
-The path finder accepts tolerance values exclusively as decimal strings. Supplying
+The internal path finder accepts tolerance values exclusively as decimal strings. Supplying
 numeric-string tolerances (for example `'0.9999999999999999'`) preserves the full
 precision of the input without depending on floating-point formatting. Internally all
 tolerances are normalised to 18 decimal places before calculating the amplifier used by the
@@ -154,7 +155,7 @@ if ($guardReport['breached']['any']) {
 ```
 
 `withToleranceBounds()` accepts only numeric-string values. Providing a string keeps the
-original precision intact when it is passed to `PathFinder`. Pair those boundaries with
+original precision intact when it is passed to the internal search engine. Pair those boundaries with
 `withGuardLimitException()` when you want guard-limit breaches to throw instead of being
 reported through metadata.
 
@@ -252,7 +253,7 @@ The builder enforces presence and validity of each piece of configuration. Inter
 configuration pre-computes minimum/maximum spend amounts derived from the tolerance window,
 which are then used when filtering the order book.
 
-During graph exploration the path finder also aggregates the mandatory minimum of every
+During graph exploration the internal path finder also aggregates the mandatory minimum of every
 edge segment and drops candidates that would undershoot those thresholds before checking
 capacity. As a result, requests that fall just below an order's minimum are pruned earlier
 in the search rather than reaching the materialisation phase.
@@ -384,14 +385,15 @@ hops, then lexicographically smaller route signatures (for example `EUR->USD->GB
 the discovery order reported by the search. This deterministic cascade keeps results stable across
 processes.
 
-Both `PathFinder` and `PathFinderService` accept a configurable ordering strategy via their
-constructors. Implement `PathOrderStrategy::compare()` to inject your own prioritisation logic and
-pass it to the constructor when instantiating either component:
+`PathFinderService` accepts a configurable ordering strategy via its constructor. Implement
+`PathOrderStrategy::compare()` to inject your own prioritisation logic and pass it to the façade when
+registering the service with your dependency injection container:
 
 ```php
-use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
+use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
 
 $ordering = new class implements PathOrderStrategy {
     public function compare(PathOrderKey $left, PathOrderKey $right): int
@@ -400,7 +402,7 @@ $ordering = new class implements PathOrderStrategy {
     }
 };
 
-$finder = new PathFinder(orderingStrategy: $ordering);
+$service = new PathFinderService(new GraphBuilder(), orderingStrategy: $ordering);
 ```
 
 Custom strategies receive lightweight `PathOrderKey` value objects that expose the computed cost,
@@ -408,8 +410,11 @@ hop count, route signature and discovery order (plus any payload provided by the
 a negative value favours the left operand, positive favours the right, and zero defers to the next
 tie-breaker.
 
-To reuse the bundled behaviour elsewhere instantiate `CostHopsSignatureOrderingStrategy` with the
-desired cost scale and pass it to either constructor.
+For one-off scenarios—such as wiring different strategies per request—you can supply a
+`pathFinderFactory` callable that produces bespoke runners. The factory receives the
+`PathSearchRequest` and must return a closure matching the signature used internally by the façade.
+Most integrations should prefer the constructor-level strategy injection shown above so that the
+internal search engine remains hidden behind the service API.
 
 In this example the first entry contains a single `PathLeg` reflecting the direct USD→USDT
 conversion.

@@ -583,22 +583,6 @@ Returns: Traversable&lt;int, Order&gt;
 
 Returns: Generator&lt;int, Order&gt;
 
-## SomeWork\P2PPathFinder\Application\PathFinder\PathFinder
-Implementation of a tolerance-aware best-path search through the trading graph.
-
-### Public methods
-
-### __construct
-`PathFinder::__construct(int $maxHops = 4, string $tolerance = '0', int $topK = 1, int $maxExpansions = 250000, int $maxVisitedStates = 250000, ?SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy $orderingStrategy = null, ?int $timeBudgetMs = null)`
-
-Parameter $maxHops: int — maximum number of edges a path may contain
-Parameter $tolerance: string — value in the [0, 1) range representing the acceptable degradation of the best product
-
-### findBestPaths
-`PathFinder::findBestPaths(SomeWork\P2PPathFinder\Application\Graph\Graph $graph, string $source, string $target, ?SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints $spendConstraints = null, ?callable $acceptCandidate = null): SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome`
-
-Parameter $acceptCandidate: callable(CandidatePath):bool|null
-
 ## SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy
 
 ### Public methods
