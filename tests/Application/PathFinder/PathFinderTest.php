@@ -7,6 +7,7 @@ namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use ReflectionProperty;
+use SomeWork\P2PPathFinder\Application\Config\SearchGuardConfig;
 use SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity;
 use SomeWork\P2PPathFinder\Application\Graph\EdgeSegment;
 use SomeWork\P2PPathFinder\Application\Graph\Graph;
@@ -2010,8 +2011,8 @@ final class PathFinderTest extends TestCase
             maxHops: 6,
             tolerance: '0.0',
             topK: 1,
-            maxExpansions: PathFinder::DEFAULT_MAX_EXPANSIONS,
-            maxVisitedStates: PathFinder::DEFAULT_MAX_VISITED_STATES,
+            maxExpansions: SearchGuardConfig::DEFAULT_MAX_EXPANSIONS,
+            maxVisitedStates: SearchGuardConfig::DEFAULT_MAX_VISITED_STATES,
             orderingStrategy: null,
             timeBudgetMs: 1,
         );

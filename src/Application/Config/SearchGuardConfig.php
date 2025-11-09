@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Config;
 
-use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 /**
- * Immutable guard limits used by {@see PathFinder}.
+ * Immutable guard limits used by the {@see \SomeWork\P2PPathFinder\Application\Service\PathFinderService} guard mechanism.
  */
 final class SearchGuardConfig
 {
+    public const DEFAULT_MAX_VISITED_STATES = 250000;
+
+    public const DEFAULT_MAX_EXPANSIONS = 250000;
+
     public function __construct(
-        private readonly int $maxVisitedStates = PathFinder::DEFAULT_MAX_VISITED_STATES,
-        private readonly int $maxExpansions = PathFinder::DEFAULT_MAX_EXPANSIONS,
+        private readonly int $maxVisitedStates = self::DEFAULT_MAX_VISITED_STATES,
+        private readonly int $maxExpansions = self::DEFAULT_MAX_EXPANSIONS,
         private readonly ?int $timeBudgetMs = null,
     ) {
         if ($this->maxVisitedStates < 1) {

@@ -138,7 +138,7 @@ Configures an optional wall-clock budget (in milliseconds) for the path finder s
 Builds a validated {@see PathSearchConfig} instance.
 
 ## SomeWork\P2PPathFinder\Application\Config\SearchGuardConfig
-Immutable guard limits used by {@see PathFinder}.
+Immutable guard limits used by the {@see \SomeWork\P2PPathFinder\Application\Service\PathFinderService} guard mechanism.
 
 ### Public methods
 
