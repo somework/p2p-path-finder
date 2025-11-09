@@ -17,15 +17,15 @@ use function sort;
  */
 final class GraphBuilder
 {
-    private OrderFillEvaluator $fillEvaluator;
+    private readonly OrderFillEvaluator $fillEvaluator;
     /**
      * @var array<string, Money>
      */
     private array $zeroMoneyCache = [];
 
-    public function __construct(?OrderFillEvaluator $fillEvaluator = null)
+    public function __construct()
     {
-        $this->fillEvaluator = $fillEvaluator ?? new OrderFillEvaluator();
+        $this->fillEvaluator = new OrderFillEvaluator();
     }
 
     /**
@@ -184,13 +184,5 @@ final class GraphBuilder
         }
 
         return $this->zeroMoneyCache[$key];
-    }
-
-    /**
-     * @codeCoverageIgnore
-     */
-    public function fillEvaluator(): OrderFillEvaluator
-    {
-        return $this->fillEvaluator;
     }
 }

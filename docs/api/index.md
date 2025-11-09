@@ -343,15 +343,12 @@ Converts a collection of domain orders into a weighted directed graph representa
 ### Public methods
 
 ### __construct
-`GraphBuilder::__construct(?SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator $fillEvaluator = null)`
+`GraphBuilder::__construct()`
 
 ### build
 `GraphBuilder::build(iterable $orders): SomeWork\P2PPathFinder\Application\Graph\Graph`
 
 Parameter $orders: iterable&lt;Order&gt;
-
-### fillEvaluator
-`GraphBuilder::fillEvaluator(): SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator`
 
 ## SomeWork\P2PPathFinder\Application\Graph\GraphEdge
 Immutable representation of a directed edge in the trading graph.
@@ -1139,7 +1136,7 @@ High level facade orchestrating order filtering, graph building and path search.
 ### Public methods
 
 ### __construct
-`PathFinderService::__construct(SomeWork\P2PPathFinder\Application\Graph\GraphBuilder $graphBuilder, ?SomeWork\P2PPathFinder\Application\Service\OrderSpendAnalyzer $orderSpendAnalyzer = null, ?SomeWork\P2PPathFinder\Application\Service\LegMaterializer $legMaterializer = null, ?SomeWork\P2PPathFinder\Application\Service\ToleranceEvaluator $toleranceEvaluator = null, ?SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator $fillEvaluator = null, ?SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy $orderingStrategy = null, ?callable $pathFinderFactory = null)`
+`PathFinderService::__construct(SomeWork\P2PPathFinder\Application\Graph\GraphBuilder $graphBuilder, ?SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy $orderingStrategy = null, ?callable $pathFinderFactory = null)`
 
 ### findBestPaths
 `PathFinderService::findBestPaths(SomeWork\P2PPathFinder\Application\Service\PathSearchRequest $request): SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome`

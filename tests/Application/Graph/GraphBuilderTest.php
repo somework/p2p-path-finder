@@ -522,16 +522,14 @@ final class GraphBuilderTest extends TestCase
         );
     }
 
-    public function test_constructor_preserves_injected_fill_evaluator(): void
+    public function test_constructor_initializes_internal_fill_evaluator(): void
     {
-        $customEvaluator = new OrderFillEvaluator();
-
-        $builder = new GraphBuilder($customEvaluator);
+        $builder = new GraphBuilder();
 
         $property = new ReflectionProperty(GraphBuilder::class, 'fillEvaluator');
         $property->setAccessible(true);
 
-        self::assertSame($customEvaluator, $property->getValue($builder));
+        self::assertInstanceOf(OrderFillEvaluator::class, $property->getValue($builder));
     }
 
     public function test_build_nodes_include_currency_metadata(): void
