@@ -46,6 +46,8 @@ use function strtoupper;
 
 /**
  * Implementation of a tolerance-aware best-path search through the trading graph.
+ *
+ * @internal
  */
 final class PathFinder
 {

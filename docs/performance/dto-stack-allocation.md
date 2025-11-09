@@ -62,8 +62,8 @@ results outside these bounds for investigation.
 
 ## Guard-rail summary
 
-Both bottleneck fixtures continue to rely on the default `PathFinder` guard
-limits (250 000 visited states / 250 000 expansions with no time budget). The
+Both bottleneck fixtures continue to rely on the default guard limits used by the
+internal path finder (250 000 visited states / 250 000 expansions with no time budget). The
 fresh runs exercise only a single frontier expansion before materialisation
 locks in the mandatory minima path, leaving the guard rails untouched:
 
