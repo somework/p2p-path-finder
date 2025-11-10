@@ -6,23 +6,32 @@ namespace SomeWork\P2PPathFinder\Application\PathFinder\Result;
 
 use JsonSerializable;
 
+/**
+ * @template-covariant TPath of mixed
+ *
+ * @phpstan-template-covariant TPath of mixed
+ *
+ * @psalm-template-covariant TPath as mixed
+ */
 final class SearchOutcome implements JsonSerializable
 {
     /**
-     * @phpstan-var PathResultSet<mixed>
+     * @var PathResultSet<TPath>
      *
-     * @psalm-var PathResultSet
+     * @phpstan-var PathResultSet<TPath>
+     *
+     * @psalm-var PathResultSet<TPath>
      */
     private readonly PathResultSet $paths;
 
     private readonly SearchGuardReport $guardLimits;
 
     /**
-     * @param PathResultSet<mixed> $paths
+     * @param PathResultSet<TPath> $paths
      *
-     * @phpstan-param PathResultSet<mixed> $paths
+     * @phpstan-param PathResultSet<TPath> $paths
      *
-     * @psalm-param PathResultSet $paths
+     * @psalm-param PathResultSet<TPath> $paths
      */
     public function __construct(PathResultSet $paths, SearchGuardReport $guardLimits)
     {
@@ -31,26 +40,53 @@ final class SearchOutcome implements JsonSerializable
     }
 
     /**
-     * @param PathResultSet<mixed> $paths
+     * @template TOutcome of mixed
      *
-     * @phpstan-param PathResultSet<mixed> $paths
+     * @phpstan-template TOutcome of mixed
      *
-     * @psalm-param PathResultSet $paths
+     * @psalm-template TOutcome as mixed
+     *
+     * @param PathResultSet<TOutcome> $paths
+     *
+     * @phpstan-param PathResultSet<TOutcome> $paths
+     *
+     * @psalm-param PathResultSet<TOutcome> $paths
+     *
+     * @return self<TOutcome>
+     *
+     * @phpstan-return self<TOutcome>
+     *
+     * @psalm-return self<TOutcome>
      */
     public static function fromResultSet(PathResultSet $paths, SearchGuardReport $guardLimits): self
     {
         return new self($paths, $guardLimits);
     }
 
+    /**
+     * @return self<mixed>
+     *
+     * @phpstan-return self<mixed>
+     *
+     * @psalm-return self<mixed>
+     */
     public static function empty(SearchGuardReport $guardLimits): self
     {
-        return self::fromResultSet(PathResultSet::empty(), $guardLimits);
+        /** @var PathResultSet<mixed> $emptyPaths */
+        $emptyPaths = PathResultSet::empty();
+
+        /** @var self<mixed> $empty */
+        $empty = self::fromResultSet($emptyPaths, $guardLimits);
+
+        return $empty;
     }
 
     /**
-     * @phpstan-return PathResultSet<mixed>
+     * @return PathResultSet<TPath>
      *
-     * @psalm-return PathResultSet
+     * @phpstan-return PathResultSet<TPath>
+     *
+     * @psalm-return PathResultSet<TPath>
      */
     public function paths(): PathResultSet
     {
@@ -69,7 +105,7 @@ final class SearchOutcome implements JsonSerializable
 
     /**
      * @return array{
-     *     paths: list<mixed>,
+     *     paths: list<TPath>,
      *     guards: array{
      *         limits: array{expansions: int, visited_states: int, time_budget_ms: int|null},
      *         metrics: array{expansions: int, visited_states: int, elapsed_ms: float},

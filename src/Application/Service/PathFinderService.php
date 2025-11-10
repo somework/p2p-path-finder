@@ -42,7 +42,7 @@ final class PathFinderService
     private readonly ToleranceEvaluator $toleranceEvaluator;
     private readonly PathOrderStrategy $orderingStrategy;
     /**
-     * @var Closure(PathSearchRequest):Closure(Graph, callable(CandidatePath):bool):SearchOutcome
+     * @var Closure(PathSearchRequest):Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath>
      */
     private readonly Closure $pathFinderFactory;
 
@@ -64,7 +64,7 @@ final class PathFinderService
              * @param Graph                        $graph
              * @param callable(CandidatePath):bool $callback
              *
-             * @return SearchOutcome
+             * @return SearchOutcome<CandidatePath>
              */
             $runner = static function (
                 Graph $graph,
@@ -97,7 +97,7 @@ final class PathFinderService
 
         $factory = $factory instanceof Closure ? $factory : Closure::fromCallable($factory);
 
-        /** @var Closure(PathSearchRequest):Closure(Graph, callable(CandidatePath):bool):SearchOutcome $typedFactory */
+        /** @var Closure(PathSearchRequest):Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath> $typedFactory */
         $typedFactory = $factory;
 
         $this->pathFinderFactory = $typedFactory;
@@ -114,6 +114,12 @@ final class PathFinderService
      * @throws GuardLimitExceeded when the search guard aborts the exploration before exhausting the configured constraints
      * @throws InvalidInput       when the requested target asset identifier is empty
      * @throws PrecisionViolation when arbitrary precision operations required for cost ordering cannot be performed
+     *
+     * @return SearchOutcome<PathResult>
+     *
+     * @phpstan-return SearchOutcome<PathResult>
+     *
+     * @psalm-return SearchOutcome<PathResult>
      */
     public function findBestPaths(PathSearchRequest $request): SearchOutcome
     {
@@ -126,7 +132,7 @@ final class PathFinderService
 
         $orders = $this->orderSpendAnalyzer->filterOrders($orderBook, $config);
         if ([] === $orders) {
-            /** @var SearchOutcome $empty */
+            /** @var SearchOutcome<PathResult> $empty */
             $empty = SearchOutcome::empty(SearchGuardReport::idle(
                 $config->pathFinderMaxVisitedStates(),
                 $config->pathFinderMaxExpansions(),
@@ -138,7 +144,7 @@ final class PathFinderService
 
         $graph = $this->graphBuilder->build($orders);
         if (!$graph->hasNode($sourceCurrency) || !$graph->hasNode($targetCurrency)) {
-            /** @var SearchOutcome $empty */
+            /** @var SearchOutcome<PathResult> $empty */
             $empty = SearchOutcome::empty(SearchGuardReport::idle(
                 $config->pathFinderMaxVisitedStates(),
                 $config->pathFinderMaxExpansions(),
@@ -149,7 +155,7 @@ final class PathFinderService
         }
 
         $runnerFactory = $this->pathFinderFactory;
-        /** @var Closure(Graph, callable(CandidatePath):bool):SearchOutcome $runner */
+        /** @var Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath> $runner */
         $runner = $runnerFactory($request);
 
         /**
@@ -228,7 +234,7 @@ final class PathFinderService
         $this->assertGuardLimits($config, $guardLimits);
 
         if ([] === $materializedResults) {
-            /** @var SearchOutcome $empty */
+            /** @var SearchOutcome<PathResult> $empty */
             $empty = SearchOutcome::empty($guardLimits);
 
             return $empty;
@@ -246,9 +252,7 @@ final class PathFinderService
         /** @var PathResultSet<PathResult> $resultSet */
         $resultSet = PathResultSet::fromEntries($this->orderingStrategy, $resultEntries);
 
-        /** @var SearchOutcome $outcome */
-        // Safe variance: PathResultSet<PathResult> → PathResultSet<mixed> isn't recognised because PathResultSet lacks covariant typing, so suppress the PHPStan false positive.
-        /** @phpstan-ignore-next-line */
+        /** @var SearchOutcome<PathResult> $outcome */
         $outcome = new SearchOutcome($resultSet, $guardLimits);
 
         return $outcome;

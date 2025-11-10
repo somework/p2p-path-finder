@@ -26,9 +26,11 @@ use function usort;
 /**
  * Immutable collection of ordered path results.
  *
- * @template TPath of mixed
+ * @template-covariant TPath of mixed
  *
- * @psalm-template TPath as mixed
+ * @phpstan-template-covariant TPath of mixed
+ *
+ * @psalm-template-covariant TPath as mixed
  *
  * @implements IteratorAggregate<int, TPath>
  */
