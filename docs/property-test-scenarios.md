@@ -33,8 +33,11 @@ dataset assertions.【F:tests/Application/Support/Generator/PathFinderScenarioGe
 `SearchOutcome::paths()` returns a `PathResultSet`, so property suites can lean
 on its helpers instead of re-implementing k-best checks in raw arrays. The
 collection keeps the search order stable, drops duplicate route signatures, and
-offers convenience accessors for the top-N slice.【F:src/Application/PathFinder/Result/SearchOutcome.php†L12-L55】【F:src/Application/PathFinder/Result/PathResultSet.php†L31-L175】 A typical
-ordering assertion therefore looks like:
+offers convenience accessors for the top-N slice.【F:src/Application/PathFinder/Result/SearchOutcome.php†L12-L55】【F:src/Application/PathFinder/Result/PathResultSet.php†L31-L175】 Because the
+items are first-class `PathResult` instances, invariants can assert on public
+APIs such as `residualTolerance()` or traverse legs via
+`PathResultFormatter`-friendly structures rather than poking at internal DTOs.
+A typical ordering assertion therefore looks like:
 
 ```php
 $paths = $outcome->paths();
@@ -43,19 +46,29 @@ $this->assertGreaterThan(0, $paths->count());
 $this->assertFalse($paths->isEmpty());
 
 // `slice()` returns another PathResultSet, so subsequent checks stay fluent.
+/** @var list<PathResult> $topThree */
 $topThree = $paths->slice(0, 3)->toArray();
 
-// Compare signatures or scalar costs to ensure the k-best front is stable.
-// routeSignature() mirrors the helper defined in PathFinderPropertyTest.
-$actualSignatures = array_map([$this, 'routeSignature'], $topThree);
+// Compare signatures or tolerance budgets to ensure the k-best front is stable.
+$actualResiduals = array_map(
+    static fn (PathResult $result): string => $result->residualTolerance()->ratio(),
+    $topThree,
+);
+self::assertSame($expectedResiduals, $actualResiduals);
+
+// routeSignatureFromLegs() mirrors the helper defined in PathFinderPropertyTest.
+$actualSignatures = array_map(
+    fn (PathResult $result) => $this->routeSignatureFromLegs($result->legs()),
+    $topThree,
+);
 foreach ($expectedSignatures as $index => $signature) {
     self::assertTrue($signature->equals($actualSignatures[$index]));
 }
 
 // Pull the headline route without unwrapping the collection.
-/** @var CandidatePath $best */
 $best = $paths->first();
-self::assertSame('0.010000000000000000', $best->cost());
+self::assertInstanceOf(PathResult::class, $best);
+self::assertSame('0.010000000000000000', $best->residualTolerance()->ratio());
 ```
 
 The property suites use the same flow when validating deterministic rankings and
