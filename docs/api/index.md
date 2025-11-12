@@ -216,127 +216,6 @@ Parameter $tolerance: numeric-string
 ### accepts
 `ToleranceWindowFilter::accepts(SomeWork\P2PPathFinder\Domain\Order\Order $order): bool`
 
-## SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity
-Represents the minimum and maximum capacity for a given measurement on an edge.
-
-### Public methods
-
-### __construct
-`EdgeCapacity::__construct(SomeWork\P2PPathFinder\Domain\ValueObject\Money $min, SomeWork\P2PPathFinder\Domain\ValueObject\Money $max)`
-
-### min
-`EdgeCapacity::min(): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
-
-### max
-`EdgeCapacity::max(): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
-
-### jsonSerialize
-`EdgeCapacity::jsonSerialize(): array`
-
-Returns: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}}
-
-## SomeWork\P2PPathFinder\Application\Graph\EdgeSegment
-Describes a segmented portion of edge capacity, indicating mandatory and optional fills.
-
-### Public methods
-
-### __construct
-`EdgeSegment::__construct(bool $isMandatory, SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity $base, SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity $quote, SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity $grossBase)`
-
-### isMandatory
-`EdgeSegment::isMandatory(): bool`
-
-### base
-`EdgeSegment::base(): SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity`
-
-### quote
-`EdgeSegment::quote(): SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity`
-
-### grossBase
-`EdgeSegment::grossBase(): SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity`
-
-### jsonSerialize
-`EdgeSegment::jsonSerialize(): array`
-
-Returns: array{
-isMandatory: bool,
-base: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-quote: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-grossBase: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-}
-
-## SomeWork\P2PPathFinder\Application\Graph\EdgeSegmentCollection
-Immutable ordered collection of {@see EdgeSegment} instances attached to a graph edge.
-
-### Public methods
-
-### empty
-`EdgeSegmentCollection::empty(): self`
-
-### fromArray
-`EdgeSegmentCollection::fromArray(array $segments): self`
-
-Parameter $segments: array&lt;array-key, EdgeSegment&gt;
-
-### count
-`EdgeSegmentCollection::count(): int`
-
-### isEmpty
-`EdgeSegmentCollection::isEmpty(): bool`
-
-### getIterator
-`EdgeSegmentCollection::getIterator(): Traversable`
-
-Returns: Traversable&lt;int, EdgeSegment&gt;
-
-### toArray
-`EdgeSegmentCollection::toArray(): array`
-
-Returns: list&lt;EdgeSegment&gt;
-
-### capacityTotals
-`EdgeSegmentCollection::capacityTotals(string $measure, int $scale): ?SomeWork\P2PPathFinder\Application\Graph\SegmentCapacityTotals`
-
-### capacityScale
-`EdgeSegmentCollection::capacityScale(string $measure): int`
-
-### jsonSerialize
-`EdgeSegmentCollection::jsonSerialize(): array`
-
-Returns: list&lt;array{
-isMandatory: bool,
-base: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-quote: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-grossBase: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-}>
-
-## SomeWork\P2PPathFinder\Application\Graph\Graph
-Directed multigraph representation keyed by asset symbol.
-
-### Public methods
-
-### __construct
-`Graph::__construct(SomeWork\P2PPathFinder\Application\Graph\GraphNodeCollection|array $nodes = [])`
-
-Parameter $nodes: GraphNodeCollection|array&lt;array-key, GraphNode&gt;
-
-### nodes
-`Graph::nodes(): SomeWork\P2PPathFinder\Application\Graph\GraphNodeCollection`
-
-### hasNode
-`Graph::hasNode(string $currency): bool`
-
-### node
-`Graph::node(string $currency): ?SomeWork\P2PPathFinder\Application\Graph\GraphNode`
-
-### getIterator
-`Graph::getIterator(): Traversable`
-
-### jsonSerialize
-`Graph::jsonSerialize(): array`
-
-Returns: array&lt;string, array{currency: string, edges: list&lt;array&lt;string, mixed&gt;&gt;}&gt;
-
 ## SomeWork\P2PPathFinder\Application\Graph\GraphBuilder
 Converts a collection of domain orders into a weighted directed graph representation.
 
@@ -349,212 +228,6 @@ Converts a collection of domain orders into a weighted directed graph representa
 `GraphBuilder::build(iterable $orders): SomeWork\P2PPathFinder\Application\Graph\Graph`
 
 Parameter $orders: iterable&lt;Order&gt;
-
-## SomeWork\P2PPathFinder\Application\Graph\GraphEdge
-Immutable representation of a directed edge in the trading graph.
-
-### Public methods
-
-### __construct
-`GraphEdge::__construct(string $from, string $to, SomeWork\P2PPathFinder\Domain\Order\OrderSide $orderSide, SomeWork\P2PPathFinder\Domain\Order\Order $order, SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate $rate, SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity $baseCapacity, SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity $quoteCapacity, SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity $grossBaseCapacity, array $segments = [])`
-
-Parameter $segments: list&lt;EdgeSegment&gt;
-
-### from
-`GraphEdge::from(): string`
-
-### to
-`GraphEdge::to(): string`
-
-### orderSide
-`GraphEdge::orderSide(): SomeWork\P2PPathFinder\Domain\Order\OrderSide`
-
-### order
-`GraphEdge::order(): SomeWork\P2PPathFinder\Domain\Order\Order`
-
-### rate
-`GraphEdge::rate(): SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate`
-
-### baseCapacity
-`GraphEdge::baseCapacity(): SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity`
-
-### quoteCapacity
-`GraphEdge::quoteCapacity(): SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity`
-
-### grossBaseCapacity
-`GraphEdge::grossBaseCapacity(): SomeWork\P2PPathFinder\Application\Graph\EdgeCapacity`
-
-### segments
-`GraphEdge::segments(): array`
-
-Returns: list&lt;EdgeSegment&gt;
-
-### segmentCollection
-`GraphEdge::segmentCollection(): SomeWork\P2PPathFinder\Application\Graph\EdgeSegmentCollection`
-
-### getIterator
-`GraphEdge::getIterator(): Traversable`
-
-### jsonSerialize
-`GraphEdge::jsonSerialize(): array`
-
-Returns: array{
-from: string,
-to: string,
-orderSide: string,
-order: array{
-side: string,
-assetPair: array{base: string, quote: string},
-bounds: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-effectiveRate: array{baseCurrency: string, quoteCurrency: string, value: string, scale: int},
-},
-rate: array{baseCurrency: string, quoteCurrency: string, value: string, scale: int},
-baseCapacity: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-quoteCapacity: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-grossBaseCapacity: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-segments: list<array{
-isMandatory: bool,
-base: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-quote: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-grossBase: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-}>,
-}
-
-## SomeWork\P2PPathFinder\Application\Graph\GraphEdgeCollection
-Immutable ordered collection of {@see GraphEdge} instances for a single origin currency.
-
-### Public methods
-
-### empty
-`GraphEdgeCollection::empty(): self`
-
-### fromArray
-`GraphEdgeCollection::fromArray(array $edges, ?callable $comparator = null): self`
-
-Parameter $edges: array&lt;array-key, GraphEdge&gt;
-Parameter $comparator: (Closure(GraphEdge, GraphEdge): int)|(callable(GraphEdge, GraphEdge): int)|null
-
-### count
-`GraphEdgeCollection::count(): int`
-
-### isEmpty
-`GraphEdgeCollection::isEmpty(): bool`
-
-### originCurrency
-`GraphEdgeCollection::originCurrency(): ?string`
-
-### comparator
-`GraphEdgeCollection::comparator(): Closure`
-
-Returns: Closure(GraphEdge, GraphEdge): int
-
-### getIterator
-`GraphEdgeCollection::getIterator(): Traversable`
-
-Returns: Traversable&lt;int, GraphEdge&gt;
-
-### at
-`GraphEdgeCollection::at(int $index): SomeWork\P2PPathFinder\Application\Graph\GraphEdge`
-
-### first
-`GraphEdgeCollection::first(): ?SomeWork\P2PPathFinder\Application\Graph\GraphEdge`
-
-### toArray
-`GraphEdgeCollection::toArray(): array`
-
-Returns: list&lt;GraphEdge&gt;
-
-### jsonSerialize
-`GraphEdgeCollection::jsonSerialize(): array`
-
-Returns: list&lt;array&lt;string, mixed&gt;&gt;
-
-### canonicalComparator
-`GraphEdgeCollection::canonicalComparator(): Closure`
-
-Canonical comparator ordering edges by quote currency, serialized order payload, then side.
-
-Returns: Closure(GraphEdge, GraphEdge): int
-
-## SomeWork\P2PPathFinder\Application\Graph\GraphNode
-Represents a currency node and its outgoing edges within the trading graph.
-
-### Public methods
-
-### __construct
-`GraphNode::__construct(string $currency, SomeWork\P2PPathFinder\Application\Graph\GraphEdgeCollection|array $edges = [])`
-
-Parameter $edges: GraphEdgeCollection|array&lt;array-key, GraphEdge&gt;
-
-### currency
-`GraphNode::currency(): string`
-
-### edges
-`GraphNode::edges(): SomeWork\P2PPathFinder\Application\Graph\GraphEdgeCollection`
-
-### getIterator
-`GraphNode::getIterator(): Traversable`
-
-### jsonSerialize
-`GraphNode::jsonSerialize(): array`
-
-Returns: array{currency: string, edges: list&lt;array&lt;string, mixed&gt;&gt;}
-
-## SomeWork\P2PPathFinder\Application\Graph\GraphNodeCollection
-Immutable ordered collection of {@see GraphNode} instances keyed by currency.
-
-### Public methods
-
-### empty
-`GraphNodeCollection::empty(): self`
-
-### fromArray
-`GraphNodeCollection::fromArray(array $nodes): self`
-
-Parameter $nodes: array&lt;array-key, GraphNode&gt;
-
-### count
-`GraphNodeCollection::count(): int`
-
-### has
-`GraphNodeCollection::has(string $currency): bool`
-
-### get
-`GraphNodeCollection::get(string $currency): ?SomeWork\P2PPathFinder\Application\Graph\GraphNode`
-
-### getIterator
-`GraphNodeCollection::getIterator(): Traversable`
-
-Returns: Traversable&lt;string, GraphNode&gt;
-
-### toArray
-`GraphNodeCollection::toArray(): array`
-
-Returns: array&lt;string, GraphNode&gt;
-
-### jsonSerialize
-`GraphNodeCollection::jsonSerialize(): array`
-
-Returns: array&lt;string, array{currency: string, edges: list&lt;array&lt;string, mixed&gt;&gt;}&gt;
-
-## SomeWork\P2PPathFinder\Application\Graph\SegmentCapacityTotals
-
-### Public methods
-
-### __construct
-`SegmentCapacityTotals::__construct(SomeWork\P2PPathFinder\Domain\ValueObject\Money $mandatory, SomeWork\P2PPathFinder\Domain\ValueObject\Money $maximum)`
-
-### mandatory
-`SegmentCapacityTotals::mandatory(): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
-
-### maximum
-`SegmentCapacityTotals::maximum(): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
-
-### scale
-`SegmentCapacityTotals::scale(): int`
-
-### optionalHeadroom
-`SegmentCapacityTotals::optionalHeadroom(): SomeWork\P2PPathFinder\Domain\ValueObject\Money`
 
 ## SomeWork\P2PPathFinder\Application\OrderBook\OrderBook
 
@@ -787,20 +460,26 @@ breached: array{expansions: bool, visited_states: bool, time_budget: bool, any: 
 ### __construct
 `SearchOutcome::__construct(SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet $paths, SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport $guardLimits)`
 
-Parameter $paths: PathResultSet&lt;mixed&gt;
+Parameter $paths: PathResultSet&lt;TPath&gt;
 
 ### fromResultSet
 `SearchOutcome::fromResultSet(SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet $paths, SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport $guardLimits): self`
 
-Parameter $paths: PathResultSet&lt;mixed&gt;
+Parameter $paths: PathResultSet&lt;TOutcome&gt;
+
+
+
+Returns: self&lt;TOutcome&gt;
 
 ### empty
 `SearchOutcome::empty(SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport $guardLimits): self`
 
+Returns: self&lt;mixed&gt;
+
 ### paths
 `SearchOutcome::paths(): SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet`
 
-Returns: PathResultSet&lt;mixed&gt;
+Returns: PathResultSet&lt;TPath&gt;
 
 ### hasPaths
 `SearchOutcome::hasPaths(): bool`
@@ -812,7 +491,7 @@ Returns: PathResultSet&lt;mixed&gt;
 `SearchOutcome::jsonSerialize(): array`
 
 Returns: array{
-paths: list<mixed>,
+paths: list<TPath>,
 guards: array{
 limits: array{expansions: int, visited_states: int, time_budget_ms: int|null},
 metrics: array{expansions: int, visited_states: int, elapsed_ms: float},
@@ -1147,6 +826,9 @@ Guard limit breaches are reported through the returned {@see SearchOutcome::guar
 metadata. Inspect the {@see SearchGuardReport} via helpers like
 {@see SearchGuardReport::anyLimitReached()} to determine whether the search exhausted its
 configured protections.
+
+
+Returns: SearchOutcome&lt;PathResult&gt;
 
 ## SomeWork\P2PPathFinder\Application\Service\PathSearchRequest
 Immutable request DTO carrying the dependencies required to run a path search.

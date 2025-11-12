@@ -17,6 +17,8 @@ use function sprintf;
 /**
  * Immutable ordered collection of {@see GraphNode} instances keyed by currency.
  *
+ * @internal
+ *
  * @implements IteratorAggregate<string, GraphNode>
  */
 final class GraphNodeCollection implements Countable, IteratorAggregate, JsonSerializable

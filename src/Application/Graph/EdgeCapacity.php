@@ -11,6 +11,8 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 /**
  * Represents the minimum and maximum capacity for a given measurement on an edge.
+ *
+ * @internal
  */
 final class EdgeCapacity implements JsonSerializable
 {

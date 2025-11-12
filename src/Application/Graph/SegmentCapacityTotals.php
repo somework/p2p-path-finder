@@ -6,6 +6,11 @@ namespace SomeWork\P2PPathFinder\Application\Graph;
 
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
+/**
+ * Aggregates mandatory and maximum segment capacities for a specific measure.
+ *
+ * @internal
+ */
 final class SegmentCapacityTotals
 {
     public function __construct(

@@ -15,6 +15,8 @@ use Traversable;
 /**
  * Immutable representation of a directed edge in the trading graph.
  *
+ * @internal
+ *
  * @implements IteratorAggregate<int, EdgeSegment>
  */
 final class GraphEdge implements IteratorAggregate, JsonSerializable

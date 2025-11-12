@@ -11,6 +11,8 @@ use Traversable;
 /**
  * Directed multigraph representation keyed by asset symbol.
  *
+ * @internal
+ *
  * @implements IteratorAggregate<string, GraphNode>
  */
 final class Graph implements IteratorAggregate, JsonSerializable

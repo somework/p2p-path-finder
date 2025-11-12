@@ -8,6 +8,8 @@ use JsonSerializable;
 
 /**
  * Describes a segmented portion of edge capacity, indicating mandatory and optional fills.
+ *
+ * @internal
  */
 final class EdgeSegment implements JsonSerializable
 {
