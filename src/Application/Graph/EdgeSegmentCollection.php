@@ -20,6 +20,8 @@ use function sprintf;
 /**
  * Immutable ordered collection of {@see EdgeSegment} instances attached to a graph edge.
  *
+ * @internal
+ *
  * @implements IteratorAggregate<int, EdgeSegment>
  */
 final class EdgeSegmentCollection implements Countable, IteratorAggregate, JsonSerializable

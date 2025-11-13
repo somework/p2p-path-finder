@@ -20,6 +20,8 @@ use function implode;
 /**
  * Immutable ordered collection of {@see GraphEdge} instances for a single origin currency.
  *
+ * @internal
+ *
  * @implements IteratorAggregate<int, GraphEdge>
  */
 final class GraphEdgeCollection implements Countable, IteratorAggregate, JsonSerializable

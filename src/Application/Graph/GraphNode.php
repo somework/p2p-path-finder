@@ -12,6 +12,8 @@ use Traversable;
 /**
  * Represents a currency node and its outgoing edges within the trading graph.
  *
+ * @internal
+ *
  * @implements IteratorAggregate<int, GraphEdge>
  */
 final class GraphNode implements IteratorAggregate, JsonSerializable
