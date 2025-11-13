@@ -21,4 +21,17 @@ final class SegmentCapacityTotalsTest extends TestCase
 
         new SegmentCapacityTotals($mandatory, $maximum);
     }
+
+    public function test_it_exposes_the_provided_totals_and_calculates_optional_headroom(): void
+    {
+        $mandatory = Money::fromString('USD', '10', 2);
+        $maximum = Money::fromString('USD', '25', 2);
+
+        $totals = new SegmentCapacityTotals($mandatory, $maximum);
+
+        self::assertSame($mandatory, $totals->mandatory());
+        self::assertSame($maximum, $totals->maximum());
+        self::assertSame(2, $totals->scale());
+        self::assertTrue($totals->optionalHeadroom()->equals(Money::fromString('USD', '15', 2)));
+    }
 }
