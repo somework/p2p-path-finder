@@ -44,20 +44,46 @@ final class PathFinderService
     /**
      * @var Closure(PathSearchRequest):Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath>
      */
-    private readonly Closure $pathFinderFactory;
+    private Closure $pathFinderFactory;
 
     public function __construct(
         private readonly GraphBuilder $graphBuilder,
         ?PathOrderStrategy $orderingStrategy = null,
-        ?callable $pathFinderFactory = null,
     ) {
+        $strategy = $orderingStrategy ?? new CostHopsSignatureOrderingStrategy(self::COST_SCALE);
         $fillEvaluator = new OrderFillEvaluator();
         $this->legMaterializer = new LegMaterializer($fillEvaluator);
         $this->orderSpendAnalyzer = new OrderSpendAnalyzer($fillEvaluator, $this->legMaterializer);
         $this->toleranceEvaluator = new ToleranceEvaluator();
-        $this->orderingStrategy = $orderingStrategy ?? new CostHopsSignatureOrderingStrategy(self::COST_SCALE);
-        $strategy = $this->orderingStrategy;
-        $factory = $pathFinderFactory ?? static function (PathSearchRequest $request) use ($strategy): Closure {
+        $this->orderingStrategy = $strategy;
+        $this->pathFinderFactory = self::createDefaultRunnerFactory($strategy);
+    }
+
+    /**
+     * @internal
+     *
+     * @param Closure(PathSearchRequest):(Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath>) $pathFinderFactory
+     */
+    public static function withRunnerFactory(
+        GraphBuilder $graphBuilder,
+        ?PathOrderStrategy $orderingStrategy,
+        Closure $pathFinderFactory,
+    ): self {
+        $service = new self($graphBuilder, $orderingStrategy);
+
+        /** @var Closure(PathSearchRequest):Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath> $typedFactory */
+        $typedFactory = $pathFinderFactory;
+        $service->pathFinderFactory = $typedFactory;
+
+        return $service;
+    }
+
+    /**
+     * @return Closure(PathSearchRequest):Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath>
+     */
+    private static function createDefaultRunnerFactory(PathOrderStrategy $strategy): Closure
+    {
+        return static function (PathSearchRequest $request) use ($strategy): Closure {
             $config = $request->config();
 
             /**
@@ -94,13 +120,6 @@ final class PathFinderService
 
             return $runner;
         };
-
-        $factory = $factory instanceof Closure ? $factory : Closure::fromCallable($factory);
-
-        /** @var Closure(PathSearchRequest):Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath> $typedFactory */
-        $typedFactory = $factory;
-
-        $this->pathFinderFactory = $typedFactory;
     }
 
     /**

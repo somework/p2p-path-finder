@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\Service\PathFinder;
 
+use Closure;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
@@ -32,9 +33,9 @@ abstract class PathFinderServiceTestCase extends TestCase
         return new PathFinderService(new GraphBuilder());
     }
 
-    protected function makeServiceWithFactory(callable $factory): PathFinderService
+    protected function makeServiceWithFactory(Closure $factory): PathFinderService
     {
-        return new PathFinderService(new GraphBuilder(), pathFinderFactory: $factory);
+        return PathFinderService::withRunnerFactory(new GraphBuilder(), orderingStrategy: null, pathFinderFactory: $factory);
     }
 
     protected function makeRequest(OrderBook $orderBook, PathSearchConfig $config, string $targetAsset): PathSearchRequest
