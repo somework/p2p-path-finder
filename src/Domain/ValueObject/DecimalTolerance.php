@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
 use JsonSerializable;
+use SomeWork\P2PPathFinder\Domain\Math\DecimalMathInterface;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
@@ -26,13 +27,16 @@ final class DecimalTolerance implements JsonSerializable
 
     private readonly int $scale;
 
+    private readonly DecimalMathInterface $math;
+
     /**
      * @param numeric-string $ratio
      */
-    private function __construct(string $ratio, int $scale)
+    private function __construct(string $ratio, int $scale, DecimalMathInterface $math)
     {
         $this->ratio = $ratio;
         $this->scale = $scale;
+        $this->math = $math;
     }
 
     /**
@@ -40,26 +44,29 @@ final class DecimalTolerance implements JsonSerializable
      *
      * @throws InvalidInput|PrecisionViolation when the ratio or scale fall outside the supported range
      */
-    public static function fromNumericString(string $ratio, ?int $scale = null): self
+    public static function fromNumericString(string $ratio, ?int $scale = null, ?DecimalMathInterface $math = null): self
     {
         $scale ??= self::DEFAULT_SCALE;
         self::assertScale($scale);
 
-        BcMath::ensureNumeric($ratio);
+        $math = MathAdapterFactory::resolve($math);
+        $math->ensureNumeric($ratio);
 
-        $normalized = BcMath::normalize($ratio, $scale);
+        $normalized = $math->normalize($ratio, $scale);
         $comparisonScale = max($scale, self::DEFAULT_SCALE);
 
-        if (BcMath::comp($normalized, '0', $comparisonScale) < 0 || BcMath::comp($normalized, '1', $comparisonScale) > 0) {
+        if ($math->comp($normalized, '0', $comparisonScale) < 0 || $math->comp($normalized, '1', $comparisonScale) > 0) {
             throw new InvalidInput('Residual tolerance must be a value between 0 and 1 inclusive.');
         }
 
-        return new self($normalized, $scale);
+        return new self($normalized, $scale, $math);
     }
 
-    public static function zero(): self
+    public static function zero(?DecimalMathInterface $math = null): self
     {
-        return new self(BcMath::normalize('0', self::DEFAULT_SCALE), self::DEFAULT_SCALE);
+        $math = MathAdapterFactory::resolve($math);
+
+        return new self($math->normalize('0', self::DEFAULT_SCALE), self::DEFAULT_SCALE, $math);
     }
 
     /**
@@ -77,7 +84,7 @@ final class DecimalTolerance implements JsonSerializable
 
     public function isZero(): bool
     {
-        return 0 === BcMath::comp($this->ratio, '0', $this->scale);
+        return 0 === $this->math->comp($this->ratio, '0', $this->scale);
     }
 
     /**
@@ -93,9 +100,9 @@ final class DecimalTolerance implements JsonSerializable
 
         $comparisonScale = max($this->scale, $scale ?? $this->scale, self::DEFAULT_SCALE);
 
-        $normalized = BcMath::normalize($value, $comparisonScale);
+        $normalized = $this->math->normalize($value, $comparisonScale);
 
-        return BcMath::comp($this->ratio, $normalized, $comparisonScale);
+        return $this->math->comp($this->ratio, $normalized, $comparisonScale);
     }
 
     /**
@@ -128,9 +135,9 @@ final class DecimalTolerance implements JsonSerializable
         self::assertScale($scale);
 
         $workingScale = max($this->scale, $scale) + 2;
-        $product = BcMath::mul($this->ratio, self::PERCENT_MULTIPLIER, $workingScale);
+        $product = $this->math->mul($this->ratio, self::PERCENT_MULTIPLIER, $workingScale);
 
-        return BcMath::normalize($product, $scale);
+        return $this->math->normalize($product, $scale);
     }
 
     /**
@@ -146,5 +153,10 @@ final class DecimalTolerance implements JsonSerializable
         if ($scale < 0) {
             throw new InvalidInput('Scale must be a non-negative integer.');
         }
+    }
+
+    public function math(): DecimalMathInterface
+    {
+        return $this->math;
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
+use SomeWork\P2PPathFinder\Domain\Math\DecimalMathInterface;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
@@ -22,6 +23,7 @@ final class ExchangeRate
         private readonly string $quoteCurrency,
         private readonly string $rate,
         private readonly int $scale,
+        private readonly DecimalMathInterface $math,
     ) {
     }
 
@@ -34,21 +36,22 @@ final class ExchangeRate
      *
      * @throws InvalidInput|PrecisionViolation when the provided currencies or rate are invalid
      */
-    public static function fromString(string $baseCurrency, string $quoteCurrency, string $rate, int $scale = 8): self
+    public static function fromString(string $baseCurrency, string $quoteCurrency, string $rate, int $scale = 8, ?DecimalMathInterface $math = null): self
     {
-        Money::fromString($baseCurrency, '0', $scale); // Validates the currency format.
-        Money::fromString($quoteCurrency, '0', $scale);
+        $math = MathAdapterFactory::resolve($math);
+        Money::fromString($baseCurrency, '0', $scale, $math); // Validates the currency format.
+        Money::fromString($quoteCurrency, '0', $scale, $math);
 
         if (0 === strcasecmp($baseCurrency, $quoteCurrency)) {
             throw new InvalidInput('Exchange rate requires distinct currencies.');
         }
 
-        $normalizedRate = BcMath::normalize($rate, $scale);
-        if (1 !== BcMath::comp($normalizedRate, '0', $scale)) {
+        $normalizedRate = $math->normalize($rate, $scale);
+        if (1 !== $math->comp($normalizedRate, '0', $scale)) {
             throw new InvalidInput('Exchange rate must be greater than zero.');
         }
 
-        return new self(strtoupper($baseCurrency), strtoupper($quoteCurrency), $normalizedRate, $scale);
+        return new self(strtoupper($baseCurrency), strtoupper($quoteCurrency), $normalizedRate, $scale, $math);
     }
 
     /**
@@ -63,10 +66,10 @@ final class ExchangeRate
         }
 
         $scale ??= max($this->scale, $money->scale());
-        $raw = BcMath::mul($money->amount(), $this->rate, $scale + $this->scale);
-        $normalized = BcMath::normalize($raw, $scale);
+        $raw = $this->math->mul($money->amount(), $this->rate, $scale + $this->scale);
+        $normalized = $this->math->normalize($raw, $scale);
 
-        return Money::fromString($this->quoteCurrency, $normalized, $scale);
+        return Money::fromString($this->quoteCurrency, $normalized, $scale, $this->math);
     }
 
     /**
@@ -76,10 +79,15 @@ final class ExchangeRate
      */
     public function invert(): self
     {
-        $inverseRaw = BcMath::div('1', $this->rate, $this->scale + 1);
-        $inverse = BcMath::normalize($inverseRaw, $this->scale);
+        $inverseRaw = $this->math->div('1', $this->rate, $this->scale + 1);
+        $inverse = $this->math->normalize($inverseRaw, $this->scale);
 
-        return new self($this->quoteCurrency, $this->baseCurrency, $inverse, $this->scale);
+        return new self($this->quoteCurrency, $this->baseCurrency, $inverse, $this->scale, $this->math);
+    }
+
+    public function math(): DecimalMathInterface
+    {
+        return $this->math;
     }
 
     /**

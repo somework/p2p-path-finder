@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
+use SomeWork\P2PPathFinder\Domain\Math\DecimalMathInterface;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
@@ -24,37 +25,41 @@ final class ToleranceWindow
     /** @var 'minimum'|'maximum' */
     private readonly string $heuristicSource;
 
+    private readonly DecimalMathInterface $math;
+
     /**
      * @param numeric-string      $minimum
      * @param numeric-string      $maximum
      * @param numeric-string      $heuristicTolerance
      * @param 'minimum'|'maximum' $heuristicSource
      */
-    private function __construct(string $minimum, string $maximum, string $heuristicTolerance, string $heuristicSource)
+    private function __construct(string $minimum, string $maximum, string $heuristicTolerance, string $heuristicSource, DecimalMathInterface $math)
     {
         $this->minimum = $minimum;
         $this->maximum = $maximum;
         $this->heuristicTolerance = $heuristicTolerance;
         $this->heuristicSource = $heuristicSource;
+        $this->math = $math;
     }
 
     /**
      * @throws InvalidInput|PrecisionViolation when either tolerance bound is invalid
      */
-    public static function fromStrings(string $minimum, string $maximum): self
+    public static function fromStrings(string $minimum, string $maximum, ?DecimalMathInterface $math = null): self
     {
-        $normalizedMinimum = self::normalizeTolerance($minimum, 'Minimum tolerance');
-        $normalizedMaximum = self::normalizeTolerance($maximum, 'Maximum tolerance');
+        $math = MathAdapterFactory::resolve($math);
+        $normalizedMinimum = self::normalizeTolerance($minimum, 'Minimum tolerance', $math);
+        $normalizedMaximum = self::normalizeTolerance($maximum, 'Maximum tolerance', $math);
 
-        if (BcMath::comp($normalizedMinimum, $normalizedMaximum, self::SCALE) > 0) {
+        if ($math->comp($normalizedMinimum, $normalizedMaximum, self::SCALE) > 0) {
             throw new InvalidInput('Minimum tolerance must be less than or equal to maximum tolerance.');
         }
 
-        if (0 === BcMath::comp($normalizedMinimum, $normalizedMaximum, self::SCALE)) {
-            return new self($normalizedMinimum, $normalizedMaximum, $normalizedMinimum, 'minimum');
+        if (0 === $math->comp($normalizedMinimum, $normalizedMaximum, self::SCALE)) {
+            return new self($normalizedMinimum, $normalizedMaximum, $normalizedMinimum, 'minimum', $math);
         }
 
-        return new self($normalizedMinimum, $normalizedMaximum, $normalizedMaximum, 'maximum');
+        return new self($normalizedMinimum, $normalizedMaximum, $normalizedMaximum, 'maximum', $math);
     }
 
     /**
@@ -64,13 +69,14 @@ final class ToleranceWindow
      *
      * @return numeric-string
      */
-    public static function normalizeTolerance(string $value, string $context): string
+    public static function normalizeTolerance(string $value, string $context, ?DecimalMathInterface $math = null): string
     {
-        BcMath::ensureNumeric($value);
+        $math = MathAdapterFactory::resolve($math);
+        $math->ensureNumeric($value);
         /** @var numeric-string $value */
-        $normalized = BcMath::normalize($value, self::SCALE);
+        $normalized = $math->normalize($value, self::SCALE);
 
-        if (BcMath::comp($normalized, '0', self::SCALE) < 0 || BcMath::comp($normalized, '1', self::SCALE) >= 0) {
+        if ($math->comp($normalized, '0', self::SCALE) < 0 || $math->comp($normalized, '1', self::SCALE) >= 0) {
             throw new InvalidInput($context.' must be in the [0, 1) range.');
         }
 
@@ -120,6 +126,11 @@ final class ToleranceWindow
     public static function scale(): int
     {
         return self::SCALE;
+    }
+
+    public function math(): DecimalMathInterface
+    {
+        return $this->math;
     }
 
     private const SCALE = 18;
