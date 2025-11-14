@@ -5,17 +5,24 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Domain\ValueObject;
 
 use PHPUnit\Framework\TestCase;
-use ReflectionProperty;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
+use SomeWork\P2PPathFinder\Internal\Math\BcMathDecimalMath;
 
 use function max;
 use function sprintf;
 
 final class DecimalToleranceTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        BcMath::useDecimalMath(null);
+    }
+
     public function test_it_normalizes_ratio_to_default_scale(): void
     {
         $tolerance = DecimalTolerance::fromNumericString('0.1');
@@ -138,16 +145,8 @@ final class DecimalToleranceTest extends TestCase
 
     public function test_from_numeric_string_requires_bcmath_extension(): void
     {
-        $detector = new ReflectionProperty(BcMath::class, 'extensionDetector');
-        $detector->setAccessible(true);
-        $verified = new ReflectionProperty(BcMath::class, 'extensionVerified');
-        $verified->setAccessible(true);
-
-        $previousDetector = $detector->getValue();
-        $previousVerified = $verified->getValue();
-
-        $detector->setValue(null, static fn (string $extension): bool => false);
-        $verified->setValue(null, false);
+        $math = $this->decimalMath();
+        $math->setExtensionDetector(static fn (string $extension): bool => false);
 
         $this->expectException(PrecisionViolation::class);
         $this->expectExceptionMessage('The BCMath extension (ext-bcmath) is required. Install it or require symfony/polyfill-bcmath when the extension cannot be loaded.');
@@ -155,8 +154,7 @@ final class DecimalToleranceTest extends TestCase
         try {
             DecimalTolerance::fromNumericString('0.1');
         } finally {
-            $detector->setValue(null, $previousDetector);
-            $verified->setValue(null, $previousVerified);
+            $math->setExtensionDetector(null);
         }
     }
 
@@ -180,5 +178,18 @@ final class DecimalToleranceTest extends TestCase
         foreach (NumericStringGenerator::toleranceRatios() as [$ratio, $scale]) {
             yield sprintf('ratio-%d', $case++) => [$ratio, $scale];
         }
+    }
+
+    private function decimalMath(): BcMathDecimalMath
+    {
+        BcMath::ensureNumeric('0');
+
+        $property = new \ReflectionProperty(BcMath::class, 'decimalMath');
+        $property->setAccessible(true);
+
+        $math = $property->getValue();
+        self::assertInstanceOf(BcMathDecimalMath::class, $math);
+
+        return $math;
     }
 }

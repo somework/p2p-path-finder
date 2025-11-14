@@ -89,14 +89,22 @@ final class ToleranceEvaluator
             $diff = substr($diff, 1);
         }
 
-        BcMath::ensureNumeric($diff);
+        BcMath::ensureNumeric($diff, $desiredAmount);
 
-        if (0 === BcMath::comp($diff, '0', $scale + 4)) {
+        /** @var numeric-string $numericDiffForComparison */
+        $numericDiffForComparison = $diff;
+
+        if (0 === BcMath::comp($numericDiffForComparison, '0', $scale + 4)) {
             $diff = '0';
         }
 
-        BcMath::ensureNumeric($diff);
-        $ratio = BcMath::div($diff, $desiredAmount, $targetScale + 4);
+        /** @var numeric-string $numericDiff */
+        $numericDiff = $diff;
+
+        /** @var numeric-string $numericDesiredAmount */
+        $numericDesiredAmount = $desiredAmount;
+
+        $ratio = BcMath::div($numericDiff, $numericDesiredAmount, $targetScale + 4);
 
         return BcMath::normalize($ratio, $targetScale);
     }

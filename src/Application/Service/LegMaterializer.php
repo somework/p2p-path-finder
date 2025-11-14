@@ -495,8 +495,15 @@ final class LegMaterializer
             $difference = '0';
         }
 
-        BcMath::ensureNumeric($difference);
-        $relative = BcMath::div($difference, $targetAmount, $comparisonScale + self::SELL_RESOLUTION_RATIO_EXTRA_SCALE);
+        BcMath::ensureNumeric($difference, $targetAmount);
+
+        /** @var numeric-string $numericDifference */
+        $numericDifference = $difference;
+
+        /** @var numeric-string $numericTargetAmount */
+        $numericTargetAmount = $targetAmount;
+
+        $relative = BcMath::div($numericDifference, $numericTargetAmount, $comparisonScale + self::SELL_RESOLUTION_RATIO_EXTRA_SCALE);
 
         return BcMath::comp($relative, self::SELL_RESOLUTION_RELATIVE_TOLERANCE, self::SELL_RESOLUTION_TOLERANCE_SCALE) <= 0;
     }

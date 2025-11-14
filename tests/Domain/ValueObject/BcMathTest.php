@@ -10,11 +10,19 @@ use ReflectionProperty;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
+use SomeWork\P2PPathFinder\Internal\Math\BcMathDecimalMath;
 
 use function sprintf;
 
 final class BcMathTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        BcMath::useDecimalMath(null);
+    }
+
     public function test_arithmetic_operations_preserve_large_precision(): void
     {
         self::assertSame('1234567890.12345677', BcMath::add('1234567890.12345678', '-0.00000001', 8));
@@ -155,31 +163,35 @@ final class BcMathTest extends TestCase
 
     public function test_working_scale_helpers_cover_all_private_strategies(): void
     {
-        $addition = new ReflectionMethod(BcMath::class, 'workingScaleForAddition');
+        $math = $this->decimalMath();
+
+        $addition = new ReflectionMethod(BcMathDecimalMath::class, 'workingScaleForAddition');
         $addition->setAccessible(true);
-        self::assertSame(5, $addition->invoke(null, '1.234', '9.87654', 3));
+        self::assertSame(5, $addition->invoke($math, '1.234', '9.87654', 3));
 
-        $multiplication = new ReflectionMethod(BcMath::class, 'workingScaleForMultiplication');
+        $multiplication = new ReflectionMethod(BcMathDecimalMath::class, 'workingScaleForMultiplication');
         $multiplication->setAccessible(true);
-        self::assertSame(9, $multiplication->invoke(null, '1.23', '4.5678', 3));
+        self::assertSame(9, $multiplication->invoke($math, '1.23', '4.5678', 3));
 
-        $division = new ReflectionMethod(BcMath::class, 'workingScaleForDivision');
+        $division = new ReflectionMethod(BcMathDecimalMath::class, 'workingScaleForDivision');
         $division->setAccessible(true);
-        self::assertSame(10, $division->invoke(null, '12.34', '0.0567', 4));
+        self::assertSame(10, $division->invoke($math, '12.34', '0.0567', 4));
 
-        $comparison = new ReflectionMethod(BcMath::class, 'workingScaleForComparison');
+        $comparison = new ReflectionMethod(BcMathDecimalMath::class, 'workingScaleForComparison');
         $comparison->setAccessible(true);
-        self::assertSame(4, $comparison->invoke(null, '123.4500', '-0.000100', 2));
+        self::assertSame(4, $comparison->invoke($math, '123.4500', '-0.000100', 2));
     }
 
     public function test_scale_of_trims_trailing_zeroes_and_signs(): void
     {
-        $method = new ReflectionMethod(BcMath::class, 'scaleOf');
+        $math = $this->decimalMath();
+
+        $method = new ReflectionMethod(BcMathDecimalMath::class, 'scaleOf');
         $method->setAccessible(true);
 
-        self::assertSame(0, $method->invoke(null, '42'));
-        self::assertSame(2, $method->invoke(null, '-0.0100'));
-        self::assertSame(4, $method->invoke(null, '+123.4567000'));
+        self::assertSame(0, $method->invoke($math, '42'));
+        self::assertSame(2, $method->invoke($math, '-0.0100'));
+        self::assertSame(4, $method->invoke($math, '+123.4567000'));
     }
 
     public function test_constructor_invocation_via_reflection_provides_coverage(): void
@@ -197,16 +209,11 @@ final class BcMathTest extends TestCase
 
     public function test_extension_check_throws_when_detector_reports_missing(): void
     {
-        $detector = new ReflectionProperty(BcMath::class, 'extensionDetector');
-        $detector->setAccessible(true);
-        $verified = new ReflectionProperty(BcMath::class, 'extensionVerified');
-        $verified->setAccessible(true);
+        $math = $this->decimalMath();
+        $previous = new ReflectionProperty(BcMath::class, 'decimalMath');
+        $previous->setAccessible(true);
 
-        $previousDetector = $detector->getValue();
-        $previousVerified = $verified->getValue();
-
-        $detector->setValue(null, static fn (string $extension): bool => false);
-        $verified->setValue(null, false);
+        $math->setExtensionDetector(static fn (string $extension): bool => false);
 
         $this->expectException(PrecisionViolation::class);
         $this->expectExceptionMessage('The BCMath extension (ext-bcmath) is required. Install it or require symfony/polyfill-bcmath when the extension cannot be loaded.');
@@ -214,8 +221,21 @@ final class BcMathTest extends TestCase
         try {
             BcMath::add('1', '1', 2);
         } finally {
-            $detector->setValue(null, $previousDetector);
-            $verified->setValue(null, $previousVerified);
+            $math->setExtensionDetector(null);
+            $previous->setValue(null, null);
         }
+    }
+
+    private function decimalMath(): BcMathDecimalMath
+    {
+        BcMath::ensureNumeric('0');
+
+        $property = new ReflectionProperty(BcMath::class, 'decimalMath');
+        $property->setAccessible(true);
+
+        $math = $property->getValue();
+        self::assertInstanceOf(BcMathDecimalMath::class, $math);
+
+        return $math;
     }
 }
