@@ -412,12 +412,6 @@ hop count, route signature and discovery order (plus any payload provided by the
 a negative value favours the left operand, positive favours the right, and zero defers to the next
 tie-breaker.
 
-For one-off scenarios—such as wiring different strategies per request—you can supply a
-`pathFinderFactory` callable that produces bespoke runners. The factory receives the
-`PathSearchRequest` and must return a closure matching the signature used internally by the façade.
-Most integrations should prefer the constructor-level strategy injection shown above so that the
-internal search engine remains hidden behind the service API.
-
 In this example the first entry contains a single `PathLeg` reflecting the direct USD→USDT
 conversion.
 

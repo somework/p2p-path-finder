@@ -815,7 +815,7 @@ High level facade orchestrating order filtering, graph building and path search.
 ### Public methods
 
 ### __construct
-`PathFinderService::__construct(SomeWork\P2PPathFinder\Application\Graph\GraphBuilder $graphBuilder, ?SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy $orderingStrategy = null, ?callable $pathFinderFactory = null)`
+`PathFinderService::__construct(SomeWork\P2PPathFinder\Application\Graph\GraphBuilder $graphBuilder, ?SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy $orderingStrategy = null)`
 
 ### findBestPaths
 `PathFinderService::findBestPaths(SomeWork\P2PPathFinder\Application\Service\PathSearchRequest $request): SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome`
