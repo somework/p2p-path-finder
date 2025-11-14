@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
+use SomeWork\P2PPathFinder\Domain\Math\DecimalMathInterface;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
@@ -25,36 +26,41 @@ final class Money
         private readonly string $currency,
         private readonly string $amount,
         private readonly int $scale,
+        private readonly DecimalMathInterface $math,
     ) {
     }
 
     /**
      * Creates a new money instance from raw string components.
      *
-     * @param string         $currency ISO-like currency symbol comprised of 3-12 alphabetic characters
-     * @param numeric-string $amount   numeric string compatible with BCMath functions
-     * @param int            $scale    number of decimal digits to retain after normalization
+     * @param string                    $currency ISO-like currency symbol comprised of 3-12 alphabetic characters
+     * @param numeric-string            $amount   numeric string compatible with BCMath functions
+     * @param int                       $scale    number of decimal digits to retain after normalization
+     * @param DecimalMathInterface|null $math     decimal math adapter used for normalization and arithmetic
      *
      * @throws InvalidInput|PrecisionViolation when the currency or amount fail validation
      */
-    public static function fromString(string $currency, string $amount, int $scale = 2): self
+    public static function fromString(string $currency, string $amount, int $scale = 2, ?DecimalMathInterface $math = null): self
     {
         self::assertCurrency($currency);
         $normalizedCurrency = strtoupper($currency);
 
-        $normalizedAmount = BcMath::normalize($amount, $scale);
+        $math = MathAdapterFactory::resolve($math);
+        $normalizedAmount = $math->normalize($amount, $scale);
 
-        return new self($normalizedCurrency, $normalizedAmount, $scale);
+        return new self($normalizedCurrency, $normalizedAmount, $scale, $math);
     }
 
     /**
      * Creates a zero-value amount for the provided currency and scale.
      *
+     * @param DecimalMathInterface|null $math decimal math adapter used for normalization and arithmetic
+     *
      * @throws InvalidInput|PrecisionViolation when the currency or scale are invalid
      */
-    public static function zero(string $currency, int $scale = 2): self
+    public static function zero(string $currency, int $scale = 2, ?DecimalMathInterface $math = null): self
     {
-        return self::fromString($currency, '0', $scale);
+        return self::fromString($currency, '0', $scale, $math);
     }
 
     /**
@@ -68,9 +74,9 @@ final class Money
             return $this;
         }
 
-        $normalized = BcMath::normalize($this->amount, $scale);
+        $normalized = $this->math->normalize($this->amount, $scale);
 
-        return new self($this->currency, $normalized, $scale);
+        return new self($this->currency, $normalized, $scale, $this->math);
     }
 
     /**
@@ -113,9 +119,9 @@ final class Money
         $this->assertSameCurrency($other);
         $scale ??= max($this->scale, $other->scale);
 
-        $result = BcMath::add($this->amount, $other->amount, $scale);
+        $result = $this->math->add($this->amount, $other->amount, $scale);
 
-        return new self($this->currency, $result, $scale);
+        return new self($this->currency, $result, $scale, $this->math);
     }
 
     /**
@@ -131,9 +137,9 @@ final class Money
         $this->assertSameCurrency($other);
         $scale ??= max($this->scale, $other->scale);
 
-        $result = BcMath::sub($this->amount, $other->amount, $scale);
+        $result = $this->math->sub($this->amount, $other->amount, $scale);
 
-        return new self($this->currency, $result, $scale);
+        return new self($this->currency, $result, $scale, $this->math);
     }
 
     /**
@@ -146,12 +152,12 @@ final class Money
      */
     public function multiply(string $multiplier, ?int $scale = null): self
     {
-        BcMath::ensureNumeric($multiplier);
+        $this->math->ensureNumeric($multiplier);
         $scale ??= $this->scale;
 
-        $result = BcMath::mul($this->amount, $multiplier, $scale);
+        $result = $this->math->mul($this->amount, $multiplier, $scale);
 
-        return new self($this->currency, BcMath::normalize($result, $scale), $scale);
+        return new self($this->currency, $this->math->normalize($result, $scale), $scale, $this->math);
     }
 
     /**
@@ -164,11 +170,11 @@ final class Money
      */
     public function divide(string $divisor, ?int $scale = null): self
     {
-        BcMath::ensureNumeric($divisor);
+        $this->math->ensureNumeric($divisor);
         $scale ??= $this->scale;
-        $result = BcMath::div($this->amount, $divisor, $scale);
+        $result = $this->math->div($this->amount, $divisor, $scale);
 
-        return new self($this->currency, BcMath::normalize($result, $scale), $scale);
+        return new self($this->currency, $this->math->normalize($result, $scale), $scale, $this->math);
     }
 
     /**
@@ -184,9 +190,9 @@ final class Money
     public function compare(self $other, ?int $scale = null): int
     {
         $this->assertSameCurrency($other);
-        $scale ??= BcMath::scaleForComparison($this->amount, $other->amount, max($this->scale, $other->scale));
+        $scale ??= $this->math->scaleForComparison($this->amount, $other->amount, max($this->scale, $other->scale));
 
-        return BcMath::comp($this->amount, $other->amount, $scale);
+        return $this->math->comp($this->amount, $other->amount, $scale);
     }
 
     /**
@@ -226,7 +232,12 @@ final class Money
      */
     public function isZero(): bool
     {
-        return 0 === BcMath::comp($this->amount, '0', $this->scale);
+        return 0 === $this->math->comp($this->amount, '0', $this->scale);
+    }
+
+    public function math(): DecimalMathInterface
+    {
+        return $this->math;
     }
 
     /**
