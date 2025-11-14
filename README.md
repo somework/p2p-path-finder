@@ -517,9 +517,13 @@ target columns establish the KPIs enforced by CI via PhpBench regression asserti
 
 | Scenario (orders)      | Mean (ms) | Peak memory | KPI target (mean) | KPI target (peak memory) |
 |------------------------|-----------|-------------|-------------------|--------------------------|
-| k-best-n1e2 (100)      | 30.7      | 5.8 MB      | ≤ 35 ms           | ≤ 7 MB                   |
-| k-best-n1e3 (1,000)    | 323.5     | 12.5 MB     | ≤ 350 ms          | ≤ 15 MB                  |
-| k-best-n1e4 (10,000)   | 4,344.2   | 79.8 MB     | ≤ 4.5 s           | ≤ 96 MB                  |
+| k-best-n1e2 (100)      | 172.5     | 6.6 MB      | ≤ 210 ms          | ≤ 8 MB                   |
+| k-best-n1e3 (1,000)    | 1,640.7   | 10.1 MB     | ≤ 2.0 s           | ≤ 12 MB                  |
+| k-best-n1e4 (10,000)   | 16,704.9  | 46.7 MB     | ≤ 20 s            | ≤ 56 MB                  |
+
+> ⚠️  The switch to the Brick-backed decimal facade (dropping the BCMath extension)
+> temporarily inflated the k-best timings and memory usage. We will tighten the
+> targets after optimising the new code path.
 
 Run the suite locally and compare against the stored baseline with:
 
