@@ -31,7 +31,7 @@ final class BcMath
     /**
      * @phpstan-assert numeric-string $values
      *
-     * @psalm-assert numeric-string $values
+     * @psalm-assert numeric-string ...$values
      */
     public static function ensureNumeric(string ...$values): void
     {

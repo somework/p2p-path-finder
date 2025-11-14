@@ -25,6 +25,11 @@ final class BrickDecimalMath implements DecimalMathInterface
 {
     public const DEFAULT_SCALE = DecimalMathInterface::DEFAULT_SCALE;
 
+    /**
+     * @phpstan-assert numeric-string $values
+     *
+     * @psalm-assert numeric-string ...$values
+     */
     public function ensureNumeric(string ...$values): void
     {
         foreach ($values as $value) {

@@ -43,6 +43,11 @@ final class BcMathDecimalMath implements DecimalMathInterface
      */
     private ?Closure $extensionDetector = null;
 
+    /**
+     * @phpstan-assert numeric-string $values
+     *
+     * @psalm-assert numeric-string ...$values
+     */
     public function ensureNumeric(string ...$values): void
     {
         foreach ($values as $value) {
@@ -161,8 +166,11 @@ final class BcMathDecimalMath implements DecimalMathInterface
 
         $this->ensureNumeric($increment);
 
+        /** @var numeric-string $numericIncrement */
+        $numericIncrement = $increment;
+
         /** @var numeric-string $adjusted */
-        $adjusted = bcadd($value, $increment, $scale + 1);
+        $adjusted = bcadd($value, $numericIncrement, $scale + 1);
 
         /** @var numeric-string $result */
         $result = bcadd($adjusted, '0', $scale);
@@ -179,6 +187,12 @@ final class BcMathDecimalMath implements DecimalMathInterface
 
     /**
      * Allows tests to replace the extension detector.
+     *
+     * @param (Closure(string):bool)|null $detector
+     *
+     * @phpstan-param (Closure(string):bool)|null $detector
+     *
+     * @psalm-param (Closure(string):bool)|null $detector
      *
      * @internal
      */
@@ -212,9 +226,11 @@ final class BcMathDecimalMath implements DecimalMathInterface
     {
         $this->ensureExtensionAvailable();
         $this->ensureNumeric($value);
+        /** @var numeric-string $numericValue */
+        $numericValue = $value;
         $scale = max($this->scaleOf($value), 1);
 
-        if (0 === bccomp($value, '0', $scale)) {
+        if (0 === bccomp($numericValue, '0', $scale)) {
             throw new InvalidInput('Division by zero.');
         }
     }

@@ -14,7 +14,7 @@ interface DecimalMathInterface
     /**
      * @phpstan-assert numeric-string $values
      *
-     * @psalm-assert numeric-string $values
+     * @psalm-assert numeric-string ...$values
      */
     public function ensureNumeric(string ...$values): void;
 
