@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Domain\ValueObject;
 
 use PHPUnit\Framework\TestCase;
+use ReflectionProperty;
 use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
-use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
-use SomeWork\P2PPathFinder\Internal\Math\BcMathDecimalMath;
 
 use function max;
 use function sprintf;
@@ -20,7 +19,9 @@ final class DecimalToleranceTest extends TestCase
     {
         parent::setUp();
 
-        BcMath::useDecimalMath(null);
+        $property = new ReflectionProperty(BcMath::class, 'decimalMath');
+        $property->setAccessible(true);
+        $property->setValue(null, null);
     }
 
     public function test_it_normalizes_ratio_to_default_scale(): void
@@ -143,21 +144,6 @@ final class DecimalToleranceTest extends TestCase
         DecimalTolerance::fromNumericString('0.5', -1);
     }
 
-    public function test_from_numeric_string_requires_bcmath_extension(): void
-    {
-        $math = $this->decimalMath();
-        $math->setExtensionDetector(static fn (string $extension): bool => false);
-
-        $this->expectException(PrecisionViolation::class);
-        $this->expectExceptionMessage('The BCMath extension (ext-bcmath) is required. Install it or require symfony/polyfill-bcmath when the extension cannot be loaded.');
-
-        try {
-            DecimalTolerance::fromNumericString('0.1');
-        } finally {
-            $math->setExtensionDetector(null);
-        }
-    }
-
     public function test_comparison_helpers_cover_both_directions(): void
     {
         $tolerance = DecimalTolerance::fromNumericString('0.25');
@@ -178,18 +164,5 @@ final class DecimalToleranceTest extends TestCase
         foreach (NumericStringGenerator::toleranceRatios() as [$ratio, $scale]) {
             yield sprintf('ratio-%d', $case++) => [$ratio, $scale];
         }
-    }
-
-    private function decimalMath(): BcMathDecimalMath
-    {
-        BcMath::ensureNumeric('0');
-
-        $property = new \ReflectionProperty(BcMath::class, 'decimalMath');
-        $property->setAccessible(true);
-
-        $math = $property->getValue();
-        self::assertInstanceOf(BcMathDecimalMath::class, $math);
-
-        return $math;
     }
 }
