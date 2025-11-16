@@ -51,6 +51,9 @@ use function strtoupper;
  */
 final class PathFinder
 {
+    /**
+     * Canonical tolerance, cost and residual scale documented in docs/decimal-strategy.md.
+     */
     private const SCALE = 18;
     /**
      * Extra precision used when converting target and source deltas into a ratio to avoid premature rounding.

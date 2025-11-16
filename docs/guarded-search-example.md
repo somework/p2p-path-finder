@@ -4,6 +4,11 @@ This quick example shows how to configure search guard limits when integrating t
 into an application. The full flow fits in a single script and can be executed in under 15
 minutes during onboarding.
 
+> ℹ️  Tolerance inputs and spend calculations follow the canonical policy described in
+> [docs/decimal-strategy.md](decimal-strategy.md#canonical-scale-and-rounding-policy). Keep
+> residual reporting at the documented scale (18 decimal places) so benchmarking and CI
+> comparisons remain reproducible.
+
 ```php
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;

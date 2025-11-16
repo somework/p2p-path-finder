@@ -19,6 +19,8 @@ use function substr;
 
 /**
  * Decimal math implementation backed by brick/math's arbitrary precision decimals.
+ *
+ * @see docs/decimal-strategy.md for the canonical scale and rounding policy applied here.
  */
 final class BrickDecimalMath
 {

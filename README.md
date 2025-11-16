@@ -9,8 +9,15 @@ clear separation between the domain model and application services.
 
 ## Requirements
 
-* PHP 8.2 or newer.
+* PHP 8.2 or newer with the standard extensions flagged by `composer check-platform-reqs`
+  enabled: `ext-ctype`, `ext-date`, `ext-dom`, `ext-filter`, `ext-hash`, `ext-iconv`,
+  `ext-json`, `ext-libxml`, `ext-mbstring` (or `symfony/polyfill-mbstring`), `ext-openssl`,
+  `ext-pcre`, `ext-phar`, `ext-reflection`, `ext-simplexml`, `ext-spl`, `ext-tokenizer`,
+  `ext-xml`, and `ext-xmlwriter`. Decimal math is handled entirely by
+  [`brick/math`](https://github.com/brick/math), so `ext-bcmath` is no longer required.
 * [Composer](https://getcomposer.org/) 2.x to install dependencies.
+
+See [docs/local-development.md](docs/local-development.md) for platform validation tips.
 
 ## Architecture overview
 
@@ -78,7 +85,9 @@ notice.【F:src/Application/Service/OrderSpendAnalyzer.php†L17-L23】【F:src/
 * **Deterministic decimal policy.** All tolerances, costs and search ratios are normalized
   to 18 decimal places using half-up rounding so the same input produces identical routing
   decisions across environments. `BrickDecimalMath` centralises this behaviour and backs
-  the tolerance validation performed by `PathFinder`.【F:src/Application/Math/BrickDecimalMath.php†L41-L123】【F:src/Application/PathFinder/PathFinder.php†L166-L212】
+  the tolerance validation performed by `PathFinder`. Refer to the
+  [decimal strategy](docs/decimal-strategy.md#canonical-scale-and-rounding-policy) for the
+  canonical tolerance scale, working precision and rounding guarantees.【F:src/Application/Math/BrickDecimalMath.php†L41-L123】【F:src/Application/PathFinder/PathFinder.php†L166-L212】
 * **Wall-clock guard rails.** `PathSearchConfig::withSearchTimeBudget()` injects a
   millisecond budget directly into the search loop so that runaway expansions halt even when
   structural guardrails are relaxed. The resulting report is surfaced via
@@ -284,6 +293,9 @@ using half-up rounding. Normalizing via `BrickDecimalMath::normalize()` (and its
 `BcMath::normalize()` proxy) ensures that tie-breaking values such as `0.5` and `-0.5`
 deterministically round away from zero, keeping matching behaviour stable across PHP
 versions and environments.【F:src/Application/Math/BrickDecimalMath.php†L41-L72】【F:src/Domain/ValueObject/BcMath.php†L32-L45】
+See [docs/decimal-strategy.md](docs/decimal-strategy.md#canonical-scale-and-rounding-policy)
+for the full canonical policy, including the working precision applied to ratios and
+intermediate sums.
 
 ## Exceptions
 
