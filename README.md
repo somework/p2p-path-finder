@@ -10,7 +10,7 @@ clear separation between the domain model and application services.
 ## Requirements
 
 * PHP 8.2 or newer.
-* The [BCMath extension](https://www.php.net/manual/en/book.bc.php) (`ext-bcmath`). Install it before running `composer install`; otherwise `composer check-platform-reqs` will fail and dependencies will not be installed. See [docs/local-development.md](docs/local-development.md) for an optional polyfill workflow when the native extension is unavailable.
+* [Composer](https://getcomposer.org/) 2.x to install dependencies.
 
 ## Architecture overview
 
@@ -18,8 +18,8 @@ The codebase is intentionally split into two layers:
 
 * **Domain layer** – Contains value objects such as `Money`, `ExchangeRate`, `OrderBounds`
   and domain entities like `Order`. These classes are immutable, validate their input and
-  provide a thin abstraction around BCMath so that all monetary calculations have
-  predictable precision.
+  route their decimal arithmetic through a Brick-backed helper so that all monetary
+  calculations have predictable precision.
 * **Application layer** – Hosts services that orchestrate the domain model. Notable
   components include:
   * `OrderBook` and a small set of reusable `OrderFilterInterface` implementations used to
@@ -77,8 +77,8 @@ notice.【F:src/Application/Service/OrderSpendAnalyzer.php†L17-L23】【F:src/
   requests from progressing further into the search.【F:src/Application/PathFinder/PathFinder.php†L692-L745】
 * **Deterministic decimal policy.** All tolerances, costs and search ratios are normalized
   to 18 decimal places using half-up rounding so the same input produces identical routing
-  decisions across environments. The `BcMath` helper centralises this behaviour and backs
-  the tolerance validation performed by `PathFinder`.【F:src/Domain/ValueObject/BcMath.php†L79-L121】【F:src/Application/PathFinder/PathFinder.php†L166-L212】
+  decisions across environments. `BrickDecimalMath` centralises this behaviour and backs
+  the tolerance validation performed by `PathFinder`.【F:src/Application/Math/BrickDecimalMath.php†L41-L123】【F:src/Application/PathFinder/PathFinder.php†L166-L212】
 * **Wall-clock guard rails.** `PathSearchConfig::withSearchTimeBudget()` injects a
   millisecond budget directly into the search loop so that runaway expansions halt even when
   structural guardrails are relaxed. The resulting report is surfaced via
@@ -260,26 +260,30 @@ edge segment and drops candidates that would undershoot those thresholds before 
 capacity. As a result, requests that fall just below an order's minimum are pruned earlier
 in the search rather than reaching the materialisation phase.
 
-## BCMath-based precision
+## Brick decimal precision
 
-All arithmetic is delegated to `SomeWork\P2PPathFinder\Domain\ValueObject\BcMath`, a thin
-wrapper around the BCMath extension. It provides:
+All arithmetic is delegated to `SomeWork\P2PPathFinder\Application\Math\BrickDecimalMath`,
+the library's wrapper around [brick/math](https://github.com/brick/math)'s `BigDecimal`
+implementation. The legacy `SomeWork\P2PPathFinder\Domain\ValueObject\BcMath` façade now
+proxies to this helper, preserving the public API while swapping the underlying engine. The
+adapter provides:
 
 * Input validation helpers that fail fast when encountering malformed numeric strings.
 * Deterministic rounding that keeps scale under control without leaking trailing digits.
-* Utility methods (`add`, `sub`, `mul`, `div`, `comp`) that normalise operands so that
+* Utility methods (`add`, `sub`, `mul`, `div`, `comp`) that normalize operands so that
   value objects such as `Money` can work with mixed scales.
 
-By routing every calculation through this helper the library avoids floating-point
+By routing every calculation through `BrickDecimalMath` the library avoids floating-point
 rounding drift and guarantees that two identical operations will always yield the same
-string representation.
+numeric-string representation.【F:src/Application/Math/BrickDecimalMath.php†L25-L123】【F:src/Domain/ValueObject/BcMath.php†L8-L82】
 
 ### Decimal policy
 
-The path finder consistently normalises tolerances, costs and ratios to 18 decimal places
-using half-up rounding. Normalising via `BcMath::normalize()` ensures that tie-breaking
-values such as `0.5` and `-0.5` deterministically round away from zero, keeping matching
-behaviour stable across PHP versions and environments.
+The path finder consistently normalizes tolerances, costs and ratios to 18 decimal places
+using half-up rounding. Normalizing via `BrickDecimalMath::normalize()` (and its
+`BcMath::normalize()` proxy) ensures that tie-breaking values such as `0.5` and `-0.5`
+deterministically round away from zero, keeping matching behaviour stable across PHP
+versions and environments.【F:src/Application/Math/BrickDecimalMath.php†L41-L72】【F:src/Domain/ValueObject/BcMath.php†L32-L45】
 
 ## Exceptions
 
@@ -291,7 +295,7 @@ The library ships with domain-specific exceptions under the
 * `InvalidInput` &mdash; emitted when configuration, path legs, or fee breakdowns fail
   validation.
 * `PrecisionViolation` &mdash; signals arithmetic inputs that cannot be represented within the
-  configured BCMath scale.
+  configured decimal precision.
 * `GuardLimitExceeded` &mdash; thrown when `PathSearchConfig::withGuardLimitException()` is used
   and the configured search guardrails (visited states, expansions, or time budget) are
   reached.
@@ -517,9 +521,13 @@ target columns establish the KPIs enforced by CI via PhpBench regression asserti
 
 | Scenario (orders)      | Mean (ms) | Peak memory | KPI target (mean) | KPI target (peak memory) |
 |------------------------|-----------|-------------|-------------------|--------------------------|
-| k-best-n1e2 (100)      | 30.7      | 5.8 MB      | ≤ 35 ms           | ≤ 7 MB                   |
-| k-best-n1e3 (1,000)    | 323.5     | 12.5 MB     | ≤ 350 ms          | ≤ 15 MB                  |
-| k-best-n1e4 (10,000)   | 4,344.2   | 79.8 MB     | ≤ 4.5 s           | ≤ 96 MB                  |
+| k-best-n1e2 (100)      | 172.5     | 6.6 MB      | ≤ 210 ms          | ≤ 8 MB                   |
+| k-best-n1e3 (1,000)    | 1,640.7   | 10.1 MB     | ≤ 2.0 s           | ≤ 12 MB                  |
+| k-best-n1e4 (10,000)   | 16,704.9  | 46.7 MB     | ≤ 20 s            | ≤ 56 MB                  |
+
+> ⚠️  The switch to the Brick-backed decimal facade (dropping the BCMath extension)
+> temporarily inflated the k-best timings and memory usage. We will tighten the
+> targets after optimising the new code path.
 
 Run the suite locally and compare against the stored baseline with:
 

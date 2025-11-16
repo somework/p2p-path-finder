@@ -4,28 +4,19 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
-use SomeWork\P2PPathFinder\Domain\Math\DecimalMathInterface;
-use SomeWork\P2PPathFinder\Internal\Math\BcMathDecimalMath;
+use SomeWork\P2PPathFinder\Application\Math\BrickDecimalMath;
 
 /**
  * Legacy static facade over the configured decimal math strategy.
  */
 final class BcMath
 {
-    public const DEFAULT_SCALE = DecimalMathInterface::DEFAULT_SCALE;
+    public const DEFAULT_SCALE = BrickDecimalMath::DEFAULT_SCALE;
 
-    private static ?DecimalMathInterface $decimalMath = null;
+    private static ?BrickDecimalMath $decimalMath = null;
 
     private function __construct()
     {
-    }
-
-    /**
-     * @internal tests may swap implementations when simulating edge cases
-     */
-    public static function useDecimalMath(?DecimalMathInterface $decimalMath): void
-    {
-        self::$decimalMath = $decimalMath;
     }
 
     /**
@@ -125,8 +116,8 @@ final class BcMath
         return self::decimalMath()->scaleForComparison($first, $second, $fallbackScale);
     }
 
-    private static function decimalMath(): DecimalMathInterface
+    private static function decimalMath(): BrickDecimalMath
     {
-        return self::$decimalMath ??= new BcMathDecimalMath();
+        return self::$decimalMath ??= new BrickDecimalMath();
     }
 }

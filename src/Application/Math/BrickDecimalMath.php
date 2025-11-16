@@ -6,7 +6,6 @@ namespace SomeWork\P2PPathFinder\Application\Math;
 
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
-use SomeWork\P2PPathFinder\Domain\Math\DecimalMathInterface;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 use function ltrim;
@@ -21,9 +20,9 @@ use function substr;
 /**
  * Decimal math implementation backed by brick/math's arbitrary precision decimals.
  */
-final class BrickDecimalMath implements DecimalMathInterface
+final class BrickDecimalMath
 {
-    public const DEFAULT_SCALE = DecimalMathInterface::DEFAULT_SCALE;
+    public const DEFAULT_SCALE = 8;
 
     /**
      * @phpstan-assert numeric-string $values
@@ -48,6 +47,11 @@ final class BrickDecimalMath implements DecimalMathInterface
         return (bool) preg_match('/^-?\d+(\.\d+)?$/', $value);
     }
 
+    /**
+     * @param numeric-string $value
+     *
+     * @return numeric-string
+     */
     public function normalize(string $value, int $scale): string
     {
         $this->ensureScale($scale);
@@ -56,6 +60,12 @@ final class BrickDecimalMath implements DecimalMathInterface
         return $this->round($value, $scale);
     }
 
+    /**
+     * @param numeric-string $left
+     * @param numeric-string $right
+     *
+     * @return numeric-string
+     */
     public function add(string $left, string $right, int $scale): string
     {
         $this->ensureScale($scale);
@@ -68,6 +78,12 @@ final class BrickDecimalMath implements DecimalMathInterface
         return $this->roundDecimal($rounded, $scale);
     }
 
+    /**
+     * @param numeric-string $left
+     * @param numeric-string $right
+     *
+     * @return numeric-string
+     */
     public function sub(string $left, string $right, int $scale): string
     {
         $this->ensureScale($scale);
@@ -80,6 +96,12 @@ final class BrickDecimalMath implements DecimalMathInterface
         return $this->roundDecimal($rounded, $scale);
     }
 
+    /**
+     * @param numeric-string $left
+     * @param numeric-string $right
+     *
+     * @return numeric-string
+     */
     public function mul(string $left, string $right, int $scale): string
     {
         $this->ensureScale($scale);
@@ -92,6 +114,12 @@ final class BrickDecimalMath implements DecimalMathInterface
         return $this->roundDecimal($rounded, $scale);
     }
 
+    /**
+     * @param numeric-string $left
+     * @param numeric-string $right
+     *
+     * @return numeric-string
+     */
     public function div(string $left, string $right, int $scale): string
     {
         $this->ensureScale($scale);
@@ -116,6 +144,11 @@ final class BrickDecimalMath implements DecimalMathInterface
         return $leftDecimal->compareTo($rightDecimal);
     }
 
+    /**
+     * @param numeric-string $value
+     *
+     * @return numeric-string
+     */
     public function round(string $value, int $scale): string
     {
         $this->ensureScale($scale);
