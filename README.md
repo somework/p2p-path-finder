@@ -264,13 +264,13 @@ in the search rather than reaching the materialisation phase.
 
 All arithmetic is delegated to `SomeWork\P2PPathFinder\Application\Math\BrickDecimalMath`,
 the library's wrapper around [brick/math](https://github.com/brick/math)'s `BigDecimal`
-implementation. The legacy `SomeWork\P2PPathFinder\Domain\ValueObject\BcMath` facade now
+implementation. The legacy `SomeWork\P2PPathFinder\Domain\ValueObject\BcMath` façade now
 proxies to this helper, preserving the public API while swapping the underlying engine. The
 adapter provides:
 
 * Input validation helpers that fail fast when encountering malformed numeric strings.
 * Deterministic rounding that keeps scale under control without leaking trailing digits.
-* Utility methods (`add`, `sub`, `mul`, `div`, `comp`) that normalise operands so that
+* Utility methods (`add`, `sub`, `mul`, `div`, `comp`) that normalize operands so that
   value objects such as `Money` can work with mixed scales.
 
 By routing every calculation through `BrickDecimalMath` the library avoids floating-point
@@ -279,8 +279,8 @@ numeric-string representation.【F:src/Application/Math/BrickDecimalMath.php†L
 
 ### Decimal policy
 
-The path finder consistently normalises tolerances, costs and ratios to 18 decimal places
-using half-up rounding. Normalising via `BrickDecimalMath::normalize()` (and its
+The path finder consistently normalizes tolerances, costs and ratios to 18 decimal places
+using half-up rounding. Normalizing via `BrickDecimalMath::normalize()` (and its
 `BcMath::normalize()` proxy) ensures that tie-breaking values such as `0.5` and `-0.5`
 deterministically round away from zero, keeping matching behaviour stable across PHP
 versions and environments.【F:src/Application/Math/BrickDecimalMath.php†L41-L72】【F:src/Domain/ValueObject/BcMath.php†L32-L45】
