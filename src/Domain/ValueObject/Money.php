@@ -85,6 +85,8 @@ final class Money
     /**
      * Returns the normalized numeric string representation of the amount.
      *
+     * @psalm-mutation-free
+     *
      * @return numeric-string
      */
     public function amount(): string
@@ -271,6 +273,9 @@ final class Money
         }
     }
 
+    /**
+     * @psalm-mutation-free
+     */
     private static function assertScale(int $scale): void
     {
         if ($scale < 0) {
@@ -287,6 +292,9 @@ final class Money
         }
     }
 
+    /**
+     * @psalm-mutation-free
+     */
     private static function scaleDecimal(BigDecimal $decimal, int $scale): BigDecimal
     {
         self::assertScale($scale);
@@ -295,6 +303,8 @@ final class Money
     }
 
     /**
+     * @psalm-mutation-free
+     *
      * @return numeric-string
      */
     private static function decimalToString(BigDecimal $decimal, int $scale): string
