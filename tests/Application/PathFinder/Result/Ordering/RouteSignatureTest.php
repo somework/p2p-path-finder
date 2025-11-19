@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder\Result\Ordering;
 
+use Brick\Math\BigDecimal;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
@@ -36,8 +37,8 @@ final class RouteSignatureTest extends TestCase
         $secondOrder = OrderFactory::buy('MID', 'DST', '1.000', '1.000', '1.000', 3, 3);
 
         $sequence = PathEdgeSequence::fromList([
-            PathEdge::create('SRC', 'MID', $buyOrder, $buyOrder->effectiveRate(), OrderSide::BUY, '1.000000000000000000'),
-            PathEdge::create('MID', 'DST', $secondOrder, $secondOrder->effectiveRate(), OrderSide::BUY, '1.000000000000000000'),
+            PathEdge::create('SRC', 'MID', $buyOrder, $buyOrder->effectiveRate(), OrderSide::BUY, BigDecimal::of('1.000000000000000000')),
+            PathEdge::create('MID', 'DST', $secondOrder, $secondOrder->effectiveRate(), OrderSide::BUY, BigDecimal::of('1.000000000000000000')),
         ]);
 
         $signature = RouteSignature::fromPathEdgeSequence($sequence);

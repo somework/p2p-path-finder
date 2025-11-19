@@ -9,8 +9,8 @@ use Random\Engine\Mt19937;
 use Random\Randomizer;
 use ReflectionClass;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Tests\Support\DecimalMath;
 use SomeWork\P2PPathFinder\Tests\Support\InfectionIterationLimiter;
 
 use function preg_match;
@@ -148,7 +148,7 @@ final class PathFinderScenarioGeneratorTest extends TestCase
 
             self::assertLessThanOrEqual(
                 0,
-                BcMath::comp($scenario['tolerance'], '0.050', 3),
+                DecimalMath::comp($scenario['tolerance'], '0.050', 3),
                 'Tolerance budget should remain tight to stress guard rails.',
             );
 

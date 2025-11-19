@@ -5,54 +5,55 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Domain\ValueObject;
 
 use PHPUnit\Framework\TestCase;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 final class OrderBoundsTest extends TestCase
 {
+    use MoneyAssertions;
+
     public function test_contains_checks_boundaries_inclusively(): void
     {
-        $min = Money::fromString('USD', '10.00', 2);
-        $max = Money::fromString('USD', '20.00', 2);
+        $min = $this->money('USD', '10.00', 2);
+        $max = $this->money('USD', '20.00', 2);
 
         $bounds = OrderBounds::from($min, $max);
 
-        self::assertTrue($bounds->contains(Money::fromString('USD', '10.00', 2)));
-        self::assertTrue($bounds->contains(Money::fromString('USD', '15.00', 2)));
-        self::assertTrue($bounds->contains(Money::fromString('USD', '20.00', 2)));
-        self::assertFalse($bounds->contains(Money::fromString('USD', '9.99', 2)));
-        self::assertFalse($bounds->contains(Money::fromString('USD', '20.01', 2)));
+        self::assertTrue($bounds->contains($this->money('USD', '10.00', 2)));
+        self::assertTrue($bounds->contains($this->money('USD', '15.00', 2)));
+        self::assertTrue($bounds->contains($this->money('USD', '20.00', 2)));
+        self::assertFalse($bounds->contains($this->money('USD', '9.99', 2)));
+        self::assertFalse($bounds->contains($this->money('USD', '20.01', 2)));
     }
 
     public function test_clamp_returns_nearest_bound(): void
     {
-        $bounds = OrderBounds::from(Money::fromString('EUR', '1.000', 3), Money::fromString('EUR', '2.000', 3));
+        $bounds = OrderBounds::from($this->money('EUR', '1.000', 3), $this->money('EUR', '2.000', 3));
 
-        self::assertSame('1.000', $bounds->clamp(Money::fromString('EUR', '0.500', 3))->amount());
-        self::assertSame('1.500', $bounds->clamp(Money::fromString('EUR', '1.500', 3))->amount());
-        self::assertSame('2.000', $bounds->clamp(Money::fromString('EUR', '5.000', 3))->amount());
+        self::assertMoneyAmount($bounds->clamp($this->money('EUR', '0.500', 3)), '1.000', 3);
+        self::assertMoneyAmount($bounds->clamp($this->money('EUR', '1.500', 3)), '1.500', 3);
+        self::assertMoneyAmount($bounds->clamp($this->money('EUR', '5.000', 3)), '2.000', 3);
     }
 
     public function test_creation_with_inverted_bounds_fails(): void
     {
         $this->expectException(InvalidInput::class);
-        OrderBounds::from(Money::fromString('GBP', '5.00'), Money::fromString('GBP', '2.00'));
+        OrderBounds::from($this->money('GBP', '5.00'), $this->money('GBP', '2.00'));
     }
 
     public function test_creation_with_currency_mismatch_fails(): void
     {
         $this->expectException(InvalidInput::class);
-        OrderBounds::from(Money::fromString('USD', '1.00'), Money::fromString('EUR', '2.00'));
+        OrderBounds::from($this->money('USD', '1.00'), $this->money('EUR', '2.00'));
     }
 
     public function test_contains_rejects_mismatched_currency(): void
     {
-        $bounds = OrderBounds::from(Money::fromString('USD', '10.00', 2), Money::fromString('USD', '20.00', 2));
+        $bounds = OrderBounds::from($this->money('USD', '10.00', 2), $this->money('USD', '20.00', 2));
 
         $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Money currency must match order bounds.');
 
-        $bounds->contains(Money::fromString('EUR', '15.00', 2));
+        $bounds->contains($this->money('EUR', '15.00', 2));
     }
 }

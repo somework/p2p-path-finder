@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\Service\PathFinder;
 
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
@@ -21,7 +23,6 @@ use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
 use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Application\Support\Generator\PathFinderScenarioGenerator;
@@ -98,12 +99,13 @@ final class PathFinderServicePropertyTest extends TestCase
             );
             $this->assertGuardStatusEquals($first->guardLimits(), $second->guardLimits());
 
-            $maximumTolerance = BcMath::normalize($scenario['tolerance'], 18);
+            $maximumTolerance = BigDecimal::of($scenario['tolerance'])->toScale(18, RoundingMode::HALF_UP);
             foreach ($first->paths() as $result) {
-                $residual = $result->residualTolerance()->ratio();
+                $residual = BigDecimal::of($result->residualTolerance()->ratio())
+                    ->toScale(18, RoundingMode::HALF_UP);
                 self::assertLessThanOrEqual(
                     0,
-                    BcMath::comp($residual, $maximumTolerance, 18),
+                    $residual->compareTo($maximumTolerance),
                     'Residual tolerance should never exceed configured maximum.'
                 );
             }
@@ -349,12 +351,15 @@ final class PathFinderServicePropertyTest extends TestCase
         $spent = $result->totalSpent()->withScale(18);
         $received = $result->totalReceived()->withScale(18);
 
-        $receivedAmount = $received->amount();
-        if (0 === BcMath::comp($receivedAmount, '0', 18)) {
+        $receivedDecimal = BigDecimal::of($received->amount())->toScale(18, RoundingMode::HALF_UP);
+        if ($receivedDecimal->isZero()) {
             self::fail('Materialized path must produce a non-zero destination amount.');
         }
 
-        $cost = BcMath::div($spent->amount(), $receivedAmount, 18);
+        $spentDecimal = BigDecimal::of($spent->amount())->toScale(18, RoundingMode::HALF_UP);
+        $cost = $spentDecimal
+            ->dividedBy($receivedDecimal, 18, RoundingMode::HALF_UP)
+            ->__toString();
 
         return [
             'cost' => $cost,
@@ -394,7 +399,9 @@ final class PathFinderServicePropertyTest extends TestCase
      */
     private function compareSortKeys(array $left, array $right): int
     {
-        $comparison = BcMath::comp($left['cost'], $right['cost'], 18);
+        $comparison = BigDecimal::of($left['cost'])
+            ->toScale(18, RoundingMode::HALF_UP)
+            ->compareTo(BigDecimal::of($right['cost'])->toScale(18, RoundingMode::HALF_UP));
         if (0 !== $comparison) {
             return $comparison;
         }

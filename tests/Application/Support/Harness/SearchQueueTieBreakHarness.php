@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\Support\Harness;
 
+use Brick\Math\BigDecimal;
 use ReflectionMethod;
 use ReflectionProperty;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
@@ -18,7 +19,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\SearchStateQueue;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
+use SomeWork\P2PPathFinder\Tests\Application\Support\DecimalFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
 use function count;
@@ -42,7 +43,7 @@ final class SearchQueueTieBreakHarness
         // Drop the bootstrap state so only seeded candidates affect the ordering under test.
         self::extractQueueEntry($queue);
 
-        $tieCost = BcMath::normalize('0.5', self::SCALE);
+        $tieCost = DecimalFactory::decimal('0.5', self::SCALE);
 
         $states = [
             self::buildStateForRoute(['SRC', 'ALPHA', 'OMEGA'], $tieCost),
@@ -60,7 +61,7 @@ final class SearchQueueTieBreakHarness
                 new SearchQueueEntry(
                     $state,
                     new SearchStatePriority(
-                        new PathCost($state->cost()),
+                        new PathCost($state->costDecimal()),
                         $state->hops(),
                         $signature,
                         $insertionOrder->next(),
@@ -98,10 +99,9 @@ final class SearchQueueTieBreakHarness
     /**
      * @param non-empty-list<non-empty-string> $nodes
      */
-    private static function buildStateForRoute(array $nodes, string $cost): SearchState
+    private static function buildStateForRoute(array $nodes, BigDecimal $cost): SearchState
     {
-        $unit = BcMath::normalize('1', self::SCALE);
-        $normalizedCost = BcMath::normalize($cost, self::SCALE);
+        $unit = DecimalFactory::decimal('1', self::SCALE);
 
         $state = SearchState::bootstrap($nodes[0], $unit, null, null);
 
@@ -111,7 +111,7 @@ final class SearchQueueTieBreakHarness
             $to = $nodes[$index];
             $edge = self::buildPathEdge($from, $to);
 
-            $state = $state->transition($to, $normalizedCost, $normalizedCost, $edge, null, null);
+            $state = $state->transition($to, $cost, $cost, $edge, null, null);
         }
 
         return $state;
@@ -127,7 +127,7 @@ final class SearchQueueTieBreakHarness
             $order,
             $order->effectiveRate(),
             OrderSide::BUY,
-            BcMath::normalize('1.000000000000000000', self::SCALE),
+            DecimalFactory::decimal('1.000000000000000000', self::SCALE),
         );
     }
 

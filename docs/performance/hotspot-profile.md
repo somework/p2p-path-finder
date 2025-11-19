@@ -35,6 +35,11 @@ small parser to surface the dominant functions. The profiling focuses on the leg
 critical queueing paths in [`src/Application/PathFinder/PathFinder.php`](../../src/Application/PathFinder/PathFinder.php#L727-L780) are
 included alongside the materialisation and graph construction code paths.
 
+> ℹ️  Since the BigDecimal migration, `Money::fromString()` and `ExchangeRate::fromString()`
+> pay the one-time cost of normalising Brick decimals during fixture warm-up. Expect
+> them to appear in profiles that include cold-start hydration; steady-state runs
+> amortise the work because downstream services reuse the cached `BigDecimal` values.
+
 Percentages below are inclusive – a parent function's time can exceed 100% when child
 costs are counted multiple times – so the tables should be interpreted as “share of
 work attributable to this component” rather than a disjoint partition. For the DTO
@@ -64,7 +69,7 @@ rails prune most states.
 | `GraphBuilder->build` | 38.7 | 5.1 | In-place graph mutation still dominates, with `createEdge`/`OrderFillEvaluator` showing up underneath this stage even after fixture caching. | **P1.** Mitigation landed – see [issue](./issues/p1-graph-builder.md) for remaining nice-to-haves. |
 | `PathFinderService->findBestPaths` | 40.0 | 5.4 | The refactored candidate callback continues to reuse buffers and keeps allocations low, but the dense frontier keeps this slice near 40%. | **P1.** Acceptance criteria satisfied – see [issue](./issues/p1-pathfinder-callback.md). |
 | `BottleneckOrderBookFactory::createHighFanOut` | 25.6 | 1.4 | Memoised fixture now front-loads the dense book build once per PhpBench process; subsequent iterations clone the cached instance. | P3. Cold-start cost only – revisit if we need to hide warm-up time. |
-| `Money::fromString` (fixture warm-up) | 19.1 | 2.3 | `Money::fromString` and its `BcMath::normalize` dependency now appear because the cached book hydrates its values during the initial build (`ExchangeRate::fromString` trails at ~9%). | P3. Acceptable warm-up overhead; no action unless start-up time becomes critical. |
+| `Money::fromString` (fixture warm-up) | 19.1 | 2.3 | `Money::fromString` and its Brick-backed decimal normalisation dominate the one-off warm-up when the cached book hydrates (`ExchangeRate::fromString` trails at ~9%). | P3. Acceptable warm-up overhead; no action unless start-up time becomes critical. |
 | `OrderSpendAnalyzer->filterOrders` | 0.4 | 0.05 | Remains a minor contributor even with higher fan-out. | P3. Monitor after the P1 items land; not currently a bottleneck. |
 | `SearchStateQueue` operations | <0.02 | <0.01 | Queue push/pop still register at the noise floor after the refactors. | No action required; re-evaluate after other changes. |
 

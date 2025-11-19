@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Config;
 
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ToleranceWindow;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
@@ -21,8 +22,7 @@ final class PathSearchConfig
 
     private readonly Money $maximumSpendAmount;
 
-    /** @var numeric-string */
-    private readonly string $pathFinderTolerance;
+    private readonly BigDecimal $pathFinderTolerance;
 
     /** @var 'override'|'minimum'|'maximum' */
     private readonly string $pathFinderToleranceSource;
@@ -65,8 +65,8 @@ final class PathSearchConfig
         $this->throwOnGuardLimit = $throwOnGuardLimit;
 
         $scale = max($this->spendAmount->scale(), self::BOUND_SCALE);
-        $lowerMultiplier = BcMath::sub('1', $this->toleranceWindow->minimum(), $scale);
-        $upperMultiplier = BcMath::add('1', $this->toleranceWindow->maximum(), $scale);
+        $lowerMultiplier = self::toleranceMultiplier($this->toleranceWindow->minimum(), $scale, false);
+        $upperMultiplier = self::toleranceMultiplier($this->toleranceWindow->maximum(), $scale, true);
 
         $this->minimumSpendAmount = $this->spendAmount
             ->multiply($lowerMultiplier, $scale)
@@ -188,7 +188,7 @@ final class PathSearchConfig
      */
     public function pathFinderTolerance(): string
     {
-        return $this->pathFinderTolerance;
+        return self::decimalToString($this->pathFinderTolerance, ToleranceWindow::scale());
     }
 
     /**
@@ -209,21 +209,47 @@ final class PathSearchConfig
     /**
      * @throws InvalidInput|PrecisionViolation when the override value does not represent a valid tolerance
      *
-     * @return array{0: numeric-string, 1: 'override'|'minimum'|'maximum'}
+     * @return array{0: BigDecimal, 1: 'override'|'minimum'|'maximum'}
      */
     private function resolvePathFinderTolerance(?string $override): array
     {
         if (null !== $override) {
             $normalized = ToleranceWindow::normalizeTolerance($override, 'Path finder tolerance');
 
-            return [$normalized, 'override'];
+            return [BigDecimal::of($normalized), 'override'];
         }
 
         return [
-            $this->toleranceWindow->heuristicTolerance(),
+            BigDecimal::of($this->toleranceWindow->heuristicTolerance()),
             $this->toleranceWindow->heuristicSource(),
         ];
     }
 
     private const BOUND_SCALE = 8;
+
+    /**
+     * @param numeric-string $tolerance
+     *
+     * @return numeric-string
+     */
+    private static function toleranceMultiplier(string $tolerance, int $scale, bool $isUpper): string
+    {
+        $toleranceDecimal = BigDecimal::of($tolerance);
+        $offset = $isUpper
+            ? BigDecimal::one()->plus($toleranceDecimal)
+            : BigDecimal::one()->minus($toleranceDecimal);
+
+        return self::decimalToString($offset, $scale);
+    }
+
+    /**
+     * @return numeric-string
+     */
+    private static function decimalToString(BigDecimal $decimal, int $scale): string
+    {
+        /** @var numeric-string $result */
+        $result = $decimal->toScale($scale, RoundingMode::HALF_UP)->__toString();
+
+        return $result;
+    }
 }

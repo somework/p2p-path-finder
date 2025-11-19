@@ -4,26 +4,17 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Domain\ValueObject;
 
+use Brick\Math\BigDecimal;
 use PHPUnit\Framework\TestCase;
-use ReflectionProperty;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Tests\Support\DecimalMath;
 
 use function max;
 use function sprintf;
 
 final class DecimalToleranceTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $property = new ReflectionProperty(BcMath::class, 'decimalMath');
-        $property->setAccessible(true);
-        $property->setValue(null, null);
-    }
-
     public function test_it_normalizes_ratio_to_default_scale(): void
     {
         $tolerance = DecimalTolerance::fromNumericString('0.1');
@@ -48,12 +39,13 @@ final class DecimalToleranceTest extends TestCase
     {
         $tolerance = DecimalTolerance::fromNumericString($ratio, $scale);
         $comparisonScale = max($scale, 18);
-        $normalizedInput = BcMath::normalize($ratio, $scale);
+        $expected = DecimalMath::decimal($ratio, $scale);
 
-        self::assertSame($normalizedInput, $tolerance->ratio());
-        self::assertSame($tolerance->ratio(), BcMath::normalize($tolerance->ratio(), $scale));
-        self::assertGreaterThanOrEqual(0, BcMath::comp($tolerance->ratio(), '0', $comparisonScale));
-        self::assertLessThanOrEqual(0, BcMath::comp($tolerance->ratio(), '1', $comparisonScale));
+        self::assertSame($expected->__toString(), $tolerance->ratio());
+
+        $ratioDecimal = DecimalMath::decimal($tolerance->ratio(), $comparisonScale);
+        self::assertGreaterThanOrEqual(0, $ratioDecimal->compareTo(BigDecimal::zero()));
+        self::assertLessThanOrEqual(0, $ratioDecimal->compareTo(BigDecimal::one()));
     }
 
     public function test_zero_factory_provides_normalized_ratio(): void

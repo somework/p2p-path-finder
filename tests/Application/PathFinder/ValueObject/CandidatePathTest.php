@@ -4,17 +4,18 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder\ValueObject;
 
+use Brick\Math\BigDecimal;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
+use SomeWork\P2PPathFinder\Tests\Support\DecimalMath;
 
 final class CandidatePathTest extends TestCase
 {
@@ -29,7 +30,7 @@ final class CandidatePathTest extends TestCase
             $order,
             $order->effectiveRate(),
             OrderSide::BUY,
-            BcMath::normalize('1.000000000000000000', 18),
+            DecimalMath::decimal('1.000000000000000000', 18),
         );
 
         $sequence = PathEdgeSequence::fromList([$edge]);
@@ -38,8 +39,8 @@ final class CandidatePathTest extends TestCase
         $this->expectExceptionMessage('Hop count must match the number of edges in the candidate path.');
 
         CandidatePath::from(
-            BcMath::normalize('1.000000000000000000', 18),
-            BcMath::normalize('1.000000000000000000', 18),
+            DecimalMath::decimal('1.000000000000000000', 18),
+            DecimalMath::decimal('1.000000000000000000', 18),
             0,
             $sequence,
         );
@@ -59,7 +60,7 @@ final class CandidatePathTest extends TestCase
                 'order' => OrderFactory::buy('AAA', 'BBB', '1.000', '1.000', '1.000', 3, 3),
                 'rate' => ExchangeRate::fromString('AAA', 'BBB', '1.000', 3),
                 'orderSide' => OrderSide::BUY,
-                'conversionRate' => BcMath::normalize('1.000000000000000000', 18),
+                'conversionRate' => DecimalMath::normalize('1.000000000000000000', 18),
             ],
         ];
 
@@ -78,7 +79,7 @@ final class CandidatePathTest extends TestCase
                 $firstOrder,
                 $firstOrder->effectiveRate(),
                 OrderSide::BUY,
-                BcMath::normalize('1.000000000000000000', self::SCALE),
+                DecimalMath::decimal('1.000000000000000000', self::SCALE),
             ),
             PathEdge::create(
                 'CCC',
@@ -86,7 +87,7 @@ final class CandidatePathTest extends TestCase
                 $secondOrder,
                 $secondOrder->effectiveRate(),
                 OrderSide::BUY,
-                BcMath::normalize('1.000000000000000000', self::SCALE),
+                DecimalMath::decimal('1.000000000000000000', self::SCALE),
             ),
         ];
 
@@ -106,7 +107,7 @@ final class CandidatePathTest extends TestCase
             $order,
             $order->effectiveRate(),
             OrderSide::SELL,
-            BcMath::normalize('1.000000000000000000', self::SCALE),
+            DecimalMath::decimal('1.000000000000000000', self::SCALE),
         );
 
         $this->expectException(InvalidInput::class);
@@ -126,7 +127,7 @@ final class CandidatePathTest extends TestCase
             $order,
             $order->effectiveRate(),
             OrderSide::SELL,
-            BcMath::normalize('1.000000000000000000', self::SCALE),
+            DecimalMath::decimal('1.000000000000000000', self::SCALE),
         );
 
         $this->expectException(InvalidInput::class);
@@ -137,8 +138,8 @@ final class CandidatePathTest extends TestCase
 
     public function test_it_serializes_to_array(): void
     {
-        $cost = BcMath::normalize('1.234500000000000000', self::SCALE);
-        $product = BcMath::normalize('0.987650000000000000', self::SCALE);
+        $cost = DecimalMath::normalize('1.234500000000000000', self::SCALE);
+        $product = DecimalMath::normalize('0.987650000000000000', self::SCALE);
 
         $firstOrder = OrderFactory::buy('AAA', 'BBB', '1.000', '1.000', '1.000', 3, 3);
         $secondOrder = OrderFactory::sell('CCC', 'BBB', '1.000', '1.000', '1.000', 3, 3);
@@ -150,7 +151,7 @@ final class CandidatePathTest extends TestCase
                 $firstOrder,
                 $firstOrder->effectiveRate(),
                 OrderSide::BUY,
-                BcMath::normalize('1.100000000000000000', self::SCALE),
+                DecimalMath::decimal('1.100000000000000000', self::SCALE),
             ),
             PathEdge::create(
                 'BBB',
@@ -158,7 +159,7 @@ final class CandidatePathTest extends TestCase
                 $secondOrder,
                 $secondOrder->effectiveRate(),
                 OrderSide::SELL,
-                BcMath::normalize('0.900000000000000000', self::SCALE),
+                DecimalMath::decimal('0.900000000000000000', self::SCALE),
             ),
         ]);
 
@@ -167,7 +168,13 @@ final class CandidatePathTest extends TestCase
         $desired = Money::fromString('USD', '2.500', 3);
         $constraints = SpendConstraints::from($min, $max, $desired);
 
-        $candidate = CandidatePath::from($cost, $product, 2, $edges, $constraints);
+        $candidate = CandidatePath::from(
+            BigDecimal::of($cost),
+            BigDecimal::of($product),
+            2,
+            $edges,
+            $constraints,
+        );
 
         $payload = $candidate->toArray();
 

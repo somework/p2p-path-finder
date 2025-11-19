@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder\Result\Ordering;
 
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
@@ -15,6 +17,16 @@ final class PathCostTest extends TestCase
         $cost = new PathCost('1.25');
 
         self::assertSame('1.250000000000000000', $cost->value());
+    }
+
+    public function test_it_accepts_bigdecimal_instances(): void
+    {
+        $decimal = BigDecimal::of('0.5');
+
+        $cost = new PathCost($decimal);
+
+        self::assertSame('0.500000000000000000', $cost->value());
+        self::assertSame(0, $cost->decimal()->compareTo($decimal->toScale(18, RoundingMode::HALF_UP)));
     }
 
     public function test_it_compares_using_bc_math_with_custom_scale(): void
