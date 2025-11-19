@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 
+use Brick\Math\BigDecimal;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use ReflectionProperty;
@@ -34,11 +35,12 @@ use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendRange;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Tests\Application\Support\DecimalFactory;
 use SomeWork\P2PPathFinder\Tests\Application\Support\Harness\SearchQueueTieBreakHarness;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
+use SomeWork\P2PPathFinder\Tests\Support\DecimalMath;
 
 use function array_is_list;
 use function array_map;
@@ -100,12 +102,12 @@ final class PathFinderInternalsTest extends TestCase
         ]);
         $registry = SearchStateRegistry::withInitial(
             'USD',
-            new SearchStateRecord(BcMath::normalize('1.2', self::SCALE), 3, $signature),
+            new SearchStateRecord($this->decimal('1.2'), 3, $signature),
         );
 
         $delta = $registry->register(
             'USD',
-            new SearchStateRecord(BcMath::normalize('1.0', self::SCALE), 2, $signature),
+            new SearchStateRecord($this->decimal('1.0'), 2, $signature),
             self::SCALE,
         );
 
@@ -113,7 +115,7 @@ final class PathFinderInternalsTest extends TestCase
         $records = $registry->recordsFor('USD');
         self::assertCount(1, $records);
         self::assertTrue($records[0]->signature()->equals($signature));
-        self::assertSame(BcMath::normalize('1.0', self::SCALE), $records[0]->cost());
+        self::assertSame(DecimalMath::normalize('1.0', self::SCALE), $records[0]->cost());
         self::assertSame(2, $records[0]->hops());
     }
 
@@ -129,19 +131,19 @@ final class PathFinderInternalsTest extends TestCase
         ]);
         $registry = SearchStateRegistry::withInitial(
             'USD',
-            new SearchStateRecord(BcMath::normalize('1.2', self::SCALE), 2, $signature),
+            new SearchStateRecord($this->decimal('1.2'), 2, $signature),
         );
 
         $delta = $registry->register(
             'USD',
-            new SearchStateRecord(BcMath::normalize('1.0', self::SCALE), 4, $signature),
+            new SearchStateRecord($this->decimal('1.0'), 4, $signature),
             self::SCALE,
         );
 
         self::assertSame(0, $delta);
         $records = $registry->recordsFor('USD');
         self::assertCount(1, $records);
-        self::assertSame(BcMath::normalize('1.2', self::SCALE), $records[0]->cost());
+        self::assertSame(DecimalMath::normalize('1.2', self::SCALE), $records[0]->cost());
         self::assertSame(2, $records[0]->hops());
         self::assertTrue($records[0]->signature()->equals($signature));
     }
@@ -158,19 +160,19 @@ final class PathFinderInternalsTest extends TestCase
         ]);
         $registry = SearchStateRegistry::withInitial(
             'USD',
-            new SearchStateRecord(BcMath::normalize('1.0', self::SCALE), 4, $signature),
+            new SearchStateRecord($this->decimal('1.0'), 4, $signature),
         );
 
         $delta = $registry->register(
             'USD',
-            new SearchStateRecord(BcMath::normalize('1.5', self::SCALE), 2, $signature),
+            new SearchStateRecord($this->decimal('1.5'), 2, $signature),
             self::SCALE,
         );
 
         self::assertSame(0, $delta);
         $records = $registry->recordsFor('USD');
         self::assertCount(1, $records);
-        self::assertSame(BcMath::normalize('1.0', self::SCALE), $records[0]->cost());
+        self::assertSame(DecimalMath::normalize('1.0', self::SCALE), $records[0]->cost());
         self::assertSame(4, $records[0]->hops());
         self::assertTrue($records[0]->signature()->equals($signature));
     }
@@ -213,11 +215,12 @@ final class PathFinderInternalsTest extends TestCase
         $signature = $this->invokeFinderMethod($finder, 'stateSignature', [$range, $desired]);
         $unitValueProperty = new ReflectionProperty(PathFinder::class, 'unitValue');
         $unitValueProperty->setAccessible(true);
-        /** @var numeric-string $unit */
         $unit = $unitValueProperty->getValue($finder);
+        self::assertInstanceOf(BigDecimal::class, $unit);
+        $unitString = $unit->__toString();
 
-        self::assertSame($unit, $state->cost());
-        self::assertSame($unit, $state->product());
+        self::assertSame($unitString, $state->cost());
+        self::assertSame($unitString, $state->product());
         self::assertInstanceOf(PathEdgeSequence::class, $state->path());
         self::assertTrue($state->path()->isEmpty());
         self::assertInstanceOf(SpendRange::class, $state->amountRange());
@@ -227,7 +230,7 @@ final class PathFinderInternalsTest extends TestCase
         self::assertTrue($bestPerNode->hasSignature('SRC', $signature));
         $records = $bestPerNode->recordsFor('SRC');
         self::assertCount(1, $records);
-        self::assertSame($unit, $records[0]->cost());
+        self::assertSame($unitString, $records[0]->cost());
         self::assertSame(0, $records[0]->hops());
         self::assertTrue($records[0]->signature()->equals($signature));
     }
@@ -244,19 +247,19 @@ final class PathFinderInternalsTest extends TestCase
         ]);
         $registry = SearchStateRegistry::withInitial(
             'USD',
-            new SearchStateRecord(BcMath::normalize('1.5', self::SCALE), 2, $signature),
+            new SearchStateRecord($this->decimal('1.5'), 2, $signature),
         );
 
         $delta = $registry->register(
             'USD',
-            new SearchStateRecord(BcMath::normalize('1.0', self::SCALE), 2, $signature),
+            new SearchStateRecord($this->decimal('1.0'), 2, $signature),
             self::SCALE,
         );
 
         self::assertSame(0, $delta);
         $records = $registry->recordsFor('USD');
         self::assertCount(1, $records);
-        self::assertSame(BcMath::normalize('1.0', self::SCALE), $records[0]->cost());
+        self::assertSame(DecimalMath::normalize('1.0', self::SCALE), $records[0]->cost());
         self::assertSame(2, $records[0]->hops());
     }
 
@@ -266,12 +269,12 @@ final class PathFinderInternalsTest extends TestCase
         $providedSignature = SearchStateSignature::fromString('provided:signature');
         $registry = SearchStateRegistry::withInitial(
             'USD',
-            new SearchStateRecord(BcMath::normalize('1.8', self::SCALE), 3, $providedSignature),
+            new SearchStateRecord($this->decimal('1.8'), 3, $providedSignature),
         );
 
         $delta = $registry->register(
             'USD',
-            new SearchStateRecord(BcMath::normalize('1.2', self::SCALE), 2, $providedSignature),
+            new SearchStateRecord($this->decimal('1.2'), 2, $providedSignature),
             self::SCALE,
         );
 
@@ -279,7 +282,7 @@ final class PathFinderInternalsTest extends TestCase
         $records = $registry->recordsFor('USD');
         self::assertCount(1, $records);
         self::assertTrue($records[0]->signature()->equals($providedSignature));
-        self::assertSame(BcMath::normalize('1.2', self::SCALE), $records[0]->cost());
+        self::assertSame(DecimalMath::normalize('1.2', self::SCALE), $records[0]->cost());
         self::assertSame(2, $records[0]->hops());
     }
 
@@ -293,15 +296,15 @@ final class PathFinderInternalsTest extends TestCase
             ),
             null,
         ]);
-        $cost = BcMath::normalize('1.750', self::SCALE);
+        $cost = DecimalMath::normalize('1.750', self::SCALE);
         $registry = SearchStateRegistry::withInitial(
             'USD',
-            new SearchStateRecord($cost, 4, $signature),
+            new SearchStateRecord(BigDecimal::of($cost), 4, $signature),
         );
 
         $delta = $registry->register(
             'USD',
-            new SearchStateRecord($cost, 2, $signature),
+            new SearchStateRecord(BigDecimal::of($cost), 2, $signature),
             self::SCALE,
         );
 
@@ -316,24 +319,24 @@ final class PathFinderInternalsTest extends TestCase
     {
         $registry = SearchStateRegistry::withInitial(
             'USD',
-            new SearchStateRecord(BcMath::normalize('1.0', self::SCALE), 2, SearchStateSignature::fromString('sig:alpha')),
+            new SearchStateRecord($this->decimal('1.0'), 2, SearchStateSignature::fromString('sig:alpha')),
         );
 
         $firstDelta = $registry->register(
             'USD',
-            new SearchStateRecord(BcMath::normalize('2.0', self::SCALE), 3, SearchStateSignature::fromString('sig:beta')),
+            new SearchStateRecord($this->decimal('2.0'), 3, SearchStateSignature::fromString('sig:beta')),
             self::SCALE,
         );
 
         $alphaReplacement = $registry->register(
             'USD',
-            new SearchStateRecord(BcMath::normalize('0.8', self::SCALE), 1, SearchStateSignature::fromString('sig:alpha')),
+            new SearchStateRecord($this->decimal('0.8'), 1, SearchStateSignature::fromString('sig:alpha')),
             self::SCALE,
         );
 
         $betaDominated = $registry->register(
             'USD',
-            new SearchStateRecord(BcMath::normalize('2.5', self::SCALE), 4, SearchStateSignature::fromString('sig:beta')),
+            new SearchStateRecord($this->decimal('2.5'), 4, SearchStateSignature::fromString('sig:beta')),
             self::SCALE,
         );
 
@@ -349,11 +352,11 @@ final class PathFinderInternalsTest extends TestCase
         }
 
         self::assertArrayHasKey('sig:alpha', $recordsBySignature);
-        self::assertSame(BcMath::normalize('0.8', self::SCALE), $recordsBySignature['sig:alpha']->cost());
+        self::assertSame(DecimalMath::normalize('0.8', self::SCALE), $recordsBySignature['sig:alpha']->cost());
         self::assertSame(1, $recordsBySignature['sig:alpha']->hops());
 
         self::assertArrayHasKey('sig:beta', $recordsBySignature);
-        self::assertSame(BcMath::normalize('2.0', self::SCALE), $recordsBySignature['sig:beta']->cost());
+        self::assertSame(DecimalMath::normalize('2.0', self::SCALE), $recordsBySignature['sig:beta']->cost());
         self::assertSame(3, $recordsBySignature['sig:beta']->hops());
     }
 
@@ -361,12 +364,12 @@ final class PathFinderInternalsTest extends TestCase
     {
         $registry = SearchStateRegistry::withInitial(
             'USD',
-            new SearchStateRecord(BcMath::normalize('1.0', self::SCALE), 2, SearchStateSignature::fromString('sig:value')),
+            new SearchStateRecord($this->decimal('1.0'), 2, SearchStateSignature::fromString('sig:value')),
         );
 
         $dominated = $registry->isDominated(
             'USD',
-            new SearchStateRecord(BcMath::normalize('1.2', self::SCALE), 3, SearchStateSignature::fromString('sig:value')),
+            new SearchStateRecord($this->decimal('1.2'), 3, SearchStateSignature::fromString('sig:value')),
             self::SCALE,
         );
 
@@ -374,7 +377,7 @@ final class PathFinderInternalsTest extends TestCase
         self::assertFalse(
             $registry->isDominated(
                 'USD',
-                new SearchStateRecord(BcMath::normalize('1.2', self::SCALE), 3, SearchStateSignature::fromString('other:value')),
+                new SearchStateRecord($this->decimal('1.2'), 3, SearchStateSignature::fromString('other:value')),
                 self::SCALE,
             ),
         );
@@ -384,11 +387,11 @@ final class PathFinderInternalsTest extends TestCase
     {
         $registry = SearchStateRegistry::withInitial(
             'USD',
-            new SearchStateRecord('1', 1, SearchStateSignature::fromString('alpha:value')),
+            new SearchStateRecord(BigDecimal::of('1'), 1, SearchStateSignature::fromString('alpha:value')),
         );
         $registry->register(
             'USD',
-            new SearchStateRecord('2', 2, SearchStateSignature::fromString('beta:value')),
+            new SearchStateRecord(BigDecimal::of('2'), 2, SearchStateSignature::fromString('beta:value')),
             self::SCALE,
         );
 
@@ -420,8 +423,8 @@ final class PathFinderInternalsTest extends TestCase
         sort($costs);
 
         self::assertSame([
-            BcMath::normalize('0.50', self::SCALE),
-            BcMath::normalize('1.00', self::SCALE),
+            DecimalMath::normalize('0.50', self::SCALE),
+            DecimalMath::normalize('1.00', self::SCALE),
         ], $costs);
     }
 
@@ -482,17 +485,17 @@ final class PathFinderInternalsTest extends TestCase
         $finalizedCandidates = $this->invokeFinderMethod($finder, 'finalizeResults', [$heap]);
         $finalizedArray = $finalizedCandidates->toArray();
         self::assertSame([
-            BcMath::normalize('1.00', self::SCALE),
-            BcMath::normalize('1.00', self::SCALE),
-            BcMath::normalize('2.00', self::SCALE),
+            DecimalMath::normalize('1.00', self::SCALE),
+            DecimalMath::normalize('1.00', self::SCALE),
+            DecimalMath::normalize('2.00', self::SCALE),
         ], array_map(static fn (CandidatePath $candidate): string => $candidate->cost(), $finalizedArray));
 
         self::assertSame(
-            BcMath::normalize('1.00', self::SCALE),
+            DecimalMath::normalize('1.00', self::SCALE),
             $finalizedArray[0]->product(),
         );
         self::assertSame(
-            BcMath::normalize('1.50', self::SCALE),
+            DecimalMath::normalize('1.50', self::SCALE),
             $finalizedArray[1]->product(),
         );
     }
@@ -544,8 +547,8 @@ final class PathFinderInternalsTest extends TestCase
         self::assertSame('USD', $nextRange->currency());
         self::assertSame('USD', $nextRange->min()->currency());
         self::assertSame('USD', $nextRange->max()->currency());
-        self::assertSame(BcMath::normalize('1.00', self::SCALE), $nextRange->min()->amount());
-        self::assertSame(BcMath::normalize('6.00', self::SCALE), $nextRange->max()->amount());
+        self::assertSame(DecimalMath::normalize('1.00', self::SCALE), $nextRange->min()->amount());
+        self::assertSame(DecimalMath::normalize('6.00', self::SCALE), $nextRange->max()->amount());
     }
 
     public function test_calculate_next_range_sorts_swapped_bounds(): void
@@ -560,8 +563,8 @@ final class PathFinderInternalsTest extends TestCase
             ),
         ]);
 
-        self::assertSame(BcMath::normalize('1.00', self::SCALE), $nextRange->min()->amount());
-        self::assertSame(BcMath::normalize('6.00', self::SCALE), $nextRange->max()->amount());
+        self::assertSame(DecimalMath::normalize('1.00', self::SCALE), $nextRange->min()->amount());
+        self::assertSame(DecimalMath::normalize('6.00', self::SCALE), $nextRange->max()->amount());
     }
 
     public function test_convert_edge_amount_clamps_and_converts(): void
@@ -574,7 +577,7 @@ final class PathFinderInternalsTest extends TestCase
         $converted = $this->invokeFinderMethod($finder, 'convertEdgeAmount', [$edge, $current]);
 
         self::assertSame('USD', $converted->currency());
-        self::assertSame(BcMath::normalize('6.00', self::SCALE), $converted->amount());
+        self::assertSame(DecimalMath::normalize('6.00', self::SCALE), $converted->amount());
         self::assertSame(self::SCALE, $converted->scale());
     }
 
@@ -603,7 +606,7 @@ final class PathFinderInternalsTest extends TestCase
         $converted = $this->invokeFinderMethod($finder, 'convertEdgeAmount', [$edge, $current]);
 
         self::assertSame('USD', $converted->currency());
-        self::assertSame(BcMath::normalize('0', self::SCALE), $converted->amount());
+        self::assertSame(DecimalMath::normalize('0', self::SCALE), $converted->amount());
         self::assertSame(self::SCALE, $converted->scale());
     }
 
@@ -638,8 +641,9 @@ final class PathFinderInternalsTest extends TestCase
 
         $rate = $this->invokeFinderMethod($finder, 'edgeEffectiveConversionRate', [$edge]);
 
-        $expected = BcMath::div('1', BcMath::div('55.00', '6.00', self::SCALE), self::SCALE);
-        self::assertSame($expected, $rate);
+        $expected = DecimalMath::div('1', DecimalMath::div('55.00', '6.00', self::SCALE), self::SCALE);
+        self::assertInstanceOf(BigDecimal::class, $rate);
+        self::assertSame($expected, $rate->__toString());
     }
 
     public function test_edge_base_to_quote_ratio_returns_zero_when_base_capacity_zero(): void
@@ -658,7 +662,8 @@ final class PathFinderInternalsTest extends TestCase
 
         $ratio = $this->invokeFinderMethod($finder, 'edgeBaseToQuoteRatio', [$edge]);
 
-        self::assertSame(BcMath::normalize('0', self::SCALE), $ratio);
+        self::assertInstanceOf(BigDecimal::class, $ratio);
+        self::assertSame(DecimalMath::normalize('0', self::SCALE), $ratio->__toString());
     }
 
     public function test_normalize_tolerance_clamps_to_upper_bound(): void
@@ -668,17 +673,19 @@ final class PathFinderInternalsTest extends TestCase
 
         $normalized = $this->invokeFinderMethod($finder, 'normalizeTolerance', [$raw]);
 
-        self::assertSame('0.'.str_repeat('9', self::SCALE), $normalized);
+        self::assertInstanceOf(BigDecimal::class, $normalized);
+        self::assertSame('0.'.str_repeat('9', self::SCALE), $normalized->__toString());
     }
 
     public function test_calculate_tolerance_amplifier_inverts_complement(): void
     {
         $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
-        $tolerance = BcMath::normalize('0.500', self::SCALE);
+        $tolerance = DecimalMath::decimal('0.500', self::SCALE);
 
         $amplifier = $this->invokeFinderMethod($finder, 'calculateToleranceAmplifier', [$tolerance]);
 
-        self::assertSame(BcMath::normalize('2', self::SCALE), $amplifier);
+        self::assertInstanceOf(BigDecimal::class, $amplifier);
+        self::assertSame(DecimalMath::normalize('2', self::SCALE), $amplifier->__toString());
     }
 
     public function test_create_queue_orders_by_cost_and_insertion(): void
@@ -689,15 +696,15 @@ final class PathFinderInternalsTest extends TestCase
 
         $queue->push(new SearchQueueEntry(
             $this->buildState('A'),
-            new SearchStatePriority(new PathCost(BcMath::normalize('0.8', self::SCALE)), 0, RouteSignature::fromNodes([]), 1),
+            new SearchStatePriority(new PathCost(DecimalFactory::decimal('0.8', self::SCALE)), 0, RouteSignature::fromNodes([]), 1),
         ));
         $queue->push(new SearchQueueEntry(
             $this->buildState('B'),
-            new SearchStatePriority(new PathCost(BcMath::normalize('0.5', self::SCALE)), 0, RouteSignature::fromNodes([]), 2),
+            new SearchStatePriority(new PathCost(DecimalFactory::decimal('0.5', self::SCALE)), 0, RouteSignature::fromNodes([]), 2),
         ));
         $queue->push(new SearchQueueEntry(
             $this->buildState('C'),
-            new SearchStatePriority(new PathCost(BcMath::normalize('0.5', self::SCALE)), 0, RouteSignature::fromNodes([]), 0),
+            new SearchStatePriority(new PathCost(DecimalFactory::decimal('0.5', self::SCALE)), 0, RouteSignature::fromNodes([]), 0),
         ));
 
         $first = $queue->extract();
@@ -738,7 +745,7 @@ final class PathFinderInternalsTest extends TestCase
         $heap->push(new CandidateHeapEntry(
             $first,
             new CandidatePriority(
-                new PathCost($first->cost()),
+                new PathCost($first->costDecimal()),
                 $first->hops(),
                 $this->routeSignatureFromCandidate($first),
                 0,
@@ -747,7 +754,7 @@ final class PathFinderInternalsTest extends TestCase
         $heap->push(new CandidateHeapEntry(
             $second,
             new CandidatePriority(
-                new PathCost($second->cost()),
+                new PathCost($second->costDecimal()),
                 $second->hops(),
                 $this->routeSignatureFromCandidate($second),
                 2,
@@ -756,7 +763,7 @@ final class PathFinderInternalsTest extends TestCase
         $heap->push(new CandidateHeapEntry(
             $third,
             new CandidatePriority(
-                new PathCost($third->cost()),
+                new PathCost($third->costDecimal()),
                 $third->hops(),
                 $this->routeSignatureFromCandidate($third),
                 1,
@@ -767,10 +774,10 @@ final class PathFinderInternalsTest extends TestCase
         $second = $heap->extract();
         $third = $heap->extract();
 
-        self::assertSame(BcMath::normalize('2.00', self::SCALE), $first->candidate()->cost());
-        self::assertSame(BcMath::normalize('1.00', self::SCALE), $second->candidate()->cost());
-        self::assertSame(BcMath::normalize('1.00', self::SCALE), $third->candidate()->cost());
-        self::assertSame(BcMath::normalize('1.50', self::SCALE), $second->candidate()->product());
+        self::assertSame(DecimalMath::normalize('2.00', self::SCALE), $first->candidate()->cost());
+        self::assertSame(DecimalMath::normalize('1.00', self::SCALE), $second->candidate()->cost());
+        self::assertSame(DecimalMath::normalize('1.00', self::SCALE), $third->candidate()->cost());
+        self::assertSame(DecimalMath::normalize('1.50', self::SCALE), $second->candidate()->product());
     }
 
     public function test_create_result_heap_extracts_candidate_with_more_hops_on_equal_cost(): void
@@ -785,7 +792,7 @@ final class PathFinderInternalsTest extends TestCase
         $heap->push(new CandidateHeapEntry(
             $fewerHops,
             new CandidatePriority(
-                new PathCost($fewerHops->cost()),
+                new PathCost($fewerHops->costDecimal()),
                 $fewerHops->hops(),
                 $this->routeSignatureFromCandidate($fewerHops),
                 0,
@@ -794,7 +801,7 @@ final class PathFinderInternalsTest extends TestCase
         $heap->push(new CandidateHeapEntry(
             $moreHops,
             new CandidatePriority(
-                new PathCost($moreHops->cost()),
+                new PathCost($moreHops->costDecimal()),
                 $moreHops->hops(),
                 $this->routeSignatureFromCandidate($moreHops),
                 1,
@@ -818,7 +825,7 @@ final class PathFinderInternalsTest extends TestCase
         $heap->push(new CandidateHeapEntry(
             $alpha,
             new CandidatePriority(
-                new PathCost($alpha->cost()),
+                new PathCost($alpha->costDecimal()),
                 $alpha->hops(),
                 $this->routeSignatureFromCandidate($alpha),
                 0,
@@ -827,7 +834,7 @@ final class PathFinderInternalsTest extends TestCase
         $heap->push(new CandidateHeapEntry(
             $beta,
             new CandidatePriority(
-                new PathCost($beta->cost()),
+                new PathCost($beta->costDecimal()),
                 $beta->hops(),
                 $this->routeSignatureFromCandidate($beta),
                 1,
@@ -1148,12 +1155,12 @@ final class PathFinderInternalsTest extends TestCase
             $order,
             $order->effectiveRate(),
             OrderSide::BUY,
-            BcMath::normalize('1.000000000000000000', self::SCALE),
+            DecimalMath::decimal('1.000000000000000000', self::SCALE),
         );
 
         return CandidatePath::from(
-            BcMath::normalize($cost, self::SCALE),
-            BcMath::normalize($product, self::SCALE),
+            $this->decimal($cost),
+            $this->decimal($product),
             1,
             PathEdgeSequence::fromList([$edge]),
         );
@@ -1162,8 +1169,8 @@ final class PathFinderInternalsTest extends TestCase
     private function buildCandidateWithHops(string $cost, string $product, int $hops): CandidatePath
     {
         return CandidatePath::from(
-            BcMath::normalize($cost, self::SCALE),
-            BcMath::normalize($product, self::SCALE),
+            $this->decimal($cost),
+            $this->decimal($product),
             $hops,
             $this->dummyEdges($hops),
         );
@@ -1193,7 +1200,7 @@ final class PathFinderInternalsTest extends TestCase
                 $order,
                 $order->effectiveRate(),
                 OrderSide::BUY,
-                BcMath::normalize('1.000000000000000000', self::SCALE),
+                DecimalMath::decimal('1.000000000000000000', self::SCALE),
             );
 
             $from = $to;
@@ -1202,14 +1209,19 @@ final class PathFinderInternalsTest extends TestCase
         return PathEdgeSequence::fromList($edges);
     }
 
+    private function decimal(string $value): BigDecimal
+    {
+        return DecimalMath::decimal($value, self::SCALE);
+    }
+
     private function buildState(string $node): SearchState
     {
-        $unit = BcMath::normalize('1', self::SCALE);
+        $unit = DecimalMath::normalize('1', self::SCALE);
 
         return SearchState::fromComponents(
             $node,
-            $unit,
-            $unit,
+            BigDecimal::of($unit),
+            BigDecimal::of($unit),
             0,
             PathEdgeSequence::empty(),
             null,

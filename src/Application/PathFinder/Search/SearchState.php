@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathFinder\Search;
 
+use Brick\Math\BigDecimal;
 use InvalidArgumentException;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendRange;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 use function is_string;
@@ -31,14 +31,12 @@ final class SearchState
     private readonly array $visited;
 
     /**
-     * @param numeric-string         $cost
-     * @param numeric-string         $product
      * @param array<array-key, bool> $visited
      */
     private function __construct(
         private readonly string $node,
-        private readonly string $cost,
-        private readonly string $product,
+        private readonly BigDecimal $cost,
+        private readonly BigDecimal $product,
         int $hops,
         private readonly PathEdgeSequence $path,
         private readonly ?SpendRange $amountRange,
@@ -51,25 +49,18 @@ final class SearchState
             throw new InvalidArgumentException('Search states require a non-empty node identifier.');
         }
 
-        BcMath::ensureNumeric($this->cost, $this->product);
-
         self::assertVisitedRegistry($visited, $this->node);
 
         /* @var non-empty-array<string, bool> $visited */
         $this->visited = $visited;
     }
 
-    /**
-     * @param numeric-string $unitValue
-     */
     public static function bootstrap(
         string $node,
-        string $unitValue,
+        BigDecimal $unitValue,
         ?SpendRange $amountRange,
         ?Money $desiredAmount
     ): self {
-        BcMath::ensureNumeric($unitValue);
-
         return new self(
             $node,
             $unitValue,
@@ -83,8 +74,6 @@ final class SearchState
     }
 
     /**
-     * @param numeric-string         $cost
-     * @param numeric-string         $product
      * @param array<array-key, bool> $visited
      *
      * @phpstan-param int<0, max> $hops
@@ -93,8 +82,8 @@ final class SearchState
      */
     public static function fromComponents(
         string $node,
-        string $cost,
-        string $product,
+        BigDecimal $cost,
+        BigDecimal $product,
         int $hops,
         PathEdgeSequence $path,
         ?SpendRange $amountRange,
@@ -120,14 +109,10 @@ final class SearchState
         return $value;
     }
 
-    /**
-     * @param numeric-string $nextCost
-     * @param numeric-string $nextProduct
-     */
     public function transition(
         string $nextNode,
-        string $nextCost,
-        string $nextProduct,
+        BigDecimal $nextCost,
+        BigDecimal $nextProduct,
         PathEdge $edge,
         ?SpendRange $amountRange,
         ?Money $desiredAmount
@@ -176,16 +161,36 @@ final class SearchState
 
     /**
      * @return numeric-string
+     *
+     * @phpstan-return numeric-string
      */
     public function cost(): string
+    {
+        /** @var numeric-string $value */
+        $value = $this->cost->__toString();
+
+        return $value;
+    }
+
+    public function costDecimal(): BigDecimal
     {
         return $this->cost;
     }
 
     /**
      * @return numeric-string
+     *
+     * @phpstan-return numeric-string
      */
     public function product(): string
+    {
+        /** @var numeric-string $value */
+        $value = $this->product->__toString();
+
+        return $value;
+    }
+
+    public function productDecimal(): BigDecimal
     {
         return $this->product;
     }

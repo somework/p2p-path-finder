@@ -15,9 +15,9 @@ use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Tests\Application\Support\Generator\PathFinderScenarioGenerator;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
+use SomeWork\P2PPathFinder\Tests\Support\DecimalMath;
 use SomeWork\P2PPathFinder\Tests\Support\InfectionIterationLimiter;
 
 use function array_map;
@@ -280,7 +280,7 @@ final class PathFinderPropertyTest extends TestCase
         $minimum = $bounds->min()->multiply($scaleFactor);
         $maximum = $bounds->max()->multiply($scaleFactor);
 
-        $normalizedRate = BcMath::normalize(
+        $normalizedRate = DecimalMath::normalize(
             $order->effectiveRate()->rate(),
             $order->effectiveRate()->scale(),
         );

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\Support\Generator;
 
+use Brick\Math\BigDecimal;
 use Random\Engine\Mt19937;
 use Random\Randomizer;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateRecord;
@@ -80,7 +81,7 @@ final class SearchStateRecordGenerator
         $cost = $this->formatUnits($units, self::COST_SCALE);
         $hops = $this->randomizer->getInt(1, 6);
 
-        return new SearchStateRecord($cost, $hops, $signature);
+        return new SearchStateRecord(BigDecimal::of($cost), $hops, $signature);
     }
 
     private function dominatingRecord(SearchStateSignature $signature, SearchStateRecord $baseline): SearchStateRecord
@@ -90,7 +91,7 @@ final class SearchStateRecordGenerator
         $cost = $this->formatUnits($units, self::COST_SCALE);
         $hops = max(0, $baseline->hops() - 1);
 
-        return new SearchStateRecord($cost, $hops, $signature);
+        return new SearchStateRecord(BigDecimal::of($cost), $hops, $signature);
     }
 
     private function dominatedRecord(SearchStateSignature $signature, SearchStateRecord $baseline): SearchStateRecord
@@ -101,7 +102,7 @@ final class SearchStateRecordGenerator
         $cost = $this->formatUnits($units, self::COST_SCALE);
         $hops = $baseline->hops() + 1;
 
-        return new SearchStateRecord($cost, $hops, $signature);
+        return new SearchStateRecord(BigDecimal::of($cost), $hops, $signature);
     }
 
     private function randomRecord(SearchStateSignature $signature): SearchStateRecord
@@ -110,7 +111,7 @@ final class SearchStateRecordGenerator
         $cost = $this->formatUnits($units, self::COST_SCALE);
         $hops = $this->randomizer->getInt(0, 8);
 
-        return new SearchStateRecord($cost, $hops, $signature);
+        return new SearchStateRecord(BigDecimal::of($cost), $hops, $signature);
     }
 
     /**

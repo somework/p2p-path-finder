@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\Service\PathFinder;
 
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
@@ -12,7 +14,6 @@ use SomeWork\P2PPathFinder\Application\Result\MoneyMap;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Service\LegMaterializer;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 use function sprintf;
@@ -402,18 +403,15 @@ final class FeesPathFinderServiceTest extends PathFinderServiceTestCase
 
         self::assertFalse($secondLeg->spent()->greaterThan($firstLeg->received()));
 
-        $difference = BcMath::sub($firstLegReceived->amount(), $secondLegSpent->amount(), $comparisonScale + 6);
-        if ('-' === $difference[0]) {
-            $difference = substr($difference, 1);
-        }
-        if ('' === $difference) {
-            $difference = '0';
-        }
-        $difference = BcMath::normalize($difference, $comparisonScale + 6);
+        $scale = $comparisonScale + 6;
+        $firstDecimal = BigDecimal::of($firstLegReceived->amount())->toScale($scale, RoundingMode::HALF_UP);
+        $secondDecimal = BigDecimal::of($secondLegSpent->amount())->toScale($scale, RoundingMode::HALF_UP);
+        $difference = $firstDecimal->minus($secondDecimal)->abs();
+        $threshold = BigDecimal::of('0.02')->toScale($scale, RoundingMode::HALF_UP);
 
         self::assertTrue(
-            BcMath::comp($difference, BcMath::normalize('0.02', $comparisonScale + 6), $comparisonScale + 6) <= 0,
-            sprintf('Gross quote spend exceeded available budget by %s.', $difference),
+            $difference->compareTo($threshold) <= 0,
+            sprintf('Gross quote spend exceeded available budget by %s.', $difference->__toString()),
         );
 
         $fees = $secondLeg->fees();

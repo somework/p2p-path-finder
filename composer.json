@@ -1,5 +1,6 @@
 {
     "name": "somework/p2p-path-finder",
+    "description": "Deterministic Brick\\Math BigDecimal path-finding toolkit for order-driven conversions",
     "type": "library",
     "keywords": [
         "path-finding",

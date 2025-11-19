@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathFinder;
 
+use Brick\Math\BigDecimal;
+use Brick\Math\Exception\MathException;
+use Brick\Math\RoundingMode;
 use SomeWork\P2PPathFinder\Application\Graph\EdgeSegmentCollection;
 use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
@@ -35,13 +38,11 @@ use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendRange;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function sprintf;
-use function str_repeat;
 use function strtoupper;
 
 /**
@@ -56,6 +57,10 @@ final class PathFinder
      */
     private const SCALE = 18;
     /**
+     * Highest representable tolerance ratio (0.999… at the canonical scale).
+     */
+    private const TOLERANCE_MAX_RATIO = '0.999999999999999999';
+    /**
      * Extra precision used when converting target and source deltas into a ratio to avoid premature rounding.
      */
     private const RATIO_EXTRA_SCALE = 4;
@@ -68,12 +73,10 @@ final class PathFinder
 
     public const DEFAULT_MAX_VISITED_STATES = 250000;
 
-    /** @var numeric-string */
-    private readonly string $unitValue;
-
-    /** @var numeric-string */
-    private readonly string $toleranceAmplifier;
-    private readonly bool $hasTolerance;
+    private readonly BigDecimal $unitValue;
+    private readonly BigDecimal $toleranceUpperBound;
+    private readonly BigDecimal $tolerance;
+    private readonly BigDecimal $toleranceAmplifier;
     private readonly PathOrderStrategy $orderingStrategy;
 
     /**
@@ -109,14 +112,10 @@ final class PathFinder
             throw new InvalidInput('Time budget must be at least one millisecond.');
         }
 
-        /** @var numeric-string $unit */
-        $unit = BcMath::normalize('1', self::SCALE);
-        $this->unitValue = $unit;
-        $normalizedTolerance = $this->normalizeTolerance($tolerance);
-        /** @var numeric-string $amplifier */
-        $amplifier = $this->calculateToleranceAmplifier($normalizedTolerance);
-        $this->toleranceAmplifier = $amplifier;
-        $this->hasTolerance = 1 === BcMath::comp($normalizedTolerance, '0', self::SCALE);
+        $this->unitValue = self::scaleDecimal(BigDecimal::one(), self::SCALE);
+        $this->toleranceUpperBound = self::decimalFromString(self::TOLERANCE_MAX_RATIO);
+        $this->tolerance = $this->normalizeTolerance($tolerance);
+        $this->toleranceAmplifier = $this->calculateToleranceAmplifier($this->tolerance);
         $this->orderingStrategy = $orderingStrategy ?? new CostHopsSignatureOrderingStrategy(self::SCALE);
     }
 
@@ -161,6 +160,7 @@ final class PathFinder
         $resultInsertionOrder = $bootstrap->resultInsertionOrder();
         $visitedStates = $bootstrap->visitedStates();
 
+        /** @var BigDecimal|null $bestTargetCost */
         $bestTargetCost = null;
 
         $guards = new SearchGuards($this->maxExpansions, $this->timeBudgetMs);
@@ -175,10 +175,8 @@ final class PathFinder
             $guards->recordExpansion();
 
             if ($state->node() === $target) {
-                $candidateCost = $state->cost();
-                $candidateProduct = $state->product();
-
-                BcMath::ensureNumeric($candidateCost, $candidateProduct);
+                $candidateCostDecimal = $this->normalizeDecimal($state->costDecimal());
+                $candidateProductDecimal = $this->normalizeDecimal($state->productDecimal());
 
                 $candidateRange = null;
                 $stateRange = $state->amountRange();
@@ -191,19 +189,16 @@ final class PathFinder
                 }
 
                 $candidate = CandidatePath::from(
-                    $candidateCost,
-                    $candidateProduct,
+                    $candidateCostDecimal,
+                    $candidateProductDecimal,
                     $state->path()->count(),
                     $state->path(),
                     $candidateRange,
                 );
 
                 if (null === $acceptCandidate || $acceptCandidate($candidate)) {
-                    if (
-                        null === $bestTargetCost
-                        || -1 === BcMath::comp($candidate->cost(), $bestTargetCost, self::SCALE)
-                    ) {
-                        $bestTargetCost = $candidate->cost();
+                    if (null === $bestTargetCost || $candidateCostDecimal->isLessThan($bestTargetCost)) {
+                        $bestTargetCost = $candidateCostDecimal;
                     }
 
                     $this->recordResult($results, $candidate, $resultInsertionOrder->next());
@@ -232,7 +227,7 @@ final class PathFinder
                 }
 
                 $conversionRate = $this->edgeEffectiveConversionRate($edge);
-                if (1 !== BcMath::comp($conversionRate, '0', self::SCALE)) {
+                if (!$conversionRate->isGreaterThan(BigDecimal::zero())) {
                     continue;
                 }
 
@@ -258,12 +253,12 @@ final class PathFinder
                         : null;
                 }
 
-                $nextCost = BcMath::div($state->cost(), $conversionRate, self::SCALE);
-                $nextProduct = BcMath::mul($state->product(), $conversionRate, self::SCALE);
+                $nextCostDecimal = $this->calculateNextCostDecimal($state->costDecimal(), $conversionRate);
+                $nextProductDecimal = $this->calculateNextProductDecimal($state->productDecimal(), $conversionRate);
                 $nextHops = $state->hops() + 1;
 
                 $signature = $this->stateSignature($nextRange, $nextDesired);
-                $candidateRecord = new SearchStateRecord($nextCost, $nextHops, $signature);
+                $candidateRecord = new SearchStateRecord($nextCostDecimal, $nextHops, $signature);
 
                 if ($bestPerNode->isDominated($nextNode, $candidateRecord, self::SCALE)) {
                     continue;
@@ -277,19 +272,15 @@ final class PathFinder
                     continue;
                 }
 
-                if (null !== $bestTargetCost) {
-                    $maxAllowedCost = $this->hasTolerance
-                        ? BcMath::mul($bestTargetCost, $this->toleranceAmplifier, self::SCALE)
-                        : $bestTargetCost;
-                    if (1 === BcMath::comp($nextCost, $maxAllowedCost, self::SCALE)) {
-                        continue;
-                    }
+                $maxAllowedCost = $this->maxAllowedCost($bestTargetCost);
+                if (null !== $maxAllowedCost && $nextCostDecimal->isGreaterThan($maxAllowedCost)) {
+                    continue;
                 }
 
                 $nextState = $state->transition(
                     $nextNode,
-                    $nextCost,
-                    $nextProduct,
+                    $nextCostDecimal,
+                    $nextProductDecimal,
                     PathEdge::fromGraphEdge($edge, $conversionRate),
                     $nextRange,
                     $nextDesired,
@@ -304,7 +295,7 @@ final class PathFinder
                     new SearchQueueEntry(
                         $nextState,
                         new SearchStatePriority(
-                            new PathCost($nextCost),
+                            new PathCost($nextCostDecimal),
                             $nextState->hops(),
                             $this->routeSignature($nextState->path()),
                             $insertionOrder->next(),
@@ -349,8 +340,8 @@ final class PathFinder
         $rangeSignature = sprintf(
             '%s:%s:%s:%d',
             $minimum->currency(),
-            $minimum->amount(),
-            $maximum->amount(),
+            $this->moneySignatureAmount($minimum, $scale),
+            $this->moneySignatureAmount($maximum, $scale),
             $scale,
         );
 
@@ -367,9 +358,21 @@ final class PathFinder
         }
 
         $scale ??= $amount->scale();
-        $normalized = $amount->withScale($scale);
 
-        return sprintf('%s:%s:%d', $normalized->currency(), $normalized->amount(), $scale);
+        return sprintf(
+            '%s:%s:%d',
+            $amount->currency(),
+            $this->moneySignatureAmount($amount, $scale),
+            $scale,
+        );
+    }
+
+    /**
+     * @return numeric-string
+     */
+    private function moneySignatureAmount(Money $amount, int $scale): string
+    {
+        return self::decimalToString($this->moneyToDecimal($amount, $scale), $scale);
     }
 
     private function createQueue(): SearchStateQueue
@@ -384,12 +387,10 @@ final class PathFinder
 
     private function recordResult(CandidateResultHeap $results, CandidatePath $candidate, int $order): void
     {
-        /** @var numeric-string $candidateCost */
-        $candidateCost = $candidate->cost();
         $entry = new CandidateHeapEntry(
             $candidate,
             new CandidatePriority(
-                new PathCost($candidateCost),
+                new PathCost($candidate->costDecimal()),
                 $candidate->hops(),
                 $this->routeSignature($candidate->edges()),
                 $order,
@@ -403,6 +404,38 @@ final class PathFinder
         }
     }
 
+    private function calculateNextCostDecimal(BigDecimal $currentCost, BigDecimal $conversionRate): BigDecimal
+    {
+        return $this->normalizeDecimal(
+            $currentCost->dividedBy($conversionRate, self::SCALE, RoundingMode::HALF_UP),
+        );
+    }
+
+    private function calculateNextProductDecimal(BigDecimal $currentProduct, BigDecimal $conversionRate): BigDecimal
+    {
+        return $this->normalizeDecimal($currentProduct->multipliedBy($conversionRate));
+    }
+
+    private function maxAllowedCost(?BigDecimal $bestTargetCost): ?BigDecimal
+    {
+        if (null === $bestTargetCost) {
+            return null;
+        }
+
+        $normalized = $this->normalizeDecimal($bestTargetCost);
+
+        if (!$this->hasTolerance()) {
+            return $normalized;
+        }
+
+        return $this->normalizeDecimal($normalized->multipliedBy($this->toleranceAmplifier));
+    }
+
+    private function normalizeDecimal(BigDecimal $value): BigDecimal
+    {
+        return self::scaleDecimal($value, self::SCALE);
+    }
+
     private function initializeSearchStructures(string $source, ?SpendRange $range, ?Money $desiredSpend): SearchBootstrap
     {
         $queue = $this->createQueue();
@@ -410,12 +443,13 @@ final class PathFinder
         $insertionOrder = new InsertionOrderCounter();
         $resultInsertionOrder = new InsertionOrderCounter();
 
-        $initialState = SearchState::bootstrap($source, $this->unitValue, $range, $desiredSpend);
+        $unitDecimal = $this->unitValue;
+        $initialState = SearchState::bootstrap($source, $unitDecimal, $range, $desiredSpend);
         $queue->push(
             new SearchQueueEntry(
                 $initialState,
                 new SearchStatePriority(
-                    new PathCost($this->unitValue),
+                    new PathCost($unitDecimal),
                     $initialState->hops(),
                     $this->routeSignature($initialState->path()),
                     $insertionOrder->next(),
@@ -424,7 +458,7 @@ final class PathFinder
         );
 
         $initialRecord = new SearchStateRecord(
-            $this->unitValue,
+            $unitDecimal,
             0,
             $this->stateSignature($range, $desiredSpend),
         );
@@ -502,22 +536,28 @@ final class PathFinder
             $scale = max($scale, $totals->scale());
         }
 
-        $normalizedRange = $range->withScale($scale);
-        $requestedMin = $normalizedRange->min();
-        $requestedMax = $normalizedRange->max();
-
+        $requestedRange = $range->withScale($scale);
         if (null === $totals) {
-            $minimum = $capacity->min()->withScale($scale);
-            $maximum = $capacity->max()->withScale($scale);
+            $capacityRange = SpendRange::fromBounds(
+                $capacity->min()->withScale($scale),
+                $capacity->max()->withScale($scale),
+            );
         } else {
-            $minimum = $totals->mandatory()->withScale($scale);
-            $maximum = $totals->maximum()->withScale($scale);
+            $capacityRange = SpendRange::fromBounds(
+                $totals->mandatory()->withScale($scale),
+                $totals->maximum()->withScale($scale),
+            );
         }
 
-        if ($maximum->isZero()) {
-            $zero = Money::zero($normalizedRange->currency(), $scale);
+        $capacityMin = $capacityRange->min();
+        $capacityMax = $capacityRange->max();
+        $requestedMin = $requestedRange->min();
+        $requestedMax = $requestedRange->max();
 
-            if ($minimum->greaterThan($zero)) {
+        if ($capacityMax->decimal()->isZero()) {
+            $zero = Money::zero($requestedRange->currency(), $scale);
+
+            if ($capacityMin->greaterThan($zero)) {
                 return null;
             }
 
@@ -528,12 +568,12 @@ final class PathFinder
             return SpendRange::fromBounds($zero, $zero);
         }
 
-        if ($requestedMax->lessThan($minimum) || $requestedMin->greaterThan($maximum)) {
+        if ($requestedMax->lessThan($capacityMin) || $requestedMin->greaterThan($capacityMax)) {
             return null;
         }
 
-        $lowerBound = $requestedMin->greaterThan($minimum) ? $requestedMin : $minimum;
-        $upperBound = $requestedMax->lessThan($maximum) ? $requestedMax : $maximum;
+        $lowerBound = $requestedMin->greaterThan($capacityMin) ? $requestedMin : $capacityMin;
+        $upperBound = $requestedMax->lessThan($capacityMax) ? $requestedMax : $capacityMax;
 
         return SpendRange::fromBounds($lowerBound, $upperBound);
     }
@@ -549,7 +589,7 @@ final class PathFinder
     private function convertEdgeAmount(GraphEdge $edge, Money $current): Money
     {
         $conversionRate = $this->edgeEffectiveConversionRate($edge);
-        if (1 !== BcMath::comp($conversionRate, '0', self::SCALE)) {
+        if (!$conversionRate->isGreaterThan(BigDecimal::zero())) {
             return Money::zero($edge->to(), max($current->scale(), self::SCALE));
         }
 
@@ -572,58 +612,56 @@ final class PathFinder
             self::SCALE,
         );
 
-        $sourceMin = $sourceCapacity->min()->withScale($sourceScale);
-        $sourceMax = $sourceCapacity->max()->withScale($sourceScale);
-        $clampedCurrent = $current->withScale($sourceScale);
+        $sourceRange = SpendRange::fromBounds(
+            $sourceCapacity->min()->withScale($sourceScale),
+            $sourceCapacity->max()->withScale($sourceScale),
+        );
+        $targetRange = SpendRange::fromBounds(
+            $targetCapacity->min()->withScale($targetScale),
+            $targetCapacity->max()->withScale($targetScale),
+        );
 
-        if ($clampedCurrent->lessThan($sourceMin)) {
-            $clampedCurrent = $sourceMin;
-        }
-
-        if ($clampedCurrent->greaterThan($sourceMax)) {
-            $clampedCurrent = $sourceMax;
-        }
-
-        $sourceDelta = $sourceMax->subtract($sourceMin, $sourceScale);
-        $targetMin = $targetCapacity->min()->withScale($targetScale);
-        $targetMax = $targetCapacity->max()->withScale($targetScale);
-        $targetDelta = $targetMax->subtract($targetMin, $targetScale);
+        $clampedCurrent = $this->clampToRange($current->withScale($sourceScale), $sourceRange);
 
         $ratioScale = max($sourceScale, $targetScale, self::SCALE);
-        $sourceDeltaAmount = $sourceDelta->withScale($ratioScale)->amount();
-        if (0 === BcMath::comp($sourceDeltaAmount, '0', $ratioScale)) {
-            return $targetMin->withScale($targetScale);
+        $sourceMinDecimal = $this->moneyToDecimal($sourceRange->min(), $ratioScale);
+        $sourceMaxDecimal = $this->moneyToDecimal($sourceRange->max(), $ratioScale);
+        $sourceDeltaDecimal = $sourceMaxDecimal->minus($sourceMinDecimal);
+        if ($sourceDeltaDecimal->isZero()) {
+            return $targetRange->min()->withScale($targetScale);
         }
-        $targetDeltaAmount = $targetDelta->withScale($ratioScale)->amount();
-        $ratio = BcMath::div(
-            $targetDeltaAmount,
-            $sourceDeltaAmount,
+
+        $targetMinDecimal = $this->moneyToDecimal($targetRange->min(), $ratioScale);
+        $targetMaxDecimal = $this->moneyToDecimal($targetRange->max(), $ratioScale);
+        $targetDeltaDecimal = $targetMaxDecimal->minus($targetMinDecimal);
+
+        $ratio = self::scaleDecimal(
+            $targetDeltaDecimal->dividedBy(
+                $sourceDeltaDecimal,
+                $ratioScale + self::RATIO_EXTRA_SCALE,
+                RoundingMode::HALF_UP,
+            ),
             $ratioScale + self::RATIO_EXTRA_SCALE,
         );
 
-        $offset = $clampedCurrent->subtract($sourceMin, $sourceScale);
-        $offsetAmount = $offset->withScale($ratioScale)->amount();
-        $incrementAmount = BcMath::mul(
-            $offsetAmount,
-            $ratio,
+        $clampedDecimal = $this->moneyToDecimal($clampedCurrent, $ratioScale);
+        $offsetDecimal = $clampedDecimal->minus($sourceMinDecimal);
+        $increment = self::scaleDecimal(
+            $offsetDecimal->multipliedBy($ratio),
             $ratioScale + self::SUM_EXTRA_SCALE,
         );
-        $baseAmount = BcMath::add(
-            $targetMin->withScale($ratioScale)->amount(),
-            $incrementAmount,
+        $baseDecimal = self::scaleDecimal(
+            $targetMinDecimal->plus($increment),
             $ratioScale + self::SUM_EXTRA_SCALE,
         );
 
-        $normalized = BcMath::normalize($baseAmount, $ratioScale + self::SUM_EXTRA_SCALE);
-        $result = Money::fromString(
+        $converted = $this->moneyFromDecimal(
             $edge->to(),
-            $normalized,
+            $baseDecimal,
             $ratioScale + self::SUM_EXTRA_SCALE,
-        );
+        )->withScale($targetScale);
 
-        $converted = $result->withScale($targetScale);
-
-        return $this->clampToRange($converted, SpendRange::fromBounds($targetMin, $targetMax));
+        return $this->clampToRange($converted, $targetRange);
     }
 
     /**
@@ -635,30 +673,29 @@ final class PathFinder
     }
 
     /**
-     * @throws PrecisionViolation when the edge ratio cannot be evaluated using BCMath
-     *
-     * @return numeric-string
+     * @throws PrecisionViolation when the edge ratio cannot be evaluated using arbitrary precision math
      */
-    private function edgeEffectiveConversionRate(GraphEdge $edge): string
+    private function edgeEffectiveConversionRate(GraphEdge $edge): BigDecimal
     {
         $baseToQuote = $this->edgeBaseToQuoteRatio($edge);
-        if (1 !== BcMath::comp($baseToQuote, '0', self::SCALE)) {
+        if (!$baseToQuote->isGreaterThan(BigDecimal::zero())) {
             return $baseToQuote;
         }
 
         if (OrderSide::SELL === $edge->orderSide()) {
-            return BcMath::div('1', $baseToQuote, self::SCALE);
+            return self::scaleDecimal(
+                BigDecimal::one()->dividedBy($baseToQuote, self::SCALE, RoundingMode::HALF_UP),
+                self::SCALE,
+            );
         }
 
         return $baseToQuote;
     }
 
     /**
-     * @throws PrecisionViolation when the edge capacity ratios cannot be evaluated using BCMath
-     *
-     * @return numeric-string
+     * @throws PrecisionViolation when the edge capacity ratios cannot be evaluated using arbitrary precision math
      */
-    private function edgeBaseToQuoteRatio(GraphEdge $edge): string
+    private function edgeBaseToQuoteRatio(GraphEdge $edge): BigDecimal
     {
         $baseCapacity = OrderSide::BUY === $edge->orderSide()
             ? $edge->grossBaseCapacity()
@@ -668,66 +705,98 @@ final class PathFinder
         $quoteCapacity = $edge->quoteCapacity();
         $quoteScale = max($quoteCapacity->min()->scale(), $quoteCapacity->max()->scale());
 
-        $baseMax = $baseCapacity->max()->withScale($baseScale)->amount();
-        if (0 === BcMath::comp($baseMax, '0', $baseScale)) {
-            return BcMath::normalize('0', self::SCALE);
+        $baseMax = $this->moneyToDecimal($baseCapacity->max(), $baseScale);
+        if ($baseMax->isZero()) {
+            return self::scaleDecimal(BigDecimal::zero(), self::SCALE);
         }
 
-        $quoteMax = $quoteCapacity->max()->withScale($quoteScale)->amount();
+        $quoteMax = $this->moneyToDecimal($quoteCapacity->max(), $quoteScale);
 
-        return BcMath::div($quoteMax, $baseMax, self::SCALE);
+        return self::scaleDecimal(
+            $quoteMax->dividedBy($baseMax, self::SCALE, RoundingMode::HALF_UP),
+            self::SCALE,
+        );
     }
 
     /**
      * @throws InvalidInput|PrecisionViolation when the tolerance value is malformed
-     *
-     * @return numeric-string
      */
-    private function normalizeTolerance(string $tolerance): string
+    private function normalizeTolerance(string $tolerance): BigDecimal
     {
-        if (!BcMath::isNumeric($tolerance)) {
-            throw new InvalidInput('Tolerance must be numeric.');
-        }
+        $decimal = self::decimalFromString($tolerance);
 
-        /** @var numeric-string $numericTolerance */
-        $numericTolerance = $tolerance;
-
-        if (-1 === BcMath::comp($numericTolerance, '0', self::SCALE)) {
+        if ($decimal->isNegative()) {
             throw new InvalidInput('Tolerance must be non-negative.');
         }
 
-        if (BcMath::comp($numericTolerance, '1', self::SCALE) >= 0) {
+        if ($decimal->isGreaterThanOrEqualTo($this->unitValue)) {
             throw new InvalidInput('Tolerance must be less than one.');
         }
 
-        $normalized = BcMath::normalize($numericTolerance, self::SCALE);
-
-        /** @var numeric-string $upperBound */
-        $upperBound = '0.'.str_repeat('9', self::SCALE);
-        if (1 === BcMath::comp($normalized, $upperBound, self::SCALE)) {
-            return $upperBound;
+        $normalized = self::scaleDecimal($decimal, self::SCALE);
+        if ($normalized->isGreaterThan($this->toleranceUpperBound)) {
+            return $this->toleranceUpperBound;
         }
 
         return $normalized;
     }
 
-    /**
-     * @param numeric-string $tolerance
-     *
-     * @throws PrecisionViolation when BCMath operations required for amplification cannot be performed
-     *
-     * @return numeric-string
-     */
-    private function calculateToleranceAmplifier(string $tolerance): string
+    private function calculateToleranceAmplifier(BigDecimal $tolerance): BigDecimal
     {
-        if (0 === BcMath::comp($tolerance, '0', self::SCALE)) {
-            return BcMath::normalize('1', self::SCALE);
+        if ($tolerance->isZero()) {
+            return $this->unitValue;
         }
 
-        $normalizedTolerance = BcMath::normalize($tolerance, self::SCALE);
-        $complement = BcMath::sub('1', $normalizedTolerance, self::SCALE);
+        $complement = $this->unitValue->minus($tolerance);
 
-        return BcMath::div('1', $complement, self::SCALE);
+        return self::scaleDecimal(
+            $this->unitValue->dividedBy($complement, self::SCALE, RoundingMode::HALF_UP),
+            self::SCALE,
+        );
+    }
+
+    private function hasTolerance(): bool
+    {
+        return $this->tolerance->isGreaterThan(BigDecimal::zero());
+    }
+
+    private static function decimalFromString(string $value): BigDecimal
+    {
+        try {
+            return BigDecimal::of($value);
+        } catch (MathException $exception) {
+            throw new InvalidInput(sprintf('Value "%s" is not numeric.', $value), 0, $exception);
+        }
+    }
+
+    /**
+     * @return numeric-string
+     */
+    private static function decimalToString(BigDecimal $decimal, int $scale): string
+    {
+        /** @var numeric-string $result */
+        $result = self::scaleDecimal($decimal, $scale)->__toString();
+
+        return $result;
+    }
+
+    private static function scaleDecimal(BigDecimal $decimal, int $scale): BigDecimal
+    {
+        if ($scale < 0) {
+            throw new InvalidInput('Scale must be non-negative.');
+        }
+
+        return $decimal->toScale($scale, RoundingMode::HALF_UP);
+    }
+
+    private function moneyToDecimal(Money $amount, int $scale): BigDecimal
+    {
+        return $amount->withScale($scale)->decimal();
+    }
+
+    private function moneyFromDecimal(string $currency, BigDecimal $amount, int $scale): Money
+    {
+        return Money::fromString($currency, self::decimalToString($amount, $scale), $scale);
     }
 }
 

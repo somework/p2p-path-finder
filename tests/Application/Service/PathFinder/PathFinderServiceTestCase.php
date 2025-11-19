@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\Service\PathFinder;
 
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use Closure;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
@@ -16,7 +18,6 @@ use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
@@ -24,7 +25,6 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 use function implode;
 use function max;
 use function sprintf;
-use function substr;
 
 abstract class PathFinderServiceTestCase extends TestCase
 {
@@ -82,25 +82,20 @@ abstract class PathFinderServiceTestCase extends TestCase
         $requestedGross = $requested->withScale($grossScale)->amount();
         $actualGross = $actual->withScale($grossScale)->amount();
 
-        $difference = BcMath::sub($actualGross, $requestedGross, $grossScale + 6);
-        if ('-' === $difference[0]) {
-            $difference = substr($difference, 1);
-        }
+        $comparisonScale = $grossScale + 6;
+        $requestedDecimal = BigDecimal::of($requestedGross)->toScale($comparisonScale, RoundingMode::HALF_UP);
+        $actualDecimal = BigDecimal::of($actualGross)->toScale($comparisonScale, RoundingMode::HALF_UP);
 
-        if ('' === $difference) {
-            $difference = '0';
-        }
+        $difference = $actualDecimal->minus($requestedDecimal)->abs();
+        $relativeDifference = $requestedDecimal->isZero()
+            ? BigDecimal::zero()->toScale($comparisonScale, RoundingMode::HALF_UP)
+            : $difference->dividedBy($requestedDecimal, $comparisonScale, RoundingMode::HALF_UP);
 
-        $difference = BcMath::normalize($difference, $grossScale + 6);
-        $relativeDifference = BcMath::div($difference, $requestedGross, $grossScale + 6);
+        $threshold = BigDecimal::of($maximumTolerance)->toScale($comparisonScale, RoundingMode::HALF_UP);
 
         self::assertTrue(
-            BcMath::comp(
-                $relativeDifference,
-                BcMath::normalize($maximumTolerance, $grossScale + 6),
-                $grossScale + 6,
-            ) <= 0,
-            sprintf($message, $difference),
+            $relativeDifference->compareTo($threshold) <= 0,
+            sprintf($message, $difference->__toString()),
         );
     }
 
@@ -127,21 +122,20 @@ abstract class PathFinderServiceTestCase extends TestCase
         $comparisonScale = max($effectiveQuote->scale(), $target->scale(), 6);
         $actualAmount = $effectiveQuote->withScale($comparisonScale)->amount();
         $targetAmount = $target->withScale($comparisonScale)->amount();
-        $difference = BcMath::sub($actualAmount, $targetAmount, $comparisonScale + 6);
-        if ('-' === $difference[0]) {
-            $difference = substr($difference, 1);
-        }
+        $scale = $comparisonScale + 6;
+        $actualDecimal = BigDecimal::of($actualAmount)->toScale($scale, RoundingMode::HALF_UP);
+        $targetDecimal = BigDecimal::of($targetAmount)->toScale($scale, RoundingMode::HALF_UP);
 
-        if ('' === $difference) {
-            $difference = '0';
-        }
+        $difference = $actualDecimal->minus($targetDecimal)->abs();
+        $relativeDifference = $targetDecimal->isZero()
+            ? BigDecimal::zero()->toScale($scale, RoundingMode::HALF_UP)
+            : $difference->dividedBy($targetDecimal, $scale, RoundingMode::HALF_UP);
 
-        $difference = BcMath::normalize($difference, $comparisonScale + 6);
-        $relativeDifference = BcMath::div($difference, $targetAmount, $comparisonScale + 6);
+        $threshold = BigDecimal::of('0.00001')->toScale($scale, RoundingMode::HALF_UP);
 
         self::assertTrue(
-            BcMath::comp($relativeDifference, '0.00001', $comparisonScale + 6) <= 0,
-            sprintf('Effective quote mismatch of %s exceeds tolerance.', $difference),
+            $relativeDifference->compareTo($threshold) <= 0,
+            sprintf('Effective quote mismatch of %s exceeds tolerance.', $difference->__toString()),
         );
 
         $grossComparisonScale = max($rawQuote->scale(), $expectedFee->scale(), $grossSpent->scale(), 6);

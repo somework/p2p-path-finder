@@ -27,4 +27,22 @@ final class MoneyMapTest extends TestCase
         self::assertFalse($map->has('EUR'));
         self::assertNull($map->get('EUR'));
     }
+
+    public function test_json_serialization_preserves_normalized_strings(): void
+    {
+        $map = MoneyMap::fromList([
+            Money::fromString('usd', '0.500', 3),
+            Money::fromString('eur', '0.12345', 5),
+            Money::fromString('usd', '1.25', 2),
+            Money::fromString('eur', '0.87655', 5),
+        ]);
+
+        self::assertSame(
+            [
+                'EUR' => ['currency' => 'EUR', 'amount' => '1.00000', 'scale' => 5],
+                'USD' => ['currency' => 'USD', 'amount' => '1.750', 'scale' => 3],
+            ],
+            $map->jsonSerialize(),
+        );
+    }
 }
