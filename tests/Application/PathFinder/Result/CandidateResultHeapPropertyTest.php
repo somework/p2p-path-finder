@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder\Result;
 
+use Brick\Math\BigDecimal;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\PathFinder\CandidateResultHeap;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidateHeapEntry;
@@ -16,10 +17,11 @@ use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
+use SomeWork\P2PPathFinder\Tests\Application\Support\DecimalFactory;
+use SomeWork\P2PPathFinder\Tests\Support\DecimalMath;
 
 use function array_column;
 use function array_map;
@@ -138,10 +140,15 @@ final class CandidateResultHeapPropertyTest extends TestCase
             $hops = max(count($nodes) - 1, 0);
             $edges = $this->buildEdgeSequence($nodes, $index);
 
-            $cost = BcMath::normalize($definition['cost'], self::SCALE);
-            $product = BcMath::normalize($definition['product'] ?? '1', self::SCALE);
+            $cost = DecimalFactory::decimal($definition['cost'], self::SCALE);
+            $product = DecimalFactory::decimal($definition['product'] ?? '1', self::SCALE);
 
-            $candidate = CandidatePath::from($cost, $product, $hops, $edges);
+            $candidate = CandidatePath::from(
+                $cost,
+                $product,
+                $hops,
+                $edges,
+            );
             $signatureNodes = $definition['signature'] ?? $nodes;
             $priority = new CandidatePriority(
                 new PathCost($cost),
@@ -190,7 +197,14 @@ final class CandidateResultHeapPropertyTest extends TestCase
                 $rate,
             );
 
-            $edges[] = PathEdge::create($from, $to, $order, $rate, OrderSide::BUY, '1');
+            $edges[] = PathEdge::create(
+                $from,
+                $to,
+                $order,
+                $rate,
+                OrderSide::BUY,
+                BigDecimal::of('1'),
+            );
         }
 
         return PathEdgeSequence::fromList($edges);
@@ -215,7 +229,7 @@ final class CandidateResultHeapPropertyTest extends TestCase
         }
 
         usort($indexed, static function (array $left, array $right): int {
-            $comparison = BcMath::comp($right['cost'], $left['cost'], self::SCALE);
+            $comparison = DecimalMath::comp($right['cost'], $left['cost'], self::SCALE);
             if (0 !== $comparison) {
                 return $comparison;
             }

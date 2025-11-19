@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\Filter;
 
+use Brick\Math\BigDecimal;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
 use SomeWork\P2PPathFinder\Application\Filter\CurrencyPairFilter;
@@ -96,7 +97,10 @@ final class OrderFiltersTest extends TestCase
         $lowerBound = new ReflectionProperty(ToleranceWindowFilter::class, 'lowerBound');
         $lowerBound->setAccessible(true);
 
-        self::assertSame('0.00', $lowerBound->getValue($filter));
+        $value = $lowerBound->getValue($filter);
+
+        self::assertInstanceOf(BigDecimal::class, $value);
+        self::assertSame('0.00', $value->__toString());
     }
 
     public function test_amount_filters_ignore_currency_mismatches(): void

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\Service\PathFinder;
 
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use ReflectionProperty;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
@@ -14,7 +16,6 @@ use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
@@ -102,10 +103,11 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
         self::assertSame('4.857', $eurFee->withScale(3)->amount());
 
         self::assertSame($maximumSpend->amount(), $result->totalSpent()->withScale(3)->amount());
-        self::assertSame(
-            BcMath::normalize($config->maximumTolerance(), 18),
-            $result->residualTolerance()->ratio(),
-        );
+        $expectedRatio = BigDecimal::of($config->maximumTolerance())
+            ->toScale(18, RoundingMode::HALF_UP)
+            ->__toString();
+
+        self::assertSame($expectedRatio, $result->residualTolerance()->ratio());
     }
 
     /**
@@ -343,12 +345,15 @@ final class TolerancePathFinderServiceTest extends PathFinderServiceTestCase
         $amplifierProperty = new ReflectionProperty(PathFinder::class, 'toleranceAmplifier');
         $amplifierProperty->setAccessible(true);
 
-        /** @var string $amplifier */
         $amplifier = $amplifierProperty->getValue($pathFinder);
 
-        $expectedAmplifier = BcMath::div('1', BcMath::sub('1', $tolerance, 18), 18);
+        self::assertInstanceOf(BigDecimal::class, $amplifier);
+        $normalizedTolerance = BigDecimal::of($tolerance)->toScale(18, RoundingMode::HALF_UP);
+        $expectedAmplifier = BigDecimal::one()
+            ->dividedBy(BigDecimal::one()->minus($normalizedTolerance), 18, RoundingMode::HALF_UP)
+            ->__toString();
 
-        self::assertSame($expectedAmplifier, $amplifier);
+        self::assertSame($expectedAmplifier, $amplifier->__toString());
     }
 
     /**

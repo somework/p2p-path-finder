@@ -8,9 +8,12 @@ use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Tests\Support\DecimalMath;
 
 final class ExchangeRateTest extends TestCase
 {
+    use MoneyAssertions;
+
     public function test_conversion_uses_base_currency(): void
     {
         $rate = ExchangeRate::fromString('USD', 'EUR', '0.923456', 6);
@@ -19,7 +22,14 @@ final class ExchangeRateTest extends TestCase
         $converted = $rate->convert($money, 4);
 
         self::assertSame('EUR', $converted->currency());
-        self::assertSame('92.3456', $converted->amount());
+        self::assertMoneyAmount($converted, '92.3456', 4);
+    }
+
+    public function test_decimal_accessor_matches_rate(): void
+    {
+        $rate = ExchangeRate::fromString('USD', 'JPY', '151.235', 3);
+
+        self::assertSame(0, DecimalMath::decimal('151.235', 3)->compareTo($rate->decimal()));
     }
 
     public function test_convert_rejects_currency_mismatch(): void
@@ -39,6 +49,7 @@ final class ExchangeRateTest extends TestCase
         self::assertSame('JPY', $inverted->baseCurrency());
         self::assertSame('USD', $inverted->quoteCurrency());
         self::assertSame('0.007', $inverted->rate());
+        self::assertSame(0, DecimalMath::decimal('0.007', 3)->compareTo($inverted->decimal()));
     }
 
     public function test_from_string_rejects_identical_currencies(): void

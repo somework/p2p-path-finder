@@ -7,7 +7,9 @@ minutes during onboarding.
 > ℹ️  Tolerance inputs and spend calculations follow the canonical policy described in
 > [docs/decimal-strategy.md](decimal-strategy.md#canonical-scale-and-rounding-policy). Keep
 > residual reporting at the documented scale (18 decimal places) so benchmarking and CI
-> comparisons remain reproducible.
+> comparisons remain reproducible. The domain value objects (`Money`, `ExchangeRate`,
+> `DecimalTolerance`, etc.) convert their inputs to `Brick\Math\BigDecimal` immediately, so
+> no BCMath extension or manual string math is required in your integration.
 
 ```php
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;

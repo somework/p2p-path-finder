@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\Support\Generator;
 
+use Brick\Math\BigDecimal;
 use Random\Engine\Mt19937;
 use Random\Randomizer;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
@@ -104,7 +105,7 @@ final class PathEdgeSequenceGenerator
                 $order,
                 $order->effectiveRate(),
                 $side,
-                $conversionRate,
+                BigDecimal::of($conversionRate),
             );
 
             $current = $to;

@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
+use SomeWork\P2PPathFinder\Tests\Application\Support\DecimalFactory;
 
 final class PathOrderKeyTest extends TestCase
 {
@@ -15,7 +16,7 @@ final class PathOrderKeyTest extends TestCase
     {
         $payload = ['candidate' => ['cost' => '0.1']];
         $key = new PathOrderKey(
-            new PathCost('0.100000000000000000'),
+            new PathCost(DecimalFactory::decimal('0.100000000000000000')),
             2,
             RouteSignature::fromNodes(['SRC', 'MID', 'DST']),
             17,

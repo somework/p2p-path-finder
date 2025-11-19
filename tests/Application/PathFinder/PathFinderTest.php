@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 
+use Brick\Math\BigDecimal;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use ReflectionProperty;
@@ -28,13 +29,13 @@ use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Tests\Application\Support\Harness\SearchQueueTieBreakHarness;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
+use SomeWork\P2PPathFinder\Tests\Support\DecimalMath;
 
 use function array_column;
 use function array_key_last;
@@ -137,7 +138,13 @@ final class PathFinderTest extends TestCase
         $property = new ReflectionProperty(PathFinder::class, 'toleranceAmplifier');
         $property->setAccessible(true);
 
-        self::assertSame($expectedAmplifier, $property->getValue($finder));
+        $amplifier = $property->getValue($finder);
+
+        self::assertInstanceOf(BigDecimal::class, $amplifier);
+        self::assertTrue(
+            $amplifier->isEqualTo(BigDecimal::of($expectedAmplifier)),
+            'Tolerance amplifier should match the expected normalized string.',
+        );
     }
 
     /**
@@ -145,18 +152,18 @@ final class PathFinderTest extends TestCase
      */
     public static function provideHighPrecisionTolerances(): iterable
     {
-        $normalized = BcMath::normalize('0.9999999999999999', self::SCALE);
-        $complement = BcMath::sub('1', $normalized, self::SCALE);
+        $normalized = DecimalMath::normalize('0.9999999999999999', self::SCALE);
+        $complement = DecimalMath::sub('1', $normalized, self::SCALE);
         yield 'sixteen_nines' => [
             '0.9999999999999999',
-            BcMath::div('1', $complement, self::SCALE),
+            DecimalMath::div('1', $complement, self::SCALE),
         ];
 
-        $tiny = BcMath::normalize('0.0000000000000001', self::SCALE);
-        $tinyComplement = BcMath::sub('1', $tiny, self::SCALE);
+        $tiny = DecimalMath::normalize('0.0000000000000001', self::SCALE);
+        $tinyComplement = DecimalMath::sub('1', $tiny, self::SCALE);
         yield 'tiny_fraction' => [
             '0.0000000000000001',
-            BcMath::div('1', $tinyComplement, self::SCALE),
+            DecimalMath::div('1', $tinyComplement, self::SCALE),
         ];
     }
 
@@ -190,7 +197,7 @@ final class PathFinderTest extends TestCase
         }
 
         self::assertSame($expectedProduct, $result['product']);
-        $expectedCost = BcMath::div('1', $expectedProduct, self::SCALE);
+        $expectedCost = DecimalMath::div('1', $expectedProduct, self::SCALE);
         self::assertSame($expectedCost, $result['cost']);
     }
 
@@ -205,8 +212,8 @@ final class PathFinderTest extends TestCase
 
         self::assertGreaterThanOrEqual(2, count($results));
         self::assertCount(2, $results);
-        self::assertLessThanOrEqual(0, BcMath::comp($results[0]['cost'], $results[1]['cost'], self::SCALE));
-        self::assertGreaterThanOrEqual(0, BcMath::comp($results[0]['product'], $results[1]['product'], self::SCALE));
+        self::assertLessThanOrEqual(0, DecimalMath::comp($results[0]['cost'], $results[1]['cost'], self::SCALE));
+        self::assertGreaterThanOrEqual(0, DecimalMath::comp($results[0]['product'], $results[1]['product'], self::SCALE));
 
         $finderWithBroaderLimit = new PathFinder(maxHops: 4, tolerance: '0.999', topK: 3);
         $extendedResults = $finderWithBroaderLimit->findBestPaths($graph, 'RUB', 'IDR');
@@ -282,8 +289,8 @@ final class PathFinderTest extends TestCase
 
         $candidates = [
             CandidatePath::from(
-                '0.100000000000000000',
-                '10.000000000000000000',
+                BigDecimal::of('0.100000000000000000'),
+                BigDecimal::of('10.000000000000000000'),
                 2,
                 PathEdgeSequence::fromList([
                     self::stubCandidateEdge('SRC', 'BET'),
@@ -291,8 +298,8 @@ final class PathFinderTest extends TestCase
                 ]),
             ),
             CandidatePath::from(
-                '0.100000000000000000',
-                '10.000000000000000000',
+                BigDecimal::of('0.100000000000000000'),
+                BigDecimal::of('10.000000000000000000'),
                 2,
                 PathEdgeSequence::fromList([
                     self::stubCandidateEdge('SRC', 'ALP'),
@@ -300,8 +307,8 @@ final class PathFinderTest extends TestCase
                 ]),
             ),
             CandidatePath::from(
-                '0.100000000000000000',
-                '10.000000000000000000',
+                BigDecimal::of('0.100000000000000000'),
+                BigDecimal::of('10.000000000000000000'),
                 1,
                 PathEdgeSequence::fromList([
                     self::stubCandidateEdge('SRC', 'TRG'),
@@ -364,8 +371,8 @@ final class PathFinderTest extends TestCase
 
         $candidates = [
             CandidatePath::from(
-                '0.100000000000000000',
-                '10.000000000000000000',
+                BigDecimal::of('0.100000000000000000'),
+                BigDecimal::of('10.000000000000000000'),
                 2,
                 PathEdgeSequence::fromList([
                     self::stubCandidateEdge('SRC', 'BET'),
@@ -373,8 +380,8 @@ final class PathFinderTest extends TestCase
                 ]),
             ),
             CandidatePath::from(
-                '0.100000000000000000',
-                '10.000000000000000000',
+                BigDecimal::of('0.100000000000000000'),
+                BigDecimal::of('10.000000000000000000'),
                 2,
                 PathEdgeSequence::fromList([
                     self::stubCandidateEdge('SRC', 'ALP'),
@@ -382,8 +389,8 @@ final class PathFinderTest extends TestCase
                 ]),
             ),
             CandidatePath::from(
-                '0.100000000000000000',
-                '10.000000000000000000',
+                BigDecimal::of('0.100000000000000000'),
+                BigDecimal::of('10.000000000000000000'),
                 1,
                 PathEdgeSequence::fromList([
                     self::stubCandidateEdge('SRC', 'TRG'),
@@ -435,7 +442,7 @@ final class PathFinderTest extends TestCase
             ),
             ExchangeRate::fromString($from, $to, $rate, self::SCALE),
             OrderSide::BUY,
-            $rate,
+            BigDecimal::of($rate),
         );
     }
 
@@ -539,7 +546,7 @@ final class PathFinderTest extends TestCase
             array_map(static fn (array $edge): string => $edge['to'], $first['edges']),
         );
         self::assertSame(['RUB', 'USD', 'IDR'], $firstNodes);
-        $expectedTwoHopCost = BcMath::div('1', BcMath::mul('30', '8', self::SCALE), self::SCALE);
+        $expectedTwoHopCost = DecimalMath::div('1', DecimalMath::mul('30', '8', self::SCALE), self::SCALE);
         self::assertSame($expectedTwoHopCost, $first['cost']);
 
         $second = $paths[1];
@@ -549,7 +556,7 @@ final class PathFinderTest extends TestCase
             array_map(static fn (array $edge): string => $edge['to'], $second['edges']),
         );
         self::assertSame(['RUB', 'IDR'], $secondNodes);
-        $expectedDirectCost = BcMath::div('1', '20', self::SCALE);
+        $expectedDirectCost = DecimalMath::div('1', '20', self::SCALE);
         self::assertSame($expectedDirectCost, $second['cost']);
 
         foreach ($paths as $path) {
@@ -637,15 +644,15 @@ final class PathFinderTest extends TestCase
 
             if (['SRC', 'TRG'] === $nodes) {
                 $directFound = true;
-                $expectedDirectCost = BcMath::div('1', '2', self::SCALE);
+                $expectedDirectCost = DecimalMath::div('1', '2', self::SCALE);
                 self::assertSame($expectedDirectCost, $path['cost']);
             }
 
             if (['SRC', 'DEEP', 'HIDDEN', 'TRG'] === $nodes) {
                 $tightFound = true;
-                $firstLegCost = BcMath::div('1', '1.923', self::SCALE);
-                $secondLegCost = BcMath::div($firstLegCost, '1.050', self::SCALE);
-                $expectedHiddenCost = BcMath::div($secondLegCost, '2.000', self::SCALE);
+                $firstLegCost = DecimalMath::div('1', '1.923', self::SCALE);
+                $secondLegCost = DecimalMath::div($firstLegCost, '1.050', self::SCALE);
+                $expectedHiddenCost = DecimalMath::div($secondLegCost, '2.000', self::SCALE);
                 self::assertSame($expectedHiddenCost, $path['cost']);
             }
         }
@@ -733,10 +740,10 @@ final class PathFinderTest extends TestCase
         );
         self::assertSame(['SRC', 'MID', 'TRG'], $secondNodes);
 
-        $expectedFirstCost = BcMath::div('1', BcMath::mul('2.000', BcMath::mul('2.000', '2.000', self::SCALE), self::SCALE), self::SCALE);
+        $expectedFirstCost = DecimalMath::div('1', DecimalMath::mul('2.000', DecimalMath::mul('2.000', '2.000', self::SCALE), self::SCALE), self::SCALE);
         self::assertSame($expectedFirstCost, $paths[0]['cost']);
 
-        $expectedSecondCost = BcMath::div('1', BcMath::mul('1.500', '1.200', self::SCALE), self::SCALE);
+        $expectedSecondCost = DecimalMath::div('1', DecimalMath::mul('1.500', '1.200', self::SCALE), self::SCALE);
         self::assertSame($expectedSecondCost, $paths[1]['cost']);
 
         foreach ($paths as $path) {
@@ -808,10 +815,10 @@ final class PathFinderTest extends TestCase
         );
         self::assertSame(['SRC', 'MID', 'TRG'], $secondNodes);
 
-        $expectedFirstCost = BcMath::div('1', BcMath::mul('2.000', BcMath::mul('2.000', '2.000', self::SCALE), self::SCALE), self::SCALE);
+        $expectedFirstCost = DecimalMath::div('1', DecimalMath::mul('2.000', DecimalMath::mul('2.000', '2.000', self::SCALE), self::SCALE), self::SCALE);
         self::assertSame($expectedFirstCost, $paths[0]['cost']);
 
-        $expectedSecondCost = BcMath::div('1', BcMath::mul('1.500', '1.200', self::SCALE), self::SCALE);
+        $expectedSecondCost = DecimalMath::div('1', DecimalMath::mul('1.500', '1.200', self::SCALE), self::SCALE);
         self::assertSame($expectedSecondCost, $paths[1]['cost']);
 
         foreach ($paths as $path) {
@@ -1248,13 +1255,13 @@ final class PathFinderTest extends TestCase
             [
                 ['from' => 'RUB', 'to' => 'IDR'],
             ],
-            BcMath::normalize('165.000', self::SCALE),
+            DecimalMath::normalize('165.000', self::SCALE),
         ];
 
-        $rubToUsd = BcMath::div('1', '90.500', self::SCALE);
-        $twoHopProduct = BcMath::mul(
+        $rubToUsd = DecimalMath::div('1', '90.500', self::SCALE);
+        $twoHopProduct = DecimalMath::mul(
             $rubToUsd,
-            BcMath::normalize('15400.000', self::SCALE),
+            DecimalMath::normalize('15400.000', self::SCALE),
             self::SCALE,
         );
         yield 'two_hop_best_path_with_strict_tolerance' => [
@@ -1279,13 +1286,13 @@ final class PathFinderTest extends TestCase
             $twoHopProduct,
         ];
 
-        $threeHopProduct = BcMath::mul(
-            BcMath::mul(
+        $threeHopProduct = DecimalMath::mul(
+            DecimalMath::mul(
                 $rubToUsd,
-                BcMath::normalize('149.500', self::SCALE),
+                DecimalMath::normalize('149.500', self::SCALE),
                 self::SCALE,
             ),
-            BcMath::normalize('112.750', self::SCALE),
+            DecimalMath::normalize('112.750', self::SCALE),
             self::SCALE,
         );
         yield 'three_hop_path_outperforms_direct_conversion' => [
@@ -1397,14 +1404,14 @@ final class PathFinderTest extends TestCase
             self::createRubToUsdSellOrders(),
             'RUB',
             'USD',
-            BcMath::div('1', '90.500', self::SCALE),
+            DecimalMath::div('1', '90.500', self::SCALE),
         ];
 
         yield 'usd_to_idr_order_book' => [
             self::createUsdToIdrBuyOrders(),
             'USD',
             'IDR',
-            BcMath::normalize('15400.000', self::SCALE),
+            DecimalMath::normalize('15400.000', self::SCALE),
         ];
     }
 
@@ -1732,9 +1739,9 @@ final class PathFinderTest extends TestCase
         self::assertSame(2, $result['hops']);
         self::assertCount(2, $result['edges']);
 
-        $expectedProduct = BcMath::mul(
-            BcMath::div('1', '1800.00', self::SCALE),
-            BcMath::normalize('1700.00', self::SCALE),
+        $expectedProduct = DecimalMath::mul(
+            DecimalMath::div('1', '1800.00', self::SCALE),
+            DecimalMath::normalize('1700.00', self::SCALE),
             self::SCALE,
         );
         self::assertSame($expectedProduct, $result['product']);
@@ -1747,7 +1754,7 @@ final class PathFinderTest extends TestCase
         self::assertSame('EUR', $result['edges'][1]['to']);
         self::assertSame(OrderSide::BUY, $result['edges'][1]['orderSide']);
 
-        self::assertSame(1, BcMath::comp($result['product'], BcMath::normalize('0.92', self::SCALE), self::SCALE));
+        self::assertSame(1, DecimalMath::comp($result['product'], DecimalMath::normalize('0.92', self::SCALE), self::SCALE));
     }
 
     public function test_it_accounts_for_gross_base_when_scoring_buy_edges(): void
@@ -1783,9 +1790,9 @@ final class PathFinderTest extends TestCase
         self::assertSame(1, $result['hops']);
         self::assertCount(1, $result['edges']);
 
-        $expectedProduct = BcMath::div('1.100', '1.050', self::SCALE);
+        $expectedProduct = DecimalMath::div('1.100', '1.050', self::SCALE);
         self::assertSame($expectedProduct, $result['product']);
-        self::assertSame(BcMath::div('1', $expectedProduct, self::SCALE), $result['cost']);
+        self::assertSame(DecimalMath::div('1', $expectedProduct, self::SCALE), $result['cost']);
         self::assertSame($expectedProduct, $result['edges'][0]['conversionRate']);
     }
 
@@ -1819,8 +1826,8 @@ final class PathFinderTest extends TestCase
         self::assertSame('EUR', $result['edges'][0]['from']);
         self::assertSame('USD', $result['edges'][0]['to']);
 
-        $expectedProduct = BcMath::div('11.400', '10.200', self::SCALE);
-        $expectedCost = BcMath::div('1', $expectedProduct, self::SCALE);
+        $expectedProduct = DecimalMath::div('11.400', '10.200', self::SCALE);
+        $expectedCost = DecimalMath::div('1', $expectedProduct, self::SCALE);
 
         self::assertSame($expectedProduct, $result['product']);
         self::assertSame($expectedCost, $result['cost']);
@@ -1840,8 +1847,8 @@ final class PathFinderTest extends TestCase
 
         self::assertSame(0, $result['hops']);
         self::assertSame([], $result['edges']);
-        self::assertSame(BcMath::normalize('1', self::SCALE), $result['product']);
-        self::assertSame(BcMath::normalize('1', self::SCALE), $result['cost']);
+        self::assertSame(DecimalMath::normalize('1', self::SCALE), $result['product']);
+        self::assertSame(DecimalMath::normalize('1', self::SCALE), $result['cost']);
     }
 
     /**
@@ -1883,7 +1890,7 @@ final class PathFinderTest extends TestCase
         $best = $firstPaths[0];
         self::assertSame($expectedHops, $best['hops']);
         self::assertSame($expectedProduct, $best['product']);
-        $expectedCost = BcMath::div('1', $expectedProduct, self::SCALE);
+        $expectedCost = DecimalMath::div('1', $expectedProduct, self::SCALE);
         self::assertSame($expectedCost, $best['cost']);
     }
 
@@ -1892,10 +1899,10 @@ final class PathFinderTest extends TestCase
      */
     public static function provideExtremeRateScenarios(): iterable
     {
-        $highGrowthFirstLeg = BcMath::div('1', '0.000000000123456789', self::SCALE);
-        $astronomicalProduct = BcMath::mul(
+        $highGrowthFirstLeg = DecimalMath::div('1', '0.000000000123456789', self::SCALE);
+        $astronomicalProduct = DecimalMath::mul(
             $highGrowthFirstLeg,
-            BcMath::normalize('987654321.987654321', self::SCALE),
+            DecimalMath::normalize('987654321.987654321', self::SCALE),
             self::SCALE,
         );
 
@@ -1973,7 +1980,7 @@ final class PathFinderTest extends TestCase
             ],
             'SRC',
             'MEG',
-            BcMath::normalize('0.000000000200000000', self::SCALE),
+            DecimalMath::normalize('0.000000000200000000', self::SCALE),
             1,
         ];
     }
