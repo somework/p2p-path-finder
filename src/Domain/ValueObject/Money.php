@@ -76,6 +76,8 @@ final class Money
 
     /**
      * Retrieves the ISO-like currency code of the amount.
+     *
+     * @psalm-mutation-free
      */
     public function currency(): string
     {
@@ -86,6 +88,8 @@ final class Money
      * Returns the normalized numeric string representation of the amount.
      *
      * @return numeric-string
+     *
+     * @psalm-mutation-free
      */
     public function amount(): string
     {
@@ -94,6 +98,8 @@ final class Money
 
     /**
      * Returns the scale (number of fractional digits) used for the amount.
+     *
+     * @psalm-mutation-free
      */
     public function scale(): int
     {
@@ -102,6 +108,8 @@ final class Money
 
     /**
      * Returns the BigDecimal representation of the amount.
+     *
+     * @psalm-mutation-free
      */
     public function decimal(): BigDecimal
     {
@@ -271,6 +279,9 @@ final class Money
         }
     }
 
+    /**
+     * @psalm-mutation-free
+     */
     private static function assertScale(int $scale): void
     {
         if ($scale < 0) {
@@ -287,6 +298,9 @@ final class Money
         }
     }
 
+    /**
+     * @psalm-mutation-free
+     */
     private static function scaleDecimal(BigDecimal $decimal, int $scale): BigDecimal
     {
         self::assertScale($scale);
@@ -296,6 +310,8 @@ final class Money
 
     /**
      * @return numeric-string
+     *
+     * @psalm-mutation-free
      */
     private static function decimalToString(BigDecimal $decimal, int $scale): string
     {
