@@ -13,6 +13,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   information).
 - `PathResultSet::fromPaths()` factory for assembling ordered collections directly from
   application-level path payloads without hand-crafting `PathResultSetEntry` objects.
+- BigDecimal determinism audit logs and a release checklist covering the guard example,
+  property suite and quality gates required before tagging a release.
 
 ### Changed
 - README now links to community resources and highlights how the changelog will track
@@ -20,6 +22,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Internal: All arithmetic has migrated from BCMath to `Brick\Math\BigDecimal`. Value
   objects now expose decimal accessors, documentation covers the canonical rounding
   policy, and helper guides reference the new decimal fixtures.
+- Composer metadata now describes the deterministic BigDecimal search workflow so
+  Packagist highlights the migration when browsing the package listing.
 - Breaking: `PathFinder::findBestPaths()` now consumes `SpendConstraints` and emits
   `CandidatePath` instances, replacing the previous associative array payloads.
   Custom callbacks or integrations must migrate to the new value objects.
