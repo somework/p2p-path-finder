@@ -99,4 +99,27 @@ final class PathLegCollectionTest extends TestCase
     {
         self::assertNull(PathLegCollection::empty()->first());
     }
+
+    public function test_json_serialization_returns_normalized_leg_payloads(): void
+    {
+        $first = new PathLeg(
+            'usd',
+            'btc',
+            Money::fromString('USD', '75', 2),
+            Money::fromString('BTC', '0.005', 6),
+        );
+        $second = new PathLeg(
+            'btc',
+            'eth',
+            Money::fromString('BTC', '0.005', 6),
+            Money::fromString('ETH', '14.25', 2),
+        );
+
+        $collection = PathLegCollection::fromList([$second, $first]);
+
+        self::assertSame(
+            [$first->jsonSerialize(), $second->jsonSerialize()],
+            $collection->jsonSerialize(),
+        );
+    }
 }

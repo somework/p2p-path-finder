@@ -1,11 +1,32 @@
-# Local development without ext-bcmath
+# Local development prerequisites
 
-Composer enforces the `ext-bcmath` requirement during installation. When the native extension is missing you have two options:
+The decimal stack now relies exclusively on [`brick/math`](https://github.com/brick/math),
+so there is no longer an `ext-bcmath` requirement for either runtime or the test suite.
+Instead, ensure your PHP 8.2+ build exposes the standard extensions reported by
+`composer check-platform-reqs`:
 
-1. Install the extension on your platform before running `composer install`.
-2. Temporarily require [`symfony/polyfill-bcmath`](https://github.com/symfony/polyfill-bcmath) to emulate the functions during local development.
+* `ext-ctype` (or [`symfony/polyfill-ctype`](https://github.com/symfony/polyfill-ctype)).
+* `ext-date`.
+* `ext-dom`.
+* `ext-filter`.
+* `ext-hash`.
+* `ext-iconv`.
+* `ext-json`.
+* `ext-libxml`.
+* `ext-mbstring` (or [`symfony/polyfill-mbstring`](https://github.com/symfony/polyfill-mbstring)).
+* `ext-openssl`.
+* `ext-pcre`.
+* `ext-phar`.
+* `ext-reflection`.
+* `ext-simplexml`.
+* `ext-spl`.
+* `ext-tokenizer`.
+* `ext-xml`.
+* `ext-xmlwriter`.
 
-The polyfill provides correctness but not the same performance characteristics as the PHP extension. Keep it out of production and CI environments so their behaviour mirrors real-world deployments.
+Run `composer check-platform-reqs` after provisioning PHP to verify that the locally
+enabled extensions match the dependency tree. When the command succeeds, you can install
+the dependencies without patching `composer.json` or adding polyfills.
 
 For guard-rail tuning tips (visited-state and expansion limits) see the
 ["Choosing search guard limits"](../README.md#choosing-search-guard-limits) section of the

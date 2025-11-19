@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Service;
 
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Application\Result\MoneyMap;
 use SomeWork\P2PPathFinder\Application\Result\PathLeg;
@@ -12,11 +14,10 @@ use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 use function max;
-use function substr;
 
 /**
  * Resolves concrete path legs from abstract graph edges.
@@ -31,6 +32,8 @@ final class LegMaterializer
     private const SELL_RESOLUTION_RATIO_EXTRA_SCALE = 6;
     private const SELL_RESOLUTION_TOLERANCE_SCALE = 12;
     private const BUY_ADJUSTMENT_MAX_ITERATIONS = 12;
+    private const BUY_ADJUSTMENT_RATIO_MIN_SCALE = 12;
+    private const BUY_ADJUSTMENT_RATIO_EXTRA_SCALE = 4;
 
     private readonly OrderFillEvaluator $fillEvaluator;
 
@@ -349,21 +352,23 @@ final class LegMaterializer
                 ];
             }
 
-            $ratioScale = max($comparisonScale, 12);
-            $ceilingAmount = $ceilingComparable->withScale($ratioScale)->amount();
-            $grossAmount = $grossComparable->withScale($ratioScale)->amount();
+            $ratioScale = max($comparisonScale, self::BUY_ADJUSTMENT_RATIO_MIN_SCALE);
+            $ceilingDecimal = self::scaleDecimal($ceilingComparable->decimal(), $ratioScale);
+            $grossDecimal = self::scaleDecimal($grossComparable->decimal(), $ratioScale);
 
-            if (0 === BcMath::comp($grossAmount, '0', $ratioScale)) {
+            if ($grossDecimal->isZero()) {
                 return null;
             }
 
-            $ratio = BcMath::div($ceilingAmount, $grossAmount, $ratioScale + 4);
+            $divisionScale = $ratioScale + self::BUY_ADJUSTMENT_RATIO_EXTRA_SCALE;
+            $ratio = $ceilingDecimal->dividedBy($grossDecimal, $divisionScale, RoundingMode::HALF_UP);
 
-            if (0 === BcMath::comp($ratio, '0', $ratioScale + 4)) {
+            if ($ratio->isZero()) {
                 return null;
             }
 
-            $nextNet = $netCandidate->multiply($ratio, max($netCandidate->scale(), $ratioScale));
+            $ratioString = self::decimalToString($ratio, $divisionScale);
+            $nextNet = $netCandidate->multiply($ratioString, max($netCandidate->scale(), $ratioScale));
             $nextNet = $bounds->clamp($nextNet);
 
             if ($nextNet->equals($netCandidate)) {
@@ -479,33 +484,23 @@ final class LegMaterializer
     {
         $comparisonScale = max($target->scale(), $actual->scale(), self::SELL_RESOLUTION_COMPARISON_SCALE);
 
-        $targetAmount = $target->withScale($comparisonScale)->amount();
-        $actualAmount = $actual->withScale($comparisonScale)->amount();
+        $targetDecimal = self::scaleDecimal($target->decimal(), $comparisonScale);
+        $actualDecimal = self::scaleDecimal($actual->decimal(), $comparisonScale);
 
-        if (0 === BcMath::comp($targetAmount, '0', $comparisonScale)) {
-            return 0 === BcMath::comp($actualAmount, '0', $comparisonScale);
+        if ($targetDecimal->isZero()) {
+            return $actualDecimal->isZero();
         }
 
-        $difference = BcMath::sub($actualAmount, $targetAmount, $comparisonScale + self::SELL_RESOLUTION_RATIO_EXTRA_SCALE);
-        if ('-' === $difference[0]) {
-            $difference = substr($difference, 1);
-        }
+        $difference = $actualDecimal->minus($targetDecimal)->abs();
+        $relativeScale = $comparisonScale + self::SELL_RESOLUTION_RATIO_EXTRA_SCALE;
+        $relative = $difference->dividedBy($targetDecimal->abs(), $relativeScale, RoundingMode::HALF_UP);
 
-        if ('' === $difference) {
-            $difference = '0';
-        }
+        $tolerance = self::scaleDecimal(
+            BigDecimal::of(self::SELL_RESOLUTION_RELATIVE_TOLERANCE),
+            self::SELL_RESOLUTION_TOLERANCE_SCALE,
+        );
 
-        BcMath::ensureNumeric($difference, $targetAmount);
-
-        /** @var numeric-string $numericDifference */
-        $numericDifference = $difference;
-
-        /** @var numeric-string $numericTargetAmount */
-        $numericTargetAmount = $targetAmount;
-
-        $relative = BcMath::div($numericDifference, $numericTargetAmount, $comparisonScale + self::SELL_RESOLUTION_RATIO_EXTRA_SCALE);
-
-        return BcMath::comp($relative, self::SELL_RESOLUTION_RELATIVE_TOLERANCE, self::SELL_RESOLUTION_TOLERANCE_SCALE) <= 0;
+        return $relative->compareTo($tolerance) <= 0;
     }
 
     /**
@@ -513,21 +508,24 @@ final class LegMaterializer
      */
     private function calculateSellAdjustmentRatio(Money $target, Money $actual, int $scale): ?string
     {
-        $targetAmount = $target->withScale($scale)->amount();
-        $actualAmount = $actual->withScale($scale)->amount();
+        $targetDecimal = self::scaleDecimal($target->decimal(), $scale);
+        $actualDecimal = self::scaleDecimal($actual->decimal(), $scale);
 
-        if (0 === BcMath::comp($actualAmount, '0', $scale)) {
+        if ($actualDecimal->isZero()) {
             return null;
         }
 
-        $targetSignNegative = '-' === $targetAmount[0];
-        $actualSignNegative = '-' === $actualAmount[0];
+        $targetNegative = $targetDecimal->isNegative();
+        $actualNegative = $actualDecimal->isNegative();
 
-        if ($targetSignNegative !== $actualSignNegative && 0 !== BcMath::comp($targetAmount, '0', $scale)) {
+        if ($targetNegative !== $actualNegative && !$targetDecimal->isZero()) {
             return null;
         }
 
-        return BcMath::div($targetAmount, $actualAmount, $scale + self::SELL_RESOLUTION_RATIO_EXTRA_SCALE);
+        $ratioScale = $scale + self::SELL_RESOLUTION_RATIO_EXTRA_SCALE;
+        $ratio = $targetDecimal->dividedBy($actualDecimal, $ratioScale, RoundingMode::HALF_UP);
+
+        return self::decimalToString($ratio, $ratioScale);
     }
 
     private function alignBaseScale(int $minScale, int $maxScale, Money $baseAmount): Money
@@ -535,5 +533,32 @@ final class LegMaterializer
         $scale = max($baseAmount->scale(), $minScale, $maxScale);
 
         return $baseAmount->withScale($scale);
+    }
+
+    private static function assertScale(int $scale): void
+    {
+        if ($scale < 0) {
+            throw new InvalidInput('Scale cannot be negative.');
+        }
+    }
+
+    private static function scaleDecimal(BigDecimal $decimal, int $scale): BigDecimal
+    {
+        self::assertScale($scale);
+
+        return $decimal->toScale($scale, RoundingMode::HALF_UP);
+    }
+
+    /**
+     * @return numeric-string
+     */
+    private static function decimalToString(BigDecimal $decimal, int $scale): string
+    {
+        $scaled = self::scaleDecimal($decimal, $scale);
+
+        /** @var numeric-string $result */
+        $result = $scaled->__toString();
+
+        return $result;
     }
 }

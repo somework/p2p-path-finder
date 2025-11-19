@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Service;
 
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ToleranceWindow;
 
 use function max;
-use function substr;
 
 /**
  * Validates materialized paths against configured tolerance bounds.
@@ -28,36 +28,30 @@ final class ToleranceEvaluator
     public function evaluate(PathSearchConfig $config, Money $requestedSpend, Money $actualSpend): ?DecimalTolerance
     {
         $residual = $this->calculateResidualTolerance($requestedSpend, $actualSpend);
+        $residualDecimal = $this->decimalFromString($residual);
 
         $requestedComparable = $requestedSpend->withScale(max($requestedSpend->scale(), $actualSpend->scale()));
         $actualComparable = $actualSpend->withScale($requestedComparable->scale());
 
-        $requestedAmount = $requestedComparable->amount();
-        $actualAmount = $actualComparable->amount();
-        $comparisonScale = $requestedComparable->scale();
-
-        if (
-            0 === BcMath::comp($requestedAmount, '0', $comparisonScale)
-            && 1 === BcMath::comp($actualAmount, '0', $comparisonScale)
-        ) {
+        if ($requestedComparable->isZero() && $actualComparable->greaterThan($requestedComparable)) {
             return null;
         }
 
         $toleranceWindow = $config->toleranceWindow();
         $toleranceScale = ToleranceWindow::scale();
-        $minimumTolerance = $toleranceWindow->minimum();
-        $maximumTolerance = $toleranceWindow->maximum();
+        $minimumTolerance = $this->decimalFromString($toleranceWindow->minimum());
+        $maximumTolerance = $this->decimalFromString($toleranceWindow->maximum());
 
         if (
             $actualComparable->lessThan($requestedComparable)
-            && 1 === BcMath::comp($residual, $minimumTolerance, $toleranceScale)
+            && $residualDecimal->compareTo($minimumTolerance) > 0
         ) {
             return null;
         }
 
         if (
             $actualComparable->greaterThan($requestedComparable)
-            && 1 === BcMath::comp($residual, $maximumTolerance, $toleranceScale)
+            && $residualDecimal->compareTo($maximumTolerance) > 0
         ) {
             return null;
         }
@@ -72,40 +66,47 @@ final class ToleranceEvaluator
     {
         $targetScale = ToleranceWindow::scale();
         $scale = max($desired->scale(), $actual->scale(), $targetScale);
-        $desiredAmount = $desired->withScale($scale)->amount();
-        $actualAmount = $actual->withScale($scale)->amount();
+        $desiredDecimal = $desired->decimal()->toScale($scale, RoundingMode::HALF_UP);
+        $actualDecimal = $actual->decimal()->toScale($scale, RoundingMode::HALF_UP);
 
-        if (0 === BcMath::comp($desiredAmount, '0', $scale)) {
-            if (0 === BcMath::comp($actualAmount, '0', $scale)) {
-                return BcMath::normalize('0', $targetScale);
+        if ($desiredDecimal->isZero()) {
+            if ($actualDecimal->isZero()) {
+                return $this->decimalToString(BigDecimal::zero(), $targetScale);
             }
 
-            return BcMath::normalize('1', $targetScale);
+            return $this->decimalToString(BigDecimal::one(), $targetScale);
         }
 
-        $diff = BcMath::sub($actualAmount, $desiredAmount, $scale + 4);
+        $difference = $actualDecimal->minus($desiredDecimal)->abs();
 
-        if ('-' === $diff[0]) {
-            $diff = substr($diff, 1);
+        if ($difference->isZero()) {
+            return $this->decimalToString(BigDecimal::zero(), $targetScale);
         }
 
-        BcMath::ensureNumeric($diff, $desiredAmount);
+        $ratioScale = $targetScale + 4;
+        $ratio = $difference->dividedBy($desiredDecimal, $ratioScale, RoundingMode::HALF_UP);
 
-        /** @var numeric-string $numericDiffForComparison */
-        $numericDiffForComparison = $diff;
+        return $this->decimalToString($ratio, $targetScale);
+    }
 
-        if (0 === BcMath::comp($numericDiffForComparison, '0', $scale + 4)) {
-            $diff = '0';
-        }
+    private function decimalFromString(string $value): BigDecimal
+    {
+        return BigDecimal::of($value);
+    }
 
-        /** @var numeric-string $numericDiff */
-        $numericDiff = $diff;
+    private function scaleDecimal(BigDecimal $decimal, int $scale): BigDecimal
+    {
+        return $decimal->toScale($scale, RoundingMode::HALF_UP);
+    }
 
-        /** @var numeric-string $numericDesiredAmount */
-        $numericDesiredAmount = $desiredAmount;
+    /**
+     * @return numeric-string
+     */
+    private function decimalToString(BigDecimal $decimal, int $scale): string
+    {
+        /** @var numeric-string $result */
+        $result = $this->scaleDecimal($decimal, $scale)->__toString();
 
-        $ratio = BcMath::div($numericDiff, $numericDesiredAmount, $targetScale + 4);
-
-        return BcMath::normalize($ratio, $targetScale);
+        return $result;
     }
 }

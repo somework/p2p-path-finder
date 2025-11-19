@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
+use Brick\Math\BigDecimal;
+use Brick\Math\Exception\MathException;
+use Brick\Math\RoundingMode;
 use JsonSerializable;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function max;
+use function sprintf;
 
 /**
  * Immutable representation of a tolerance ratio expressed as a decimal value between 0 and 1.
@@ -19,20 +23,10 @@ final class DecimalTolerance implements JsonSerializable
 
     private const PERCENT_MULTIPLIER = '100';
 
-    /**
-     * @var numeric-string
-     */
-    private readonly string $ratio;
-
-    private readonly int $scale;
-
-    /**
-     * @param numeric-string $ratio
-     */
-    private function __construct(string $ratio, int $scale)
-    {
-        $this->ratio = $ratio;
-        $this->scale = $scale;
+    private function __construct(
+        private readonly BigDecimal $decimal,
+        private readonly int $scale,
+    ) {
     }
 
     /**
@@ -45,12 +39,9 @@ final class DecimalTolerance implements JsonSerializable
         $scale ??= self::DEFAULT_SCALE;
         self::assertScale($scale);
 
-        BcMath::ensureNumeric($ratio);
+        $normalized = self::scaleDecimal(self::decimalFromString($ratio), $scale);
 
-        $normalized = BcMath::normalize($ratio, $scale);
-        $comparisonScale = max($scale, self::DEFAULT_SCALE);
-
-        if (BcMath::comp($normalized, '0', $comparisonScale) < 0 || BcMath::comp($normalized, '1', $comparisonScale) > 0) {
+        if ($normalized->compareTo(BigDecimal::zero()) < 0 || $normalized->compareTo(BigDecimal::one()) > 0) {
             throw new InvalidInput('Residual tolerance must be a value between 0 and 1 inclusive.');
         }
 
@@ -59,7 +50,7 @@ final class DecimalTolerance implements JsonSerializable
 
     public static function zero(): self
     {
-        return new self(BcMath::normalize('0', self::DEFAULT_SCALE), self::DEFAULT_SCALE);
+        return new self(self::scaleDecimal(BigDecimal::zero(), self::DEFAULT_SCALE), self::DEFAULT_SCALE);
     }
 
     /**
@@ -67,7 +58,7 @@ final class DecimalTolerance implements JsonSerializable
      */
     public function ratio(): string
     {
-        return $this->ratio;
+        return self::decimalToString($this->decimal, $this->scale);
     }
 
     public function scale(): int
@@ -77,7 +68,7 @@ final class DecimalTolerance implements JsonSerializable
 
     public function isZero(): bool
     {
-        return 0 === BcMath::comp($this->ratio, '0', $this->scale);
+        return $this->decimal->isZero();
     }
 
     /**
@@ -93,9 +84,10 @@ final class DecimalTolerance implements JsonSerializable
 
         $comparisonScale = max($this->scale, $scale ?? $this->scale, self::DEFAULT_SCALE);
 
-        $normalized = BcMath::normalize($value, $comparisonScale);
+        $left = self::scaleDecimal($this->decimal, $comparisonScale);
+        $right = self::scaleDecimal(self::decimalFromString($value), $comparisonScale);
 
-        return BcMath::comp($this->ratio, $normalized, $comparisonScale);
+        return $left->compareTo($right);
     }
 
     /**
@@ -128,9 +120,10 @@ final class DecimalTolerance implements JsonSerializable
         self::assertScale($scale);
 
         $workingScale = max($this->scale, $scale) + 2;
-        $product = BcMath::mul($this->ratio, self::PERCENT_MULTIPLIER, $workingScale);
+        $product = self::scaleDecimal($this->decimal, $workingScale)
+            ->multipliedBy(BigDecimal::of(self::PERCENT_MULTIPLIER));
 
-        return BcMath::normalize($product, $scale);
+        return self::decimalToString($product, $scale);
     }
 
     /**
@@ -138,7 +131,7 @@ final class DecimalTolerance implements JsonSerializable
      */
     public function jsonSerialize(): string
     {
-        return $this->ratio;
+        return $this->ratio();
     }
 
     private static function assertScale(int $scale): void
@@ -146,5 +139,32 @@ final class DecimalTolerance implements JsonSerializable
         if ($scale < 0) {
             throw new InvalidInput('Scale must be a non-negative integer.');
         }
+    }
+
+    private static function decimalFromString(string $value): BigDecimal
+    {
+        try {
+            return BigDecimal::of($value);
+        } catch (MathException $exception) {
+            throw new InvalidInput(sprintf('Value "%s" is not numeric.', $value), 0, $exception);
+        }
+    }
+
+    private static function scaleDecimal(BigDecimal $decimal, int $scale): BigDecimal
+    {
+        self::assertScale($scale);
+
+        return $decimal->toScale($scale, RoundingMode::HALF_UP);
+    }
+
+    /**
+     * @return numeric-string
+     */
+    private static function decimalToString(BigDecimal $decimal, int $scale): string
+    {
+        /** @var numeric-string $result */
+        $result = self::scaleDecimal($decimal, $scale)->__toString();
+
+        return $result;
     }
 }

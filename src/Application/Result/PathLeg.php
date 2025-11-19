@@ -89,9 +89,9 @@ final class PathLeg implements JsonSerializable
      * @return array{
      *     from: string,
      *     to: string,
-     *     spent: array{currency: string, amount: string, scale: int},
-     *     received: array{currency: string, amount: string, scale: int},
-     *     fees: array<string, array{currency: string, amount: string, scale: int}>,
+     *     spent: array{currency: string, amount: numeric-string, scale: int},
+     *     received: array{currency: string, amount: numeric-string, scale: int},
+     *     fees: array<string, array{currency: string, amount: numeric-string, scale: int}>,
      * }
      */
     public function jsonSerialize(): array

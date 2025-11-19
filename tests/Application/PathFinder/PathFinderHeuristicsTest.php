@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 
+use Brick\Math\BigDecimal;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\Graph\Graph;
@@ -27,11 +28,12 @@ use SomeWork\P2PPathFinder\Application\Service\LegMaterializer;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Tests\Application\Support\DecimalFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
+use SomeWork\P2PPathFinder\Tests\Support\DecimalMath;
 
 use function chr;
 use function sprintf;
@@ -48,14 +50,14 @@ final class PathFinderHeuristicsTest extends TestCase
         $registry = SearchStateRegistry::withInitial(
             'USD',
             new SearchStateRecord(
-                BcMath::normalize('1.000', 18),
+                $this->decimal('1.000'),
                 1,
                 SearchStateSignature::fromString('range:null|desired:null'),
             ),
         );
 
         $candidate = new SearchStateRecord(
-            BcMath::normalize('1.250', 18),
+            $this->decimal('1.250'),
             3,
             SearchStateSignature::fromString('range:null|desired:null'),
         );
@@ -68,7 +70,7 @@ final class PathFinderHeuristicsTest extends TestCase
         $registry = SearchStateRegistry::withInitial(
             'USD',
             new SearchStateRecord(
-                BcMath::normalize('0.750', 18),
+                $this->decimal('0.750'),
                 1,
                 SearchStateSignature::fromString('signature:alpha'),
             ),
@@ -77,7 +79,7 @@ final class PathFinderHeuristicsTest extends TestCase
         $registry->register(
             'USD',
             new SearchStateRecord(
-                BcMath::normalize('0.800', 18),
+                $this->decimal('0.800'),
                 2,
                 SearchStateSignature::fromString('signature:beta'),
             ),
@@ -85,12 +87,12 @@ final class PathFinderHeuristicsTest extends TestCase
         );
 
         $candidate = new SearchStateRecord(
-            BcMath::normalize('0.900', 18),
+            $this->decimal('0.900'),
             2,
             SearchStateSignature::fromString('signature:beta'),
         );
         $mismatch = new SearchStateRecord(
-            BcMath::normalize('0.900', 18),
+            $this->decimal('0.900'),
             2,
             SearchStateSignature::fromString('signature:gamma'),
         );
@@ -109,12 +111,12 @@ final class PathFinderHeuristicsTest extends TestCase
 
         $registry = SearchStateRegistry::withInitial(
             'USD',
-            new SearchStateRecord(BcMath::normalize('2.000', 18), 3, $signature),
+            new SearchStateRecord($this->decimal('2.000'), 3, $signature),
         );
         $registry->register(
             'USD',
             new SearchStateRecord(
-                BcMath::normalize('3.000', 18),
+                $this->decimal('3.000'),
                 4,
                 SearchStateSignature::fromString('other:signature'),
             ),
@@ -123,7 +125,7 @@ final class PathFinderHeuristicsTest extends TestCase
 
         $netChange = $registry->register(
             'USD',
-            new SearchStateRecord(BcMath::normalize('1.500', 18), 1, $signature),
+            new SearchStateRecord($this->decimal('1.500'), 1, $signature),
             18,
         );
 
@@ -136,12 +138,42 @@ final class PathFinderHeuristicsTest extends TestCase
         }
 
         self::assertArrayHasKey('other:signature', $recordsBySignature);
-        self::assertSame(BcMath::normalize('3.000', 18), $recordsBySignature['other:signature']->cost());
+        self::assertSame(DecimalMath::normalize('3.000', 18), $recordsBySignature['other:signature']->cost());
         self::assertSame(4, $recordsBySignature['other:signature']->hops());
 
         $replacement = $recordsBySignature[$signature->value()];
-        self::assertSame(BcMath::normalize('1.500', 18), $replacement->cost());
+        self::assertSame(DecimalMath::normalize('1.500', 18), $replacement->cost());
         self::assertSame(1, $replacement->hops());
+    }
+
+    public function test_registry_reports_new_signatures(): void
+    {
+        $finder = new PathFinder(maxHops: 1, tolerance: '0.0');
+        $signatureMethod = new ReflectionMethod(PathFinder::class, 'stateSignature');
+        $signatureMethod->setAccessible(true);
+
+        /** @var SearchStateSignature $baseline */
+        $baseline = $signatureMethod->invoke($finder, null, null);
+        $registry = SearchStateRegistry::withInitial(
+            'USD',
+            new SearchStateRecord($this->decimal('1.000'), 1, $baseline),
+        );
+
+        /** @var SearchStateSignature $alternate */
+        $alternate = $signatureMethod->invoke(
+            $finder,
+            null,
+            CurrencyScenarioFactory::money('USD', '5', 0),
+        );
+
+        $delta = $registry->register(
+            'USD',
+            new SearchStateRecord($this->decimal('0.500'), 0, $alternate),
+            self::SCALE,
+        );
+
+        self::assertSame(1, $delta);
+        self::assertCount(2, $registry->recordsFor('USD'));
     }
 
     public function test_record_state_removes_matching_entry_after_skipping_mismatched_signatures(): void
@@ -155,17 +187,17 @@ final class PathFinderHeuristicsTest extends TestCase
 
         $registry = SearchStateRegistry::withInitial(
             'USD',
-            new SearchStateRecord(BcMath::normalize('4.000', 18), 5, $alternateSignature),
+            new SearchStateRecord($this->decimal('4.000'), 5, $alternateSignature),
         );
         $registry->register(
             'USD',
-            new SearchStateRecord(BcMath::normalize('2.750', 18), 3, $primarySignature),
+            new SearchStateRecord($this->decimal('2.750'), 3, $primarySignature),
             18,
         );
 
         $netChange = $registry->register(
             'USD',
-            new SearchStateRecord(BcMath::normalize('1.250', 18), 2, $primarySignature),
+            new SearchStateRecord($this->decimal('1.250'), 2, $primarySignature),
             18,
         );
 
@@ -179,13 +211,13 @@ final class PathFinderHeuristicsTest extends TestCase
 
         self::assertArrayHasKey($alternateSignature->value(), $recordsBySignature);
         self::assertSame(
-            BcMath::normalize('4.000', 18),
+            DecimalMath::normalize('4.000', 18),
             $recordsBySignature[$alternateSignature->value()]->cost(),
         );
         self::assertSame(5, $recordsBySignature[$alternateSignature->value()]->hops());
 
         $replacement = $recordsBySignature[$primarySignature->value()];
-        self::assertSame(BcMath::normalize('1.250', 18), $replacement->cost());
+        self::assertSame(DecimalMath::normalize('1.250', 18), $replacement->cost());
         self::assertSame(2, $replacement->hops());
     }
 
@@ -222,7 +254,7 @@ final class PathFinderHeuristicsTest extends TestCase
 
         $registry = SearchStateRegistry::withInitial(
             'EUR',
-            new SearchStateRecord(BcMath::normalize('1.000', 18), 1, $signature),
+            new SearchStateRecord($this->decimal('1.000'), 1, $signature),
         );
 
         self::assertTrue($registry->hasSignature('EUR', $signature));
@@ -460,9 +492,11 @@ final class PathFinderHeuristicsTest extends TestCase
         $method->setAccessible(true);
         $conversion = $method->invoke($finder, $edge);
 
+        self::assertInstanceOf(BigDecimal::class, $ratio);
+        self::assertInstanceOf(BigDecimal::class, $conversion);
         self::assertSame(
-            BcMath::div('1', $ratio, 18),
-            $conversion,
+            DecimalMath::div('1', $ratio->__toString(), 18),
+            $conversion->__toString(),
         );
     }
 
@@ -499,7 +533,7 @@ final class PathFinderHeuristicsTest extends TestCase
         $method->setAccessible(true);
 
         $this->expectException(InvalidInput::class);
-        $this->expectExceptionMessage('Tolerance must be numeric.');
+        $this->expectExceptionMessage('Value "not-a-number" is not numeric.');
 
         $method->invoke($finder, 'not-a-number');
     }
@@ -540,7 +574,8 @@ final class PathFinderHeuristicsTest extends TestCase
         $almostOne = '0.9999999999999999999';
         $normalized = $method->invoke($finder, $almostOne);
 
-        self::assertSame('0.'.str_repeat('9', 18), $normalized);
+        self::assertInstanceOf(BigDecimal::class, $normalized);
+        self::assertSame('0.'.str_repeat('9', 18), $normalized->__toString());
     }
 
     public function test_calculate_tolerance_amplifier_returns_one_for_zero_tolerance(): void
@@ -550,9 +585,9 @@ final class PathFinderHeuristicsTest extends TestCase
         $method = new ReflectionMethod(PathFinder::class, 'calculateToleranceAmplifier');
         $method->setAccessible(true);
 
-        $amplifier = $method->invoke($finder, BcMath::normalize('0', 18));
+        $amplifier = $method->invoke($finder, DecimalMath::decimal('0', 18));
 
-        self::assertSame(BcMath::normalize('1', 18), $amplifier);
+        self::assertSame(DecimalMath::normalize('1', 18), $amplifier->__toString());
     }
 
     public function test_calculate_tolerance_amplifier_inverts_complement(): void
@@ -562,10 +597,10 @@ final class PathFinderHeuristicsTest extends TestCase
         $method = new ReflectionMethod(PathFinder::class, 'calculateToleranceAmplifier');
         $method->setAccessible(true);
 
-        $tolerance = BcMath::normalize('0.25', 18);
+        $tolerance = DecimalMath::decimal('0.25', 18);
         $amplifier = $method->invoke($finder, $tolerance);
 
-        self::assertSame(BcMath::normalize('1.333333333333333333', 18), $amplifier);
+        self::assertSame(DecimalMath::normalize('1.333333333333333333', 18), $amplifier->__toString());
     }
 
     public function test_record_result_trims_heap_to_requested_limit(): void
@@ -604,8 +639,8 @@ final class PathFinderHeuristicsTest extends TestCase
 
         self::assertCount(2, $finalized);
         $finalized = $finalized->toArray();
-        self::assertSame(BcMath::normalize('0.900', 18), $finalized[0]->cost());
-        self::assertSame(BcMath::normalize('1.050', 18), $finalized[1]->cost());
+        self::assertSame(DecimalMath::normalize('0.900', 18), $finalized[0]->cost());
+        self::assertSame(DecimalMath::normalize('1.050', 18), $finalized[1]->cost());
     }
 
     public function test_record_result_preserves_insertion_order_when_costs_are_equal(): void
@@ -627,8 +662,8 @@ final class PathFinderHeuristicsTest extends TestCase
                 $finder,
                 $heap,
                 CandidatePath::from(
-                    BcMath::normalize('1.000', 18),
-                    BcMath::normalize('1.000', 18),
+                    DecimalMath::decimal('1.000', 18),
+                    DecimalMath::decimal('1.000', 18),
                     $order,
                     $this->dummyEdges($order),
                 ),
@@ -653,12 +688,12 @@ final class PathFinderHeuristicsTest extends TestCase
         $queue->push(new SearchQueueEntry(
             $this->searchState(
                 'high',
-                BcMath::normalize('1.500', 18),
-                BcMath::normalize('0.666', 18),
+                DecimalMath::normalize('1.500', 18),
+                DecimalMath::normalize('0.666', 18),
                 1,
             ),
             new SearchStatePriority(
-                new PathCost(BcMath::normalize('1.500', 18)),
+                new PathCost(DecimalFactory::decimal('1.500', 18)),
                 1,
                 RouteSignature::fromNodes(['SRC', 'high']),
                 0,
@@ -668,12 +703,12 @@ final class PathFinderHeuristicsTest extends TestCase
         $queue->push(new SearchQueueEntry(
             $this->searchState(
                 'low',
-                BcMath::normalize('0.750', 18),
-                BcMath::normalize('1.333', 18),
+                DecimalMath::normalize('0.750', 18),
+                DecimalMath::normalize('1.333', 18),
                 1,
             ),
             new SearchStatePriority(
-                new PathCost(BcMath::normalize('0.750', 18)),
+                new PathCost(DecimalFactory::decimal('0.750', 18)),
                 1,
                 RouteSignature::fromNodes(['SRC', 'low']),
                 1,
@@ -693,12 +728,12 @@ final class PathFinderHeuristicsTest extends TestCase
             [
                 'state' => $this->searchState(
                     'lexicographically-later',
-                    BcMath::normalize('0.500', 18),
-                    BcMath::normalize('2.000', 18),
+                    DecimalMath::normalize('0.500', 18),
+                    DecimalMath::normalize('2.000', 18),
                     2,
                 ),
                 'priority' => new SearchStatePriority(
-                    new PathCost(BcMath::normalize('0.500', 18)),
+                    new PathCost(DecimalFactory::decimal('0.500', 18)),
                     2,
                     RouteSignature::fromNodes(['SRC', 'A', 'C']),
                     0,
@@ -707,12 +742,12 @@ final class PathFinderHeuristicsTest extends TestCase
             [
                 'state' => $this->searchState(
                     'fewer-hops',
-                    BcMath::normalize('0.500', 18),
-                    BcMath::normalize('2.000', 18),
+                    DecimalMath::normalize('0.500', 18),
+                    DecimalMath::normalize('2.000', 18),
                     1,
                 ),
                 'priority' => new SearchStatePriority(
-                    new PathCost(BcMath::normalize('0.500', 18)),
+                    new PathCost(DecimalFactory::decimal('0.500', 18)),
                     1,
                     RouteSignature::fromNodes(['SRC', 'A']),
                     1,
@@ -721,12 +756,12 @@ final class PathFinderHeuristicsTest extends TestCase
             [
                 'state' => $this->searchState(
                     'lexicographically-first',
-                    BcMath::normalize('0.500', 18),
-                    BcMath::normalize('2.000', 18),
+                    DecimalMath::normalize('0.500', 18),
+                    DecimalMath::normalize('2.000', 18),
                     2,
                 ),
                 'priority' => new SearchStatePriority(
-                    new PathCost(BcMath::normalize('0.500', 18)),
+                    new PathCost(DecimalFactory::decimal('0.500', 18)),
                     2,
                     RouteSignature::fromNodes(['SRC', 'A', 'B']),
                     2,
@@ -735,12 +770,12 @@ final class PathFinderHeuristicsTest extends TestCase
             [
                 'state' => $this->searchState(
                     'lexicographically-later-second',
-                    BcMath::normalize('0.500', 18),
-                    BcMath::normalize('2.000', 18),
+                    DecimalMath::normalize('0.500', 18),
+                    DecimalMath::normalize('2.000', 18),
                     2,
                 ),
                 'priority' => new SearchStatePriority(
-                    new PathCost(BcMath::normalize('0.500', 18)),
+                    new PathCost(DecimalFactory::decimal('0.500', 18)),
                     2,
                     RouteSignature::fromNodes(['SRC', 'A', 'C']),
                     3,
@@ -780,8 +815,8 @@ final class PathFinderHeuristicsTest extends TestCase
         $recordResult = new ReflectionMethod(PathFinder::class, 'recordResult');
         $recordResult->setAccessible(true);
 
-        $highCost = BcMath::normalize('2.000000000000000000', 18);
-        $lowCost = BcMath::normalize('1.500000000000000000', 18);
+        $highCost = DecimalMath::normalize('2.000000000000000000', 18);
+        $lowCost = DecimalMath::normalize('1.500000000000000000', 18);
 
         $recordResult->invokeArgs($finder, [$heap, $this->buildCandidate($highCost), 0]);
         $recordResult->invokeArgs($finder, [$heap, $this->buildCandidate($lowCost), 1]);
@@ -809,7 +844,7 @@ final class PathFinderHeuristicsTest extends TestCase
         $recordResult = new ReflectionMethod(PathFinder::class, 'recordResult');
         $recordResult->setAccessible(true);
 
-        $cost = BcMath::normalize('1.750000000000000000', 18);
+        $cost = DecimalMath::normalize('1.750000000000000000', 18);
 
         $first = $this->buildCandidate($cost, [[
             'from' => 'SRC',
@@ -836,10 +871,13 @@ final class PathFinderHeuristicsTest extends TestCase
 
     private function searchState(string $node, string $cost, string $product, int $hops): SearchState
     {
+        $costDecimal = BigDecimal::of($cost);
+        $productDecimal = BigDecimal::of($product);
+
         return SearchState::fromComponents(
             $node,
-            $cost,
-            $product,
+            $costDecimal,
+            $productDecimal,
             $hops,
             PathEdgeSequence::empty(),
             null,
@@ -867,7 +905,7 @@ final class PathFinderHeuristicsTest extends TestCase
                 $order,
                 $order->effectiveRate(),
                 OrderSide::BUY,
-                BcMath::normalize('1.000000000000000000', self::SCALE),
+                DecimalMath::decimal('1.000000000000000000', self::SCALE),
             );
 
             $from = $to;
@@ -876,9 +914,15 @@ final class PathFinderHeuristicsTest extends TestCase
         return PathEdgeSequence::fromList($edges);
     }
 
+    private function decimal(string $value): BigDecimal
+    {
+        return DecimalMath::decimal($value, self::SCALE);
+    }
+
     private function buildCandidate(string $cost, array $edges = []): CandidatePath
     {
-        $normalized = BcMath::normalize($cost, self::SCALE);
+        $normalized = $this->decimal($cost);
+        $normalizedProduct = $this->decimal('1.000000000000000000');
 
         $edgeSequence = [] === $edges
             ? PathEdgeSequence::empty()
@@ -889,14 +933,14 @@ final class PathFinderHeuristicsTest extends TestCase
                     $edge['order'],
                     $edge['rate'],
                     $edge['orderSide'],
-                    $edge['conversionRate'],
+                    BigDecimal::of($edge['conversionRate']),
                 ),
                 $this->ensureEdgeDefaults($edges),
             ));
 
         return CandidatePath::from(
             $normalized,
-            BcMath::normalize('1.000000000000000000', self::SCALE),
+            $normalizedProduct,
             $edgeSequence->count(),
             $edgeSequence,
         );
@@ -928,7 +972,7 @@ final class PathFinderHeuristicsTest extends TestCase
                     'order' => $order,
                     'rate' => $edge['rate'] ?? $order->effectiveRate(),
                     'orderSide' => $orderSide,
-                    'conversionRate' => $edge['conversionRate'] ?? BcMath::normalize('1.000000000000000000', self::SCALE),
+                    'conversionRate' => $edge['conversionRate'] ?? DecimalMath::normalize('1.000000000000000000', self::SCALE),
                 ];
             },
             $edges,

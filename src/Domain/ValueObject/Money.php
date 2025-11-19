@@ -4,26 +4,27 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
+use Brick\Math\BigDecimal;
+use Brick\Math\Exception\MathException;
+use Brick\Math\RoundingMode;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
+use function max;
 use function sprintf;
 
 /**
  * Immutable representation of a monetary amount backed by arbitrary precision arithmetic.
  *
  * Money instances always carry their currency code, normalized amount representation and
- * the scale used when interacting with BCMath operations. Instances are created through
- * named constructors to guarantee validation and normalization of their internal state.
+ * the scale used when interacting with arbitrary precision operations. Instances are created
+ * through named constructors to guarantee validation and normalization of their internal state.
  */
 final class Money
 {
-    /**
-     * @param numeric-string $amount
-     */
     private function __construct(
         private readonly string $currency,
-        private readonly string $amount,
+        private readonly BigDecimal $decimal,
         private readonly int $scale,
     ) {
     }
@@ -32,7 +33,7 @@ final class Money
      * Creates a new money instance from raw string components.
      *
      * @param string         $currency ISO-like currency symbol comprised of 3-12 alphabetic characters
-     * @param numeric-string $amount   numeric string compatible with BCMath functions
+     * @param numeric-string $amount   numeric string convertible to an arbitrary precision decimal
      * @param int            $scale    number of decimal digits to retain after normalization
      *
      * @throws InvalidInput|PrecisionViolation when the currency or amount fail validation
@@ -42,9 +43,9 @@ final class Money
         self::assertCurrency($currency);
         $normalizedCurrency = strtoupper($currency);
 
-        $normalizedAmount = BcMath::normalize($amount, $scale);
+        $normalizedDecimal = self::scaleDecimal(self::decimalFromString($amount), $scale);
 
-        return new self($normalizedCurrency, $normalizedAmount, $scale);
+        return new self($normalizedCurrency, $normalizedDecimal, $scale);
     }
 
     /**
@@ -68,7 +69,7 @@ final class Money
             return $this;
         }
 
-        $normalized = BcMath::normalize($this->amount, $scale);
+        $normalized = self::scaleDecimal($this->decimal, $scale);
 
         return new self($this->currency, $normalized, $scale);
     }
@@ -83,13 +84,14 @@ final class Money
 
     /**
      * Returns the normalized numeric string representation of the amount.
-     */
-    /**
+     *
+     * @psalm-mutation-free
+     *
      * @return numeric-string
      */
     public function amount(): string
     {
-        return $this->amount;
+        return self::decimalToString($this->decimal, $this->scale);
     }
 
     /**
@@ -98,6 +100,14 @@ final class Money
     public function scale(): int
     {
         return $this->scale;
+    }
+
+    /**
+     * Returns the BigDecimal representation of the amount.
+     */
+    public function decimal(): BigDecimal
+    {
+        return $this->decimal;
     }
 
     /**
@@ -113,7 +123,7 @@ final class Money
         $this->assertSameCurrency($other);
         $scale ??= max($this->scale, $other->scale);
 
-        $result = BcMath::add($this->amount, $other->amount, $scale);
+        $result = self::scaleDecimal($this->decimal->plus($other->decimal), $scale);
 
         return new self($this->currency, $result, $scale);
     }
@@ -131,7 +141,7 @@ final class Money
         $this->assertSameCurrency($other);
         $scale ??= max($this->scale, $other->scale);
 
-        $result = BcMath::sub($this->amount, $other->amount, $scale);
+        $result = self::scaleDecimal($this->decimal->minus($other->decimal), $scale);
 
         return new self($this->currency, $result, $scale);
     }
@@ -139,36 +149,42 @@ final class Money
     /**
      * Multiplies the amount by a scalar numeric multiplier.
      *
-     * @param numeric-string $multiplier numeric multiplier compatible with BCMath
+     * @param numeric-string $multiplier numeric multiplier convertible to an arbitrary precision decimal
      * @param int|null       $scale      optional explicit scale override
      *
      * @throws InvalidInput|PrecisionViolation when the multiplier or scale are invalid
      */
     public function multiply(string $multiplier, ?int $scale = null): self
     {
-        BcMath::ensureNumeric($multiplier);
         $scale ??= $this->scale;
 
-        $result = BcMath::mul($this->amount, $multiplier, $scale);
+        $result = self::scaleDecimal(
+            $this->decimal->multipliedBy(self::decimalFromString($multiplier)),
+            $scale,
+        );
 
-        return new self($this->currency, BcMath::normalize($result, $scale), $scale);
+        return new self($this->currency, $result, $scale);
     }
 
     /**
      * Divides the amount by a scalar numeric divisor.
      *
-     * @param numeric-string $divisor numeric divisor compatible with BCMath
+     * @param numeric-string $divisor numeric divisor convertible to an arbitrary precision decimal
      * @param int|null       $scale   optional explicit scale override
      *
      * @throws InvalidInput|PrecisionViolation when the divisor or scale are invalid
      */
     public function divide(string $divisor, ?int $scale = null): self
     {
-        BcMath::ensureNumeric($divisor);
         $scale ??= $this->scale;
-        $result = BcMath::div($this->amount, $divisor, $scale);
+        $divisorDecimal = self::decimalFromString($divisor);
+        if ($divisorDecimal->isZero()) {
+            throw new InvalidInput('Division by zero.');
+        }
 
-        return new self($this->currency, BcMath::normalize($result, $scale), $scale);
+        $result = self::scaleDecimal($this->decimal->dividedBy($divisorDecimal, $scale, RoundingMode::HALF_UP), $scale);
+
+        return new self($this->currency, $result, $scale);
     }
 
     /**
@@ -177,16 +193,19 @@ final class Money
      * @param self     $other money value expressed in the same currency
      * @param int|null $scale optional explicit scale override
      *
-     * @throws InvalidInput|PrecisionViolation when the currencies differ or BCMath validation fails
+     * @throws InvalidInput|PrecisionViolation when the currencies differ or comparison cannot be performed
      *
      * @return int -1, 0 or 1 depending on the comparison result
      */
     public function compare(self $other, ?int $scale = null): int
     {
         $this->assertSameCurrency($other);
-        $scale ??= BcMath::scaleForComparison($this->amount, $other->amount, max($this->scale, $other->scale));
+        $comparisonScale = max($scale ?? max($this->scale, $other->scale), $this->scale, $other->scale);
 
-        return BcMath::comp($this->amount, $other->amount, $scale);
+        $left = self::scaleDecimal($this->decimal, $comparisonScale);
+        $right = self::scaleDecimal($other->decimal, $comparisonScale);
+
+        return $left->compareTo($right);
     }
 
     /**
@@ -221,12 +240,10 @@ final class Money
 
     /**
      * Indicates whether the amount equals zero at the stored scale.
-     *
-     * @throws PrecisionViolation when the BCMath extension is unavailable
      */
     public function isZero(): bool
     {
-        return 0 === BcMath::comp($this->amount, '0', $this->scale);
+        return $this->decimal->isZero();
     }
 
     /**
@@ -254,5 +271,47 @@ final class Money
         if ($this->currency !== $other->currency) {
             throw new InvalidInput('Currency mismatch.');
         }
+    }
+
+    /**
+     * @psalm-mutation-free
+     */
+    private static function assertScale(int $scale): void
+    {
+        if ($scale < 0) {
+            throw new InvalidInput('Scale cannot be negative.');
+        }
+    }
+
+    private static function decimalFromString(string $value): BigDecimal
+    {
+        try {
+            return BigDecimal::of($value);
+        } catch (MathException $exception) {
+            throw new InvalidInput(sprintf('Value "%s" is not numeric.', $value), 0, $exception);
+        }
+    }
+
+    /**
+     * @psalm-mutation-free
+     */
+    private static function scaleDecimal(BigDecimal $decimal, int $scale): BigDecimal
+    {
+        self::assertScale($scale);
+
+        return $decimal->toScale($scale, RoundingMode::HALF_UP);
+    }
+
+    /**
+     * @psalm-mutation-free
+     *
+     * @return numeric-string
+     */
+    private static function decimalToString(BigDecimal $decimal, int $scale): string
+    {
+        /** @var numeric-string $result */
+        $result = self::scaleDecimal($decimal, $scale)->__toString();
+
+        return $result;
     }
 }

@@ -10,9 +10,9 @@ use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Application\Support\Generator\GraphScenarioGenerator;
+use SomeWork\P2PPathFinder\Tests\Support\DecimalMath;
 use SomeWork\P2PPathFinder\Tests\Support\InfectionIterationLimiter;
 
 use function sprintf;
@@ -146,21 +146,21 @@ final class PathFinderHeuristicsPropertyTest extends TestCase
 
         $ratioScale = max($sourceScale, $targetScale, $referenceScale);
         $sourceDelta = $sourceMax->subtract($sourceMin, $sourceScale)->withScale($ratioScale)->amount();
-        if (0 === BcMath::comp($sourceDelta, '0', $ratioScale)) {
+        if (0 === DecimalMath::comp($sourceDelta, '0', $ratioScale)) {
             return $targetMin->withScale($ratioScale);
         }
 
         $targetDelta = $targetMax->subtract($targetMin, $targetScale)->withScale($ratioScale)->amount();
-        $ratio = BcMath::div($targetDelta, $sourceDelta, $ratioScale + $this->ratioExtraScale);
+        $ratio = DecimalMath::div($targetDelta, $sourceDelta, $ratioScale + $this->ratioExtraScale);
         $offset = $current->subtract($sourceMin, $sourceScale)->withScale($ratioScale)->amount();
-        $increment = BcMath::mul($offset, $ratio, $ratioScale + $this->sumExtraScale);
-        $result = BcMath::add(
+        $increment = DecimalMath::mul($offset, $ratio, $ratioScale + $this->sumExtraScale);
+        $result = DecimalMath::add(
             $targetMin->withScale($ratioScale)->amount(),
             $increment,
             $ratioScale + $this->sumExtraScale,
         );
 
-        $normalized = BcMath::normalize($result, $ratioScale + $this->sumExtraScale);
+        $normalized = DecimalMath::normalize($result, $ratioScale + $this->sumExtraScale);
 
         $interpolated = Money::fromString(
             $targetMin->currency(),

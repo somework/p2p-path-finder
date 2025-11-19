@@ -15,7 +15,6 @@ use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
@@ -28,6 +27,7 @@ use function strlen;
 use PhpBench\Attributes\BeforeMethods;
 use PhpBench\Attributes\ParamProviders;
 use SomeWork\P2PPathFinder\Tests\Fixture\BottleneckOrderBookFactory;
+use SomeWork\P2PPathFinder\Tests\Support\DecimalMath;
 
 #[BeforeMethods('setUp')]
 class PathFinderBench
@@ -453,14 +453,14 @@ class PathFinderBench
         $orders = [];
         $counter = 0;
         $paths = intdiv($orderCount, 2);
-        $minimumRate = BcMath::normalize('0.000001', 6);
+        $minimumRate = DecimalMath::normalize('0.000001', 6);
 
         for ($pathIndex = 0; $pathIndex < $paths; ++$pathIndex) {
             $branchCurrency = $this->syntheticCurrency($counter);
-            $decrement = BcMath::div((string) ($pathIndex + 1), '100000', 6);
-            $rate = BcMath::sub('1.000000', $decrement, 6);
+            $decrement = DecimalMath::div((string) ($pathIndex + 1), '100000', 6);
+            $rate = DecimalMath::sub('1.000000', $decrement, 6);
 
-            if (BcMath::comp($rate, '0.000000', 6) <= 0) {
+            if (DecimalMath::comp($rate, '0.000000', 6) <= 0) {
                 $rate = $minimumRate;
             }
             $orders[] = new Order(

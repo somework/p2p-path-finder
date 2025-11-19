@@ -12,10 +12,10 @@ use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SegmentPruner;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Tests\Fixture\FeePolicyFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\PathFinderEdgeCaseFixtures;
+use SomeWork\P2PPathFinder\Tests\Support\DecimalMath;
 
 final class PathFinderMetamorphicTest extends TestCase
 {
@@ -113,11 +113,11 @@ final class PathFinderMetamorphicTest extends TestCase
         self::assertLessThanOrEqual($counts['narrow'], $counts['strict']);
         self::assertLessThanOrEqual($counts['relaxed'], $counts['narrow']);
 
-        self::assertGreaterThanOrEqual(0, BcMath::comp($lowerBounds['strict'], $lowerBounds['narrow'], 18));
-        self::assertGreaterThanOrEqual(0, BcMath::comp($lowerBounds['narrow'], $lowerBounds['relaxed'], 18));
+        self::assertGreaterThanOrEqual(0, DecimalMath::comp($lowerBounds['strict'], $lowerBounds['narrow'], 18));
+        self::assertGreaterThanOrEqual(0, DecimalMath::comp($lowerBounds['narrow'], $lowerBounds['relaxed'], 18));
 
-        self::assertLessThanOrEqual(0, BcMath::comp($upperBounds['strict'], $upperBounds['narrow'], 18));
-        self::assertLessThanOrEqual(0, BcMath::comp($upperBounds['narrow'], $upperBounds['relaxed'], 18));
+        self::assertLessThanOrEqual(0, DecimalMath::comp($upperBounds['strict'], $upperBounds['narrow'], 18));
+        self::assertLessThanOrEqual(0, DecimalMath::comp($upperBounds['narrow'], $upperBounds['relaxed'], 18));
 
         $directEdge = $this->findDirectEdge($graph, 'SRC', 'DST');
         self::assertInstanceOf(GraphEdge::class, $directEdge);
@@ -130,7 +130,7 @@ final class PathFinderMetamorphicTest extends TestCase
         $mandatory = $segments[0];
         $mandatoryQuoteMax = $mandatory->quote()->max()->withScale(18)->amount();
 
-        self::assertGreaterThanOrEqual(0, BcMath::comp($mandatoryQuoteMax, $lowerBounds['relaxed'], 18));
+        self::assertGreaterThanOrEqual(0, DecimalMath::comp($mandatoryQuoteMax, $lowerBounds['relaxed'], 18));
     }
 
     /**
@@ -145,7 +145,7 @@ final class PathFinderMetamorphicTest extends TestCase
         $minimum = $values[0];
 
         foreach ($values as $value) {
-            if (1 === BcMath::comp($minimum, $value, 18)) {
+            if (1 === DecimalMath::comp($minimum, $value, 18)) {
                 $minimum = $value;
             }
         }
@@ -165,7 +165,7 @@ final class PathFinderMetamorphicTest extends TestCase
         $maximum = $values[0];
 
         foreach ($values as $value) {
-            if (-1 === BcMath::comp($maximum, $value, 18)) {
+            if (-1 === DecimalMath::comp($maximum, $value, 18)) {
                 $maximum = $value;
             }
         }

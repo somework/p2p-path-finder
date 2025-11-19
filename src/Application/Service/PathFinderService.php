@@ -235,7 +235,7 @@ final class PathFinderService
                 );
 
                 $orderKey = new PathOrderKey(
-                    new PathCost($candidate->cost()),
+                    new PathCost($candidate->costDecimal()),
                     $candidate->hops(),
                     $routeSignature,
                     $resultOrder,
@@ -263,7 +263,7 @@ final class PathFinderService
         $resultEntries = [];
         foreach ($materializedResults as $entry) {
             /** @var PathResultSetEntry<PathResult> $resultEntry */
-            $resultEntry = new PathResultSetEntry($entry->result(), $entry->orderKey());
+            $resultEntry = $entry->toEntry();
 
             $resultEntries[] = $resultEntry;
         }

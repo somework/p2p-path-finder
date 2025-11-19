@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder;
 
+use Brick\Math\BigDecimal;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\PathFinder\CandidateResultHeap;
@@ -22,7 +23,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStateSignature;
 use SomeWork\P2PPathFinder\Application\PathFinder\SearchStateQueue;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
+use SomeWork\P2PPathFinder\Tests\Support\DecimalMath;
 
 final class SearchBootstrapTest extends TestCase
 {
@@ -34,25 +35,25 @@ final class SearchBootstrapTest extends TestCase
         $results = new CandidateResultHeap(self::SCALE);
         $registry = SearchStateRegistry::withInitial(
             'SRC',
-            new SearchStateRecord('1', 0, SearchStateSignature::fromString('sig:src')),
+            new SearchStateRecord(BigDecimal::of('1'), 0, SearchStateSignature::fromString('sig:src')),
         );
         $insertionOrder = new InsertionOrderCounter();
         $resultInsertionOrder = new InsertionOrderCounter(3);
 
-        $state = SearchState::bootstrap('SRC', BcMath::normalize('1', self::SCALE), null, null);
+        $state = SearchState::bootstrap('SRC', DecimalMath::decimal('1', self::SCALE), null, null);
         $queue->push(new SearchQueueEntry(
             $state,
-            new SearchStatePriority(new PathCost($state->cost()), $state->hops(), RouteSignature::fromNodes([]), $insertionOrder->next()),
+            new SearchStatePriority(new PathCost($state->costDecimal()), $state->hops(), RouteSignature::fromNodes([]), $insertionOrder->next()),
         ));
 
         $candidate = CandidatePath::from(
-            BcMath::normalize('0.5', self::SCALE),
-            BcMath::normalize('1.5', self::SCALE),
+            DecimalMath::decimal('0.5', self::SCALE),
+            DecimalMath::decimal('1.5', self::SCALE),
             0,
             PathEdgeSequence::empty(),
             null,
         );
-        $results->push(new CandidateHeapEntry($candidate, new CandidatePriority(new PathCost($candidate->cost()), 1, RouteSignature::fromNodes(['sig:candidate']), $resultInsertionOrder->next())));
+        $results->push(new CandidateHeapEntry($candidate, new CandidatePriority(new PathCost($candidate->costDecimal()), 1, RouteSignature::fromNodes(['sig:candidate']), $resultInsertionOrder->next())));
 
         $bootstrap = new SearchBootstrap($queue, $results, $registry, $insertionOrder, $resultInsertionOrder, 1);
         $clone = clone $bootstrap;
@@ -75,7 +76,7 @@ final class SearchBootstrapTest extends TestCase
 
         $clone->registry()->register(
             'DST',
-            new SearchStateRecord('2', 1, SearchStateSignature::fromString('sig:dst')),
+            new SearchStateRecord(BigDecimal::of('2'), 1, SearchStateSignature::fromString('sig:dst')),
             self::SCALE,
         );
         self::assertFalse(
@@ -92,15 +93,15 @@ final class SearchBootstrapTest extends TestCase
         $results = new CandidateResultHeap(self::SCALE);
         $registry = SearchStateRegistry::withInitial(
             'SRC',
-            new SearchStateRecord('1', 0, SearchStateSignature::fromString('sig:src')),
+            new SearchStateRecord(BigDecimal::of('1'), 0, SearchStateSignature::fromString('sig:src')),
         );
         $insertionOrder = new InsertionOrderCounter();
         $resultInsertionOrder = new InsertionOrderCounter();
 
-        $state = SearchState::bootstrap('SRC', BcMath::normalize('1', self::SCALE), null, null);
+        $state = SearchState::bootstrap('SRC', DecimalMath::decimal('1', self::SCALE), null, null);
         $queue->push(new SearchQueueEntry(
             $state,
-            new SearchStatePriority(new PathCost($state->cost()), $state->hops(), RouteSignature::fromNodes([]), $insertionOrder->next()),
+            new SearchStatePriority(new PathCost($state->costDecimal()), $state->hops(), RouteSignature::fromNodes([]), $insertionOrder->next()),
         ));
 
         $bootstrap = new SearchBootstrap($queue, $results, $registry, $insertionOrder, $resultInsertionOrder, 1);
@@ -108,7 +109,7 @@ final class SearchBootstrapTest extends TestCase
 
         $clone->registry()->register(
             'SRC',
-            new SearchStateRecord('0.5', 0, SearchStateSignature::fromString('sig:src')),
+            new SearchStateRecord(BigDecimal::of('0.5'), 0, SearchStateSignature::fromString('sig:src')),
             self::SCALE,
         );
 
@@ -127,15 +128,15 @@ final class SearchBootstrapTest extends TestCase
         $results = new CandidateResultHeap(self::SCALE);
         $registry = SearchStateRegistry::withInitial(
             'SRC',
-            new SearchStateRecord('1', 0, SearchStateSignature::fromString('sig:src')),
+            new SearchStateRecord(BigDecimal::of('1'), 0, SearchStateSignature::fromString('sig:src')),
         );
         $insertionOrder = new InsertionOrderCounter();
         $resultInsertionOrder = new InsertionOrderCounter();
 
-        $state = SearchState::bootstrap('SRC', BcMath::normalize('1', self::SCALE), null, null);
+        $state = SearchState::bootstrap('SRC', DecimalMath::decimal('1', self::SCALE), null, null);
         $queue->push(new SearchQueueEntry(
             $state,
-            new SearchStatePriority(new PathCost($state->cost()), $state->hops(), RouteSignature::fromNodes([]), $insertionOrder->next()),
+            new SearchStatePriority(new PathCost($state->costDecimal()), $state->hops(), RouteSignature::fromNodes([]), $insertionOrder->next()),
         ));
 
         $this->expectException(InvalidArgumentException::class);
@@ -148,7 +149,7 @@ final class SearchBootstrapTest extends TestCase
         $results = new CandidateResultHeap(self::SCALE);
         $registry = SearchStateRegistry::withInitial(
             'SRC',
-            new SearchStateRecord('1', 0, SearchStateSignature::fromString('sig:src')),
+            new SearchStateRecord(BigDecimal::of('1'), 0, SearchStateSignature::fromString('sig:src')),
         );
         $insertionOrder = new InsertionOrderCounter();
         $resultInsertionOrder = new InsertionOrderCounter();
@@ -165,10 +166,10 @@ final class SearchBootstrapTest extends TestCase
         $insertionOrder = new InsertionOrderCounter();
         $resultInsertionOrder = new InsertionOrderCounter();
 
-        $state = SearchState::bootstrap('SRC', BcMath::normalize('1', self::SCALE), null, null);
+        $state = SearchState::bootstrap('SRC', DecimalMath::decimal('1', self::SCALE), null, null);
         $queue->push(new SearchQueueEntry(
             $state,
-            new SearchStatePriority(new PathCost($state->cost()), $state->hops(), RouteSignature::fromNodes([]), $insertionOrder->next()),
+            new SearchStatePriority(new PathCost($state->costDecimal()), $state->hops(), RouteSignature::fromNodes([]), $insertionOrder->next()),
         ));
 
         $this->expectException(InvalidArgumentException::class);

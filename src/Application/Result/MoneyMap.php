@@ -176,7 +176,7 @@ final class MoneyMap implements Countable, IteratorAggregate, JsonSerializable
     }
 
     /**
-     * @return array<string, array{currency: string, amount: string, scale: int}>
+     * @return array<string, array{currency: string, amount: numeric-string, scale: int}>
      */
     public function jsonSerialize(): array
     {
