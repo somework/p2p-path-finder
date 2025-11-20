@@ -103,8 +103,6 @@ final class SearchStateQueueOrderingPropertyTest extends TestCase
     private function buildEqualCostCandidates(): array
     {
         $cost = DecimalFactory::decimal(self::COST, self::SCALE);
-        /** @var numeric-string $costString */
-        $costString = $cost->__toString();
 
         $candidates = [];
         foreach (self::baseDefinitions() as $definition) {

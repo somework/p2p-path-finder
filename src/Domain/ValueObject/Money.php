@@ -177,6 +177,8 @@ final class Money
     public function divide(string $divisor, ?int $scale = null): self
     {
         $scale ??= $this->scale;
+        self::assertScale($scale);
+
         $divisorDecimal = self::decimalFromString($divisor);
         if ($divisorDecimal->isZero()) {
             throw new InvalidInput('Division by zero.');
