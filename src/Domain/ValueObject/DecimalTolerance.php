@@ -19,7 +19,16 @@ final class DecimalTolerance implements JsonSerializable
 
     private const DEFAULT_SCALE = 18;
 
+    /**
+     * Multiplier to convert decimal ratio (0.0-1.0) to percentage (0-100).
+     */
     private const PERCENT_MULTIPLIER = '100';
+
+    /**
+     * Extra precision digits used during percentage calculation to guard against
+     * intermediate rounding loss before scaling to the final percentage scale.
+     */
+    private const PERCENT_WORKING_SCALE_EXTRA = 2;
 
     private function __construct(
         private readonly BigDecimal $decimal,
@@ -80,7 +89,7 @@ final class DecimalTolerance implements JsonSerializable
             self::assertScale($scale);
         }
 
-        $comparisonScale = max($this->scale, $scale ?? $this->scale, self::DEFAULT_SCALE);
+        $comparisonScale = max($scale ?? $this->scale, self::DEFAULT_SCALE);
 
         $left = self::scaleDecimal($this->decimal, $comparisonScale);
         $right = self::scaleDecimal(self::decimalFromString($value), $comparisonScale);
@@ -109,15 +118,22 @@ final class DecimalTolerance implements JsonSerializable
     }
 
     /**
-     * @throws InvalidInput when the tolerance cannot be converted to a percentage
+     * Converts the tolerance ratio to a percentage string.
      *
-     * @return numeric-string
+     * Uses extra working precision during multiplication to minimize rounding loss
+     * before scaling to the requested percentage scale with HALF_UP rounding.
+     *
+     * @param int $scale The number of decimal places for the percentage result (default: 2)
+     *
+     * @throws InvalidInput when the scale is negative
+     *
+     * @return numeric-string The tolerance as a percentage (e.g., "5.00" for 0.05 ratio at scale 2)
      */
     public function percentage(int $scale = 2): string
     {
         self::assertScale($scale);
 
-        $workingScale = max($this->scale, $scale) + 2;
+        $workingScale = max($this->scale, $scale) + self::PERCENT_WORKING_SCALE_EXTRA;
         $product = self::scaleDecimal($this->decimal, $workingScale)
             ->multipliedBy(BigDecimal::of(self::PERCENT_MULTIPLIER));
 
@@ -125,7 +141,9 @@ final class DecimalTolerance implements JsonSerializable
     }
 
     /**
-     * @return numeric-string
+     * Returns the canonical numeric-string representation for JSON serialization.
+     *
+     * @return numeric-string The tolerance ratio (e.g., "0.050000000000000000" at scale 18)
      */
     public function jsonSerialize(): string
     {

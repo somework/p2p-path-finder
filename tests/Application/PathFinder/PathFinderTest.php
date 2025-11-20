@@ -197,8 +197,7 @@ final class PathFinderTest extends TestCase
         }
 
         self::assertSame($expectedProduct, $result['product']);
-        $expectedCost = DecimalMath::div('1', $expectedProduct, self::SCALE);
-        self::assertSame($expectedCost, $result['cost']);
+        self::assertSame(self::expectedPathCost($expectedProduct), $result['cost']);
     }
 
     public function test_it_limits_results_to_requested_top_k(): void
@@ -1259,11 +1258,8 @@ final class PathFinderTest extends TestCase
         ];
 
         $rubToUsd = DecimalMath::div('1', '90.500', self::SCALE);
-        $twoHopProduct = DecimalMath::mul(
-            $rubToUsd,
-            DecimalMath::normalize('15400.000', self::SCALE),
-            self::SCALE,
-        );
+        $twoHopProduct = self::expectedPathProduct([$rubToUsd, '15400.000']);
+
         yield 'two_hop_best_path_with_strict_tolerance' => [
             2,
             '0.0',
@@ -1286,15 +1282,7 @@ final class PathFinderTest extends TestCase
             $twoHopProduct,
         ];
 
-        $threeHopProduct = DecimalMath::mul(
-            DecimalMath::mul(
-                $rubToUsd,
-                DecimalMath::normalize('149.500', self::SCALE),
-                self::SCALE,
-            ),
-            DecimalMath::normalize('112.750', self::SCALE),
-            self::SCALE,
-        );
+        $threeHopProduct = self::expectedPathProduct([$rubToUsd, '149.500', '112.750']);
         yield 'three_hop_path_outperforms_direct_conversion' => [
             3,
             '0.995',
@@ -2548,6 +2536,35 @@ final class PathFinderTest extends TestCase
                 return 'percentage-mixed:'.$this->basePercentage.':'.$this->quotePercentage;
             }
         };
+    }
+
+    /**
+     * Calculates the expected product for a path by multiplying conversion rates.
+     *
+     * @param list<numeric-string> $rates The conversion rates along the path
+     *
+     * @return numeric-string The path product at the canonical scale
+     */
+    private static function expectedPathProduct(array $rates): string
+    {
+        $product = '1';
+        foreach ($rates as $rate) {
+            $product = DecimalMath::mul($product, $rate, self::SCALE);
+        }
+
+        return DecimalMath::normalize($product, self::SCALE);
+    }
+
+    /**
+     * Calculates the expected cost for a path (inverse of product).
+     *
+     * @param numeric-string $product The path product
+     *
+     * @return numeric-string The path cost at the canonical scale
+     */
+    private static function expectedPathCost(string $product): string
+    {
+        return DecimalMath::div('1', $product, self::SCALE);
     }
 
     private static function formatAmount(float $amount): string

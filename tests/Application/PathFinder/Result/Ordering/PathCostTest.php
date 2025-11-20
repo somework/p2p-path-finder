@@ -29,7 +29,7 @@ final class PathCostTest extends TestCase
         self::assertSame(0, $cost->decimal()->compareTo($decimal->toScale(18, RoundingMode::HALF_UP)));
     }
 
-    public function test_it_compares_using_bc_math_with_custom_scale(): void
+    public function test_it_compares_with_custom_scale(): void
     {
         $left = new PathCost('0.333333333333333333');
         $right = new PathCost('0.333333333333333334');

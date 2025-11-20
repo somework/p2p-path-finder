@@ -11,6 +11,22 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 use function sprintf;
 
+/**
+ * Shared helpers for BigDecimal operations with canonical scale handling.
+ *
+ * This trait provides consistent decimal parsing, scaling, and serialization
+ * across value objects and services. All methods use HALF_UP rounding and
+ * preserve fixed scales without stripping trailing zeros, ensuring deterministic
+ * string representations for assertions and persistence.
+ *
+ * Canonicalization policy:
+ * - Scale validation ensures non-negative integers only
+ * - String parsing uses BigDecimal::of() with InvalidInput on failure
+ * - Scaling always applies HALF_UP rounding to the specified scale
+ * - String output preserves trailing zeros (e.g., "1.500000000000000000" at scale 18)
+ *
+ * @internal
+ */
 trait DecimalHelperTrait
 {
     private static function assertScale(int $scale): void

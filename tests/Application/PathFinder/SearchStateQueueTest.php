@@ -32,10 +32,10 @@ final class SearchStateQueueTest extends TestCase
             $stateA,
             $this->priority(DecimalFactory::decimal('0.100000000000000000'), $stateA->hops(), '', 1),
         );
-        $queue->insert($entryA);
+        $queue->push($entryA);
 
         $stateB = $this->state('B', DecimalFactory::decimal('0.200000000000000000'));
-        $queue->insert(new SearchQueueEntry(
+        $queue->push(new SearchQueueEntry(
             $stateB,
             $this->priority(DecimalFactory::decimal('0.200000000000000000'), $stateB->hops(), '', 2),
         ));

@@ -91,7 +91,12 @@ final class PathEdge
     }
 
     /**
-     * @return numeric-string
+     * Returns the conversion rate as a numeric string.
+     *
+     * The scale is preserved from the BigDecimal provided at construction time,
+     * typically normalized to 18 decimal places by PathFinder.
+     *
+     * @return numeric-string The conversion rate (e.g., "1.234567890123456789")
      */
     public function conversionRate(): string
     {
@@ -103,6 +108,11 @@ final class PathEdge
 
     /**
      * Returns the conversion rate as a BigDecimal with preserved scale from creation.
+     *
+     * Useful for calculations that need to maintain full precision without
+     * string conversion overhead.
+     *
+     * @return BigDecimal The conversion rate at its original scale
      */
     public function conversionRateDecimal(): BigDecimal
     {

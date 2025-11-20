@@ -24,13 +24,6 @@ final class CandidateResultHeap
         $this->heap = clone $this->heap;
     }
 
-    public function insert(CandidateHeapEntry $entry): true
-    {
-        $this->heap->insert($entry, $entry->priority());
-
-        return true;
-    }
-
     public function push(CandidateHeapEntry $entry): void
     {
         $this->heap->insert($entry, $entry->priority());

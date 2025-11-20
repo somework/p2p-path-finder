@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Application\PathFinder;
 
 use Brick\Math\BigDecimal;
-use Brick\Math\Exception\MathException;
 use Brick\Math\RoundingMode;
 use SomeWork\P2PPathFinder\Application\Graph\EdgeSegmentCollection;
 use SomeWork\P2PPathFinder\Application\Graph\Graph;
@@ -37,6 +36,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendRange;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
+use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalHelperTrait;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
@@ -51,6 +51,7 @@ use function strtoupper;
  */
 final class PathFinder
 {
+    use DecimalHelperTrait;
     /**
      * Canonical tolerance, cost and residual scale documented in docs/decimal-strategy.md.
      */
@@ -759,36 +760,6 @@ final class PathFinder
         return $this->tolerance->isGreaterThan(BigDecimal::zero());
     }
 
-    private static function decimalFromString(string $value): BigDecimal
-    {
-        try {
-            return BigDecimal::of($value);
-        } catch (MathException $exception) {
-            throw new InvalidInput(sprintf('Value "%s" is not numeric.', $value), 0, $exception);
-        }
-    }
-
-    /**
-     * @return numeric-string
-     */
-    private static function decimalToString(BigDecimal $decimal, int $scale): string
-    {
-        /** @var numeric-string $result */
-        $result = self::scaleDecimal($decimal, $scale)->__toString();
-
-        return $result;
-    }
-
-    private static function scaleDecimal(BigDecimal $decimal, int $scale): BigDecimal
-    {
-        if ($scale < 0) {
-            throw new InvalidInput('Scale must be non-negative.');
-        }
-
-        // Ensure 18 decimal places for canonical output, padding with zeros if necessary
-        return $decimal->toScale($scale, RoundingMode::HALF_UP);
-    }
-
     private function moneyToDecimal(Money $amount, int $scale): BigDecimal
     {
         return $amount->withScale($scale)->decimal();
@@ -820,13 +791,6 @@ final class SearchStateQueue
     public function __clone()
     {
         $this->queue = clone $this->queue;
-    }
-
-    public function insert(SearchQueueEntry $entry): true
-    {
-        $this->queue->insert($entry, $entry->priority());
-
-        return true;
     }
 
     public function push(SearchQueueEntry $entry): void

@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
+use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSetEntry;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Service\MaterializedResult;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
@@ -38,6 +39,7 @@ final class MaterializedResultTest extends TestCase
 
         $entry = $materialized->toEntry();
 
+        self::assertInstanceOf(PathResultSetEntry::class, $entry);
         self::assertSame($result, $entry->path());
         self::assertSame($orderKey, $entry->orderKey());
         self::assertSame($result->jsonSerialize(), $materialized->jsonSerialize());
