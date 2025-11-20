@@ -62,7 +62,7 @@ final class SearchStatePriorityTest extends TestCase
         $priority = new SearchStatePriority(new PathCost(DecimalFactory::decimal('0.1')), 0, RouteSignature::fromNodes([]), 0);
 
         $this->expectException(InvalidInput::class);
-        $this->expectExceptionMessage('Scale cannot be negative.');
+        $this->expectExceptionMessage('Scale must be a non-negative integer.');
 
         $priority->compare(new SearchStatePriority(new PathCost(DecimalFactory::decimal('0.1')), 0, RouteSignature::fromNodes([]), 1), -1);
     }

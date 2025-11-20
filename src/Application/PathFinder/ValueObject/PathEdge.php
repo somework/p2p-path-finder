@@ -101,6 +101,9 @@ final class PathEdge
         return $value;
     }
 
+    /**
+     * Returns the conversion rate as a BigDecimal with preserved scale from creation.
+     */
     public function conversionRateDecimal(): BigDecimal
     {
         return $this->conversionRate;

@@ -5,20 +5,18 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
 use Brick\Math\BigDecimal;
-use Brick\Math\Exception\MathException;
-use Brick\Math\RoundingMode;
 use JsonSerializable;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
-use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function max;
-use function sprintf;
 
 /**
  * Immutable representation of a tolerance ratio expressed as a decimal value between 0 and 1.
  */
 final class DecimalTolerance implements JsonSerializable
 {
+    use DecimalHelperTrait;
+
     private const DEFAULT_SCALE = 18;
 
     private const PERCENT_MULTIPLIER = '100';
@@ -32,7 +30,7 @@ final class DecimalTolerance implements JsonSerializable
     /**
      * @param numeric-string $ratio
      *
-     * @throws InvalidInput|PrecisionViolation when the ratio or scale fall outside the supported range
+     * @throws InvalidInput when the ratio or scale fall outside the supported range
      */
     public static function fromNumericString(string $ratio, ?int $scale = null): self
     {
@@ -74,7 +72,7 @@ final class DecimalTolerance implements JsonSerializable
     /**
      * @param numeric-string $value
      *
-     * @throws InvalidInput|PrecisionViolation when the value cannot be normalized for comparison
+     * @throws InvalidInput when the value cannot be normalized for comparison
      */
     public function compare(string $value, ?int $scale = null): int
     {
@@ -93,7 +91,7 @@ final class DecimalTolerance implements JsonSerializable
     /**
      * @param numeric-string $value
      *
-     * @throws InvalidInput|PrecisionViolation when the value cannot be compared using BCMath
+     * @throws InvalidInput when the value cannot be compared using arbitrary-precision decimals
      */
     public function isGreaterThanOrEqual(string $value, ?int $scale = null): bool
     {
@@ -103,7 +101,7 @@ final class DecimalTolerance implements JsonSerializable
     /**
      * @param numeric-string $value
      *
-     * @throws InvalidInput|PrecisionViolation when the value cannot be compared using BCMath
+     * @throws InvalidInput when the value cannot be compared using arbitrary-precision decimals
      */
     public function isLessThanOrEqual(string $value, ?int $scale = null): bool
     {
@@ -111,7 +109,7 @@ final class DecimalTolerance implements JsonSerializable
     }
 
     /**
-     * @throws InvalidInput|PrecisionViolation when the tolerance cannot be converted to a percentage
+     * @throws InvalidInput when the tolerance cannot be converted to a percentage
      *
      * @return numeric-string
      */
@@ -132,39 +130,5 @@ final class DecimalTolerance implements JsonSerializable
     public function jsonSerialize(): string
     {
         return $this->ratio();
-    }
-
-    private static function assertScale(int $scale): void
-    {
-        if ($scale < 0) {
-            throw new InvalidInput('Scale must be a non-negative integer.');
-        }
-    }
-
-    private static function decimalFromString(string $value): BigDecimal
-    {
-        try {
-            return BigDecimal::of($value);
-        } catch (MathException $exception) {
-            throw new InvalidInput(sprintf('Value "%s" is not numeric.', $value), 0, $exception);
-        }
-    }
-
-    private static function scaleDecimal(BigDecimal $decimal, int $scale): BigDecimal
-    {
-        self::assertScale($scale);
-
-        return $decimal->toScale($scale, RoundingMode::HALF_UP);
-    }
-
-    /**
-     * @return numeric-string
-     */
-    private static function decimalToString(BigDecimal $decimal, int $scale): string
-    {
-        /** @var numeric-string $result */
-        $result = self::scaleDecimal($decimal, $scale)->__toString();
-
-        return $result;
     }
 }

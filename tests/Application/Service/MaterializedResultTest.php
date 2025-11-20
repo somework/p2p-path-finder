@@ -12,6 +12,7 @@ use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Service\MaterializedResult;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Tests\Application\Support\DecimalFactory;
 
 final class MaterializedResultTest extends TestCase
 {
@@ -24,7 +25,7 @@ final class MaterializedResultTest extends TestCase
         );
 
         $orderKey = new PathOrderKey(
-            new PathCost('1.111111111111111111'),
+            new PathCost(DecimalFactory::decimal('1.111111111111111111')),
             1,
             RouteSignature::fromNodes(['USD', 'EUR']),
             0,

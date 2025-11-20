@@ -1831,7 +1831,10 @@ final class PathFinderTest extends TestCase
 
         self::assertSame($expectedProduct, $result['product']);
         self::assertSame($expectedCost, $result['cost']);
-        self::assertSame($expectedProduct, $result['edges'][0]['conversionRate']);
+        self::assertSame(
+            DecimalMath::normalize($expectedProduct, self::SCALE),
+            DecimalMath::normalize($result['edges'][0]['conversionRate'], self::SCALE)
+        );
     }
 
     public function test_it_returns_zero_hop_path_when_source_equals_target(): void

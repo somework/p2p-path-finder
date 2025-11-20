@@ -33,7 +33,7 @@ The codebase is intentionally split into two layers:
   * `OrderBook` and a small set of reusable `OrderFilterInterface` implementations used to
     prune irrelevant liquidity.
   * `GraphBuilder`, which converts domain orders into a weighted graph representation.
-  * `PathFinderService`, a façade that applies filters, builds the search graph and returns
+  * `PathFinderService`, a facade that applies filters, builds the search graph and returns
     `PathResult` aggregates complete with `PathLeg` breakdowns. It is backed by an internal
     search engine that implements the tolerance-aware route discovery logic without being
     part of the supported surface.
@@ -41,7 +41,7 @@ The codebase is intentionally split into two layers:
 The internal path finder accepts tolerance values exclusively as decimal strings. Supplying
 numeric-string tolerances (for example `'0.9999999999999999'`) preserves the full
 precision of the input without depending on floating-point formatting. Internally those
-strings are converted to `BigDecimal` objects and normalised to 18 decimal places before
+strings are converted to `BigDecimal` objects and normalized to 18 decimal places before
 calculating the amplifier used by the search heuristic, ensuring the tolerance stays
 lossless throughout the search.
 
@@ -56,7 +56,7 @@ The package intentionally keeps its entry points compact:
   `PathFinderService::findBestPaths()`. It normalises the target asset, derives spend
   constraints and ensures callers supply all dependencies required to launch a search.
 * `PathFinderService` orchestrates filtering, graph construction and search. It is the
-  primary façade exposed to consumers integrating the library into their own
+  primary facade exposed to consumers integrating the library into their own
   applications. The constructor accepts the public `GraphBuilder` plus optional ordering
   and factory hooks while instantiating its internal helpers itself so the `@internal`
   services remain encapsulated.【F:src/Application/Service/PathFinderService.php†L41-L165】
@@ -67,7 +67,7 @@ The package intentionally keeps its entry points compact:
   provides iteration, slicing and `jsonSerialize()`/`toArray()` helpers so you can pipe the
   results straight into response DTOs or JSON encoders.【F:src/Application/PathFinder/Result/SearchOutcome.php†L9-L71】【F:src/Application/PathFinder/Result/PathResultSet.php†L1-L205】
 
-Support services that exist only to back the façade&mdash;for example
+Support services that exist only to back the facade&mdash;for example
 `OrderSpendAnalyzer`, `LegMaterializer` and `ToleranceEvaluator`&mdash;are marked with
 `@internal` annotations and should not be depended upon directly by userland code. They
 are omitted from the generated API reference to reinforce that they may change without
@@ -407,7 +407,7 @@ hops, then lexicographically smaller route signatures (for example `EUR->USD->GB
 deterministic cascade keeps results stable across processes.
 
 `PathFinderService` accepts a configurable ordering strategy via its constructor. Implement
-`PathOrderStrategy::compare()` to inject your own prioritisation logic and pass it to the façade when
+`PathOrderStrategy::compare()` to inject your own prioritisation logic and pass it to the facade when
 registering the service with your dependency injection container:
 
 ```php

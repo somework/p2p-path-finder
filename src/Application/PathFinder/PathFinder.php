@@ -13,7 +13,6 @@ use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\Guard\SearchGuards;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidateHeapEntry;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidatePriority;
-use SomeWork\P2PPathFinder\Application\PathFinder\Result\Heap\CandidatePriorityQueue;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
@@ -786,6 +785,7 @@ final class PathFinder
             throw new InvalidInput('Scale must be non-negative.');
         }
 
+        // Ensure 18 decimal places for canonical output, padding with zeros if necessary
         return $decimal->toScale($scale, RoundingMode::HALF_UP);
     }
 
@@ -855,53 +855,5 @@ final class SearchStateQueue
     public function compare(SearchStatePriority $priority1, SearchStatePriority $priority2): int
     {
         return $priority1->compare($priority2, $this->scale);
-    }
-}
-
-/**
- * @internal
- */
-final class CandidateResultHeap
-{
-    private CandidatePriorityQueue $heap;
-
-    public function __construct(private readonly int $scale)
-    {
-        $this->heap = new CandidatePriorityQueue($this->scale);
-    }
-
-    public function __clone()
-    {
-        $this->heap = clone $this->heap;
-    }
-
-    public function insert(CandidateHeapEntry $entry): true
-    {
-        $this->heap->insert($entry, $entry->priority());
-
-        return true;
-    }
-
-    public function push(CandidateHeapEntry $entry): void
-    {
-        $this->heap->insert($entry, $entry->priority());
-    }
-
-    public function extract(): CandidateHeapEntry
-    {
-        /** @var CandidateHeapEntry $entry */
-        $entry = $this->heap->extract();
-
-        return $entry;
-    }
-
-    public function isEmpty(): bool
-    {
-        return 0 === $this->heap->count();
-    }
-
-    public function count(): int
-    {
-        return $this->heap->count();
     }
 }

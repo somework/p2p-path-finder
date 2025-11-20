@@ -44,7 +44,7 @@ final class PathCostTest extends TestCase
         $right = new PathCost('0.2');
 
         $this->expectException(InvalidInput::class);
-        $this->expectExceptionMessage('Scale cannot be negative.');
+        $this->expectExceptionMessage('Scale must be a non-negative integer.');
 
         $left->compare($right, -1);
     }

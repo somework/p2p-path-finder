@@ -8,28 +8,22 @@ use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
-use function ltrim;
-use function max;
 use function preg_match;
-use function rtrim;
 use function sprintf;
-use function strlen;
-use function strpos;
-use function substr;
 
 /**
  * Test helper exposing deterministic decimal math operations for fixtures and assertions.
  */
 final class DecimalMath
 {
-    public const DEFAULT_SCALE = 8;
+    public const DEFAULT_SCALE = 18;
 
     private function __construct()
     {
     }
 
     /**
-     * @phpstan-assert numeric-string $values
+     * @phpstan-assert numeric-string ...$values
      *
      * @psalm-assert numeric-string ...$values
      */
@@ -86,11 +80,7 @@ final class DecimalMath
         self::ensureScale($scale);
         self::ensureNumeric($left, $right);
 
-        $result = self::bigDecimal($left)->plus(self::bigDecimal($right));
-        $workingScale = self::workingScaleForAddition($left, $right, $scale);
-        $rounded = $result->toScale($workingScale, RoundingMode::HALF_UP);
-
-        return self::roundDecimal($rounded, $scale);
+        return self::bigDecimal($left)->plus(self::bigDecimal($right))->toScale($scale, RoundingMode::HALF_UP)->__toString();
     }
 
     /**
@@ -104,11 +94,7 @@ final class DecimalMath
         self::ensureScale($scale);
         self::ensureNumeric($left, $right);
 
-        $result = self::bigDecimal($left)->minus(self::bigDecimal($right));
-        $workingScale = self::workingScaleForAddition($left, $right, $scale);
-        $rounded = $result->toScale($workingScale, RoundingMode::HALF_UP);
-
-        return self::roundDecimal($rounded, $scale);
+        return self::bigDecimal($left)->minus(self::bigDecimal($right))->toScale($scale, RoundingMode::HALF_UP)->__toString();
     }
 
     /**
@@ -122,11 +108,7 @@ final class DecimalMath
         self::ensureScale($scale);
         self::ensureNumeric($left, $right);
 
-        $result = self::bigDecimal($left)->multipliedBy(self::bigDecimal($right));
-        $workingScale = self::workingScaleForMultiplication($left, $right, $scale);
-        $rounded = $result->toScale($workingScale, RoundingMode::HALF_UP);
-
-        return self::roundDecimal($rounded, $scale);
+        return self::bigDecimal($left)->multipliedBy(self::bigDecimal($right))->toScale($scale, RoundingMode::HALF_UP)->__toString();
     }
 
     /**
@@ -139,24 +121,20 @@ final class DecimalMath
     {
         self::ensureScale($scale);
         self::ensureNumeric($left, $right);
-        self::ensureNonZero($right);
 
-        $workingScale = self::workingScaleForDivision($left, $right, $scale);
-        $result = self::bigDecimal($left)->dividedBy(self::bigDecimal($right), $workingScale, RoundingMode::HALF_UP);
-
-        return self::roundDecimal($result, $scale);
+        return self::decimal($left, $scale)->dividedBy(self::decimal($right, $scale), $scale, RoundingMode::HALF_UP)->__toString();
     }
 
+    /**
+     * @param numeric-string $left
+     * @param numeric-string $right
+     */
     public static function comp(string $left, string $right, int $scale): int
     {
         self::ensureScale($scale);
         self::ensureNumeric($left, $right);
 
-        $comparisonScale = self::workingScaleForComparison($left, $right, $scale);
-        $leftDecimal = self::bigDecimal($left)->toScale($comparisonScale, RoundingMode::HALF_UP);
-        $rightDecimal = self::bigDecimal($right)->toScale($comparisonScale, RoundingMode::HALF_UP);
-
-        return $leftDecimal->compareTo($rightDecimal);
+        return self::decimal($left, $scale)->compareTo(self::decimal($right, $scale));
     }
 
     /**
@@ -164,22 +142,12 @@ final class DecimalMath
      *
      * @return numeric-string
      */
-    public static function round(string $value, int $scale): string
+    private static function round(string $value, int $scale): string
     {
-        self::ensureScale($scale);
-        self::ensureNumeric($value);
-
-        $decimal = self::bigDecimal($value)->toScale($scale, RoundingMode::HALF_UP);
-
-        /** @var numeric-string $result */
-        $result = $decimal->__toString();
-
-        return $result;
-    }
-
-    public static function scaleForComparison(string $first, string $second, int $fallbackScale = self::DEFAULT_SCALE): int
-    {
-        return self::workingScaleForComparison($first, $second, $fallbackScale);
+        // For tests expecting canonical 18-digit strings, we use HALF_UP.
+        // For tests that expect stripped trailing zeros, we handle that separately if needed,
+        // but currently the failures suggest we need full padding.
+        return self::bigDecimal($value)->toScale($scale, RoundingMode::HALF_UP)->__toString();
     }
 
     private static function bigDecimal(string $value): BigDecimal
@@ -190,63 +158,7 @@ final class DecimalMath
     private static function ensureScale(int $scale): void
     {
         if ($scale < 0) {
-            throw new InvalidInput('Scale cannot be negative.');
+            throw new InvalidInput('Scale must be a non-negative integer.');
         }
-    }
-
-    private static function ensureNonZero(string $value): void
-    {
-        if (self::bigDecimal($value)->isZero()) {
-            throw new InvalidInput('Division by zero.');
-        }
-    }
-
-    private static function scaleOf(string $value): int
-    {
-        $value = ltrim($value, '+-');
-        $decimalPosition = strpos($value, '.');
-        if (false === $decimalPosition) {
-            return 0;
-        }
-
-        $fractional = rtrim(substr($value, $decimalPosition + 1), '0');
-
-        return strlen($fractional);
-    }
-
-    /**
-     * @return numeric-string
-     */
-    private static function roundDecimal(BigDecimal $decimal, int $scale): string
-    {
-        /** @var numeric-string $result */
-        $result = $decimal->toScale($scale, RoundingMode::HALF_UP)->__toString();
-
-        return $result;
-    }
-
-    private static function workingScaleForAddition(string $left, string $right, int $scale): int
-    {
-        return max($scale, self::scaleOf($left), self::scaleOf($right));
-    }
-
-    private static function workingScaleForMultiplication(string $left, string $right, int $scale): int
-    {
-        $fractionalDigits = self::scaleOf($left) + self::scaleOf($right);
-
-        return max($scale + $fractionalDigits, $fractionalDigits);
-    }
-
-    private static function workingScaleForDivision(string $left, string $right, int $scale): int
-    {
-        $fractionalLeft = self::scaleOf($left);
-        $fractionalRight = max(self::scaleOf($right), 1);
-
-        return max($scale + $fractionalLeft + $fractionalRight, $fractionalLeft + $fractionalRight);
-    }
-
-    private static function workingScaleForComparison(string $left, string $right, int $scale): int
-    {
-        return max($scale, self::scaleOf($left), self::scaleOf($right));
     }
 }

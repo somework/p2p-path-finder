@@ -14,8 +14,8 @@ use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
+use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalHelperTrait;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
-use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 use function max;
 
@@ -26,6 +26,8 @@ use function max;
  */
 final class LegMaterializer
 {
+    use DecimalHelperTrait;
+
     private const SELL_RESOLUTION_MAX_ITERATIONS = 16;
     private const SELL_RESOLUTION_RELATIVE_TOLERANCE = '0.000001';
     private const SELL_RESOLUTION_COMPARISON_SCALE = 18;
@@ -368,7 +370,7 @@ final class LegMaterializer
             }
 
             $ratioString = self::decimalToString($ratio, $divisionScale);
-            $nextNet = $netCandidate->multiply($ratioString, max($netCandidate->scale(), $ratioScale));
+            $nextNet = $netCandidate->multiply($ratioString, max($netCandidate->scale(), $divisionScale));
             $nextNet = $bounds->clamp($nextNet);
 
             if ($nextNet->equals($netCandidate)) {
@@ -533,32 +535,5 @@ final class LegMaterializer
         $scale = max($baseAmount->scale(), $minScale, $maxScale);
 
         return $baseAmount->withScale($scale);
-    }
-
-    private static function assertScale(int $scale): void
-    {
-        if ($scale < 0) {
-            throw new InvalidInput('Scale cannot be negative.');
-        }
-    }
-
-    private static function scaleDecimal(BigDecimal $decimal, int $scale): BigDecimal
-    {
-        self::assertScale($scale);
-
-        return $decimal->toScale($scale, RoundingMode::HALF_UP);
-    }
-
-    /**
-     * @return numeric-string
-     */
-    private static function decimalToString(BigDecimal $decimal, int $scale): string
-    {
-        $scaled = self::scaleDecimal($decimal, $scale);
-
-        /** @var numeric-string $result */
-        $result = $scaled->__toString();
-
-        return $result;
     }
 }

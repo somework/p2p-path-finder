@@ -5,18 +5,17 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Domain\ValueObject;
 
 use Brick\Math\BigDecimal;
-use Brick\Math\Exception\MathException;
-use Brick\Math\RoundingMode;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
-use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
-
-use function sprintf;
 
 /**
  * Represents a normalized tolerance window with deterministic heuristics.
  */
 final class ToleranceWindow
 {
+    use DecimalHelperTrait;
+
+    private const SCALE = 18;
+
     /**
      * @param 'minimum'|'maximum' $heuristicSource
      */
@@ -29,7 +28,7 @@ final class ToleranceWindow
     }
 
     /**
-     * @throws InvalidInput|PrecisionViolation when either tolerance bound is invalid
+     * @throws InvalidInput when either tolerance bound is invalid
      */
     public static function fromStrings(string $minimum, string $maximum): self
     {
@@ -50,13 +49,13 @@ final class ToleranceWindow
     /**
      * Normalizes a tolerance value ensuring it lies within the [0, 1) interval.
      *
-     * @throws InvalidInput|PrecisionViolation when the provided value is invalid
+     * @throws InvalidInput when the provided value is invalid
      *
      * @return numeric-string
      */
     public static function normalizeTolerance(string $value, string $context): string
     {
-        return self::decimalToString(self::normalizeToleranceDecimal($value, $context));
+        return self::decimalToString(self::normalizeToleranceDecimal($value, $context), self::SCALE);
     }
 
     /**
@@ -66,7 +65,7 @@ final class ToleranceWindow
      */
     public function minimum(): string
     {
-        return self::decimalToString($this->minimum);
+        return self::decimalToString($this->minimum, self::SCALE);
     }
 
     /**
@@ -76,7 +75,7 @@ final class ToleranceWindow
      */
     public function maximum(): string
     {
-        return self::decimalToString($this->maximum);
+        return self::decimalToString($this->maximum, self::SCALE);
     }
 
     /**
@@ -86,7 +85,7 @@ final class ToleranceWindow
      */
     public function heuristicTolerance(): string
     {
-        return self::decimalToString($this->heuristicTolerance);
+        return self::decimalToString($this->heuristicTolerance, self::SCALE);
     }
 
     /**
@@ -104,45 +103,18 @@ final class ToleranceWindow
         return self::SCALE;
     }
 
-    private const SCALE = 18;
-
     /**
-     * @throws InvalidInput|PrecisionViolation when the provided value is invalid
+     * @throws InvalidInput when the provided value is invalid
      */
     private static function normalizeToleranceDecimal(string $value, string $context): BigDecimal
     {
         $decimal = self::decimalFromString($value);
-        $normalized = self::scaleDecimal($decimal);
+        $normalized = self::scaleDecimal($decimal, self::SCALE);
 
         if ($normalized->compareTo(BigDecimal::zero()) < 0 || $normalized->compareTo(BigDecimal::one()) >= 0) {
             throw new InvalidInput($context.' must be in the [0, 1) range.');
         }
 
         return $normalized;
-    }
-
-    private static function decimalFromString(string $value): BigDecimal
-    {
-        try {
-            return BigDecimal::of($value);
-        } catch (MathException $exception) {
-            throw new InvalidInput(sprintf('Value "%s" is not numeric.', $value), 0, $exception);
-        }
-    }
-
-    private static function scaleDecimal(BigDecimal $decimal): BigDecimal
-    {
-        return $decimal->toScale(self::SCALE, RoundingMode::HALF_UP);
-    }
-
-    /**
-     * @return numeric-string
-     */
-    private static function decimalToString(BigDecimal $decimal): string
-    {
-        /** @var numeric-string $result */
-        $result = self::scaleDecimal($decimal)->__toString();
-
-        return $result;
     }
 }
