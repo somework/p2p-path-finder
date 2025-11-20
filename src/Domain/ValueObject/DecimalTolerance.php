@@ -51,6 +51,8 @@ final class DecimalTolerance implements JsonSerializable
 
         $normalized = self::scaleDecimal(self::decimalFromString($ratio), $scale);
 
+        // Range check after scaling: values that round to [0, 1] at the target scale are accepted.
+        // For example, "1.0000000000000000001" would round to "1.000000000000000000" and pass.
         if ($normalized->compareTo(BigDecimal::zero()) < 0 || $normalized->compareTo(BigDecimal::one()) > 0) {
             throw new InvalidInput('Residual tolerance must be a value between 0 and 1 inclusive.');
         }

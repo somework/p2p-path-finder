@@ -26,7 +26,7 @@ final class SearchStateQueue
         $this->queue = new SearchStatePriorityQueue($this->scale);
     }
 
-    public function __clone()
+    public function __clone(): void
     {
         $this->queue = clone $this->queue;
     }
