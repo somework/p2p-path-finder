@@ -27,17 +27,17 @@ final class SearchStateQueueTest extends TestCase
     {
         $queue = new SearchStateQueue(18);
 
-        $stateA = $this->state('A', DecimalFactory::decimal('0.100000000000000000'));
+        $stateA = $this->state('A', DecimalFactory::decimal('0.1'));
         $entryA = new SearchQueueEntry(
             $stateA,
-            $this->priority(DecimalFactory::decimal('0.100000000000000000'), $stateA->hops(), '', 1),
+            $this->priority(DecimalFactory::decimal('0.1'), $stateA->hops(), '', 1),
         );
         $queue->push($entryA);
 
-        $stateB = $this->state('B', DecimalFactory::decimal('0.200000000000000000'));
+        $stateB = $this->state('B', DecimalFactory::decimal('0.2'));
         $queue->push(new SearchQueueEntry(
             $stateB,
-            $this->priority(DecimalFactory::decimal('0.200000000000000000'), $stateB->hops(), '', 2),
+            $this->priority(DecimalFactory::decimal('0.2'), $stateB->hops(), '', 2),
         ));
 
         self::assertSame($stateA, $queue->extract());
@@ -49,12 +49,12 @@ final class SearchStateQueueTest extends TestCase
         $queue = new SearchStateQueue(18);
         $signature = RouteSignature::fromNodes(['SRC', 'MID']);
 
-        $stateA = $this->state('A', DecimalFactory::decimal('0.400000000000000000'));
+        $stateA = $this->state('A', DecimalFactory::decimal('0.4'));
         $queue->push(
             new SearchQueueEntry(
                 $stateA,
                 new SearchStatePriority(
-                    new PathCost(BigDecimal::of('0.400000000000000000')),
+                    new PathCost(BigDecimal::of('0.4')),
                     $stateA->hops(),
                     $signature,
                     1,
@@ -62,12 +62,12 @@ final class SearchStateQueueTest extends TestCase
             ),
         );
 
-        $stateB = $this->state('B', DecimalFactory::decimal('0.400000000000000000'));
+        $stateB = $this->state('B', DecimalFactory::decimal('0.4'));
         $queue->push(
             new SearchQueueEntry(
                 $stateB,
                 new SearchStatePriority(
-                    new PathCost(BigDecimal::of('0.400000000000000000')),
+                    new PathCost(BigDecimal::of('0.4')),
                     $stateB->hops(),
                     $signature,
                     2,
@@ -83,26 +83,26 @@ final class SearchStateQueueTest extends TestCase
     {
         $queue = new SearchStateQueue(18);
 
-        $lowerCost = $this->priority(DecimalFactory::decimal('0.010000000000000000'), 0, '', 0);
-        $higherCost = $this->priority(DecimalFactory::decimal('0.020000000000000000'), 0, '', 1);
+        $lowerCost = $this->priority(DecimalFactory::decimal('0.01'), 0, '', 0);
+        $higherCost = $this->priority(DecimalFactory::decimal('0.02'), 0, '', 1);
 
         self::assertSame(1, $queue->compare($lowerCost, $higherCost));
         self::assertSame(-1, $queue->compare($higherCost, $lowerCost));
 
-        $fewerHops = $this->priority(DecimalFactory::decimal('0.030000000000000000'), 1, '', 1);
-        $moreHops = $this->priority(DecimalFactory::decimal('0.030000000000000000'), 2, '', 0);
+        $fewerHops = $this->priority(DecimalFactory::decimal('0.03'), 1, '', 1);
+        $moreHops = $this->priority(DecimalFactory::decimal('0.03'), 2, '', 0);
 
         self::assertSame(1, $queue->compare($fewerHops, $moreHops));
         self::assertSame(-1, $queue->compare($moreHops, $fewerHops));
 
-        $alpha = $this->priority(DecimalFactory::decimal('0.030000000000000000'), 2, 'A->B', 1);
-        $beta = $this->priority(DecimalFactory::decimal('0.030000000000000000'), 2, 'A->C', 0);
+        $alpha = $this->priority(DecimalFactory::decimal('0.03'), 2, 'A->B', 1);
+        $beta = $this->priority(DecimalFactory::decimal('0.03'), 2, 'A->C', 0);
 
         self::assertSame(1, $queue->compare($alpha, $beta));
         self::assertSame(-1, $queue->compare($beta, $alpha));
 
-        $earlier = $this->priority(DecimalFactory::decimal('0.030000000000000000'), 2, 'A->C', 0);
-        $later = $this->priority(DecimalFactory::decimal('0.030000000000000000'), 2, 'A->C', 1);
+        $earlier = $this->priority(DecimalFactory::decimal('0.03'), 2, 'A->C', 0);
+        $later = $this->priority(DecimalFactory::decimal('0.03'), 2, 'A->C', 1);
 
         self::assertSame(1, $queue->compare($earlier, $later));
         self::assertSame(-1, $queue->compare($later, $earlier));
@@ -112,8 +112,8 @@ final class SearchStateQueueTest extends TestCase
     {
         $queue = new SearchStateQueue(18);
 
-        $alpha = $this->priority(DecimalFactory::decimal('0.050000000000000000'), 1, 'A->B', 0);
-        $beta = $this->priority(DecimalFactory::decimal('0.050000000000000000'), 1, 'A->C', 1);
+        $alpha = $this->priority(DecimalFactory::decimal('0.05'), 1, 'A->B', 0);
+        $beta = $this->priority(DecimalFactory::decimal('0.05'), 1, 'A->C', 1);
 
         self::assertSame(1, $queue->compare($alpha, $beta));
         self::assertSame(-1, $queue->compare($beta, $alpha));
@@ -123,8 +123,8 @@ final class SearchStateQueueTest extends TestCase
     {
         $queue = new SearchStateQueue(18);
 
-        $first = $this->priority(DecimalFactory::decimal('0.030000000000000000'), 2, 'A->B->C', 5);
-        $second = $this->priority(DecimalFactory::decimal('0.030000000000000000'), 2, 'A->B->C', 5);
+        $first = $this->priority(DecimalFactory::decimal('0.03'), 2, 'A->B->C', 5);
+        $second = $this->priority(DecimalFactory::decimal('0.03'), 2, 'A->B->C', 5);
 
         self::assertSame(0, $queue->compare($first, $second));
         self::assertSame(0, $queue->compare($second, $first));
@@ -135,7 +135,7 @@ final class SearchStateQueueTest extends TestCase
         $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Route signature nodes cannot be empty (index 1).');
 
-        $this->priority(DecimalFactory::decimal('0.010000000000000000'), 1, 'SRC-> ', 0);
+        $this->priority(DecimalFactory::decimal('0.01'), 1, 'SRC-> ', 0);
     }
 
     private function state(string $node, BigDecimal $cost): SearchState
