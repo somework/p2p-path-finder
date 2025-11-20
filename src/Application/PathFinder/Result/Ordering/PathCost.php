@@ -13,8 +13,10 @@ final class PathCost
 
     /**
      * Canonical scale for path cost storage and default comparisons.
+     *
+     * @see DecimalHelperTrait::CANONICAL_SCALE
      */
-    private const NORMALIZED_SCALE = 18;
+    private const NORMALIZED_SCALE = self::CANONICAL_SCALE;
 
     private readonly BigDecimal $decimal;
 

@@ -29,6 +29,20 @@ use function sprintf;
  */
 trait DecimalHelperTrait
 {
+    /**
+     * Canonical scale for high-precision decimal operations across the application.
+     *
+     * This scale (18 decimal places) is used for:
+     * - Path finding cost/product calculations
+     * - Exchange rate conversions
+     * - Tolerance comparisons
+     * - Test fixtures and assertions
+     *
+     * Using a consistent scale ensures deterministic rounding behavior and
+     * prevents subtle precision mismatches across different components.
+     */
+    private const CANONICAL_SCALE = 18;
+
     private static function assertScale(int $scale): void
     {
         if ($scale < 0) {

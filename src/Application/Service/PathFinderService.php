@@ -22,6 +22,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
+use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalHelperTrait;
 use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
@@ -35,6 +36,9 @@ use function trim;
  */
 final class PathFinderService
 {
+    /**
+     * @see DecimalHelperTrait::CANONICAL_SCALE
+     */
     private const COST_SCALE = 18;
 
     private readonly OrderSpendAnalyzer $orderSpendAnalyzer;

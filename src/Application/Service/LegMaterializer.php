@@ -30,7 +30,10 @@ final class LegMaterializer
 
     private const SELL_RESOLUTION_MAX_ITERATIONS = 16;
     private const SELL_RESOLUTION_RELATIVE_TOLERANCE = '0.000001';
-    private const SELL_RESOLUTION_COMPARISON_SCALE = 18;
+    /**
+     * @see DecimalHelperTrait::CANONICAL_SCALE
+     */
+    private const SELL_RESOLUTION_COMPARISON_SCALE = self::CANONICAL_SCALE;
     private const SELL_RESOLUTION_RATIO_EXTRA_SCALE = 6;
     private const SELL_RESOLUTION_TOLERANCE_SCALE = 12;
     private const BUY_ADJUSTMENT_MAX_ITERATIONS = 12;

@@ -14,7 +14,10 @@ final class ToleranceWindow
 {
     use DecimalHelperTrait;
 
-    private const SCALE = 18;
+    /**
+     * @see DecimalHelperTrait::CANONICAL_SCALE
+     */
+    private const SCALE = self::CANONICAL_SCALE;
 
     /**
      * @param 'minimum'|'maximum' $heuristicSource

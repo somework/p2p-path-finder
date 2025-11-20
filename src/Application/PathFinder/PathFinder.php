@@ -38,7 +38,6 @@ use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalHelperTrait;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
-use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function sprintf;
 use function strtoupper;
@@ -53,8 +52,10 @@ final class PathFinder
     use DecimalHelperTrait;
     /**
      * Canonical tolerance, cost and residual scale documented in docs/decimal-strategy.md.
+     *
+     * @see DecimalHelperTrait::CANONICAL_SCALE
      */
-    private const SCALE = 18;
+    private const SCALE = self::CANONICAL_SCALE;
     /**
      * Highest representable tolerance ratio (0.999… at the canonical scale).
      */
@@ -371,7 +372,13 @@ final class PathFinder
      */
     private function moneySignatureAmount(Money $amount, int $scale): string
     {
-        return self::decimalToString($this->moneyToDecimal($amount, $scale), $scale);
+        // moneyToDecimal already scales to the requested scale via withScale(),
+        // so we can directly convert to string without re-scaling
+        $decimal = $this->moneyToDecimal($amount, $scale);
+        /** @var numeric-string $result */
+        $result = $decimal->__toString();
+
+        return $result;
     }
 
     private function createQueue(): SearchStateQueue
@@ -405,9 +412,8 @@ final class PathFinder
 
     private function calculateNextCostDecimal(BigDecimal $currentCost, BigDecimal $conversionRate): BigDecimal
     {
-        return $this->normalizeDecimal(
-            $currentCost->dividedBy($conversionRate, self::SCALE, RoundingMode::HALF_UP),
-        );
+        // dividedBy already produces a value at self::SCALE, no need to normalize again
+        return $currentCost->dividedBy($conversionRate, self::SCALE, RoundingMode::HALF_UP);
     }
 
     private function calculateNextProductDecimal(BigDecimal $currentProduct, BigDecimal $conversionRate): BigDecimal
@@ -421,13 +427,12 @@ final class PathFinder
             return null;
         }
 
-        $normalized = $this->normalizeDecimal($bestTargetCost);
-
+        // bestTargetCost is already normalized when set
         if (!$this->hasTolerance()) {
-            return $normalized;
+            return $bestTargetCost;
         }
 
-        return $this->normalizeDecimal($normalized->multipliedBy($this->toleranceAmplifier));
+        return $this->normalizeDecimal($bestTargetCost->multipliedBy($this->toleranceAmplifier));
     }
 
     private function normalizeDecimal(BigDecimal $value): BigDecimal
@@ -664,7 +669,7 @@ final class PathFinder
     }
 
     /**
-     * @throws InvalidInput|PrecisionViolation when normalization fails or currencies mismatch
+     * @throws InvalidInput when currencies mismatch or clamping fails
      */
     private function clampToRange(Money $value, SpendRange $range): Money
     {
@@ -672,7 +677,9 @@ final class PathFinder
     }
 
     /**
-     * @throws PrecisionViolation when the edge ratio cannot be evaluated using arbitrary precision math
+     * Computes the effective conversion rate for an edge.
+     *
+     * @throws InvalidInput when the edge ratio cannot be computed
      */
     private function edgeEffectiveConversionRate(GraphEdge $edge): BigDecimal
     {
@@ -692,7 +699,9 @@ final class PathFinder
     }
 
     /**
-     * @throws PrecisionViolation when the edge capacity ratios cannot be evaluated using arbitrary precision math
+     * Computes the base-to-quote ratio from edge capacities.
+     *
+     * @throws InvalidInput when the capacity ratios cannot be computed
      */
     private function edgeBaseToQuoteRatio(GraphEdge $edge): BigDecimal
     {
@@ -718,7 +727,9 @@ final class PathFinder
     }
 
     /**
-     * @throws InvalidInput|PrecisionViolation when the tolerance value is malformed
+     * Normalizes and validates a tolerance value.
+     *
+     * @throws InvalidInput when the tolerance value is malformed or out of range
      */
     private function normalizeTolerance(string $tolerance): BigDecimal
     {

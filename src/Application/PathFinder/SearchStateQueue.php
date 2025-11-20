@@ -54,6 +54,15 @@ final class SearchStateQueue
         return $this->queue->count();
     }
 
+    /**
+     * Compares two priorities using the queue's scale.
+     *
+     * This method provides a test seam for verifying priority comparison logic
+     * without exposing the internal SearchStatePriorityQueue implementation.
+     * The comparison logic intentionally mirrors SearchStatePriorityQueue::compare().
+     *
+     * @return int Negative if priority1 < priority2, positive if priority1 > priority2, zero if equal
+     */
     public function compare(SearchStatePriority $priority1, SearchStatePriority $priority2): int
     {
         return $priority1->compare($priority2, $this->scale);

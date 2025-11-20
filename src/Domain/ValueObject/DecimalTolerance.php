@@ -17,7 +17,10 @@ final class DecimalTolerance implements JsonSerializable
 {
     use DecimalHelperTrait;
 
-    private const DEFAULT_SCALE = 18;
+    /**
+     * @see DecimalHelperTrait::CANONICAL_SCALE
+     */
+    private const DEFAULT_SCALE = self::CANONICAL_SCALE;
 
     /**
      * Multiplier to convert decimal ratio (0.0-1.0) to percentage (0-100).
