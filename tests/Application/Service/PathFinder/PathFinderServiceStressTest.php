@@ -300,7 +300,7 @@ final class PathFinderServiceStressTest extends PathFinderServiceTestCase
         // We verify it completes in reasonable time across all CI environments (including slow systems).
         // The actual elapsed time includes setup overhead, so we use a generous upper bound.
         self::assertLessThan(2000, $guardReport->elapsedMilliseconds(), 'Should complete in reasonable time');
-        
+
         // The key verification: time budget should be enforced (though may not always be reached on very fast systems)
         self::assertSame(1, $guardReport->timeBudgetLimit(), 'Time budget should be set to 1ms');
     }
