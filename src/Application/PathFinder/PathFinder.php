@@ -186,8 +186,8 @@ final class PathFinder
             $guards->recordExpansion();
 
             if ($state->node() === $target) {
-                $candidateCostDecimal = $this->normalizeDecimal($state->costDecimal());
-                $candidateProductDecimal = $this->normalizeDecimal($state->productDecimal());
+                $candidateCostDecimal = $state->costDecimal();
+                $candidateProductDecimal = $state->productDecimal();
 
                 $candidateRange = null;
                 $stateRange = $state->amountRange();
