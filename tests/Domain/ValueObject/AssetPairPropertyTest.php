@@ -161,7 +161,12 @@ final class AssetPairPropertyTest extends TestCase
             // Contains digits
             fn () => 'AB'.$this->randomizer->getInt(0, 9),
             // Contains special chars
-            fn () => 'AB'.['!', '@', '#', '$', '%', '^', '&', '*'][$this->randomizer->getInt(0, 7)],
+            fn () => (static function (Randomizer $r): string {
+                $chars = ['!', '@', '#', '$', '%', '^', '&', '*'];
+                $idx = $r->pickArrayKeys($chars, 1)[0];
+
+                return 'AB'.$chars[$idx];
+            })($this->randomizer),
             // Empty string
             fn () => '',
         ];
