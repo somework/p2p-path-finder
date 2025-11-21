@@ -205,7 +205,7 @@ final class SearchGuardsTest extends TestCase
         $clock = static fn (): float => 0.0;
         $guards = new SearchGuards(1000000, null, $clock);
 
-        for ($i = 0; $i < 1000; $i++) {
+        for ($i = 0; $i < 1000; ++$i) {
             self::assertTrue($guards->canExpand());
             $guards->recordExpansion();
         }

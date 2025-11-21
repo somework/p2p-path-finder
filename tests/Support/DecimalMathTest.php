@@ -9,6 +9,8 @@ use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
+use function strlen;
+
 /**
  * Explicit unit tests for DecimalMath test helper to verify parity with production code.
  */
@@ -415,4 +417,3 @@ final class DecimalMathTest extends TestCase
         self::assertSame('999999999.99', $result);
     }
 }
-

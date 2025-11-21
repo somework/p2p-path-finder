@@ -181,7 +181,7 @@ final class OrderBookTest extends TestCase
     public function test_large_order_book_can_be_iterated(): void
     {
         $orders = [];
-        for ($i = 0; $i < 1000; $i++) {
+        for ($i = 0; $i < 1000; ++$i) {
             $orders[] = OrderFactory::buy(rate: (string) (30000 + $i));
         }
 
@@ -195,7 +195,7 @@ final class OrderBookTest extends TestCase
     public function test_large_order_book_can_be_filtered(): void
     {
         $orders = [];
-        for ($i = 0; $i < 1000; $i++) {
+        for ($i = 0; $i < 1000; ++$i) {
             $orders[] = OrderFactory::buy(minAmount: '0.100', maxAmount: '1.000', rate: (string) (30000 + $i));
         }
 
