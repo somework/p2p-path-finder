@@ -57,15 +57,6 @@ final class PathFinder
      */
     private const SCALE = self::CANONICAL_SCALE;
     /**
-     * Highest representable tolerance ratio (0.999… at the canonical scale).
-     *
-     * This value must have exactly SCALE nines after the decimal point.
-     * For SCALE=18: "0.999999999999999999" (18 nines)
-     *
-     * If CANONICAL_SCALE changes, this constant must be updated accordingly.
-     */
-    private const TOLERANCE_MAX_RATIO = '0.999999999999999999';
-    /**
      * Extra precision used when converting target and source deltas into a ratio to avoid premature rounding.
      */
     private const RATIO_EXTRA_SCALE = 4;
@@ -118,12 +109,14 @@ final class PathFinder
         }
 
         $this->unitValue = self::scaleDecimal(BigDecimal::one(), self::SCALE);
-        $this->toleranceUpperBound = self::decimalFromString(self::TOLERANCE_MAX_RATIO);
-
-        // Validate TOLERANCE_MAX_RATIO has the correct scale
-        if (self::SCALE !== $this->toleranceUpperBound->getScale()) {
-            throw new InvalidInput(sprintf('TOLERANCE_MAX_RATIO must have exactly %d decimal places to match CANONICAL_SCALE.', self::SCALE));
-        }
+        // Compute tolerance upper bound as 0.999...9 (SCALE nines after decimal point)
+        // This is 1 - (1 / 10^SCALE), which represents the highest tolerance < 1 at this scale
+        $epsilon = BigDecimal::one()->dividedBy(
+            BigDecimal::of(10)->power(self::SCALE),
+            self::SCALE,
+            RoundingMode::HALF_UP
+        );
+        $this->toleranceUpperBound = $this->unitValue->minus($epsilon);
 
         $this->tolerance = $this->normalizeTolerance($tolerance);
         $this->toleranceAmplifier = $this->calculateToleranceAmplifier($this->tolerance);
@@ -700,10 +693,8 @@ final class PathFinder
         }
 
         if (OrderSide::SELL === $edge->orderSide()) {
-            return self::scaleDecimal(
-                BigDecimal::one()->dividedBy($baseToQuote, self::SCALE, RoundingMode::HALF_UP),
-                self::SCALE,
-            );
+            // dividedBy already produces a value at self::SCALE, no need to scale again
+            return BigDecimal::one()->dividedBy($baseToQuote, self::SCALE, RoundingMode::HALF_UP);
         }
 
         return $baseToQuote;
@@ -731,10 +722,8 @@ final class PathFinder
 
         $quoteMax = $this->moneyToDecimal($quoteCapacity->max(), $quoteScale);
 
-        return self::scaleDecimal(
-            $quoteMax->dividedBy($baseMax, self::SCALE, RoundingMode::HALF_UP),
-            self::SCALE,
-        );
+        // dividedBy already produces a value at self::SCALE, no need to scale again
+        return $quoteMax->dividedBy($baseMax, self::SCALE, RoundingMode::HALF_UP);
     }
 
     /**
@@ -770,10 +759,8 @@ final class PathFinder
 
         $complement = $this->unitValue->minus($tolerance);
 
-        return self::scaleDecimal(
-            $this->unitValue->dividedBy($complement, self::SCALE, RoundingMode::HALF_UP),
-            self::SCALE,
-        );
+        // dividedBy already produces a value at self::SCALE, no need to scale again
+        return $this->unitValue->dividedBy($complement, self::SCALE, RoundingMode::HALF_UP);
     }
 
     private function hasTolerance(): bool
