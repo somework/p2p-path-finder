@@ -276,12 +276,20 @@ final class Money
     }
 
     /**
+     * Maximum allowed scale to prevent memory exhaustion and performance degradation.
+     */
+    private const MAX_SCALE = 50;
+
+    /**
      * @psalm-mutation-free
      */
     private static function assertScale(int $scale): void
     {
         if ($scale < 0) {
             throw new InvalidInput('Scale cannot be negative.');
+        }
+        if ($scale > self::MAX_SCALE) {
+            throw new InvalidInput(sprintf('Scale cannot exceed %d decimal places.', self::MAX_SCALE));
         }
     }
 

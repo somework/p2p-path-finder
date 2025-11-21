@@ -75,18 +75,18 @@ final class GuardedSearchExampleTest extends TestCase
 
     private function executeDocumentationScript(string $script): string
     {
-        $path = tempnam(sys_get_temp_dir(), 'guarded-search-doc-');
+        $tempScriptPath = tempnam(sys_get_temp_dir(), 'guarded-search-doc-');
 
-        if (false === $path) {
+        if (false === $tempScriptPath) {
             throw new RuntimeException('Unable to create temporary script for documentation walkthrough.');
         }
 
-        $bytesWritten = @file_put_contents($path, $script);
+        $bytesWritten = @file_put_contents($tempScriptPath, $script);
 
         if (false === $bytesWritten) {
             $error = error_get_last();
 
-            throw new RuntimeException(sprintf('Unable to write documentation walkthrough script to "%s": %s', $path, $error['message'] ?? 'unknown error'));
+            throw new RuntimeException(sprintf('Unable to write documentation walkthrough script to "%s": %s', $tempScriptPath, $error['message'] ?? 'unknown error'));
         }
 
         $previousZendAssertions = ini_get('zend.assertions');
@@ -103,7 +103,7 @@ final class GuardedSearchExampleTest extends TestCase
         ob_start();
 
         try {
-            include $path;
+            include $tempScriptPath;
 
             $output = (string) ob_get_contents();
         } finally {
@@ -127,7 +127,7 @@ final class GuardedSearchExampleTest extends TestCase
                 ini_set('assert.warning', (string) $previousAssertWarning);
             }
 
-            @unlink($path);
+            @unlink($tempScriptPath);
         }
 
         return $output;

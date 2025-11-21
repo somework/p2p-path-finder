@@ -111,4 +111,96 @@ final class OrderFiltersTest extends TestCase
         self::assertFalse((new MinimumAmountFilter($foreignMoney))->accepts($order));
         self::assertFalse((new MaximumAmountFilter($foreignMoney))->accepts($order));
     }
+
+    public function test_minimum_amount_filter_accepts_order_at_exact_boundary(): void
+    {
+        $order = OrderFactory::buy(minAmount: '0.100', maxAmount: '1.000');
+        $filter = new MinimumAmountFilter(CurrencyScenarioFactory::money('BTC', '0.100', 3));
+
+        self::assertTrue($filter->accepts($order));
+    }
+
+    public function test_minimum_amount_filter_rejects_order_above_boundary(): void
+    {
+        $order = OrderFactory::buy(minAmount: '0.101', maxAmount: '1.000');
+        $filter = new MinimumAmountFilter(CurrencyScenarioFactory::money('BTC', '0.100', 3));
+
+        self::assertFalse($filter->accepts($order));
+    }
+
+    public function test_maximum_amount_filter_accepts_order_at_exact_boundary(): void
+    {
+        $order = OrderFactory::buy(minAmount: '0.100', maxAmount: '1.000');
+        $filter = new MaximumAmountFilter(CurrencyScenarioFactory::money('BTC', '1.000', 3));
+
+        self::assertTrue($filter->accepts($order));
+    }
+
+    public function test_maximum_amount_filter_rejects_order_below_boundary(): void
+    {
+        $order = OrderFactory::buy(minAmount: '0.100', maxAmount: '0.999');
+        $filter = new MaximumAmountFilter(CurrencyScenarioFactory::money('BTC', '1.000', 3));
+
+        self::assertFalse($filter->accepts($order));
+    }
+
+    public function test_filter_returns_empty_when_all_orders_rejected(): void
+    {
+        $book = new OrderBook([
+            OrderFactory::buy(minAmount: '0.100', maxAmount: '0.500'),
+            OrderFactory::buy(minAmount: '0.200', maxAmount: '0.600'),
+        ]);
+
+        $filter = new MaximumAmountFilter(CurrencyScenarioFactory::money('BTC', '1.000', 3));
+        $filtered = iterator_to_array($book->filter($filter));
+
+        self::assertCount(0, $filtered);
+    }
+
+    public function test_filter_accepts_all_orders_when_all_pass(): void
+    {
+        $first = OrderFactory::buy(minAmount: '0.100', maxAmount: '1.000');
+        $second = OrderFactory::buy(minAmount: '0.200', maxAmount: '2.000');
+        $third = OrderFactory::buy(minAmount: '0.300', maxAmount: '3.000');
+
+        $book = new OrderBook([$first, $second, $third]);
+
+        $filter = new MinimumAmountFilter(CurrencyScenarioFactory::money('BTC', '0.500', 3));
+        $filtered = iterator_to_array($book->filter($filter));
+
+        self::assertCount(3, $filtered);
+        self::assertSame([$first, $second, $third], $filtered);
+    }
+
+    public function test_filter_handles_empty_order_book(): void
+    {
+        $book = new OrderBook([]);
+
+        $filter = new CurrencyPairFilter(CurrencyScenarioFactory::assetPair('BTC', 'USD'));
+        $filtered = iterator_to_array($book->filter($filter));
+
+        self::assertCount(0, $filtered);
+    }
+
+    public function test_tolerance_window_filter_with_zero_tolerance(): void
+    {
+        $reference = CurrencyScenarioFactory::exchangeRate('BTC', 'USD', '30000.00', 2);
+        $filter = new ToleranceWindowFilter($reference, '0.00');
+
+        $exactOrder = OrderFactory::buy(rate: '30000.00');
+        $differentOrder = OrderFactory::buy(rate: '30000.01');
+
+        self::assertTrue($filter->accepts($exactOrder));
+        self::assertFalse($filter->accepts($differentOrder));
+    }
+
+    public function test_tolerance_window_filter_with_very_wide_tolerance(): void
+    {
+        $reference = CurrencyScenarioFactory::exchangeRate('BTC', 'USD', '30000.00', 2);
+        $filter = new ToleranceWindowFilter($reference, '10.00');
+
+        $order = OrderFactory::buy(rate: '100000.00');
+
+        self::assertTrue($filter->accepts($order));
+    }
 }

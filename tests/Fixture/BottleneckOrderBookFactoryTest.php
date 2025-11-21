@@ -49,7 +49,7 @@ final class BottleneckOrderBookFactoryTest extends TestCase
         self::assertSame($expectedOrders, $firstOrders);
         self::assertSame($expectedOrders, $secondOrders);
 
-        $second->add(OrderFactory::sell('SRC', 'CLONECHK2', '1.000', '1.000', '1.000', 3, 3));
+        $second->add(OrderFactory::sell('SRC', 'CLONECHKK', '1.000', '1.000', '1.000', 3, 3));
 
         $firstOrdersAfterMutation = iterator_to_array($first);
         $secondOrdersAfterMutation = iterator_to_array($second);

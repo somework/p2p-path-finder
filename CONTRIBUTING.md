@@ -8,8 +8,8 @@ confidence.
 
 1. Fork the repository and clone it locally.
 2. Install dependencies with `composer install`.
-3. Read the [local development notes](docs/local-development.md) for tips on setting up
-   the required `ext-bcmath` extension.
+3. Read the [local development notes](docs/local-development.md) for tips on running tests
+   and quality checks.
 
 ## Development workflow
 
