@@ -12,6 +12,7 @@ use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function max;
 
@@ -33,6 +34,8 @@ final class OrderSpendAnalyzer
 
     /**
      * @return list<Order>
+     *
+     * @throws PrecisionViolation when scale normalization operations exceed precision limits
      */
     public function filterOrders(OrderBook $orderBook, PathSearchConfig $config): array
     {
@@ -70,6 +73,8 @@ final class OrderSpendAnalyzer
 
     /**
      * @return array{net: Money, gross: Money, grossCeiling: Money}|null
+     *
+     * @throws PrecisionViolation when monetary operations exceed precision limits
      */
     public function determineInitialSpendAmount(PathSearchConfig $config, GraphEdge|PathEdge $edge): ?array
     {

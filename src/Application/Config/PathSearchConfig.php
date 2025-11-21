@@ -74,6 +74,22 @@ final class PathSearchConfig
         $this->maximumSpendAmount = $this->spendAmount
             ->multiply($upperMultiplier, $scale)
             ->withScale($this->spendAmount->scale());
+
+        // Validate computed bounds are sensible
+        if ($this->minimumSpendAmount->greaterThan($this->maximumSpendAmount)) {
+            throw new InvalidInput(
+                'Tolerance window produces inverted spend bounds. ' .
+                'Ensure tolerance maximum > minimum and spend amount precision is adequate.'
+            );
+        }
+
+        if ($this->minimumSpendAmount->equals($this->maximumSpendAmount)
+            && $this->toleranceWindow->minimum() !== $this->toleranceWindow->maximum()) {
+            throw new InvalidInput(
+                'Tolerance window collapsed to zero range due to insufficient spend amount precision. ' .
+                'Increase spend amount scale or adjust tolerance bounds.'
+            );
+        }
     }
 
     /**

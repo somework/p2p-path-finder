@@ -51,13 +51,18 @@ final class SearchStateRegistry
         return $collection->all();
     }
 
-    public function register(string $node, SearchStateRecord $record, int $scale): int
+    /**
+     * @return array{self, int} Returns new instance and registration delta (1 if new, 0 if update/skip)
+     */
+    public function register(string $node, SearchStateRecord $record, int $scale): array
     {
         $collection = $this->records[$node] ?? SearchStateRecordCollection::empty();
-        $delta = $collection->register($record, $scale);
-        $this->records[$node] = $collection;
+        [$newCollection, $delta] = $collection->register($record, $scale);
+        
+        $records = $this->records;
+        $records[$node] = $newCollection;
 
-        return $delta;
+        return [new self($records), $delta];
     }
 
     public function isDominated(string $node, SearchStateRecord $record, int $scale): bool
@@ -84,8 +89,11 @@ final class SearchStateRegistry
 
     public function __clone()
     {
+        // Deep clone: clone each collection in the records array
+        $clonedRecords = [];
         foreach ($this->records as $node => $collection) {
-            $this->records[$node] = clone $collection;
+            $clonedRecords[$node] = clone $collection;
         }
+        $this->records = $clonedRecords;
     }
 }

@@ -92,6 +92,10 @@ final class PathSearchConfigBuilder
     /**
      * Configures limits that guard search explosion in dense graphs.
      *
+     * @param int      $maxVisitedStates Maximum unique states to track (affects memory: ~1KB per state)
+     * @param int      $maxExpansions    Maximum edge expansions (affects computation time)
+     * @param int|null $timeBudgetMs     Optional wall-clock budget in milliseconds
+     *
      * @throws InvalidInput when either guard limit is less than one
      */
     public function withSearchGuards(int $maxVisitedStates, int $maxExpansions, ?int $timeBudgetMs = null): self

@@ -50,7 +50,7 @@ final class SearchStateRegistryPropertyTest extends TestCase
             $node = $operation['node'];
             $record = $operation['record'];
 
-            $registry->register($node, $record, self::SCALE);
+            [$registry] = $registry->register($node, $record, self::SCALE);
 
             $signatureValue = $record->signature()->value();
             $history[$node][$signatureValue][] = $record;

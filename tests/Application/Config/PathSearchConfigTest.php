@@ -625,4 +625,118 @@ final class PathSearchConfigTest extends TestCase
             self::assertTrue($property->isReadOnly(), "Property {$property->getName()} should be readonly");
         }
     }
+
+    public function test_constructor_rejects_collapsed_tolerance_window_due_to_precision(): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Tolerance window collapsed to zero range due to insufficient spend amount precision.');
+
+        // Very small spend amount with tight tolerance bounds that collapse after rounding
+        new PathSearchConfig(
+            Money::fromString('USD', '0.01', 2),
+            ToleranceWindow::fromStrings('0.00000001', '0.00000002'),
+            1,
+            3,
+        );
+    }
+
+    public function test_constructor_accepts_valid_tight_tolerance_window_with_adequate_precision(): void
+    {
+        // Higher precision spend amount can handle tight tolerance bounds
+        $config = new PathSearchConfig(
+            Money::fromString('USD', '100.000000', 6),
+            ToleranceWindow::fromStrings('0.0000001', '0.0000002'),
+            1,
+            3,
+        );
+
+        self::assertSame('99.999990', $config->minimumSpendAmount()->amount());
+        self::assertSame('100.000020', $config->maximumSpendAmount()->amount());
+    }
+
+    public function test_constructor_accepts_equal_bounds_with_matching_tolerance(): void
+    {
+        // When tolerance min == max, bounds should also be equal
+        $config = new PathSearchConfig(
+            Money::fromString('USD', '0.01', 2),
+            ToleranceWindow::fromStrings('0.1', '0.1'),
+            1,
+            3,
+        );
+
+        self::assertSame('0.01', $config->minimumSpendAmount()->amount());
+        self::assertSame('0.01', $config->maximumSpendAmount()->amount());
+    }
+
+    public function test_constructor_handles_extreme_low_tolerance_with_low_precision(): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Tolerance window collapsed to zero range due to insufficient spend amount precision.');
+
+        // Scale 0 with very tight tolerance window will collapse
+        new PathSearchConfig(
+            Money::fromString('USD', '1', 0),
+            ToleranceWindow::fromStrings('0.000001', '0.000002'),
+            1,
+            3,
+        );
+    }
+
+    public function test_constructor_validates_bounds_remain_ordered_after_computation(): void
+    {
+        // This should work fine - normal case
+        $config = new PathSearchConfig(
+            Money::fromString('EUR', '100.00', 2),
+            ToleranceWindow::fromStrings('0.10', '0.20'),
+            1,
+            3,
+        );
+
+        self::assertTrue($config->minimumSpendAmount()->lessThan($config->maximumSpendAmount()));
+        self::assertSame('90.00', $config->minimumSpendAmount()->amount());
+        self::assertSame('120.00', $config->maximumSpendAmount()->amount());
+    }
+
+    public function test_constructor_rejects_very_small_amounts_with_collapsed_tolerance(): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Tolerance window collapsed to zero range due to insufficient spend amount precision.');
+
+        // Very small amount where tolerance bounds collapse after rounding
+        new PathSearchConfig(
+            Money::fromString('BTC', '0.00000001', 8),
+            ToleranceWindow::fromStrings('0.1', '0.2'),
+            1,
+            3,
+        );
+    }
+
+    public function test_constructor_handles_very_small_amounts_with_equal_tolerance(): void
+    {
+        // Very small amount with equal tolerance bounds should work
+        $config = new PathSearchConfig(
+            Money::fromString('BTC', '0.00000001', 8),
+            ToleranceWindow::fromStrings('0.1', '0.1'),
+            1,
+            3,
+        );
+
+        self::assertSame('0.00000001', $config->minimumSpendAmount()->amount());
+        self::assertSame('0.00000001', $config->maximumSpendAmount()->amount());
+        self::assertSame(8, $config->minimumSpendAmount()->scale());
+    }
+
+    public function test_constructor_handles_high_precision_with_narrow_tolerance(): void
+    {
+        // High precision allows narrow tolerance windows
+        $config = new PathSearchConfig(
+            Money::fromString('USD', '1000.00000000', 8),
+            ToleranceWindow::fromStrings('0.000001', '0.000002'),
+            1,
+            3,
+        );
+
+        self::assertSame('999.99900000', $config->minimumSpendAmount()->amount());
+        self::assertSame('1000.00200000', $config->maximumSpendAmount()->amount());
+    }
 }

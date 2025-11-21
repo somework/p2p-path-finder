@@ -43,6 +43,8 @@ final class PathLegCollection implements Countable, IteratorAggregate, JsonSeria
 
     /**
      * @param array<array-key, PathLeg> $legs
+     *
+     * @throws InvalidInput when legs array is not a list, contains invalid elements, or cannot form a monotonic sequence
      */
     public static function fromList(array $legs): self
     {
@@ -121,6 +123,9 @@ final class PathLegCollection implements Countable, IteratorAggregate, JsonSeria
         return $serialized;
     }
 
+    /**
+     * @throws InvalidInput when index does not reference an existing position
+     */
     public function at(int $index): PathLeg
     {
         if (!isset($this->legs[$index])) {

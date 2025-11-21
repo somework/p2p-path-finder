@@ -765,6 +765,218 @@ final class LegMaterializerTest extends TestCase
         self::assertSame('USD', $aligned->currency());
     }
 
+    public function test_materialize_rejects_empty_edge_sequence(): void
+    {
+        $materializer = new LegMaterializer();
+        
+        $initialSeed = [
+            'net' => Money::fromString('USD', '100.00', 2),
+            'gross' => Money::fromString('USD', '100.00', 2),
+            'grossCeiling' => Money::fromString('USD', '125.00', 2),
+        ];
+
+        $result = $materializer->materialize(
+            PathEdgeSequence::empty(),
+            Money::fromString('USD', '100.00', 2),
+            $initialSeed,
+            'EUR'
+        );
+
+        self::assertNull($result, 'Expected null when edge sequence is empty');
+    }
+
+    public function test_materialize_rejects_zero_net_seed(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.000', '200.000', '0.900', 3, 3);
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $this->edge($graph, 'USD', 0);
+
+        $materializer = new LegMaterializer();
+        
+        $initialSeed = [
+            'net' => Money::zero('USD', 2),
+            'gross' => Money::fromString('USD', '100.00', 2),
+            'grossCeiling' => Money::fromString('USD', '125.00', 2),
+        ];
+
+        $result = $materializer->materialize(
+            $this->pathEdges([$edge]),
+            Money::fromString('USD', '100.00', 2),
+            $initialSeed,
+            'EUR'
+        );
+
+        self::assertNull($result, 'Expected null when net seed is zero');
+    }
+
+    public function test_materialize_rejects_negative_net_seed(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.000', '200.000', '0.900', 3, 3);
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $this->edge($graph, 'USD', 0);
+
+        $materializer = new LegMaterializer();
+        
+        $initialSeed = [
+            'net' => Money::fromString('USD', '-50.00', 2),
+            'gross' => Money::fromString('USD', '100.00', 2),
+            'grossCeiling' => Money::fromString('USD', '125.00', 2),
+        ];
+
+        $result = $materializer->materialize(
+            $this->pathEdges([$edge]),
+            Money::fromString('USD', '100.00', 2),
+            $initialSeed,
+            'EUR'
+        );
+
+        self::assertNull($result, 'Expected null when net seed is negative');
+    }
+
+    public function test_materialize_rejects_zero_gross_seed(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.000', '200.000', '0.900', 3, 3);
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $this->edge($graph, 'USD', 0);
+
+        $materializer = new LegMaterializer();
+        
+        $initialSeed = [
+            'net' => Money::fromString('USD', '100.00', 2),
+            'gross' => Money::zero('USD', 2),
+            'grossCeiling' => Money::fromString('USD', '125.00', 2),
+        ];
+
+        $result = $materializer->materialize(
+            $this->pathEdges([$edge]),
+            Money::fromString('USD', '100.00', 2),
+            $initialSeed,
+            'EUR'
+        );
+
+        self::assertNull($result, 'Expected null when gross seed is zero');
+    }
+
+    public function test_materialize_rejects_negative_gross_seed(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.000', '200.000', '0.900', 3, 3);
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $this->edge($graph, 'USD', 0);
+
+        $materializer = new LegMaterializer();
+        
+        $initialSeed = [
+            'net' => Money::fromString('USD', '100.00', 2),
+            'gross' => Money::fromString('USD', '-100.00', 2),
+            'grossCeiling' => Money::fromString('USD', '125.00', 2),
+        ];
+
+        $result = $materializer->materialize(
+            $this->pathEdges([$edge]),
+            Money::fromString('USD', '100.00', 2),
+            $initialSeed,
+            'EUR'
+        );
+
+        self::assertNull($result, 'Expected null when gross seed is negative');
+    }
+
+    public function test_materialize_rejects_zero_gross_ceiling(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.000', '200.000', '0.900', 3, 3);
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $this->edge($graph, 'USD', 0);
+
+        $materializer = new LegMaterializer();
+        
+        $initialSeed = [
+            'net' => Money::fromString('USD', '100.00', 2),
+            'gross' => Money::fromString('USD', '100.00', 2),
+            'grossCeiling' => Money::zero('USD', 2),
+        ];
+
+        $result = $materializer->materialize(
+            $this->pathEdges([$edge]),
+            Money::fromString('USD', '100.00', 2),
+            $initialSeed,
+            'EUR'
+        );
+
+        self::assertNull($result, 'Expected null when gross ceiling is zero');
+    }
+
+    public function test_materialize_rejects_negative_gross_ceiling(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.000', '200.000', '0.900', 3, 3);
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $this->edge($graph, 'USD', 0);
+
+        $materializer = new LegMaterializer();
+        
+        $initialSeed = [
+            'net' => Money::fromString('USD', '100.00', 2),
+            'gross' => Money::fromString('USD', '100.00', 2),
+            'grossCeiling' => Money::fromString('USD', '-125.00', 2),
+        ];
+
+        $result = $materializer->materialize(
+            $this->pathEdges([$edge]),
+            Money::fromString('USD', '100.00', 2),
+            $initialSeed,
+            'EUR'
+        );
+
+        self::assertNull($result, 'Expected null when gross ceiling is negative');
+    }
+
+    public function test_materialize_rejects_zero_requested_spend(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.000', '200.000', '0.900', 3, 3);
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $this->edge($graph, 'USD', 0);
+
+        $materializer = new LegMaterializer();
+        
+        $initialSeed = [
+            'net' => Money::fromString('USD', '100.00', 2),
+            'gross' => Money::fromString('USD', '100.00', 2),
+            'grossCeiling' => Money::fromString('USD', '125.00', 2),
+        ];
+
+        $result = $materializer->materialize(
+            $this->pathEdges([$edge]),
+            Money::zero('USD', 2),
+            $initialSeed,
+            'EUR'
+        );
+
+        self::assertNull($result, 'Expected null when requested spend is zero');
+    }
+
+    public function test_materialize_rejects_negative_requested_spend(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.000', '200.000', '0.900', 3, 3);
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $this->edge($graph, 'USD', 0);
+
+        $materializer = new LegMaterializer();
+        
+        $initialSeed = [
+            'net' => Money::fromString('USD', '100.00', 2),
+            'gross' => Money::fromString('USD', '100.00', 2),
+            'grossCeiling' => Money::fromString('USD', '125.00', 2),
+        ];
+
+        $result = $materializer->materialize(
+            $this->pathEdges([$edge]),
+            Money::fromString('USD', '-100.00', 2),
+            $initialSeed,
+            'EUR'
+        );
+
+        self::assertNull($result, 'Expected null when requested spend is negative');
+    }
+
     /**
      * @param list<GraphEdge> $edges
      */
