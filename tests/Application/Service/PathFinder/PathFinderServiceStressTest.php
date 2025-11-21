@@ -151,7 +151,7 @@ final class PathFinderServiceStressTest extends PathFinderServiceTestCase
             $leg = $paths[0]->legs()[0];
             // Verify precision is maintained
             self::assertIsString($leg->spend()->amount());
-            self::assertIsString($leg->receive().amount());
+            self::assertIsString($leg->receive()->amount());
         } else {
             // No path found, but test validated that extremely small amounts don't crash
             self::assertTrue(true, 'Extremely small amounts handled without error');
