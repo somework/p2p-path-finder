@@ -184,4 +184,3 @@ final class SearchStateRegistryCloneTest extends TestCase
         self::assertFalse($clone->hasSignature($otherSignature));
     }
 }
-

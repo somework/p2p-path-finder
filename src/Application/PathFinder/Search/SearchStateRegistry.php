@@ -58,7 +58,7 @@ final class SearchStateRegistry
     {
         $collection = $this->records[$node] ?? SearchStateRecordCollection::empty();
         [$newCollection, $delta] = $collection->register($record, $scale);
-        
+
         $records = $this->records;
         $records[$node] = $newCollection;
 

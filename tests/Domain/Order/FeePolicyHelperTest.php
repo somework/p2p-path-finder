@@ -128,4 +128,3 @@ final class FeePolicyHelperTest extends TestCase
         self::assertTrue(true);
     }
 }
-

@@ -14,6 +14,9 @@ use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\FeePolicyFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
+use function count;
+use function sprintf;
+
 /**
  * Integration tests for order filter combinations, edge cases, and error paths.
  *
@@ -348,7 +351,7 @@ final class OrderFilterIntegrationTest extends TestCase
     {
         // Create 1000 orders
         $orders = [];
-        for ($i = 0; $i < 1000; $i++) {
+        for ($i = 0; $i < 1000; ++$i) {
             $orders[] = OrderFactory::buy(
                 minAmount: sprintf('0.%03d', $i % 1000),
                 maxAmount: sprintf('1.%03d', $i % 1000),
@@ -417,7 +420,7 @@ final class OrderFilterIntegrationTest extends TestCase
 
         // MaximumAmountFilter accepts if order.max is NOT less than filter amount
         // In other words: order.max >= filter.amount
-        
+
         // Filter at scale 2: 1.00
         $filterScale2 = new MaximumAmountFilter(CurrencyScenarioFactory::money('BTC', '1.00', 2));
         // Filter amount 1.00 is scaled to order scale 3 => 1.000
@@ -435,4 +438,3 @@ final class OrderFilterIntegrationTest extends TestCase
         self::assertTrue($filterAtMax->accepts($order));
     }
 }
-

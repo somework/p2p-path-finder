@@ -52,6 +52,8 @@ final class LegMaterializer
     /**
      * @param array{net: Money, gross: Money, grossCeiling: Money} $initialSeed
      *
+     * @throws InvalidInput|PrecisionViolation when path edges cannot be materialized or arithmetic operations fail
+     *
      * @return array{
      *     totalSpent: Money,
      *     totalReceived: Money,
@@ -59,8 +61,6 @@ final class LegMaterializer
      *     legs: PathLegCollection,
      *     feeBreakdown: MoneyMap,
      * }|null
-     *
-     * @throws InvalidInput|PrecisionViolation when path edges cannot be materialized or arithmetic operations fail
      */
     public function materialize(PathEdgeSequence $edges, Money $requestedSpend, array $initialSeed, string $targetCurrency): ?array
     {
@@ -197,9 +197,9 @@ final class LegMaterializer
     }
 
     /**
-     * @return array{0: Money, 1: Money, 2: FeeBreakdown}|null
-     *
      * @throws PrecisionViolation when monetary calculations exceed precision limits
+     *
+     * @return array{0: Money, 1: Money, 2: FeeBreakdown}|null
      */
     public function resolveSellLegAmounts(Order $order, Money $targetEffectiveQuote, ?Money $availableQuoteBudget = null): ?array
     {
@@ -361,9 +361,9 @@ final class LegMaterializer
     }
 
     /**
-     * @return array{gross: Money, quote: Money, fees: FeeBreakdown, net: Money}|null
-     *
      * @throws PrecisionViolation when monetary calculations exceed precision limits
+     *
+     * @return array{gross: Money, quote: Money, fees: FeeBreakdown, net: Money}|null
      */
     public function resolveBuyFill(Order $order, Money $netSeed, Money $grossSeed, Money $grossCeiling): ?array
     {
@@ -442,14 +442,14 @@ final class LegMaterializer
     }
 
     /**
+     * @throws PrecisionViolation when fee calculation or monetary operations exceed precision limits
+     *
      * @return array{
      *     grossQuote: Money,
      *     fees: FeeBreakdown,
      *     effectiveQuote: Money,
      *     netBase: Money,
      * }
-     *
-     * @throws PrecisionViolation when fee calculation or monetary operations exceed precision limits
      */
     public function evaluateSellQuote(Order $order, Money $baseAmount): array
     {

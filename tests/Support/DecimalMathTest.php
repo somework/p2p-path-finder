@@ -422,7 +422,7 @@ final class DecimalMathTest extends TestCase
     public function test_decimal_helper_at_canonical_scale_18(): void
     {
         $normalized = DecimalMath::normalize('1.5', 18);
-        
+
         self::assertSame('1.500000000000000000', $normalized);
         self::assertSame(20, strlen($normalized)); // "1" + "." + 18 digits
     }
@@ -430,7 +430,7 @@ final class DecimalMathTest extends TestCase
     public function test_decimal_helper_at_max_scale_50(): void
     {
         $normalized = DecimalMath::normalize('2.5', 50);
-        
+
         self::assertSame(52, strlen($normalized)); // "2" + "." + 50 digits
         self::assertStringStartsWith('2.5', $normalized);
         self::assertStringEndsWith('0', $normalized);
@@ -441,11 +441,11 @@ final class DecimalMathTest extends TestCase
         $add = DecimalMath::add('1.5', '2.5', 50);
         $mul = DecimalMath::mul('1.5', '2.0', 50);
         $div = DecimalMath::div('10.0', '4.0', 50);
-        
+
         self::assertSame(52, strlen($add));
         self::assertSame(52, strlen($mul));
         self::assertSame(52, strlen($div));
-        
+
         self::assertStringStartsWith('4.0', $add);
         self::assertStringStartsWith('3.0', $mul);
         self::assertStringStartsWith('2.5', $div);
@@ -455,7 +455,7 @@ final class DecimalMathTest extends TestCase
     {
         $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Scale must be a non-negative integer.');
-        
+
         DecimalMath::normalize('1.5', -1);
     }
 
@@ -463,7 +463,7 @@ final class DecimalMathTest extends TestCase
     {
         // DecimalMath is a test helper and may support scales beyond production limits
         $result = DecimalMath::normalize('1.5', 51);
-        
+
         self::assertSame(53, strlen($result)); // "1" + "." + 51 digits
         self::assertStringStartsWith('1.5', $result);
     }
@@ -473,7 +473,7 @@ final class DecimalMathTest extends TestCase
         // Test that operations at scale 50 don't lose precision
         $a = '0.00000000000000000000000000000000000000000000000001';
         $b = '0.00000000000000000000000000000000000000000000000002';
-        
+
         $sum = DecimalMath::add($a, $b, 50);
         self::assertSame('0.00000000000000000000000000000000000000000000000003', $sum);
     }
@@ -481,7 +481,7 @@ final class DecimalMathTest extends TestCase
     public function test_division_at_scale_50_with_repeating_decimal(): void
     {
         $result = DecimalMath::div('1', '3', 50);
-        
+
         // 1/3 = 0.333... at scale 50
         self::assertSame('0.33333333333333333333333333333333333333333333333333', $result);
         self::assertSame(52, strlen($result));
@@ -490,7 +490,7 @@ final class DecimalMathTest extends TestCase
     public function test_multiplication_at_high_scale_maintains_accuracy(): void
     {
         $result = DecimalMath::mul('0.123456789012345678', '2.0', 18);
-        
+
         self::assertSame('0.246913578024691356', $result);
     }
 
@@ -498,7 +498,7 @@ final class DecimalMathTest extends TestCase
     {
         $value = '123';
         $scaled = DecimalMath::normalize($value, 50);
-        
+
         self::assertSame('123.00000000000000000000000000000000000000000000000000', $scaled);
     }
 
@@ -506,7 +506,7 @@ final class DecimalMathTest extends TestCase
     {
         $value = '123.99999999999999999999999999999999999999999999999999';
         $scaled = DecimalMath::normalize($value, 0);
-        
+
         // HALF_UP rounding: should round to 124
         self::assertSame('124', $scaled);
     }
@@ -516,7 +516,7 @@ final class DecimalMathTest extends TestCase
         // Add a very precise number to a whole number
         $precise = '0.123456789012345678';
         $whole = '100';
-        
+
         $sum = DecimalMath::add($precise, $whole, 18);
         self::assertSame('100.123456789012345678', $sum);
     }
@@ -525,7 +525,7 @@ final class DecimalMathTest extends TestCase
     {
         $large = '999999999999.999999999999999999';
         $normalized = DecimalMath::normalize($large, 18);
-        
+
         self::assertSame('999999999999.999999999999999999', $normalized);
     }
 
@@ -533,7 +533,7 @@ final class DecimalMathTest extends TestCase
     {
         $tiny = '0.000000000000000001';
         $normalized = DecimalMath::normalize($tiny, 18);
-        
+
         self::assertSame('0.000000000000000001', $normalized);
     }
 
@@ -542,7 +542,7 @@ final class DecimalMathTest extends TestCase
         // Compare values that are equal but at different implicit precisions
         $a = '1.0';
         $b = '1.00000000000000000';
-        
+
         $comparison = DecimalMath::comp($a, $b, 18);
         self::assertSame(0, $comparison, 'Values should be equal when normalized to same scale');
     }
@@ -551,14 +551,14 @@ final class DecimalMathTest extends TestCase
     {
         // Test that rounding is consistent regardless of scale
         $value = '1.5555555555555555555555555555555555555555555555555555';
-        
+
         // Round to various scales
         $s0 = DecimalMath::normalize($value, 0);
         $s2 = DecimalMath::normalize($value, 2);
         $s8 = DecimalMath::normalize($value, 8);
         $s18 = DecimalMath::normalize($value, 18);
         $s50 = DecimalMath::normalize($value, 50);
-        
+
         self::assertSame('2', $s0);
         self::assertSame('1.56', $s2);
         self::assertSame('1.55555556', $s8);

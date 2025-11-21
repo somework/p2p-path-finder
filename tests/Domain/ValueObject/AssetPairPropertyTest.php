@@ -13,8 +13,10 @@ use SomeWork\P2PPathFinder\Tests\Application\Support\Generator\ProvidesRandomize
 use SomeWork\P2PPathFinder\Tests\Support\InfectionIterationLimiter;
 
 use function chr;
+use function count;
 use function ord;
 use function str_repeat;
+use function strlen;
 use function strtoupper;
 
 /**
@@ -159,7 +161,7 @@ final class AssetPairPropertyTest extends TestCase
             // Contains digits
             fn () => 'AB'.$this->randomizer->getInt(0, 9),
             // Contains special chars
-            fn () => 'AB'.$this->randomizer->pickArrayKeys(['!', '@', '#', '$', '%', '^', '&', '*'], 1)[0],
+            fn () => 'AB'.['!', '@', '#', '$', '%', '^', '&', '*'][$this->randomizer->getInt(0, 7)],
             // Empty string
             fn () => '',
         ];
@@ -174,7 +176,7 @@ final class AssetPairPropertyTest extends TestCase
                 AssetPair::fromString($invalid, $valid);
                 self::fail('Expected InvalidInput for invalid base currency: '.$invalid);
             } catch (InvalidInput) {
-                self::assertTrue(true);
+                $this->addToAssertionCount(1);
             }
 
             // Test invalid quote
@@ -182,7 +184,7 @@ final class AssetPairPropertyTest extends TestCase
                 AssetPair::fromString($valid, $invalid);
                 self::fail('Expected InvalidInput for invalid quote currency: '.$invalid);
             } catch (InvalidInput) {
-                self::assertTrue(true);
+                $this->addToAssertionCount(1);
             }
         }
     }
@@ -293,10 +295,9 @@ final class AssetPairPropertyTest extends TestCase
         $length = strlen($str);
         for ($i = 0; $i < $length; ++$i) {
             $char = $str[$i];
-            $result .= $this->randomizer->getInt(0, 1) === 0 ? strtolower($char) : strtoupper($char);
+            $result .= 0 === $this->randomizer->getInt(0, 1) ? strtolower($char) : strtoupper($char);
         }
 
         return $result;
     }
 }
-

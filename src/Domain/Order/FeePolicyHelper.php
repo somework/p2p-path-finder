@@ -6,6 +6,7 @@ namespace SomeWork\P2PPathFinder\Domain\Order;
 
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
+use function sprintf;
 use function strlen;
 use function trim;
 
@@ -33,13 +34,7 @@ final class FeePolicyHelper
         }
 
         if (strlen($fingerprint) > self::MAX_FINGERPRINT_LENGTH) {
-            throw new InvalidInput(
-                sprintf(
-                    'Fee policy fingerprint must be ≤%d characters, got %d characters.',
-                    self::MAX_FINGERPRINT_LENGTH,
-                    strlen($fingerprint)
-                )
-            );
+            throw new InvalidInput(sprintf('Fee policy fingerprint must be ≤%d characters, got %d characters.', self::MAX_FINGERPRINT_LENGTH, strlen($fingerprint)));
         }
     }
 
@@ -82,10 +77,7 @@ final class FeePolicyHelper
         }
 
         if ([] !== $duplicates) {
-            throw new InvalidInput(
-                'Fee policy fingerprints must be unique. Found duplicates: ' . implode('; ', $duplicates)
-            );
+            throw new InvalidInput('Fee policy fingerprints must be unique. Found duplicates: '.implode('; ', $duplicates));
         }
     }
 }
-

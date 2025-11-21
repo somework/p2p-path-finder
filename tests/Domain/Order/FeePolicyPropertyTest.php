@@ -16,6 +16,7 @@ use SomeWork\P2PPathFinder\Tests\Support\InfectionIterationLimiter;
 use function array_map;
 use function array_unique;
 use function count;
+use function strlen;
 
 /**
  * Property-based tests for FeePolicy fingerprint contract.
@@ -224,34 +225,46 @@ final class FeePolicyPropertyTest extends TestCase
     private function generateDiversePolicies(): array
     {
         $policies = [];
+        $seenFingerprints = [];
+
+        $addPolicy = static function (FeePolicy $policy) use (&$policies, &$seenFingerprints): void {
+            $fingerprint = $policy->fingerprint();
+            if (isset($seenFingerprints[$fingerprint])) {
+                // Skip duplicate configurations to keep the set diverse
+                return;
+            }
+
+            $seenFingerprints[$fingerprint] = true;
+            $policies[] = $policy;
+        };
 
         // Generate 3-5 base surcharge policies with different ratios
         $count = $this->randomizer->getInt(3, 5);
         for ($j = 0; $j < $count; ++$j) {
-            $policies[] = FeePolicyFactory::baseSurcharge(
+            $addPolicy(FeePolicyFactory::baseSurcharge(
                 $this->randomRatio(),
                 $this->randomScale()
-            );
+            ));
         }
 
         // Generate 2-3 base+quote surcharge policies
         $count = $this->randomizer->getInt(2, 3);
         for ($j = 0; $j < $count; ++$j) {
-            $policies[] = FeePolicyFactory::baseAndQuoteSurcharge(
+            $addPolicy(FeePolicyFactory::baseAndQuoteSurcharge(
                 $this->randomRatio(),
                 $this->randomRatio(),
                 $this->randomScale()
-            );
+            ));
         }
 
         // Generate 2-3 quote percentage + fixed policies
         $count = $this->randomizer->getInt(2, 3);
         for ($j = 0; $j < $count; ++$j) {
-            $policies[] = FeePolicyFactory::quotePercentageWithFixed(
+            $addPolicy(FeePolicyFactory::quotePercentageWithFixed(
                 $this->randomRatio(),
                 $this->randomFixedAmount(),
                 $this->randomScale()
-            );
+            ));
         }
 
         return $policies;
@@ -283,7 +296,7 @@ final class FeePolicyPropertyTest extends TestCase
     {
         // Bias towards common scales
         $commonScales = [2, 6, 8, 18];
-        if ($this->randomizer->getInt(0, 1) === 0) {
+        if (0 === $this->randomizer->getInt(0, 1)) {
             return $commonScales[$this->randomizer->getInt(0, count($commonScales) - 1)];
         }
 
@@ -302,4 +315,3 @@ final class FeePolicyPropertyTest extends TestCase
         return $new;
     }
 }
-

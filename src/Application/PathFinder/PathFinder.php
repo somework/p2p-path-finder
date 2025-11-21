@@ -130,10 +130,10 @@ final class PathFinder
     /**
      * @param callable(CandidatePath):bool|null $acceptCandidate
      *
-     * @return SearchOutcome<CandidatePath>
-     *
-     * @throws GuardLimitExceeded when a configured guard limit is exceeded during search
+     * @throws GuardLimitExceeded              when a configured guard limit is exceeded during search
      * @throws InvalidInput|PrecisionViolation when path construction or arithmetic operations fail
+     *
+     * @return SearchOutcome<CandidatePath>
      *
      * @phpstan-return SearchOutcome<CandidatePath>
      *

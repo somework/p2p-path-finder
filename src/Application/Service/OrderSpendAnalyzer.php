@@ -33,9 +33,9 @@ final class OrderSpendAnalyzer
     }
 
     /**
-     * @return list<Order>
-     *
      * @throws PrecisionViolation when scale normalization operations exceed precision limits
+     *
+     * @return list<Order>
      */
     public function filterOrders(OrderBook $orderBook, PathSearchConfig $config): array
     {
@@ -72,9 +72,9 @@ final class OrderSpendAnalyzer
     }
 
     /**
-     * @return array{net: Money, gross: Money, grossCeiling: Money}|null
-     *
      * @throws PrecisionViolation when monetary operations exceed precision limits
+     *
+     * @return array{net: Money, gross: Money, grossCeiling: Money}|null
      */
     public function determineInitialSpendAmount(PathSearchConfig $config, GraphEdge|PathEdge $edge): ?array
     {

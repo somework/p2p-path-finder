@@ -768,7 +768,7 @@ final class LegMaterializerTest extends TestCase
     public function test_materialize_rejects_empty_edge_sequence(): void
     {
         $materializer = new LegMaterializer();
-        
+
         $initialSeed = [
             'net' => Money::fromString('USD', '100.00', 2),
             'gross' => Money::fromString('USD', '100.00', 2),
@@ -792,7 +792,7 @@ final class LegMaterializerTest extends TestCase
         $edge = $this->edge($graph, 'USD', 0);
 
         $materializer = new LegMaterializer();
-        
+
         $initialSeed = [
             'net' => Money::zero('USD', 2),
             'gross' => Money::fromString('USD', '100.00', 2),
@@ -816,7 +816,7 @@ final class LegMaterializerTest extends TestCase
         $edge = $this->edge($graph, 'USD', 0);
 
         $materializer = new LegMaterializer();
-        
+
         $initialSeed = [
             'net' => Money::fromString('USD', '-50.00', 2),
             'gross' => Money::fromString('USD', '100.00', 2),
@@ -840,7 +840,7 @@ final class LegMaterializerTest extends TestCase
         $edge = $this->edge($graph, 'USD', 0);
 
         $materializer = new LegMaterializer();
-        
+
         $initialSeed = [
             'net' => Money::fromString('USD', '100.00', 2),
             'gross' => Money::zero('USD', 2),
@@ -864,7 +864,7 @@ final class LegMaterializerTest extends TestCase
         $edge = $this->edge($graph, 'USD', 0);
 
         $materializer = new LegMaterializer();
-        
+
         $initialSeed = [
             'net' => Money::fromString('USD', '100.00', 2),
             'gross' => Money::fromString('USD', '-100.00', 2),
@@ -888,7 +888,7 @@ final class LegMaterializerTest extends TestCase
         $edge = $this->edge($graph, 'USD', 0);
 
         $materializer = new LegMaterializer();
-        
+
         $initialSeed = [
             'net' => Money::fromString('USD', '100.00', 2),
             'gross' => Money::fromString('USD', '100.00', 2),
@@ -912,7 +912,7 @@ final class LegMaterializerTest extends TestCase
         $edge = $this->edge($graph, 'USD', 0);
 
         $materializer = new LegMaterializer();
-        
+
         $initialSeed = [
             'net' => Money::fromString('USD', '100.00', 2),
             'gross' => Money::fromString('USD', '100.00', 2),
@@ -936,7 +936,7 @@ final class LegMaterializerTest extends TestCase
         $edge = $this->edge($graph, 'USD', 0);
 
         $materializer = new LegMaterializer();
-        
+
         $initialSeed = [
             'net' => Money::fromString('USD', '100.00', 2),
             'gross' => Money::fromString('USD', '100.00', 2),
@@ -960,7 +960,7 @@ final class LegMaterializerTest extends TestCase
         $edge = $this->edge($graph, 'USD', 0);
 
         $materializer = new LegMaterializer();
-        
+
         $initialSeed = [
             'net' => Money::fromString('USD', '100.00', 2),
             'gross' => Money::fromString('USD', '100.00', 2),

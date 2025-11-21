@@ -13,6 +13,8 @@ use SomeWork\P2PPathFinder\Tests\Application\Support\Generator\ProvidesRandomize
 use SomeWork\P2PPathFinder\Tests\Domain\ValueObject\MoneyAssertions;
 use SomeWork\P2PPathFinder\Tests\Support\InfectionIterationLimiter;
 
+use function count;
+
 /**
  * Property-based tests for FeeBreakdown value object.
  */
@@ -392,7 +394,7 @@ final class FeeBreakdownPropertyTest extends TestCase
     {
         // Bias towards common scales
         $commonScales = [0, 2, 8, 18];
-        if ($this->randomizer->getInt(0, 1) === 0) {
+        if (0 === $this->randomizer->getInt(0, 1)) {
             return $commonScales[$this->randomizer->getInt(0, count($commonScales) - 1)];
         }
 
@@ -416,4 +418,3 @@ final class FeeBreakdownPropertyTest extends TestCase
         return $currency;
     }
 }
-
