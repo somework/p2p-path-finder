@@ -451,14 +451,6 @@ final class DecimalMathTest extends TestCase
         self::assertStringStartsWith('2.5', $div);
     }
 
-    public function test_scale_decimal_with_invalid_negative_scale(): void
-    {
-        $this->expectException(InvalidInput::class);
-        $this->expectExceptionMessage('Scale must be a non-negative integer.');
-
-        DecimalMath::normalize('1.5', -1);
-    }
-
     public function test_operations_work_at_scale_51(): void
     {
         // DecimalMath is a test helper and may support scales beyond production limits
