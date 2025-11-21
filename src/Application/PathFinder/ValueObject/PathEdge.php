@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathFinder\ValueObject;
 
+use Brick\Math\BigDecimal;
 use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 
 /**
@@ -23,8 +23,7 @@ final class PathEdge
         private readonly Order $order,
         private readonly ExchangeRate $rate,
         private readonly OrderSide $orderSide,
-        /** @var numeric-string */
-        private readonly string $conversionRate,
+        private readonly BigDecimal $conversionRate,
     ) {
     }
 
@@ -34,17 +33,12 @@ final class PathEdge
         Order $order,
         ExchangeRate $rate,
         OrderSide $orderSide,
-        string $conversionRate,
+        BigDecimal $conversionRate,
     ): self {
-        BcMath::ensureNumeric($conversionRate);
-
-        /** @var numeric-string $conversionRate */
-        $conversionRate = $conversionRate;
-
         return new self($from, $to, $order, $rate, $orderSide, $conversionRate);
     }
 
-    public static function fromGraphEdge(GraphEdge $edge, string $conversionRate): self
+    public static function fromGraphEdge(GraphEdge $edge, BigDecimal $conversionRate): self
     {
         return self::create(
             $edge->from(),
@@ -67,7 +61,7 @@ final class PathEdge
             'order' => $this->order,
             'rate' => $this->rate,
             'orderSide' => $this->orderSide,
-            'conversionRate' => $this->conversionRate,
+            'conversionRate' => $this->conversionRate(),
         ];
     }
 
@@ -97,9 +91,30 @@ final class PathEdge
     }
 
     /**
-     * @return numeric-string
+     * Returns the conversion rate as a numeric string.
+     *
+     * The scale is preserved from the BigDecimal provided at construction time,
+     * typically normalized to 18 decimal places by PathFinder.
+     *
+     * @return numeric-string The conversion rate (e.g., "1.234567890123456789")
      */
     public function conversionRate(): string
+    {
+        /** @var numeric-string $value */
+        $value = $this->conversionRate->__toString();
+
+        return $value;
+    }
+
+    /**
+     * Returns the conversion rate as a BigDecimal with preserved scale from creation.
+     *
+     * Useful for calculations that need to maintain full precision without
+     * string conversion overhead.
+     *
+     * @return BigDecimal The conversion rate at its original scale
+     */
+    public function conversionRateDecimal(): BigDecimal
     {
         return $this->conversionRate;
     }

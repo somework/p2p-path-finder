@@ -12,6 +12,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome;
+use SomeWork\P2PPathFinder\Tests\Application\Support\DecimalFactory;
 
 final class SearchOutcomeTest extends TestCase
 {
@@ -35,8 +36,8 @@ final class SearchOutcomeTest extends TestCase
     public function test_paths_accessor_returns_materialized_collection(): void
     {
         $orderKeys = [
-            new PathOrderKey(new PathCost('2'), 1, RouteSignature::fromNodes(['B']), 1),
-            new PathOrderKey(new PathCost('1'), 1, RouteSignature::fromNodes(['A']), 0),
+            new PathOrderKey(new PathCost(DecimalFactory::decimal('2')), 1, RouteSignature::fromNodes(['B']), 1),
+            new PathOrderKey(new PathCost(DecimalFactory::decimal('1')), 1, RouteSignature::fromNodes(['A']), 0),
         ];
 
         $paths = PathResultSet::fromPaths(
@@ -58,8 +59,8 @@ final class SearchOutcomeTest extends TestCase
     public function test_json_serialize_returns_paths_and_guard_report_payload(): void
     {
         $orderKeys = [
-            new PathOrderKey(new PathCost('2'), 1, RouteSignature::fromNodes(['C']), 1),
-            new PathOrderKey(new PathCost('1'), 1, RouteSignature::fromNodes(['B']), 0),
+            new PathOrderKey(new PathCost(DecimalFactory::decimal('2')), 1, RouteSignature::fromNodes(['C']), 1),
+            new PathOrderKey(new PathCost(DecimalFactory::decimal('1')), 1, RouteSignature::fromNodes(['B']), 0),
         ];
 
         $paths = PathResultSet::fromPaths(

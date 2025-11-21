@@ -4,22 +4,25 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\Filter;
 
+use Brick\Math\BigDecimal;
+use Brick\Math\Exception\MathException;
+use Brick\Math\RoundingMode;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
+
+use function sprintf;
 
 /**
  * Accepts orders whose effective rates fall within a tolerance window around a reference rate.
  */
 final class ToleranceWindowFilter implements OrderFilterInterface
 {
-    /** @var numeric-string */
-    private readonly string $lowerBound;
+    private readonly BigDecimal $lowerBound;
 
-    /** @var numeric-string */
-    private readonly string $upperBound;
+    private readonly BigDecimal $upperBound;
+
     private readonly int $scale;
 
     /**
@@ -29,23 +32,23 @@ final class ToleranceWindowFilter implements OrderFilterInterface
      */
     public function __construct(private readonly ExchangeRate $referenceRate, string $tolerance)
     {
-        BcMath::ensureNumeric($tolerance);
         $this->scale = $referenceRate->scale();
-        $normalizedTolerance = BcMath::normalize($tolerance, $this->scale);
 
-        if (-1 === BcMath::comp($normalizedTolerance, '0', $this->scale)) {
+        $referenceDecimal = self::scaleDecimal($referenceRate->decimal(), $this->scale);
+        $normalizedTolerance = self::scaleDecimal(self::decimalFromString($tolerance), $this->scale);
+
+        if ($normalizedTolerance->compareTo(BigDecimal::zero()) < 0) {
             throw new InvalidInput('Tolerance cannot be negative.');
         }
 
-        $offset = BcMath::mul($referenceRate->rate(), $normalizedTolerance, $this->scale);
+        $offset = self::scaleDecimal($referenceDecimal->multipliedBy($normalizedTolerance), $this->scale);
 
-        $min = BcMath::sub($referenceRate->rate(), $offset, $this->scale);
-        if (-1 === BcMath::comp($min, '0', $this->scale)) {
-            $min = BcMath::normalize('0', $this->scale);
-        }
+        $min = $referenceDecimal->minus($offset);
+        $this->lowerBound = $min->compareTo(BigDecimal::zero()) < 0
+            ? self::scaleDecimal(BigDecimal::zero(), $this->scale)
+            : self::scaleDecimal($min, $this->scale);
 
-        $this->lowerBound = $min;
-        $this->upperBound = BcMath::add($referenceRate->rate(), $offset, $this->scale);
+        $this->upperBound = self::scaleDecimal($referenceDecimal->plus($offset), $this->scale);
     }
 
     public function accepts(Order $order): bool
@@ -57,16 +60,39 @@ final class ToleranceWindowFilter implements OrderFilterInterface
             return false;
         }
 
-        $rate = BcMath::normalize($effective->rate(), $this->scale);
+        $rate = self::scaleDecimal($effective->decimal(), $this->scale);
 
-        if (-1 === BcMath::comp($rate, $this->lowerBound, $this->scale)) {
+        if ($rate->compareTo($this->lowerBound) < 0) {
             return false;
         }
 
-        if (1 === BcMath::comp($rate, $this->upperBound, $this->scale)) {
+        if ($rate->compareTo($this->upperBound) > 0) {
             return false;
         }
 
         return true;
+    }
+
+    private static function assertScale(int $scale): void
+    {
+        if ($scale < 0) {
+            throw new InvalidInput('Scale cannot be negative.');
+        }
+    }
+
+    private static function decimalFromString(string $value): BigDecimal
+    {
+        try {
+            return BigDecimal::of($value);
+        } catch (MathException $exception) {
+            throw new InvalidInput(sprintf('Value "%s" is not numeric.', $value), 0, $exception);
+        }
+    }
+
+    private static function scaleDecimal(BigDecimal $decimal, int $scale): BigDecimal
+    {
+        self::assertScale($scale);
+
+        return $decimal->toScale($scale, RoundingMode::HALF_UP);
     }
 }

@@ -13,7 +13,8 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriority;
 use SomeWork\P2PPathFinder\Application\PathFinder\Search\SearchStatePriorityQueue;
 use SomeWork\P2PPathFinder\Application\PathFinder\SearchStateQueue;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
+use SomeWork\P2PPathFinder\Tests\Application\Support\DecimalFactory;
+use SomeWork\P2PPathFinder\Tests\Support\DecimalMath;
 
 use function count;
 
@@ -101,7 +102,7 @@ final class SearchStateQueueOrderingPropertyTest extends TestCase
      */
     private function buildEqualCostCandidates(): array
     {
-        $cost = BcMath::normalize(self::COST, self::SCALE);
+        $cost = DecimalFactory::decimal(self::COST, self::SCALE);
 
         $candidates = [];
         foreach (self::baseDefinitions() as $definition) {
@@ -158,7 +159,7 @@ final class SearchStateQueueOrderingPropertyTest extends TestCase
         }
 
         usort($indexed, static function (array $left, array $right): int {
-            $comparison = BcMath::comp($left['cost'], $right['cost'], self::SCALE);
+            $comparison = DecimalMath::comp($left['cost'], $right['cost'], self::SCALE);
             if (0 !== $comparison) {
                 return $comparison;
             }

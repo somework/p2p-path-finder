@@ -11,6 +11,7 @@ use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature;
 use SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet;
+use SomeWork\P2PPathFinder\Tests\Application\Support\DecimalFactory;
 
 final class PathResultSetTest extends TestCase
 {
@@ -18,9 +19,9 @@ final class PathResultSetTest extends TestCase
     {
         $paths = ['late', 'early', 'middle'];
         $orderKeys = [
-            new PathOrderKey(new PathCost('0.300000000000000000'), 3, RouteSignature::fromNodes(['SRC', 'C', 'DST']), 2),
-            new PathOrderKey(new PathCost('0.100000000000000000'), 1, RouteSignature::fromNodes(['SRC', 'A', 'DST']), 0),
-            new PathOrderKey(new PathCost('0.100000000000000000'), 2, RouteSignature::fromNodes(['SRC', 'B', 'DST']), 1),
+            new PathOrderKey(new PathCost(DecimalFactory::decimal('0.300000000000000000')), 3, RouteSignature::fromNodes(['SRC', 'C', 'DST']), 2),
+            new PathOrderKey(new PathCost(DecimalFactory::decimal('0.100000000000000000')), 1, RouteSignature::fromNodes(['SRC', 'A', 'DST']), 0),
+            new PathOrderKey(new PathCost(DecimalFactory::decimal('0.100000000000000000')), 2, RouteSignature::fromNodes(['SRC', 'B', 'DST']), 1),
         ];
 
         $set = $this->createResultSet($paths, $orderKeys);
@@ -33,9 +34,9 @@ final class PathResultSetTest extends TestCase
     {
         $paths = ['worse duplicate', 'preferred duplicate', 'unique'];
         $orderKeys = [
-            new PathOrderKey(new PathCost('0.300000000000000000'), 3, RouteSignature::fromNodes(['SRC', 'A', 'DST']), 2),
-            new PathOrderKey(new PathCost('0.100000000000000000'), 1, RouteSignature::fromNodes(['SRC', 'A', 'DST']), 0),
-            new PathOrderKey(new PathCost('0.200000000000000000'), 2, RouteSignature::fromNodes(['SRC', 'B', 'DST']), 1),
+            new PathOrderKey(new PathCost(DecimalFactory::decimal('0.300000000000000000')), 3, RouteSignature::fromNodes(['SRC', 'A', 'DST']), 2),
+            new PathOrderKey(new PathCost(DecimalFactory::decimal('0.100000000000000000')), 1, RouteSignature::fromNodes(['SRC', 'A', 'DST']), 0),
+            new PathOrderKey(new PathCost(DecimalFactory::decimal('0.200000000000000000')), 2, RouteSignature::fromNodes(['SRC', 'B', 'DST']), 1),
         ];
 
         $set = $this->createResultSet($paths, $orderKeys);
@@ -56,10 +57,10 @@ final class PathResultSetTest extends TestCase
             $arrayConvertible,
         ];
         $orderKeys = [
-            new PathOrderKey(new PathCost('0.400000000000000000'), 3, RouteSignature::fromNodes(['SRC', 'A', 'DST']), 3),
-            new PathOrderKey(new PathCost('0.100000000000000000'), 1, RouteSignature::fromNodes(['SRC', 'A', 'DST']), 0),
-            new PathOrderKey(new PathCost('0.150000000000000000'), 2, RouteSignature::fromNodes(['SRC', 'B', 'DST']), 1),
-            new PathOrderKey(new PathCost('0.200000000000000000'), 2, RouteSignature::fromNodes(['SRC', 'C', 'DST']), 2),
+            new PathOrderKey(new PathCost(DecimalFactory::decimal('0.400000000000000000')), 3, RouteSignature::fromNodes(['SRC', 'A', 'DST']), 3),
+            new PathOrderKey(new PathCost(DecimalFactory::decimal('0.100000000000000000')), 1, RouteSignature::fromNodes(['SRC', 'A', 'DST']), 0),
+            new PathOrderKey(new PathCost(DecimalFactory::decimal('0.150000000000000000')), 2, RouteSignature::fromNodes(['SRC', 'B', 'DST']), 1),
+            new PathOrderKey(new PathCost(DecimalFactory::decimal('0.200000000000000000')), 2, RouteSignature::fromNodes(['SRC', 'C', 'DST']), 2),
         ];
 
         $set = $this->createResultSet($paths, $orderKeys);
@@ -84,9 +85,9 @@ final class PathResultSetTest extends TestCase
 
         $paths = [$serializable, $arrayConvertible, ['type' => 'scalar']];
         $orderKeys = [
-            new PathOrderKey(new PathCost('0.100000000000000000'), 1, RouteSignature::fromNodes(['SRC', 'A', 'DST']), 0),
-            new PathOrderKey(new PathCost('0.200000000000000000'), 1, RouteSignature::fromNodes(['SRC', 'B', 'DST']), 1),
-            new PathOrderKey(new PathCost('0.300000000000000000'), 1, RouteSignature::fromNodes(['SRC', 'C', 'DST']), 2),
+            new PathOrderKey(new PathCost(DecimalFactory::decimal('0.100000000000000000')), 1, RouteSignature::fromNodes(['SRC', 'A', 'DST']), 0),
+            new PathOrderKey(new PathCost(DecimalFactory::decimal('0.200000000000000000')), 1, RouteSignature::fromNodes(['SRC', 'B', 'DST']), 1),
+            new PathOrderKey(new PathCost(DecimalFactory::decimal('0.300000000000000000')), 1, RouteSignature::fromNodes(['SRC', 'C', 'DST']), 2),
         ];
 
         $set = $this->createResultSet($paths, $orderKeys);
@@ -105,9 +106,9 @@ final class PathResultSetTest extends TestCase
     {
         $paths = ['first', 'second', 'third'];
         $orderKeys = [
-            new PathOrderKey(new PathCost('0.100000000000000000'), 1, RouteSignature::fromNodes(['SRC', 'A', 'DST']), 0),
-            new PathOrderKey(new PathCost('0.200000000000000000'), 2, RouteSignature::fromNodes(['SRC', 'B', 'DST']), 1),
-            new PathOrderKey(new PathCost('0.300000000000000000'), 3, RouteSignature::fromNodes(['SRC', 'C', 'DST']), 2),
+            new PathOrderKey(new PathCost(DecimalFactory::decimal('0.100000000000000000')), 1, RouteSignature::fromNodes(['SRC', 'A', 'DST']), 0),
+            new PathOrderKey(new PathCost(DecimalFactory::decimal('0.200000000000000000')), 2, RouteSignature::fromNodes(['SRC', 'B', 'DST']), 1),
+            new PathOrderKey(new PathCost(DecimalFactory::decimal('0.300000000000000000')), 3, RouteSignature::fromNodes(['SRC', 'C', 'DST']), 2),
         ];
 
         $set = $this->createResultSet($paths, $orderKeys);
@@ -120,7 +121,7 @@ final class PathResultSetTest extends TestCase
     {
         $paths = ['only'];
         $orderKeys = [
-            new PathOrderKey(new PathCost('0.100000000000000000'), 1, RouteSignature::fromNodes(['SRC', 'A', 'DST']), 0),
+            new PathOrderKey(new PathCost(DecimalFactory::decimal('0.100000000000000000')), 1, RouteSignature::fromNodes(['SRC', 'A', 'DST']), 0),
         ];
 
         $set = $this->createResultSet($paths, $orderKeys);

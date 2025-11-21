@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathFinder\ValueObject;
 
+use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalHelperTrait;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
@@ -15,6 +16,9 @@ use function str_starts_with;
  */
 final class SpendConstraints
 {
+    /**
+     * @see DecimalHelperTrait::CANONICAL_SCALE
+     */
     private const SCALAR_SCALE = 18;
 
     private readonly SpendRange $range;

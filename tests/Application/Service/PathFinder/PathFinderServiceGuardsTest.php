@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\Service\PathFinder;
 
+use Brick\Math\BigDecimal;
+use Closure;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
@@ -18,10 +20,12 @@ use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
 use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
+use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
+use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
+use SomeWork\P2PPathFinder\Tests\Application\Support\DecimalFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\FeePolicyFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
@@ -131,8 +135,8 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
 
         $factory = $this->pathFinderFactoryForCandidates([
             [
-                'cost' => '1.000000000000000000',
-                'product' => '1.000000000000000000',
+                'cost' => DecimalFactory::decimal('1.000000000000000000', self::SCALE),
+                'product' => DecimalFactory::decimal('1.000000000000000000', self::SCALE),
                 'hops' => 0,
                 'edges' => [],
                 'amountRange' => null,
@@ -159,8 +163,8 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
 
         $factory = $this->pathFinderFactoryForCandidates([
             [
-                'cost' => '1.000000000000000000',
-                'product' => '1.000000000000000000',
+                'cost' => DecimalFactory::decimal('1.000000000000000000', self::SCALE),
+                'product' => DecimalFactory::decimal('1.000000000000000000', self::SCALE),
                 'hops' => 1,
                 'edges' => [
                     [
@@ -200,16 +204,16 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
 
         $factory = $this->pathFinderFactoryForCandidates([
             [
-                'cost' => '1.000000000000000000',
-                'product' => '1.000000000000000000',
+                'cost' => DecimalFactory::decimal('1.000000000000000000', self::SCALE),
+                'product' => DecimalFactory::decimal('1.000000000000000000', self::SCALE),
                 'hops' => 1,
                 'edges' => [$edgeA],
                 'amountRange' => null,
                 'desiredAmount' => null,
             ],
             [
-                'cost' => '1.000000000000000000',
-                'product' => '1.000000000000000000',
+                'cost' => DecimalFactory::decimal('1.000000000000000000', self::SCALE),
+                'product' => DecimalFactory::decimal('1.000000000000000000', self::SCALE),
                 'hops' => 1,
                 'edges' => [$edgeB],
                 'amountRange' => null,
@@ -370,9 +374,25 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
     }
 
     /**
-     * @param list<CandidatePath|array{cost: numeric-string, product: numeric-string, hops: int, edges: list<array>, amountRange: mixed, desiredAmount: mixed}> $candidates
+     * @param list<CandidatePath|array{
+     *     cost: BigDecimal|numeric-string,
+     *     product: BigDecimal|numeric-string,
+     *     hops: int,
+     *     edges: list<array{
+     *         from?: string,
+     *         to?: string,
+     *         order?: Order,
+     *         rate?: ExchangeRate,
+     *         orderSide?: OrderSide,
+     *         conversionRate?: BigDecimal|numeric-string,
+     *     }>,
+     *     amountRange: mixed,
+     *     desiredAmount: mixed,
+     * }> $candidates
+     *
+     * @return Closure(PathSearchRequest):(Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath>)
      */
-    private function pathFinderFactoryForCandidates(array $candidates, ?SearchGuardReport $guardLimits = null): callable
+    private function pathFinderFactoryForCandidates(array $candidates, ?SearchGuardReport $guardLimits = null): Closure
     {
         $normalized = array_map(
             static function ($candidate): CandidatePath {
@@ -390,8 +410,8 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
                 }
 
                 return CandidatePath::from(
-                    $candidate['cost'],
-                    $candidate['product'],
+                    self::normalizeDecimal($candidate['cost']),
+                    self::normalizeDecimal($candidate['product']),
                     $candidate['hops'],
                     self::normalizeEdges($candidate['edges'], $candidate['hops']),
                     $range,
@@ -400,7 +420,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
             $candidates,
         );
 
-        return static function (PathSearchRequest $request) use ($normalized, $guardLimits): callable {
+        return static function (PathSearchRequest $request) use ($normalized, $guardLimits): Closure {
             return static function (Graph $graph, callable $callback) use ($normalized, $guardLimits): SearchOutcome {
                 foreach ($normalized as $candidate) {
                     $callback($candidate);
@@ -430,7 +450,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
                         'order' => $edge->order(),
                         'rate' => $edge->rate(),
                         'orderSide' => $edge->orderSide(),
-                        'conversionRate' => BcMath::normalize('1.000000000000000000', self::SCALE),
+                        'conversionRate' => self::unitConversionRate(),
                     ];
                 }
 
@@ -458,7 +478,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
                 'order' => $order,
                 'rate' => $edge['rate'] ?? $order->effectiveRate(),
                 'orderSide' => $orderSide,
-                'conversionRate' => $edge['conversionRate'] ?? BcMath::normalize('1.000000000000000000', self::SCALE),
+                'conversionRate' => $edge['conversionRate'] ?? self::unitConversionRate(),
             ];
 
             $currentFrom = $to;
@@ -476,7 +496,7 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
                 'order' => $order,
                 'rate' => $order->effectiveRate(),
                 'orderSide' => OrderSide::SELL,
-                'conversionRate' => BcMath::normalize('1.000000000000000000', self::SCALE),
+                'conversionRate' => self::unitConversionRate(),
             ];
 
             $currentFrom = $to;
@@ -489,10 +509,23 @@ final class PathFinderServiceGuardsTest extends PathFinderServiceTestCase
                 $edge['order'],
                 $edge['rate'],
                 $edge['orderSide'],
-                $edge['conversionRate'],
+                self::normalizeDecimal($edge['conversionRate']),
             ),
             $normalizedEdges,
         ));
+    }
+
+    /**
+     * @param BigDecimal|numeric-string $value
+     */
+    private static function normalizeDecimal(BigDecimal|string $value): BigDecimal
+    {
+        return $value instanceof BigDecimal ? $value : BigDecimal::of($value);
+    }
+
+    private static function unitConversionRate(): BigDecimal
+    {
+        return DecimalFactory::unit(self::SCALE);
     }
 
     /**

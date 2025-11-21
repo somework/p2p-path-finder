@@ -9,10 +9,10 @@ use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdge;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
+use SomeWork\P2PPathFinder\Tests\Support\DecimalMath;
 
 final class PathEdgeSequenceTest extends TestCase
 {
@@ -30,7 +30,7 @@ final class PathEdgeSequenceTest extends TestCase
                 $firstOrder,
                 $firstOrder->effectiveRate(),
                 OrderSide::BUY,
-                BcMath::normalize('1.100000000000000000', self::SCALE),
+                DecimalMath::decimal('1.100000000000000000', self::SCALE),
             );
 
             yield PathEdge::create(
@@ -39,7 +39,7 @@ final class PathEdgeSequenceTest extends TestCase
                 $secondOrder,
                 $secondOrder->effectiveRate(),
                 OrderSide::SELL,
-                BcMath::normalize('0.900000000000000000', self::SCALE),
+                DecimalMath::decimal('0.900000000000000000', self::SCALE),
             );
         })();
 
@@ -72,7 +72,7 @@ final class PathEdgeSequenceTest extends TestCase
                 $firstOrder,
                 $firstOrder->effectiveRate(),
                 OrderSide::BUY,
-                BcMath::normalize('1.000000000000000000', self::SCALE),
+                DecimalMath::decimal('1.000000000000000000', self::SCALE),
             );
 
             yield PathEdge::create(
@@ -81,7 +81,7 @@ final class PathEdgeSequenceTest extends TestCase
                 $secondOrder,
                 $secondOrder->effectiveRate(),
                 OrderSide::BUY,
-                BcMath::normalize('1.000000000000000000', self::SCALE),
+                DecimalMath::decimal('1.000000000000000000', self::SCALE),
             );
         })();
 
@@ -103,7 +103,7 @@ final class PathEdgeSequenceTest extends TestCase
                 $firstOrder,
                 $firstOrder->effectiveRate(),
                 OrderSide::BUY,
-                BcMath::normalize('1.000000000000000000', self::SCALE),
+                DecimalMath::decimal('1.000000000000000000', self::SCALE),
             ),
         ]);
 
@@ -113,7 +113,7 @@ final class PathEdgeSequenceTest extends TestCase
             $secondOrder,
             $secondOrder->effectiveRate(),
             OrderSide::BUY,
-            BcMath::normalize('1.000000000000000000', self::SCALE),
+            DecimalMath::decimal('1.000000000000000000', self::SCALE),
         );
 
         $this->expectException(InvalidInput::class);
@@ -133,7 +133,7 @@ final class PathEdgeSequenceTest extends TestCase
                 $firstOrder,
                 $firstOrder->effectiveRate(),
                 OrderSide::BUY,
-                BcMath::normalize('1.100000000000000000', self::SCALE),
+                DecimalMath::decimal('1.100000000000000000', self::SCALE),
             ),
         ]);
 
@@ -144,7 +144,7 @@ final class PathEdgeSequenceTest extends TestCase
                 $secondOrder,
                 $secondOrder->effectiveRate(),
                 OrderSide::SELL,
-                BcMath::normalize('0.900000000000000000', self::SCALE),
+                DecimalMath::decimal('0.900000000000000000', self::SCALE),
             ),
         );
 
@@ -164,7 +164,7 @@ final class PathEdgeSequenceTest extends TestCase
             $order,
             ExchangeRate::fromString('BBB', 'AAA', '1.000', 3),
             OrderSide::BUY,
-            BcMath::normalize('1.000000000000000000', self::SCALE),
+            DecimalMath::decimal('1.000000000000000000', self::SCALE),
         );
 
         $this->expectException(InvalidInput::class);

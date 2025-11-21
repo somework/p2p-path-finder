@@ -15,6 +15,11 @@ Each template is seeded so that `PathFinderScenarioGenerator::dataset()` returns
 stable fixtures for regression tests, while `scenario()` keeps mixing the
 profiles to explore more permutations.【F:tests/Application/Support/Generator/PathFinderScenarioGenerator.php†L38-L110】【F:tests/Application/Support/Generator/PathFinderScenarioGenerator.php†L122-L177】
 
+Property suites pull canonical decimal values from `tests/Support/DecimalMath.php` and
+`tests/Application/Support/DecimalFactory.php` so every generated amount, tolerance, and
+conversion rate starts life as a `Brick\Math\BigDecimal`. This mirrors the production
+value objects and avoids BCMath-era normalisation helpers.
+
 ## Iteration budgets
 
 The property suites cap their iteration counts to keep the wider test suite

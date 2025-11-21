@@ -9,8 +9,15 @@ clear separation between the domain model and application services.
 
 ## Requirements
 
-* PHP 8.2 or newer.
+* PHP 8.2 or newer with the standard extensions flagged by `composer check-platform-reqs`
+  enabled: `ext-ctype`, `ext-date`, `ext-dom`, `ext-filter`, `ext-hash`, `ext-iconv`,
+  `ext-json`, `ext-libxml`, `ext-mbstring` (or `symfony/polyfill-mbstring`), `ext-openssl`,
+  `ext-pcre`, `ext-phar`, `ext-reflection`, `ext-simplexml`, `ext-spl`, `ext-tokenizer`,
+  `ext-xml`, and `ext-xmlwriter`. Decimal math is handled entirely by
+  [`brick/math`](https://github.com/brick/math), so `ext-bcmath` is no longer required.
 * [Composer](https://getcomposer.org/) 2.x to install dependencies.
+
+See [docs/local-development.md](docs/local-development.md) for platform validation tips.
 
 ## Architecture overview
 
@@ -18,23 +25,25 @@ The codebase is intentionally split into two layers:
 
 * **Domain layer** – Contains value objects such as `Money`, `ExchangeRate`, `OrderBounds`
   and domain entities like `Order`. These classes are immutable, validate their input and
-  route their decimal arithmetic through a Brick-backed helper so that all monetary
-  calculations have predictable precision.
+  store their normalized amounts as `Brick\Math\BigDecimal` instances, only converting
+  back to numeric strings when serializing so that every public API continues to expose
+  canonical `numeric-string` payloads.
 * **Application layer** – Hosts services that orchestrate the domain model. Notable
   components include:
   * `OrderBook` and a small set of reusable `OrderFilterInterface` implementations used to
     prune irrelevant liquidity.
   * `GraphBuilder`, which converts domain orders into a weighted graph representation.
-  * `PathFinderService`, a façade that applies filters, builds the search graph and returns
+  * `PathFinderService`, a facade that applies filters, builds the search graph and returns
     `PathResult` aggregates complete with `PathLeg` breakdowns. It is backed by an internal
     search engine that implements the tolerance-aware route discovery logic without being
     part of the supported surface.
 
 The internal path finder accepts tolerance values exclusively as decimal strings. Supplying
 numeric-string tolerances (for example `'0.9999999999999999'`) preserves the full
-precision of the input without depending on floating-point formatting. Internally all
-tolerances are normalised to 18 decimal places before calculating the amplifier used by the
-search heuristic.
+precision of the input without depending on floating-point formatting. Internally those
+strings are converted to `BigDecimal` objects and normalized to 18 decimal places before
+calculating the amplifier used by the search heuristic, ensuring the tolerance stays
+lossless throughout the search.
 
 The separation allows you to extend or replace either layer (e.g. load orders from an API
 or swap in a different search algorithm) without leaking implementation details.
@@ -47,7 +56,7 @@ The package intentionally keeps its entry points compact:
   `PathFinderService::findBestPaths()`. It normalises the target asset, derives spend
   constraints and ensures callers supply all dependencies required to launch a search.
 * `PathFinderService` orchestrates filtering, graph construction and search. It is the
-  primary façade exposed to consumers integrating the library into their own
+  primary facade exposed to consumers integrating the library into their own
   applications. The constructor accepts the public `GraphBuilder` plus optional ordering
   and factory hooks while instantiating its internal helpers itself so the `@internal`
   services remain encapsulated.【F:src/Application/Service/PathFinderService.php†L41-L165】
@@ -58,7 +67,7 @@ The package intentionally keeps its entry points compact:
   provides iteration, slicing and `jsonSerialize()`/`toArray()` helpers so you can pipe the
   results straight into response DTOs or JSON encoders.【F:src/Application/PathFinder/Result/SearchOutcome.php†L9-L71】【F:src/Application/PathFinder/Result/PathResultSet.php†L1-L205】
 
-Support services that exist only to back the façade&mdash;for example
+Support services that exist only to back the facade&mdash;for example
 `OrderSpendAnalyzer`, `LegMaterializer` and `ToleranceEvaluator`&mdash;are marked with
 `@internal` annotations and should not be depended upon directly by userland code. They
 are omitted from the generated API reference to reinforce that they may change without
@@ -77,8 +86,14 @@ notice.【F:src/Application/Service/OrderSpendAnalyzer.php†L17-L23】【F:src/
   requests from progressing further into the search.【F:src/Application/PathFinder/PathFinder.php†L692-L745】
 * **Deterministic decimal policy.** All tolerances, costs and search ratios are normalized
   to 18 decimal places using half-up rounding so the same input produces identical routing
-  decisions across environments. `BrickDecimalMath` centralises this behaviour and backs
-  the tolerance validation performed by `PathFinder`.【F:src/Application/Math/BrickDecimalMath.php†L41-L123】【F:src/Application/PathFinder/PathFinder.php†L166-L212】
+  decisions across environments. `PathFinder::SCALE` defines the canonical tolerance scale
+  while value objects such as `Money` normalize their `BigDecimal` amounts before exposing
+  numeric strings, keeping serialization and ordering deterministic. Refer to the
+  [decimal strategy](docs/decimal-strategy.md#canonical-scale-and-rounding-policy) for the
+  canonical tolerance scale, working precision and rounding guarantees. For contributors,
+  the `tests/Support/DecimalMath.php` helper mirrors those rules so fixtures and
+  assertions can continue producing canonical `numeric-string` payloads without
+  reimplementing production math.【F:src/Application/PathFinder/PathFinder.php†L166-L212】【F:src/Domain/ValueObject/Money.php†L19-L92】【F:tests/Support/DecimalMath.php†L1-L120】
 * **Wall-clock guard rails.** `PathSearchConfig::withSearchTimeBudget()` injects a
   millisecond budget directly into the search loop so that runaway expansions halt even when
   structural guardrails are relaxed. The resulting report is surfaced via
@@ -262,28 +277,28 @@ in the search rather than reaching the materialisation phase.
 
 ## Brick decimal precision
 
-All arithmetic is delegated to `SomeWork\P2PPathFinder\Application\Math\BrickDecimalMath`,
-the library's wrapper around [brick/math](https://github.com/brick/math)'s `BigDecimal`
-implementation. The legacy `SomeWork\P2PPathFinder\Domain\ValueObject\BcMath` façade now
-proxies to this helper, preserving the public API while swapping the underlying engine. The
-adapter provides:
+All arithmetic now happens directly on [brick/math](https://github.com/brick/math)'s
+`BigDecimal` instances owned by the domain value objects and search state helpers. Inputs
+are validated as numeric strings, converted to `BigDecimal`, and rounded via
+`RoundingMode::HALF_UP` before any serialization occurs. This keeps queue ordering,
+tolerance windows, and materialised path results in lock-step without a separate facade.
 
-* Input validation helpers that fail fast when encountering malformed numeric strings.
-* Deterministic rounding that keeps scale under control without leaking trailing digits.
-* Utility methods (`add`, `sub`, `mul`, `div`, `comp`) that normalize operands so that
-  value objects such as `Money` can work with mixed scales.
-
-By routing every calculation through `BrickDecimalMath` the library avoids floating-point
-rounding drift and guarantees that two identical operations will always yield the same
-numeric-string representation.【F:src/Application/Math/BrickDecimalMath.php†L25-L123】【F:src/Domain/ValueObject/BcMath.php†L8-L82】
+* `Money`, `ExchangeRate`, and tolerance value objects enforce their canonical scales and
+  expose normalized numeric strings through their getters, guaranteeing backwards-compatible
+  serialization.【F:src/Domain/ValueObject/Money.php†L19-L116】【F:src/Domain/ValueObject/ExchangeRate.php†L17-L129】【F:src/Domain/ValueObject/DecimalTolerance.php†L17-L142】
+* Search costs, ratios, and amplification values reuse the `PathFinder::SCALE` and extra
+  working-precision constants so expansion heuristics, candidate ordering, and guard checks
+  all operate on the same deterministic decimal policy.【F:src/Application/PathFinder/PathFinder.php†L66-L212】【F:src/Application/PathFinder/ValueObject/CandidatePath.php†L15-L114】
 
 ### Decimal policy
 
 The path finder consistently normalizes tolerances, costs and ratios to 18 decimal places
-using half-up rounding. Normalizing via `BrickDecimalMath::normalize()` (and its
-`BcMath::normalize()` proxy) ensures that tie-breaking values such as `0.5` and `-0.5`
-deterministically round away from zero, keeping matching behaviour stable across PHP
-versions and environments.【F:src/Application/Math/BrickDecimalMath.php†L41-L72】【F:src/Domain/ValueObject/BcMath.php†L32-L45】
+using half-up rounding. Value objects convert their internal `BigDecimal` values to strings
+when serializing, so tie-breaking values such as `0.5` and `-0.5` deterministically round
+away from zero, keeping matching behaviour stable across PHP versions and environments.
+See [docs/decimal-strategy.md](docs/decimal-strategy.md#canonical-scale-and-rounding-policy)
+for the full canonical policy, including the working precision applied to ratios and
+intermediate sums.【F:src/Application/PathFinder/PathFinder.php†L166-L212】【F:src/Domain/ValueObject/Money.php†L19-L92】
 
 ## Exceptions
 
@@ -392,7 +407,7 @@ hops, then lexicographically smaller route signatures (for example `EUR->USD->GB
 deterministic cascade keeps results stable across processes.
 
 `PathFinderService` accepts a configurable ordering strategy via its constructor. Implement
-`PathOrderStrategy::compare()` to inject your own prioritisation logic and pass it to the façade when
+`PathOrderStrategy::compare()` to inject your own prioritisation logic and pass it to the facade when
 registering the service with your dependency injection container:
 
 ```php

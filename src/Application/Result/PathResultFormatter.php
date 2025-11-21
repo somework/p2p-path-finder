@@ -19,16 +19,16 @@ final class PathResultFormatter
 {
     /**
      * @return array{
-     *     totalSpent: array{currency: string, amount: string, scale: int},
-     *     totalReceived: array{currency: string, amount: string, scale: int},
+     *     totalSpent: array{currency: string, amount: numeric-string, scale: int},
+     *     totalReceived: array{currency: string, amount: numeric-string, scale: int},
      *     residualTolerance: numeric-string,
-     *     feeBreakdown: array<string, array{currency: string, amount: string, scale: int}>,
+     *     feeBreakdown: array<string, array{currency: string, amount: numeric-string, scale: int}>,
      *     legs: list<array{
      *         from: string,
      *         to: string,
-     *         spent: array{currency: string, amount: string, scale: int},
-     *         received: array{currency: string, amount: string, scale: int},
-     *         fees: array<string, array{currency: string, amount: string, scale: int}>,
+     *         spent: array{currency: string, amount: numeric-string, scale: int},
+     *         received: array{currency: string, amount: numeric-string, scale: int},
+     *         fees: array<string, array{currency: string, amount: numeric-string, scale: int}>,
      *     }>,
      * }
      */
@@ -41,16 +41,16 @@ final class PathResultFormatter
      * @param PathResultSet<PathResult> $results
      *
      * @return list<array{
-     *     totalSpent: array{currency: string, amount: string, scale: int},
-     *     totalReceived: array{currency: string, amount: string, scale: int},
+     *     totalSpent: array{currency: string, amount: numeric-string, scale: int},
+     *     totalReceived: array{currency: string, amount: numeric-string, scale: int},
      *     residualTolerance: numeric-string,
-     *     feeBreakdown: array<string, array{currency: string, amount: string, scale: int}>,
+     *     feeBreakdown: array<string, array{currency: string, amount: numeric-string, scale: int}>,
      *     legs: list<array{
      *         from: string,
      *         to: string,
-     *         spent: array{currency: string, amount: string, scale: int},
-     *         received: array{currency: string, amount: string, scale: int},
-     *         fees: array<string, array{currency: string, amount: string, scale: int}>,
+     *         spent: array{currency: string, amount: numeric-string, scale: int},
+     *         received: array{currency: string, amount: numeric-string, scale: int},
+     *         fees: array<string, array{currency: string, amount: numeric-string, scale: int}>,
      *     }>,
      * }>
      */

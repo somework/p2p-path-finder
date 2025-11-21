@@ -12,13 +12,21 @@ use function str_repeat;
 
 final class MoneyTest extends TestCase
 {
+    use MoneyAssertions;
+
     public function test_normalization_rounds_half_up(): void
     {
         $money = Money::fromString('usd', '1.23456', 4);
 
         self::assertSame('USD', $money->currency());
-        self::assertSame('1.2346', $money->amount());
-        self::assertSame(4, $money->scale());
+        self::assertMoneyAmount($money, '1.2346', 4);
+    }
+
+    public function test_decimal_accessor_reflects_amount(): void
+    {
+        $money = Money::fromString('usd', '42.4200', 4);
+
+        self::assertMoneyAmount($money, '42.4200', 4);
     }
 
     public function test_from_string_rejects_empty_currency(): void
@@ -78,8 +86,7 @@ final class MoneyTest extends TestCase
         $b = Money::fromString('EUR', '2.345', 3);
 
         $sum = $a->add($b);
-        self::assertSame('12.845', $sum->amount());
-        self::assertSame(3, $sum->scale());
+        self::assertMoneyAmount($sum, '12.845', 3);
 
         $difference = $sum->subtract($b);
         self::assertTrue($difference->equals($a->withScale(3)));
@@ -91,7 +98,7 @@ final class MoneyTest extends TestCase
 
         $result = $money->multiply('1.157', 2);
 
-        self::assertSame('13.88', $result->amount());
+        self::assertMoneyAmount($result, '13.88', 2);
     }
 
     public function test_divide_rounds_result_and_honours_custom_scale(): void
@@ -100,8 +107,7 @@ final class MoneyTest extends TestCase
 
         $result = $money->divide('3', 4);
 
-        self::assertSame('33.3333', $result->amount());
-        self::assertSame(4, $result->scale());
+        self::assertMoneyAmount($result, '33.3333', 4);
         self::assertSame(0, $result->compare(Money::fromString('USD', '33.3333', 4), 4));
     }
 

@@ -1,5 +1,6 @@
 {
     "name": "somework/p2p-path-finder",
+    "description": "Deterministic Brick\\Math BigDecimal path-finding toolkit for order-driven conversions",
     "type": "library",
     "keywords": [
         "path-finding",
@@ -29,7 +30,7 @@
     ],
     "require": {
         "php": "^8.2",
-        "brick/math": "^0.12"
+        "brick/math": "^0.12.3"
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.58",

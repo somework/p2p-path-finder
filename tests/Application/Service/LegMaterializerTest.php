@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Application\Service;
 
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\Graph;
@@ -19,11 +22,11 @@ use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Tests\Application\Support\DecimalFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\FeePolicyFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
@@ -338,7 +341,15 @@ final class LegMaterializerTest extends TestCase
 
         $ratio = $method->invoke($materializer, $target, $actual, 3);
 
-        self::assertSame(BcMath::div('95.000', '100.000', 9), $ratio);
+        $ratioScale = 3 + $this->sellResolutionExtraScale();
+        $targetDecimal = BigDecimal::of($target->amount())->toScale($ratioScale, RoundingMode::HALF_UP);
+        $actualDecimal = BigDecimal::of($actual->amount())->toScale($ratioScale, RoundingMode::HALF_UP);
+        $expectedRatio = $targetDecimal
+            ->dividedBy($actualDecimal, $ratioScale, RoundingMode::HALF_UP)
+            ->toScale($ratioScale, RoundingMode::HALF_UP)
+            ->__toString();
+
+        self::assertSame($expectedRatio, $ratio);
     }
 
     public function test_is_within_sell_resolution_tolerance_requires_matching_zeroes(): void
@@ -770,10 +781,19 @@ final class LegMaterializerTest extends TestCase
                 $edge->order(),
                 $edge->rate(),
                 $edge->orderSide(),
-                BcMath::normalize('1.000000000000000000', 18),
+                DecimalFactory::unit(18),
             ),
             $edges,
         ));
+    }
+
+    private function sellResolutionExtraScale(): int
+    {
+        $reflection = new ReflectionClass(LegMaterializer::class);
+        $constant = $reflection->getReflectionConstant('SELL_RESOLUTION_RATIO_EXTRA_SCALE');
+        self::assertNotFalse($constant);
+
+        return (int) $constant->getValue();
     }
 
     /**

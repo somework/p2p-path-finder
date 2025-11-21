@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathFinder\ValueObject;
 
+use Brick\Math\BigDecimal;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
@@ -18,13 +18,9 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
  */
 final class CandidatePath
 {
-    /**
-     * @param numeric-string $cost    aggregate spend for the candidate path
-     * @param numeric-string $product cumulative product of the edge exchange rates
-     */
     private function __construct(
-        private readonly string $cost,
-        private readonly string $product,
+        private readonly BigDecimal $cost,
+        private readonly BigDecimal $product,
         private readonly int $hops,
         private readonly PathEdgeSequence $edges,
         private readonly ?SpendConstraints $range,
@@ -32,20 +28,15 @@ final class CandidatePath
     }
 
     /**
-     * @param numeric-string $cost    aggregate spend for the candidate path
-     * @param numeric-string $product cumulative product of the edge exchange rates
-     *
      * @throws InvalidInput when the hop count does not match the number of edges
      */
     public static function from(
-        string $cost,
-        string $product,
+        BigDecimal $cost,
+        BigDecimal $product,
         int $hops,
         PathEdgeSequence $edges,
         ?SpendConstraints $range = null
     ): self {
-        BcMath::ensureNumeric($cost, $product);
-
         if ($hops < 0) {
             throw new InvalidInput('Hop count cannot be negative.');
         }
@@ -62,6 +53,14 @@ final class CandidatePath
      */
     public function cost(): string
     {
+        /** @var numeric-string $value */
+        $value = $this->cost->toScale(18, \Brick\Math\RoundingMode::HALF_UP)->__toString();
+
+        return $value;
+    }
+
+    public function costDecimal(): BigDecimal
+    {
         return $this->cost;
     }
 
@@ -69,6 +68,14 @@ final class CandidatePath
      * @return numeric-string
      */
     public function product(): string
+    {
+        /** @var numeric-string $value */
+        $value = $this->product->toScale(18, \Brick\Math\RoundingMode::HALF_UP)->__toString();
+
+        return $value;
+    }
+
+    public function productDecimal(): BigDecimal
     {
         return $this->product;
     }
@@ -101,8 +108,8 @@ final class CandidatePath
     public function toArray(): array
     {
         return [
-            'cost' => $this->cost,
-            'product' => $this->product,
+            'cost' => $this->cost(),
+            'product' => $this->product(),
             'hops' => $this->hops,
             'edges' => $this->edges->toArray(),
             'amountRange' => $this->range?->bounds(),

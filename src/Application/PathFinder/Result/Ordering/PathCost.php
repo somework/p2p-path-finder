@@ -4,52 +4,96 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering;
 
-use SomeWork\P2PPathFinder\Domain\ValueObject\BcMath;
+use Brick\Math\BigDecimal;
+use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalHelperTrait;
 
 final class PathCost
 {
-    private const NORMALIZED_SCALE = 18;
+    use DecimalHelperTrait;
 
     /**
-     * @var numeric-string
+     * Canonical scale for path cost storage and default comparisons.
+     *
+     * @see DecimalHelperTrait::CANONICAL_SCALE
      */
-    private readonly string $value;
+    private const NORMALIZED_SCALE = self::CANONICAL_SCALE;
+
+    private readonly BigDecimal $decimal;
 
     /**
-     * @param numeric-string $value
+     * Creates a path cost from a numeric string or BigDecimal.
+     *
+     * The value is normalized to 18 decimal places using HALF_UP rounding,
+     * ensuring consistent precision for all cost calculations and comparisons.
+     *
+     * @param numeric-string|BigDecimal $value The cost value to store
      */
-    public function __construct(string $value)
+    public function __construct(BigDecimal|string $value)
     {
-        $this->value = BcMath::normalize($value, self::NORMALIZED_SCALE);
+        $decimal = $value instanceof BigDecimal ? $value : self::decimalFromString($value);
+
+        $this->decimal = self::scaleDecimal($decimal, self::NORMALIZED_SCALE);
     }
 
     /**
-     * @return numeric-string
+     * Returns the cost as a canonical numeric string at 18 decimal places.
+     *
+     * @return numeric-string The cost (e.g., "1.234567890123456789")
      */
     public function value(): string
     {
-        return $this->value;
+        return self::decimalToString($this->decimal, self::NORMALIZED_SCALE);
     }
 
+    /**
+     * Returns the underlying BigDecimal representation at normalized scale.
+     *
+     * @return BigDecimal The cost as a BigDecimal at 18 decimal places
+     */
+    public function decimal(): BigDecimal
+    {
+        return $this->decimal;
+    }
+
+    /**
+     * Checks if this cost equals another cost at full precision.
+     *
+     * @param self $other The cost to compare against
+     *
+     * @return bool True if costs are equal at normalized scale
+     */
     public function equals(self $other): bool
     {
-        return $this->value === $other->value;
+        return 0 === $this->decimal->compareTo($other->decimal);
     }
 
+    /**
+     * Compares this cost to another cost with optional scale control.
+     *
+     * Both costs are rescaled to the specified comparison scale using HALF_UP
+     * rounding before comparison. Passing a scale smaller than NORMALIZED_SCALE
+     * effectively rounds both costs down to that precision, which may cause
+     * costs that differ only in lower-order digits to compare as equal.
+     *
+     * @param self $other The cost to compare against
+     * @param int  $scale The decimal scale for comparison (default: 18)
+     *
+     * @return int -1 if this cost is less, 0 if equal, 1 if greater at the given scale
+     */
     public function compare(self $other, int $scale = self::NORMALIZED_SCALE): int
     {
-        if ($scale < self::NORMALIZED_SCALE) {
-            $left = BcMath::round($this->value, $scale);
-            $right = BcMath::round($other->value, $scale);
+        self::assertScale($scale);
 
-            return BcMath::comp($left, $right, $scale);
-        }
+        $comparisonScale = $scale;
 
-        return BcMath::comp($this->value, $other->value, $scale);
+        $left = self::scaleDecimal($this->decimal, $comparisonScale);
+        $right = self::scaleDecimal($other->decimal, $comparisonScale);
+
+        return $left->compareTo($right);
     }
 
     public function __toString(): string
     {
-        return $this->value;
+        return $this->value();
     }
 }
