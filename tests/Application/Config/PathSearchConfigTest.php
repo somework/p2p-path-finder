@@ -565,4 +565,64 @@ final class PathSearchConfigTest extends TestCase
         $this->expectException(InvalidInput::class);
         $builder->build();
     }
+
+    public function test_builder_is_reusable_for_multiple_configs(): void
+    {
+        $builder = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+            ->withToleranceBounds('0.05', '0.10')
+            ->withHopLimits(1, 3);
+
+        $config1 = $builder->build();
+        $config2 = $builder->build();
+
+        self::assertNotSame($config1, $config2);
+        self::assertSame('100.00', $config1->spendAmount()->amount());
+        self::assertSame('100.00', $config2->spendAmount()->amount());
+        self::assertSame('0.050000000000000000', $config1->minimumTolerance());
+        self::assertSame('0.050000000000000000', $config2->minimumTolerance());
+    }
+
+    public function test_builder_creates_independent_configs(): void
+    {
+        $builder = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '50.00', 2))
+            ->withToleranceBounds('0.10', '0.20')
+            ->withHopLimits(1, 5);
+
+        $config1 = $builder->build();
+
+        $builder->withSpendAmount(Money::fromString('EUR', '75.00', 2))
+            ->withToleranceBounds('0.15', '0.25')
+            ->withHopLimits(2, 4);
+
+        $config2 = $builder->build();
+
+        self::assertSame('50.00', $config1->spendAmount()->amount());
+        self::assertSame('75.00', $config2->spendAmount()->amount());
+        self::assertSame('0.100000000000000000', $config1->minimumTolerance());
+        self::assertSame('0.150000000000000000', $config2->minimumTolerance());
+        self::assertSame(1, $config1->minimumHops());
+        self::assertSame(2, $config2->minimumHops());
+    }
+
+    public function test_config_is_immutable_after_construction(): void
+    {
+        $spendAmount = Money::fromString('USD', '100.00', 2);
+        $toleranceWindow = ToleranceWindow::fromStrings('0.05', '0.10');
+
+        $config = new PathSearchConfig(
+            $spendAmount,
+            $toleranceWindow,
+            1,
+            3,
+        );
+
+        $reflectionClass = new \ReflectionClass($config);
+        $properties = $reflectionClass->getProperties();
+
+        foreach ($properties as $property) {
+            self::assertTrue($property->isReadOnly(), "Property {$property->getName()} should be readonly");
+        }
+    }
 }

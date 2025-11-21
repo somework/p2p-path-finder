@@ -43,10 +43,24 @@ trait DecimalHelperTrait
      */
     private const CANONICAL_SCALE = 18;
 
+    /**
+     * Maximum allowed scale to prevent memory exhaustion and performance degradation.
+     *
+     * Setting an upper bound (50 decimal places) protects against accidental or malicious
+     * requests for extremely high precision that could consume excessive resources.
+     */
+    private const MAX_SCALE = 50;
+
+    /**
+     * @psalm-mutation-free
+     */
     private static function assertScale(int $scale): void
     {
         if ($scale < 0) {
             throw new InvalidInput('Scale must be a non-negative integer.');
+        }
+        if ($scale > self::MAX_SCALE) {
+            throw new InvalidInput(sprintf('Scale cannot exceed %d decimal places.', self::MAX_SCALE));
         }
     }
 
@@ -59,6 +73,9 @@ trait DecimalHelperTrait
         }
     }
 
+    /**
+     * @psalm-mutation-free
+     */
     private static function scaleDecimal(BigDecimal $decimal, int $scale): BigDecimal
     {
         self::assertScale($scale);
@@ -67,6 +84,8 @@ trait DecimalHelperTrait
     }
 
     /**
+     * @psalm-mutation-free
+     *
      * @return numeric-string
      */
     private static function decimalToString(BigDecimal $decimal, int $scale): string

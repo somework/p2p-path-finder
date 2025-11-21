@@ -396,4 +396,170 @@ final class OrderTest extends TestCase
             }
         };
     }
+
+    public function test_order_side_buy_is_available(): void
+    {
+        $order = OrderFactory::buy();
+
+        self::assertSame(OrderSide::BUY, $order->side());
+    }
+
+    public function test_order_side_sell_is_available(): void
+    {
+        $order = OrderFactory::sell();
+
+        self::assertSame(OrderSide::SELL, $order->side());
+    }
+
+    public function test_order_exposes_asset_pair(): void
+    {
+        $assetPair = AssetPair::fromString('BTC', 'USD');
+        $bounds = OrderBounds::from(
+            Money::fromString('BTC', '0.100', 3),
+            Money::fromString('BTC', '1.000', 3),
+        );
+        $rate = ExchangeRate::fromString('BTC', 'USD', '30000', 3);
+
+        $order = new Order(OrderSide::BUY, $assetPair, $bounds, $rate);
+
+        self::assertSame('BTC', $order->assetPair()->base());
+        self::assertSame('USD', $order->assetPair()->quote());
+    }
+
+    public function test_order_exposes_bounds(): void
+    {
+        $order = OrderFactory::buy();
+
+        $bounds = $order->bounds();
+
+        self::assertTrue($bounds->min()->equals(CurrencyScenarioFactory::money('BTC', '0.100', 3)));
+        self::assertTrue($bounds->max()->equals(CurrencyScenarioFactory::money('BTC', '1.000', 3)));
+    }
+
+    public function test_order_exposes_effective_rate(): void
+    {
+        $order = OrderFactory::buy();
+
+        $rate = $order->effectiveRate();
+
+        self::assertSame('BTC', $rate->baseCurrency());
+        self::assertSame('USD', $rate->quoteCurrency());
+        self::assertSame('30000.00', $rate->rate());
+    }
+
+    public function test_calculate_quote_amount_with_minimum_boundary(): void
+    {
+        $order = OrderFactory::buy();
+
+        $quote = $order->calculateQuoteAmount(CurrencyScenarioFactory::money('BTC', '0.100', 3));
+
+        self::assertTrue($quote->equals(CurrencyScenarioFactory::money('USD', '3000.000', 3)));
+    }
+
+    public function test_calculate_quote_amount_with_maximum_boundary(): void
+    {
+        $order = OrderFactory::buy();
+
+        $quote = $order->calculateQuoteAmount(CurrencyScenarioFactory::money('BTC', '1.000', 3));
+
+        self::assertTrue($quote->equals(CurrencyScenarioFactory::money('USD', '30000.000', 3)));
+    }
+
+    public function test_order_immutability(): void
+    {
+        $order = OrderFactory::buy();
+
+        // Accessing methods multiple times should return consistent values
+        $side1 = $order->side();
+        $side2 = $order->side();
+        self::assertSame($side1, $side2);
+
+        $pair1 = $order->assetPair();
+        $pair2 = $order->assetPair();
+        self::assertSame($pair1, $pair2);
+
+        $bounds1 = $order->bounds();
+        $bounds2 = $order->bounds();
+        self::assertSame($bounds1, $bounds2);
+    }
+
+    public function test_calculate_quote_amount_preserves_precision(): void
+    {
+        $order = OrderFactory::createOrder(
+            OrderSide::BUY,
+            'BTC',
+            'USD',
+            '0.001',
+            '10.000',
+            '45678.123456789',
+            amountScale: 3,
+            rateScale: 9,
+        );
+
+        $baseAmount = CurrencyScenarioFactory::money('BTC', '0.123', 3);
+        $quote = $order->calculateQuoteAmount($baseAmount);
+
+        // Should use the higher scale (9) from rate
+        self::assertSame(9, $quote->scale());
+        self::assertTrue($quote->equals(CurrencyScenarioFactory::money('USD', '5618.409185185', 9)));
+    }
+
+    public function test_order_with_equal_min_max_bounds(): void
+    {
+        $amount = Money::fromString('BTC', '0.5', 1);
+        $bounds = OrderBounds::from($amount, $amount);
+        $rate = ExchangeRate::fromString('BTC', 'USD', '30000', 2);
+
+        $order = new Order(OrderSide::BUY, AssetPair::fromString('BTC', 'USD'), $bounds, $rate);
+
+        // Should accept exactly the boundary value
+        $order->validatePartialFill(Money::fromString('BTC', '0.5', 1));
+
+        self::assertTrue(true, 'No exception should be thrown for exact boundary match.');
+    }
+
+    public function test_sell_order_calculates_effective_quote_correctly(): void
+    {
+        $order = OrderFactory::sell();
+
+        $quote = $order->calculateEffectiveQuoteAmount(CurrencyScenarioFactory::money('BTC', '0.500', 3));
+
+        self::assertTrue($quote->equals(CurrencyScenarioFactory::money('USD', '15000.000', 3)));
+    }
+
+    public function test_order_with_very_high_rate(): void
+    {
+        $order = OrderFactory::createOrder(
+            OrderSide::BUY,
+            'SATS',
+            'BTC',
+            '1',
+            '100000',
+            '0.00000001',
+            amountScale: 0,
+            rateScale: 8,
+        );
+
+        $quote = $order->calculateQuoteAmount(CurrencyScenarioFactory::money('SATS', '50000', 0));
+
+        self::assertTrue($quote->equals(CurrencyScenarioFactory::money('BTC', '0.00050000', 8)));
+    }
+
+    public function test_order_with_very_low_rate(): void
+    {
+        $order = OrderFactory::createOrder(
+            OrderSide::BUY,
+            'BTC',
+            'SATS',
+            '0.0001',
+            '1.0',
+            '100000000',
+            amountScale: 4,
+            rateScale: 0,
+        );
+
+        $quote = $order->calculateQuoteAmount(CurrencyScenarioFactory::money('BTC', '0.5000', 4));
+
+        self::assertTrue($quote->equals(CurrencyScenarioFactory::money('SATS', '50000000', 4)));
+    }
 }

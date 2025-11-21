@@ -67,4 +67,90 @@ final class RouteSignatureTest extends TestCase
         self::assertSame(-1, $gamma->compare($alpha));
         self::assertFalse($alpha->equals($beta));
     }
+
+    public function test_very_long_route_signature(): void
+    {
+        $nodes = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'AUD', 'CAD', 'NZD', 'SEK', 'NOK', 'DKK', 'PLN'];
+        $signature = RouteSignature::fromNodes($nodes);
+
+        self::assertSame($nodes, $signature->nodes());
+        self::assertSame('USD->EUR->GBP->JPY->CHF->AUD->CAD->NZD->SEK->NOK->DKK->PLN', $signature->value());
+        self::assertCount(12, $signature->nodes());
+    }
+
+    public function test_single_node_route(): void
+    {
+        $signature = RouteSignature::fromNodes(['SINGLE']);
+
+        self::assertSame(['SINGLE'], $signature->nodes());
+        self::assertSame('SINGLE', $signature->value());
+    }
+
+    public function test_nodes_with_numbers_and_underscores(): void
+    {
+        $nodes = ['TOKEN_1', 'TOKEN_2', 'ASSET_123', 'COIN_999'];
+        $signature = RouteSignature::fromNodes($nodes);
+
+        self::assertSame($nodes, $signature->nodes());
+        self::assertSame('TOKEN_1->TOKEN_2->ASSET_123->COIN_999', $signature->value());
+    }
+
+    public function test_case_sensitivity_in_comparison(): void
+    {
+        $upper = RouteSignature::fromNodes(['USD', 'EUR']);
+        $lower = RouteSignature::fromNodes(['usd', 'eur']);
+        $mixed = RouteSignature::fromNodes(['Usd', 'Eur']);
+
+        // All should be different due to case sensitivity
+        self::assertFalse($upper->equals($lower));
+        self::assertFalse($upper->equals($mixed));
+        self::assertFalse($lower->equals($mixed));
+
+        // Comparison should be lexicographic and case-sensitive
+        self::assertLessThan(0, $upper->compare($lower)); // 'USD' < 'usd' (uppercase first)
+        self::assertGreaterThan(0, $lower->compare($upper));
+    }
+
+    public function test_lexicographic_ordering_with_common_prefix(): void
+    {
+        $short = RouteSignature::fromNodes(['USD', 'EUR']);
+        $long = RouteSignature::fromNodes(['USD', 'EUR', 'GBP']);
+
+        // Shorter path should come first lexicographically
+        self::assertLessThan(0, $short->compare($long));
+        self::assertGreaterThan(0, $long->compare($short));
+    }
+
+    public function test_nodes_are_preserved_exactly(): void
+    {
+        $nodesWithSpaces = ['  ASSET_A  ', ' ASSET_B ', 'ASSET_C   '];
+        $signature = RouteSignature::fromNodes($nodesWithSpaces);
+
+        // Nodes should be trimmed
+        self::assertSame(['ASSET_A', 'ASSET_B', 'ASSET_C'], $signature->nodes());
+    }
+
+    public function test_to_string_returns_value(): void
+    {
+        $signature = RouteSignature::fromNodes(['A', 'B', 'C']);
+
+        self::assertSame('A->B->C', (string) $signature);
+        self::assertSame($signature->value(), (string) $signature);
+    }
+
+    public function test_rejects_empty_node_at_start(): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Route signature nodes cannot be empty (index 0).');
+
+        RouteSignature::fromNodes(['', 'A', 'B']);
+    }
+
+    public function test_rejects_empty_node_in_middle(): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Route signature nodes cannot be empty (index 2).');
+
+        RouteSignature::fromNodes(['A', 'B', '', 'C']);
+    }
 }

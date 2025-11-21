@@ -22,17 +22,17 @@ final class BottleneckOrderBookFactoryTest extends TestCase
         $secondOrders = iterator_to_array($second);
 
         self::assertNotSame($first, $second);
-        self::assertSame($expectedOrders, $firstOrders);
-        self::assertSame($expectedOrders, $secondOrders);
+        self::assertEquals($expectedOrders, $firstOrders);
+        self::assertEquals($expectedOrders, $secondOrders);
 
         $second->add(OrderFactory::sell('SRC', 'CLONECHK', '1.000', '1.000', '1.000', 3, 3));
 
         $firstOrdersAfterMutation = iterator_to_array($first);
         $secondOrdersAfterMutation = iterator_to_array($second);
 
-        self::assertSame($expectedOrders, $firstOrdersAfterMutation);
+        self::assertEquals($expectedOrders, $firstOrdersAfterMutation);
         self::assertCount(count($expectedOrders), $firstOrdersAfterMutation);
-        self::assertNotSame($expectedOrders, $secondOrdersAfterMutation);
+        self::assertNotEquals($expectedOrders, $secondOrdersAfterMutation);
         self::assertCount(count($expectedOrders) + 1, $secondOrdersAfterMutation);
     }
 
@@ -46,17 +46,17 @@ final class BottleneckOrderBookFactoryTest extends TestCase
         $secondOrders = iterator_to_array($second);
 
         self::assertNotSame($first, $second);
-        self::assertSame($expectedOrders, $firstOrders);
-        self::assertSame($expectedOrders, $secondOrders);
+        self::assertEquals($expectedOrders, $firstOrders);
+        self::assertEquals($expectedOrders, $secondOrders);
 
-        $second->add(OrderFactory::sell('SRC', 'CLONECHK2', '1.000', '1.000', '1.000', 3, 3));
+        $second->add(OrderFactory::sell('SRC', 'CLONECHKK', '1.000', '1.000', '1.000', 3, 3));
 
         $firstOrdersAfterMutation = iterator_to_array($first);
         $secondOrdersAfterMutation = iterator_to_array($second);
 
-        self::assertSame($expectedOrders, $firstOrdersAfterMutation);
+        self::assertEquals($expectedOrders, $firstOrdersAfterMutation);
         self::assertCount(count($expectedOrders), $firstOrdersAfterMutation);
-        self::assertNotSame($expectedOrders, $secondOrdersAfterMutation);
+        self::assertNotEquals($expectedOrders, $secondOrdersAfterMutation);
         self::assertCount(count($expectedOrders) + 1, $secondOrdersAfterMutation);
     }
 

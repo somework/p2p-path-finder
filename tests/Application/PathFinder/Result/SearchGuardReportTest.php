@@ -184,4 +184,113 @@ final class SearchGuardReportTest extends TestCase
             $payload,
         );
     }
+
+    public function test_from_metrics_clamps_negative_expansions_to_zero(): void
+    {
+        $report = SearchGuardReport::fromMetrics(
+            expansions: -5,
+            visitedStates: 10,
+            elapsedMilliseconds: 5.0,
+            expansionLimit: 100,
+            visitedStateLimit: 100,
+            timeBudgetLimit: null,
+        );
+
+        self::assertSame(0, $report->expansions());
+    }
+
+    public function test_from_metrics_clamps_negative_visited_states_to_zero(): void
+    {
+        $report = SearchGuardReport::fromMetrics(
+            expansions: 10,
+            visitedStates: -3,
+            elapsedMilliseconds: 5.0,
+            expansionLimit: 100,
+            visitedStateLimit: 100,
+            timeBudgetLimit: null,
+        );
+
+        self::assertSame(0, $report->visitedStates());
+    }
+
+    public function test_from_metrics_clamps_negative_elapsed_time_to_zero(): void
+    {
+        $report = SearchGuardReport::fromMetrics(
+            expansions: 10,
+            visitedStates: 10,
+            elapsedMilliseconds: -1.5,
+            expansionLimit: 100,
+            visitedStateLimit: 100,
+            timeBudgetLimit: null,
+        );
+
+        self::assertSame(0.0, $report->elapsedMilliseconds());
+    }
+
+    public function test_from_metrics_clamps_negative_limits_to_zero(): void
+    {
+        $report = SearchGuardReport::fromMetrics(
+            expansions: 10,
+            visitedStates: 10,
+            elapsedMilliseconds: 5.0,
+            expansionLimit: -50,
+            visitedStateLimit: -100,
+            timeBudgetLimit: -20,
+        );
+
+        self::assertSame(0, $report->expansionLimit());
+        self::assertSame(0, $report->visitedStateLimit());
+        self::assertSame(0, $report->timeBudgetLimit());
+    }
+
+    public function test_from_metrics_detects_all_limits_reached_simultaneously(): void
+    {
+        $report = SearchGuardReport::fromMetrics(
+            expansions: 100,
+            visitedStates: 200,
+            elapsedMilliseconds: 50.0,
+            expansionLimit: 100,
+            visitedStateLimit: 200,
+            timeBudgetLimit: 50,
+        );
+
+        self::assertTrue($report->expansionsReached());
+        self::assertTrue($report->visitedStatesReached());
+        self::assertTrue($report->timeBudgetReached());
+        self::assertTrue($report->anyLimitReached());
+    }
+
+    public function test_from_metrics_handles_very_high_limits(): void
+    {
+        $report = SearchGuardReport::fromMetrics(
+            expansions: 100,
+            visitedStates: 200,
+            elapsedMilliseconds: 5.0,
+            expansionLimit: 1000000,
+            visitedStateLimit: 1000000,
+            timeBudgetLimit: 60000,
+        );
+
+        self::assertFalse($report->expansionsReached());
+        self::assertFalse($report->visitedStatesReached());
+        self::assertFalse($report->timeBudgetReached());
+        self::assertFalse($report->anyLimitReached());
+    }
+
+    public function test_json_serialization_with_null_time_budget(): void
+    {
+        $report = SearchGuardReport::fromMetrics(
+            expansions: 5,
+            visitedStates: 10,
+            elapsedMilliseconds: 3.5,
+            expansionLimit: 100,
+            visitedStateLimit: 200,
+            timeBudgetLimit: null,
+        );
+
+        $payload = $report->jsonSerialize();
+
+        self::assertNull($payload['limits']['time_budget_ms']);
+        self::assertFalse($payload['breached']['time_budget']);
+    }
 }
