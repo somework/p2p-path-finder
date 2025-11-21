@@ -292,16 +292,27 @@ final class FeeBreakdownPropertyTest extends TestCase
             $quoteCurrency = $this->randomDistinctCurrency($baseCurrency);
             $scale = $this->randomScale();
 
-            $positiveFee = $this->randomPositiveMoney($baseCurrency, $scale);
-            $zeroFee = $this->money($baseCurrency, '0', $scale);
+            $positiveBaseFee = $this->randomPositiveMoney($baseCurrency, $scale);
+            $zeroBaseFee = $this->money($baseCurrency, '0', $scale);
 
-            // Positive fee -> hasBaseFee() is true
-            $withPositive = FeeBreakdown::forBase($positiveFee);
-            self::assertTrue($withPositive->hasBaseFee());
+            // Positive base fee -> hasBaseFee() is true
+            $withPositiveBase = FeeBreakdown::forBase($positiveBaseFee);
+            self::assertTrue($withPositiveBase->hasBaseFee());
 
-            // Zero fee -> hasBaseFee() is false
-            $withZero = FeeBreakdown::forBase($zeroFee);
-            self::assertFalse($withZero->hasBaseFee());
+            // Zero base fee -> hasBaseFee() is false
+            $withZeroBase = FeeBreakdown::forBase($zeroBaseFee);
+            self::assertFalse($withZeroBase->hasBaseFee());
+
+            $positiveQuoteFee = $this->randomPositiveMoney($quoteCurrency, $scale);
+            $zeroQuoteFee = $this->money($quoteCurrency, '0', $scale);
+
+            // Positive quote fee -> hasQuoteFee() is true
+            $withPositiveQuote = FeeBreakdown::forQuote($positiveQuoteFee);
+            self::assertTrue($withPositiveQuote->hasQuoteFee());
+
+            // Zero quote fee -> hasQuoteFee() is false
+            $withZeroQuote = FeeBreakdown::forQuote($zeroQuoteFee);
+            self::assertFalse($withZeroQuote->hasQuoteFee());
         }
     }
 
