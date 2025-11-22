@@ -23,6 +23,9 @@ use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
  * @invariant contains(amount) checks min <= amount <= max (inclusive)
  * @invariant clamp(amount) returns value within [min, max]
  *
+ * @see Order::bounds() For usage in orders
+ * @see docs/domain-invariants.md#orderbounds For complete constraints
+ *
  * @api
  */
 final class OrderBounds

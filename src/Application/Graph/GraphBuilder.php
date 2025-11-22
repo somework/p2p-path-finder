@@ -17,6 +17,10 @@ use function sort;
 /**
  * Converts a collection of domain orders into a weighted directed graph representation.
  *
+ * @see Graph For the resulting graph structure
+ * @see PathFinder For how the graph is traversed
+ * @see PathFinderService For orchestration
+ *
  * @api
  */
 final class GraphBuilder

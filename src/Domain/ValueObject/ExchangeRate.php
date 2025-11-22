@@ -33,6 +33,10 @@ use function strtoupper;
  * @invariant invert() swaps currencies and returns 1 / rate
  * @invariant invert()->invert() ≈ original (within rounding error)
  *
+ * @see Order::effectiveRate() For fee-adjusted rates
+ * @see Money::multiply() For rate application
+ * @see AssetPair For currency pair representation
+ *
  * @api
  */
 final class ExchangeRate

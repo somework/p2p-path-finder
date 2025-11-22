@@ -24,6 +24,10 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
  * @invariant heuristicTolerance = (min == max) ? min : max
  * @invariant heuristicSource = (min == max) ? 'minimum' : 'maximum'
  *
+ * @see PathSearchConfig For how tolerance affects search
+ * @see PathFinder For tolerance amplifier algorithm
+ * @see docs/decimal-strategy.md For precision guarantees
+ *
  * @api
  */
 final class ToleranceWindow

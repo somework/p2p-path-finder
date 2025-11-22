@@ -153,6 +153,49 @@ interface FeePolicy
      * @param Money     $quoteAmount The amount being traded in the quote asset
      *
      * @return FeeBreakdown The calculated fee breakdown
+     *
+     * @example
+     * ```php
+     * // Example: Fixed percentage fee policy (0.5% on quote amount)
+     * class PercentageFeePolicy implements FeePolicy
+     * {
+     *     public function __construct(private readonly string $rate) {}
+     *
+     *     public function calculate(OrderSide $side, Money $base, Money $quote): FeeBreakdown
+     *     {
+     *         // Calculate 0.5% fee on quote amount
+     *         $fee = $quote->multiply($this->rate, $quote->scale());
+     *         return FeeBreakdown::forQuote($fee);
+     *     }
+     *
+     *     public function fingerprint(): string
+     *     {
+     *         return "quote-percentage:{$this->rate}";
+     *     }
+     * }
+     *
+     * // Example: Tiered fee policy
+     * class TieredFeePolicy implements FeePolicy
+     * {
+     *     public function calculate(OrderSide $side, Money $base, Money $quote): FeeBreakdown
+     *     {
+     *         // 0.5% for < $1000, 0.25% for >= $1000
+     *         $rate = $quote->compareTo(Money::fromString('USD', '1000', 2)) >= 0
+     *             ? '0.0025'  // 0.25%
+     *             : '0.005';  // 0.5%
+     *
+     *         $fee = $quote->multiply($rate, $quote->scale());
+     *         return FeeBreakdown::forQuote($fee);
+     *     }
+     *
+     *     public function fingerprint(): string
+     *     {
+     *         return 'tiered:0.005:1000:0.0025';
+     *     }
+     * }
+     * ```
+     *
+     * @see examples/custom-fee-policy.php For complete implementations
      */
     public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown;
 

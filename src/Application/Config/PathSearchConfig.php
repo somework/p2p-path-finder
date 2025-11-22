@@ -34,6 +34,11 @@ use function max;
  * @invariant minSpend <= spendAmount <= maxSpend
  * @invariant pathFinderTolerance = override OR toleranceWindow.heuristicTolerance
  *
+ * @see PathSearchConfigBuilder For fluent construction
+ * @see PathSearchRequest For how config is used
+ * @see docs/getting-started.md#configuring-a-path-search For usage guide
+ * @see docs/domain-invariants.md#pathsearchconfig For complete constraints
+ *
  * @api
  */
 final class PathSearchConfig

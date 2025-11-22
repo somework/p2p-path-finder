@@ -14,6 +14,11 @@ use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 /**
  * Aggregated representation of a discovered conversion path.
  *
+ * @see PathLeg For individual hop details
+ * @see PathLegCollection For the legs collection
+ * @see MoneyMap For fee breakdown aggregation
+ * @see docs/api-contracts.md#pathresult For JSON structure specification
+ *
  * @api
  */
 final class PathResult implements JsonSerializable

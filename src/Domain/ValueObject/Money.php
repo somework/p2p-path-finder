@@ -50,6 +50,10 @@ use function sprintf;
  * @invariant add/subtract result scale = max(left.scale, right.scale) OR explicit scale
  * @invariant multiply/divide result scale = left.scale OR explicit scale
  *
+ * @see ExchangeRate::convert() For currency conversion
+ * @see MoneyMap For aggregating multiple Money instances
+ * @see docs/domain-invariants.md#money For complete constraint specification
+ *
  * @api
  */
 final class Money
@@ -69,6 +73,17 @@ final class Money
      * @param int            $scale    number of decimal digits to retain after normalization
      *
      * @throws InvalidInput|PrecisionViolation when the currency or amount fail validation
+     *
+     * @example
+     * ```php
+     * // Fiat currencies (typically 2 decimal places)
+     * $usd = Money::fromString('USD', '100.50', 2);
+     * $eur = Money::fromString('EUR', '92.00', 2);
+     *
+     * // Cryptocurrencies (higher precision)
+     * $btc = Money::fromString('BTC', '0.00420000', 8);
+     * $eth = Money::fromString('ETH', '1.500000000000000000', 18);
+     * ```
      */
     public static function fromString(string $currency, string $amount, int $scale = 2): self
     {

@@ -31,12 +31,17 @@ use function sprintf;
 use function strtoupper;
 use function trim;
 
-/**
- * High level facade orchestrating order filtering, graph building and path search.
- *
- * @api
- */
-final class PathFinderService
+    /**
+     * High level facade orchestrating order filtering, graph building and path search.
+     *
+     * @see PathSearchRequest For request structure
+     * @see PathSearchConfig For configuration options
+     * @see SearchOutcome For result structure
+     * @see docs/guarded-search-example.md For complete usage example
+     *
+     * @api
+     */
+    final class PathFinderService
 {
     /**
      * @see DecimalHelperTrait::CANONICAL_SCALE
@@ -160,6 +165,31 @@ final class PathFinderService
      * @phpstan-return SearchOutcome<PathResult>
      *
      * @psalm-return SearchOutcome<PathResult>
+     *
+     * @example
+     * ```php
+     * // Create configuration
+     * $config = PathSearchConfig::builder()
+     *     ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+     *     ->withToleranceBounds('0.0', '0.10')  // 0-10% tolerance
+     *     ->withHopLimits(1, 3)  // Allow 1-3 hop paths
+     *     ->build();
+     *
+     * // Create request and execute search
+     * $request = new PathSearchRequest($orderBook, $config, 'BTC');
+     * $outcome = $service->findBestPaths($request);
+     *
+     * // Process results
+     * foreach ($outcome->paths() as $path) {
+     *     echo "Route: {$path->route()}\n";
+     *     echo "Receive: {$path->totalReceived()->amount()} BTC\n";
+     * }
+     *
+     * // Check guard limits
+     * if ($outcome->guardLimits()->anyLimitReached()) {
+     *     echo "Search was limited by guard rails\n";
+     * }
+     * ```
      */
     public function findBestPaths(PathSearchRequest $request): SearchOutcome
     {
