@@ -80,6 +80,74 @@ final class MoneyTest extends TestCase
         yield 'upper bound length' => [str_repeat('Z', 12)];
     }
 
+    /**
+     * @test
+     */
+    public function rejects_negative_amounts(): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Money amount cannot be negative');
+
+        Money::fromString('USD', '-10.00', 2);
+    }
+
+    /**
+     * @test
+     * @dataProvider provideNegativeAmounts
+     */
+    public function rejects_various_negative_amounts(string $amount, int $scale): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Money amount cannot be negative');
+
+        Money::fromString('USD', $amount, $scale);
+    }
+
+    /**
+     * @return iterable<string, array{amount: string, scale: int}>
+     */
+    public static function provideNegativeAmounts(): iterable
+    {
+        yield 'negative with decimals' => ['amount' => '-10.50', 'scale' => 2];
+        yield 'negative integer' => ['amount' => '-100', 'scale' => 0];
+        yield 'small negative' => ['amount' => '-0.01', 'scale' => 2];
+        yield 'large negative' => ['amount' => '-999999999.99', 'scale' => 2];
+        yield 'negative with high precision' => ['amount' => '-0.00000001', 'scale' => 8];
+    }
+
+    /**
+     * @test
+     */
+    public function allows_zero_amount(): void
+    {
+        $money = Money::fromString('USD', '0.00', 2);
+
+        $this->assertSame('0.00', $money->amount());
+        $this->assertTrue($money->isZero());
+    }
+
+    /**
+     * @test
+     */
+    public function allows_positive_amounts(): void
+    {
+        $money = Money::fromString('USD', '100.50', 2);
+
+        $this->assertSame('100.50', $money->amount());
+        $this->assertFalse($money->isZero());
+    }
+
+    /**
+     * @test
+     */
+    public function zero_from_constructor_is_non_negative(): void
+    {
+        $zero = Money::zero('EUR', 2);
+
+        $this->assertSame('0.00', $zero->amount());
+        $this->assertTrue($zero->isZero());
+    }
+
     public function test_add_and_subtract_respect_scale(): void
     {
         $a = Money::fromString('EUR', '10.5', 2);

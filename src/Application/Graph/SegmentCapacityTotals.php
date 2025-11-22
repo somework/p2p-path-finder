@@ -21,6 +21,19 @@ final class SegmentCapacityTotals
         if ($mandatory->currency() !== $maximum->currency()) {
             throw new InvalidInput('Segment capacity totals must share the same currency.');
         }
+
+        // Enforce mandatory <= maximum invariant (prevents negative headroom)
+        if ($mandatory->greaterThan($maximum)) {
+            throw new InvalidInput(
+                sprintf(
+                    'Segment capacity mandatory amount (%s %s) cannot exceed maximum (%s %s).',
+                    $mandatory->currency(),
+                    $mandatory->amount(),
+                    $maximum->currency(),
+                    $maximum->amount()
+                )
+            );
+        }
     }
 
     public function mandatory(): Money

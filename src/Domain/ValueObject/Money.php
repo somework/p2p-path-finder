@@ -20,6 +20,20 @@ use function sprintf;
  * the scale used when interacting with arbitrary precision operations. Instances are created
  * through named constructors to guarantee validation and normalization of their internal state.
  *
+ * ## Invariants
+ *
+ * - **Non-negative amounts**: Money amounts must be >= 0. Negative amounts have no semantic
+ *   meaning in the path-finding domain (orders, spends, receives, fees are all naturally
+ *   non-negative). Construction with negative amounts throws InvalidInput.
+ * - **Valid currency**: Currency code must be 3-12 uppercase letters matching /^[A-Z]{3,12}$/
+ * - **Scale bounds**: Scale must be 0 <= scale <= 50 to prevent memory/performance issues
+ * - **Precision preservation**: Amounts are stored as BigDecimal and normalized to the
+ *   specified scale using HALF_UP rounding
+ *
+ * @invariant amount >= 0
+ * @invariant scale >= 0 && scale <= 50
+ * @invariant currency matches /^[A-Z]{3,12}$/
+ *
  * @api
  */
 final class Money
@@ -45,7 +59,16 @@ final class Money
         self::assertCurrency($currency);
         $normalizedCurrency = strtoupper($currency);
 
-        $normalizedDecimal = self::scaleDecimal(self::decimalFromString($amount), $scale);
+        $decimal = self::decimalFromString($amount);
+        
+        // Enforce non-negative amounts: path finding domain has no semantic meaning for negative money
+        if ($decimal->isNegative()) {
+            throw new InvalidInput(
+                sprintf('Money amount cannot be negative. Got: %s %s', $normalizedCurrency, $amount)
+            );
+        }
+
+        $normalizedDecimal = self::scaleDecimal($decimal, $scale);
 
         return new self($normalizedCurrency, $normalizedDecimal, $scale);
     }

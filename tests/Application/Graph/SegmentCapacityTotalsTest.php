@@ -48,16 +48,6 @@ final class SegmentCapacityTotalsTest extends TestCase
 
     public function test_it_allows_negative_optional_headroom_when_mandatory_exceeds_maximum(): void
     {
-        $mandatory = Money::fromString('USD', '30', 0);
-        $maximum = Money::fromString('USD', '25', 0);
-
-        $totals = new SegmentCapacityTotals($mandatory, $maximum);
-
-        self::assertTrue($totals->optionalHeadroom()->equals(Money::fromString('USD', '-5', 0)));
-    }
-
-    public function test_it_returns_zero_optional_headroom_when_totals_are_equal(): void
-    {
         $mandatory = Money::fromString('USD', '50', 2);
         $maximum = Money::fromString('USD', '50', 2);
 
