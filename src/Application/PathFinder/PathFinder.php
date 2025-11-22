@@ -589,6 +589,33 @@ final class PathFinder
         return RouteSignature::fromPathEdgeSequence($edges);
     }
 
+    /**
+     * Determines if an edge can accommodate the requested spend range.
+     *
+     * This method intersects the requested spend range with the edge's available capacity,
+     * considering mandatory segments (order minimums). If there's no overlap, the edge
+     * cannot satisfy the constraints and should be pruned.
+     *
+     * ## Intersection Logic
+     *
+     * - **No overlap**: Returns null (prune edge)
+     *   - `requestedMax < capacityMin` (requested range entirely below capacity)
+     *   - `requestedMin > capacityMax` (requested range entirely above capacity)
+     *
+     * - **Partial/full overlap**: Returns intersection range
+     *   - `lowerBound = max(requestedMin, capacityMin)`
+     *   - `upperBound = min(requestedMax, capacityMax)`
+     *
+     * ## Mandatory Segments
+     *
+     * When segments exist, uses `mandatory` capacity as the minimum bound (not raw capacity.min).
+     * This ensures paths respect order minimums due to fees.
+     *
+     * @param GraphEdge $edge The edge to check
+     * @param SpendRange $range The requested spend range
+     *
+     * @return SpendRange|null Feasible intersection range, or null if edge cannot satisfy constraints
+     */
     private function edgeSupportsAmount(GraphEdge $edge, SpendRange $range): ?SpendRange
     {
         $isBuy = OrderSide::BUY === $edge->orderSide();
@@ -651,6 +678,25 @@ final class PathFinder
         return SpendRange::fromBounds($lowerBound, $upperBound);
     }
 
+    /**
+     * Converts a spend range to the target currency of an edge.
+     *
+     * This propagates spend constraints forward through the path by converting
+     * both the minimum and maximum bounds using the edge's conversion rate.
+     *
+     * ## Conversion
+     *
+     * - BUY orders: `targetAmount = sourceAmount * rate`
+     * - SELL orders: `targetAmount = sourceAmount / rate`
+     *
+     * Amounts are clamped to edge capacity during conversion to ensure bounds
+     * remain within available liquidity.
+     *
+     * @param GraphEdge $edge The edge to traverse
+     * @param SpendRange $range The spend range to convert
+     *
+     * @return SpendRange The converted range in the target currency
+     */
     private function calculateNextRange(GraphEdge $edge, SpendRange $range): SpendRange
     {
         $minimum = $this->convertEdgeAmount($edge, $range->min());
