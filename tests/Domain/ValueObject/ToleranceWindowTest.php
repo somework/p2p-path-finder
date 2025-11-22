@@ -196,4 +196,238 @@ final class ToleranceWindowTest extends TestCase
 
         ToleranceWindow::normalizeTolerance('-0.1', 'Test tolerance');
     }
+
+    // ==================== Additional Boundary Edge Case Tests ====================
+
+    /**
+     * @test
+     */
+    public function testZeroToleranceWindow(): void
+    {
+        // Test zero tolerance window (min = 0, max = 0)
+        $window = ToleranceWindow::fromStrings('0.0', '0.0');
+
+        self::assertSame('0.000000000000000000', $window->minimum());
+        self::assertSame('0.000000000000000000', $window->maximum());
+        self::assertSame('0.000000000000000000', $window->heuristicTolerance());
+        self::assertSame('minimum', $window->heuristicSource());
+
+        // Test with explicit zero strings
+        $window2 = ToleranceWindow::fromStrings('0', '0.00');
+
+        self::assertSame('0.000000000000000000', $window2->minimum());
+        self::assertSame('0.000000000000000000', $window2->maximum());
+
+        // Test with scientific notation zero
+        $window3 = ToleranceWindow::fromStrings('0e-10', '0.0e5');
+
+        self::assertSame('0.000000000000000000', $window3->minimum());
+        self::assertSame('0.000000000000000000', $window3->maximum());
+    }
+
+    /**
+     * @test
+     */
+    public function testWideToleranceWindow(): void
+    {
+        // Test very wide tolerance window approaching upper bound (1.0)
+        $window = ToleranceWindow::fromStrings('0.0', '0.999999999999999999');
+
+        self::assertSame('0.000000000000000000', $window->minimum());
+        self::assertSame('0.999999999999999999', $window->maximum());
+        self::assertSame('0.999999999999999999', $window->heuristicTolerance());
+        self::assertSame('maximum', $window->heuristicSource());
+
+        // Test with small minimum and near-1 maximum
+        $window2 = ToleranceWindow::fromStrings('0.000000000000000001', '0.999999999999999999');
+
+        self::assertSame('0.000000000000000001', $window2->minimum());
+        self::assertSame('0.999999999999999999', $window2->maximum());
+
+        // Test maximum at the edge (one less than 1.0 at scale 18)
+        $window3 = ToleranceWindow::fromStrings('0.5', '0.999999999999999999');
+
+        self::assertSame('0.500000000000000000', $window3->minimum());
+        self::assertSame('0.999999999999999999', $window3->maximum());
+    }
+
+    /**
+     * @test
+     */
+    public function testMinEqualsMax(): void
+    {
+        // Test when min equals max (single point tolerance)
+        $window = ToleranceWindow::fromStrings('0.5', '0.5');
+
+        self::assertSame('0.500000000000000000', $window->minimum());
+        self::assertSame('0.500000000000000000', $window->maximum());
+        self::assertSame('0.500000000000000000', $window->heuristicTolerance());
+        self::assertSame('minimum', $window->heuristicSource());
+
+        // Test with small equal values
+        $window2 = ToleranceWindow::fromStrings('0.001', '0.001');
+
+        self::assertSame('0.001000000000000000', $window2->minimum());
+        self::assertSame('0.001000000000000000', $window2->maximum());
+        self::assertSame('minimum', $window2->heuristicSource());
+
+        // Test with high precision equal values
+        $window3 = ToleranceWindow::fromStrings(
+            '0.123456789012345678',
+            '0.123456789012345678'
+        );
+
+        self::assertSame('0.123456789012345678', $window3->minimum());
+        self::assertSame('0.123456789012345678', $window3->maximum());
+        self::assertSame('0.123456789012345678', $window3->heuristicTolerance());
+        self::assertSame('minimum', $window3->heuristicSource());
+
+        // Test that min = max uses 'minimum' for heuristic source
+        self::assertSame('minimum', $window->heuristicSource());
+        self::assertSame('minimum', $window2->heuristicSource());
+        self::assertSame('minimum', $window3->heuristicSource());
+    }
+
+    /**
+     * @test
+     */
+    public function testMinGreaterThanMaxThrowsException(): void
+    {
+        // Test that min > max is rejected with proper error
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Minimum tolerance must be less than or equal to maximum tolerance.');
+
+        ToleranceWindow::fromStrings('0.6', '0.4');
+    }
+
+    /**
+     * @test
+     */
+    public function testMinGreaterThanMaxVariousScenarios(): void
+    {
+        // Test min > max with small difference
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Minimum tolerance must be less than or equal to maximum tolerance.');
+
+        ToleranceWindow::fromStrings('0.501', '0.5');
+    }
+
+    /**
+     * @test
+     */
+    public function testMinGreaterThanMaxAtExtremes(): void
+    {
+        // Test min > max at extreme values
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Minimum tolerance must be less than or equal to maximum tolerance.');
+
+        ToleranceWindow::fromStrings('0.999999999999999999', '0.000000000000000001');
+    }
+
+    /**
+     * @test
+     */
+    public function testBoundaryAtUpperLimit(): void
+    {
+        // Test values very close to 1.0 but still valid
+        $window = ToleranceWindow::fromStrings('0.999999999999999998', '0.999999999999999999');
+
+        self::assertSame('0.999999999999999998', $window->minimum());
+        self::assertSame('0.999999999999999999', $window->maximum());
+        self::assertSame('0.999999999999999999', $window->heuristicTolerance());
+        self::assertSame('maximum', $window->heuristicSource());
+    }
+
+    /**
+     * @test
+     */
+    public function testBoundaryJustBelowOne(): void
+    {
+        // Test that 1.0 minus smallest representable value is valid
+        // At scale 18, the smallest increment is 0.000000000000000001
+        // So 1.0 - 0.000000000000000001 = 0.999999999999999999
+        $window = ToleranceWindow::fromStrings('0.0', '0.999999999999999999');
+
+        self::assertSame('0.999999999999999999', $window->maximum());
+
+        // Verify that adding one more would exceed 1.0 and be rejected
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Maximum tolerance must be in the [0, 1) range.');
+
+        // This would round to 1.0 at scale 18
+        ToleranceWindow::fromStrings('0.0', '1.0');
+    }
+
+    /**
+     * @test
+     */
+    public function testVeryNarrowWindow(): void
+    {
+        // Test very narrow tolerance windows
+        $window = ToleranceWindow::fromStrings(
+            '0.500000000000000000',
+            '0.500000000000000001'
+        );
+
+        self::assertSame('0.500000000000000000', $window->minimum());
+        self::assertSame('0.500000000000000001', $window->maximum());
+        self::assertSame('0.500000000000000001', $window->heuristicTolerance());
+        self::assertSame('maximum', $window->heuristicSource());
+
+        // Test at the smallest possible scale
+        $window2 = ToleranceWindow::fromStrings(
+            '0.000000000000000001',
+            '0.000000000000000002'
+        );
+
+        self::assertSame('0.000000000000000001', $window2->minimum());
+        self::assertSame('0.000000000000000002', $window2->maximum());
+    }
+
+    /**
+     * @test
+     */
+    public function testHeuristicSourceSelection(): void
+    {
+        // Test that heuristic source is 'maximum' when min != max
+        $window1 = ToleranceWindow::fromStrings('0.1', '0.2');
+        self::assertSame('maximum', $window1->heuristicSource());
+        self::assertSame('0.200000000000000000', $window1->heuristicTolerance());
+
+        // Test that heuristic source is 'minimum' when min == max
+        $window2 = ToleranceWindow::fromStrings('0.15', '0.15');
+        self::assertSame('minimum', $window2->heuristicSource());
+        self::assertSame('0.150000000000000000', $window2->heuristicTolerance());
+
+        // Test with very small window
+        $window3 = ToleranceWindow::fromStrings('0.1', '0.100000000000000001');
+        self::assertSame('maximum', $window3->heuristicSource());
+        self::assertSame('0.100000000000000001', $window3->heuristicTolerance());
+    }
+
+    /**
+     * @test
+     */
+    public function testRoundingAtBoundaries(): void
+    {
+        // Test that values rounding to exactly 1.0 are rejected
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Maximum tolerance must be in the [0, 1) range.');
+
+        // This would round to 1.0 at scale 18
+        ToleranceWindow::fromStrings('0.0', '0.9999999999999999999');
+    }
+
+    /**
+     * @test
+     */
+    public function testRoundingNearZero(): void
+    {
+        // Test that very small values round correctly
+        $window = ToleranceWindow::fromStrings('0.00000000000000000049', '0.5');
+
+        // Should round down to 0 at scale 18
+        self::assertSame('0.000000000000000000', $window->minimum());
+        self::assertSame('0.500000000000000000', $window->maximum());
+    }
 }
