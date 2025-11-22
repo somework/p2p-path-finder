@@ -1,8 +1,11 @@
 includes:
     - phpstan-baseline.neon
+    - phpstan/phpstan-custom-rules.neon
 
 parameters:
     level: max
     paths:
         - src
     tmpDir: var/cache/phpstan
+    scanDirectories:
+        - phpstan

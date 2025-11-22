@@ -48,7 +48,8 @@
     "autoload-dev": {
         "psr-4": {
             "SomeWork\\P2PPathFinder\\Tests\\": "tests/",
-            "SomeWork\\P2PPathFinder\\Benchmarks\\": "benchmarks/"
+            "SomeWork\\P2PPathFinder\\Benchmarks\\": "benchmarks/",
+            "SomeWork\\P2PPathFinder\\PHPStan\\": "phpstan/"
         }
     },
     "scripts": {

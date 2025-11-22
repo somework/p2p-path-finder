@@ -1,0 +1,16 @@
+services:
+    -
+        class: SomeWork\P2PPathFinder\PHPStan\Rules\FloatLiteralInArithmeticRule
+        tags:
+            - phpstan.rules.rule
+
+    -
+        class: SomeWork\P2PPathFinder\PHPStan\Rules\MissingRoundingModeRule
+        tags:
+            - phpstan.rules.rule
+
+    -
+        class: SomeWork\P2PPathFinder\PHPStan\Rules\BCMathFunctionCallRule
+        tags:
+            - phpstan.rules.rule
+
