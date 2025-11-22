@@ -462,6 +462,8 @@ if ($report->anyLimitReached()) {
 
 ## Architecture Overview
 
+> **📖 For a comprehensive architectural guide with diagrams and design patterns, see [docs/architecture.md](docs/architecture.md)**
+
 The codebase is intentionally split into two layers:
 
 * **Domain layer** – Contains value objects such as `Money`, `ExchangeRate`, `OrderBounds`
@@ -710,6 +712,7 @@ All commands rely on development dependencies declared in `composer.json`.
 
 ### Domain and Architecture
 
+- **[Architecture Guide](docs/architecture.md)** – Comprehensive architectural overview with diagrams
 - **[Domain Invariants](docs/domain-invariants.md)** – Value object constraints and validation rules
 - **[Decimal Strategy](docs/decimal-strategy.md)** – Arbitrary precision arithmetic policy
 - **[Memory Characteristics](docs/memory-characteristics.md)** – Memory usage and optimization
