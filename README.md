@@ -152,6 +152,22 @@ $topTwo = $outcome->paths()->slice(0, 2);
 - **Having issues?** Check the [Troubleshooting Guide](docs/troubleshooting.md)
 - **Need API details?** See [API Documentation](#api-documentation)
 
+**Explore More Examples:**
+
+All examples in the [examples/](examples/) directory are runnable and production-ready:
+
+```bash
+# Run all examples
+composer examples
+
+# Run specific examples
+composer examples:custom-order-filter
+composer examples:error-handling
+composer examples:performance-optimization
+```
+
+See [examples/README.md](examples/README.md) for complete documentation of all examples.
+
 ---
 
 ## Extension Points

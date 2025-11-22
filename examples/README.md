@@ -32,6 +32,8 @@ All examples in this directory are:
 
 ### Execution
 
+#### Option 1: Direct PHP Execution
+
 Run any example directly from the project root:
 
 ```bash
@@ -42,13 +44,39 @@ php examples/performance-optimization.php
 # ... etc
 ```
 
-### Docker Execution
+#### Option 2: Using Composer Scripts (Recommended)
+
+Run examples using composer scripts for convenience:
+
+```bash
+# Run all examples (in sequence)
+composer examples
+
+# Run individual examples
+composer examples:custom-order-filter
+composer examples:custom-ordering-strategy
+composer examples:custom-fee-policy
+composer examples:error-handling
+composer examples:performance-optimization
+composer examples:guarded-search
+```
+
+**Benefits of using composer scripts**:
+- ✅ Consistent execution environment
+- ✅ Easier to remember (named scripts)
+- ✅ Can be integrated into CI/CD
+- ✅ Validates examples work with your installation
+
+#### Option 3: Docker Execution
 
 If using Docker:
 
 ```bash
 # From parent directory containing docker-compose.yml
 docker compose exec php php /var/www/html/p2p-path-finder/examples/custom-order-filter.php
+
+# Or with composer
+docker compose exec php composer examples
 ```
 
 ## Examples by Topic

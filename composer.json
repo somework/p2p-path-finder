@@ -65,6 +65,20 @@
         "psalm": "vendor/bin/psalm --config=psalm.xml.dist --show-info=false",
         "phpdoc": "php bin/generate-phpdoc.php",
         "phpbench": "php -d memory_limit=-1 -d xdebug.mode=off vendor/bin/phpbench run --config=phpbench.json --report=p2p_aggregate",
+        "examples": [
+            "@examples:custom-order-filter",
+            "@examples:custom-ordering-strategy",
+            "@examples:custom-fee-policy",
+            "@examples:error-handling",
+            "@examples:performance-optimization",
+            "@examples:guarded-search"
+        ],
+        "examples:custom-order-filter": "php examples/custom-order-filter.php",
+        "examples:custom-ordering-strategy": "php examples/custom-ordering-strategy.php",
+        "examples:custom-fee-policy": "php examples/custom-fee-policy.php",
+        "examples:error-handling": "php examples/error-handling.php",
+        "examples:performance-optimization": "php examples/performance-optimization.php",
+        "examples:guarded-search": "php examples/guarded-search-example.php",
         "check": [
             "@phpstan",
             "@psalm",
