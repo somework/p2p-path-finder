@@ -37,7 +37,9 @@ use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendRange;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalHelperTrait;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function sprintf;
 use function strtoupper;
@@ -78,6 +80,8 @@ final class PathFinder
     /**
      * @param int    $maxHops   maximum number of edges a path may contain
      * @param string $tolerance value in the [0, 1) range representing the acceptable degradation of the best product
+     *
+     * @throws InvalidInput|PrecisionViolation when configuration parameters are invalid or tolerance normalization fails
      */
     public function __construct(
         private readonly int $maxHops = 4,
@@ -125,6 +129,9 @@ final class PathFinder
 
     /**
      * @param callable(CandidatePath):bool|null $acceptCandidate
+     *
+     * @throws GuardLimitExceeded              when a configured guard limit is exceeded during search
+     * @throws InvalidInput|PrecisionViolation when path construction or arithmetic operations fail
      *
      * @return SearchOutcome<CandidatePath>
      *
@@ -290,10 +297,8 @@ final class PathFinder
                     $nextDesired,
                 );
 
-                $visitedStates = max(
-                    0,
-                    $visitedStates + $bestPerNode->register($nextNode, $candidateRecord, self::SCALE),
-                );
+                [$bestPerNode, $delta] = $bestPerNode->register($nextNode, $candidateRecord, self::SCALE);
+                $visitedStates = max(0, $visitedStates + $delta);
 
                 $queue->push(
                     new SearchQueueEntry(

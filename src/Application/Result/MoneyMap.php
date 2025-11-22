@@ -30,7 +30,7 @@ final class MoneyMap implements Countable, IteratorAggregate, JsonSerializable
     /**
      * @var array<string, Money>
      */
-    private array $values;
+    private readonly array $values;
 
     /**
      * @param array<string, Money> $values

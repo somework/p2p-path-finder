@@ -105,7 +105,7 @@ final class PathFinderInternalsTest extends TestCase
             new SearchStateRecord($this->decimal('1.2'), 3, $signature),
         );
 
-        $delta = $registry->register(
+        [$registry, $delta] = $registry->register(
             'USD',
             new SearchStateRecord($this->decimal('1.0'), 2, $signature),
             self::SCALE,
@@ -134,7 +134,7 @@ final class PathFinderInternalsTest extends TestCase
             new SearchStateRecord($this->decimal('1.2'), 2, $signature),
         );
 
-        $delta = $registry->register(
+        [$registry, $delta] = $registry->register(
             'USD',
             new SearchStateRecord($this->decimal('1.0'), 4, $signature),
             self::SCALE,
@@ -163,7 +163,7 @@ final class PathFinderInternalsTest extends TestCase
             new SearchStateRecord($this->decimal('1.0'), 4, $signature),
         );
 
-        $delta = $registry->register(
+        [$registry, $delta] = $registry->register(
             'USD',
             new SearchStateRecord($this->decimal('1.5'), 2, $signature),
             self::SCALE,
@@ -250,7 +250,7 @@ final class PathFinderInternalsTest extends TestCase
             new SearchStateRecord($this->decimal('1.5'), 2, $signature),
         );
 
-        $delta = $registry->register(
+        [$registry, $delta] = $registry->register(
             'USD',
             new SearchStateRecord($this->decimal('1.0'), 2, $signature),
             self::SCALE,
@@ -272,7 +272,7 @@ final class PathFinderInternalsTest extends TestCase
             new SearchStateRecord($this->decimal('1.8'), 3, $providedSignature),
         );
 
-        $delta = $registry->register(
+        [$registry, $delta] = $registry->register(
             'USD',
             new SearchStateRecord($this->decimal('1.2'), 2, $providedSignature),
             self::SCALE,
@@ -302,7 +302,7 @@ final class PathFinderInternalsTest extends TestCase
             new SearchStateRecord(BigDecimal::of($cost), 4, $signature),
         );
 
-        $delta = $registry->register(
+        [$registry, $delta] = $registry->register(
             'USD',
             new SearchStateRecord(BigDecimal::of($cost), 2, $signature),
             self::SCALE,
@@ -322,19 +322,19 @@ final class PathFinderInternalsTest extends TestCase
             new SearchStateRecord($this->decimal('1.0'), 2, SearchStateSignature::fromString('sig:alpha')),
         );
 
-        $firstDelta = $registry->register(
+        [$registry, $firstDelta] = $registry->register(
             'USD',
             new SearchStateRecord($this->decimal('2.0'), 3, SearchStateSignature::fromString('sig:beta')),
             self::SCALE,
         );
 
-        $alphaReplacement = $registry->register(
+        [$registry, $alphaReplacement] = $registry->register(
             'USD',
             new SearchStateRecord($this->decimal('0.8'), 1, SearchStateSignature::fromString('sig:alpha')),
             self::SCALE,
         );
 
-        $betaDominated = $registry->register(
+        [$registry, $betaDominated] = $registry->register(
             'USD',
             new SearchStateRecord($this->decimal('2.5'), 4, SearchStateSignature::fromString('sig:beta')),
             self::SCALE,
@@ -389,7 +389,7 @@ final class PathFinderInternalsTest extends TestCase
             'USD',
             new SearchStateRecord(BigDecimal::of('1'), 1, SearchStateSignature::fromString('alpha:value')),
         );
-        $registry->register(
+        [$registry] = $registry->register(
             'USD',
             new SearchStateRecord(BigDecimal::of('2'), 2, SearchStateSignature::fromString('beta:value')),
             self::SCALE,

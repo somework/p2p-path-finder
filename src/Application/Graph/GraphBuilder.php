@@ -8,6 +8,8 @@ use SomeWork\P2PPathFinder\Application\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function array_keys;
 use function sort;
@@ -21,7 +23,7 @@ final class GraphBuilder
     /**
      * @var array<string, Money>
      */
-    private array $zeroMoneyCache = [];
+    private static array $zeroMoneyCache = [];
 
     public function __construct()
     {
@@ -30,6 +32,8 @@ final class GraphBuilder
 
     /**
      * @param iterable<Order> $orders
+     *
+     * @throws InvalidInput|PrecisionViolation when order processing fails or arithmetic operations exceed precision limits
      */
     public function build(iterable $orders): Graph
     {
@@ -140,15 +144,15 @@ final class GraphBuilder
             $segments[] = new EdgeSegment(
                 false,
                 new EdgeCapacity(
-                    $this->zeroMoney($baseRemainder->currency(), $baseRemainder->scale()),
+                    self::zeroMoney($baseRemainder->currency(), $baseRemainder->scale()),
                     $baseRemainder,
                 ),
                 new EdgeCapacity(
-                    $this->zeroMoney($quoteRemainder->currency(), $quoteRemainder->scale()),
+                    self::zeroMoney($quoteRemainder->currency(), $quoteRemainder->scale()),
                     $quoteRemainder,
                 ),
                 new EdgeCapacity(
-                    $this->zeroMoney($grossBaseRemainder->currency(), $grossBaseRemainder->scale()),
+                    self::zeroMoney($grossBaseRemainder->currency(), $grossBaseRemainder->scale()),
                     $grossBaseRemainder,
                 ),
             );
@@ -158,16 +162,16 @@ final class GraphBuilder
             $segments[] = new EdgeSegment(
                 false,
                 new EdgeCapacity(
-                    $this->zeroMoney($minBase->currency(), $minBase->scale()),
-                    $this->zeroMoney($maxBase->currency(), $maxBase->scale()),
+                    self::zeroMoney($minBase->currency(), $minBase->scale()),
+                    self::zeroMoney($maxBase->currency(), $maxBase->scale()),
                 ),
                 new EdgeCapacity(
-                    $this->zeroMoney($minQuote->currency(), $minQuote->scale()),
-                    $this->zeroMoney($maxQuote->currency(), $maxQuote->scale()),
+                    self::zeroMoney($minQuote->currency(), $minQuote->scale()),
+                    self::zeroMoney($maxQuote->currency(), $maxQuote->scale()),
                 ),
                 new EdgeCapacity(
-                    $this->zeroMoney($minGrossBase->currency(), $minGrossBase->scale()),
-                    $this->zeroMoney($maxGrossBase->currency(), $maxGrossBase->scale()),
+                    self::zeroMoney($minGrossBase->currency(), $minGrossBase->scale()),
+                    self::zeroMoney($maxGrossBase->currency(), $maxGrossBase->scale()),
                 ),
             );
         }
@@ -175,14 +179,14 @@ final class GraphBuilder
         return $segments;
     }
 
-    private function zeroMoney(string $currency, int $scale): Money
+    private static function zeroMoney(string $currency, int $scale): Money
     {
         $key = $currency.':'.$scale;
 
-        if (!isset($this->zeroMoneyCache[$key])) {
-            $this->zeroMoneyCache[$key] = Money::zero($currency, $scale);
+        if (!isset(self::$zeroMoneyCache[$key])) {
+            self::$zeroMoneyCache[$key] = Money::zero($currency, $scale);
         }
 
-        return $this->zeroMoneyCache[$key];
+        return self::$zeroMoneyCache[$key];
     }
 }

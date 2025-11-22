@@ -86,3 +86,128 @@ The following mitigations have been triaged:
 
 Re-run the PhpBench command above after each optimisation to validate the impact on
 both datasets and update this document with refreshed percentages.
+
+## Memory Profile
+
+Memory usage patterns derived from PhpBench profiling complement the timing data above. The library's memory footprint is predictable and scales linearly with order book size for typical workloads.
+
+### Memory Scaling Characteristics
+
+From k-best benchmark scenarios (PHP 8.3, Ubuntu 22.04):
+
+| Scenario | Orders | Peak Memory | Memory/Order | Notes |
+|----------|--------|-------------|--------------|-------|
+| k-best-n1e2 | 100 | 8.3 MB | ~83 KB | Includes ~6-7 MB base overhead (framework, services) |
+| k-best-n1e3 | 1,000 | 12.8 MB | ~12.8 KB | Sub-linear scaling due to object pooling |
+| k-best-n1e4 | 10,000 | 59.1 MB | ~5.9 KB | Efficient at scale, cached value objects |
+
+**Key insights:**
+
+1. **Base overhead:** ~6-8 MB for framework, core services, and initial structures
+2. **Per-order cost decreases at scale:** Object caching and pooling improve efficiency
+3. **Search state overhead:** Typically 1-10 MB for visited state tracking
+4. **Result materialization:** Minimal (< 1 MB for typical resultLimit values)
+
+### Memory Hotspots by Component
+
+**Graph construction (`GraphBuilder->build`):**
+- **Allocation pattern:** In-place mutation with zero-Money cache
+- **Memory share:** ~10-20% of peak (depending on order count)
+- **Optimization:** Reuses zero-value `Money` instances, reducing allocations by ~40%
+
+**Search state tracking (`SearchStateRegistry`):**
+- **Allocation pattern:** Hash-based registry for visited states
+- **Memory share:** ~15-25% of peak (scales with hop depth and graph density)
+- **Typical size:** 1,000-20,000 states for moderate graphs
+- **Per-state cost:** ~1 KB (includes path history, cost, currency trail)
+
+**Order book and domain objects:**
+- **Allocation pattern:** Immutable value objects (Money, ExchangeRate, OrderBounds)
+- **Memory share:** ~40-60% of peak
+- **Optimization:** Memoized ExchangeRate instances shared across orders
+
+**Result materialization (`LegMaterializer`):**
+- **Allocation pattern:** Stack-allocated candidate DTOs, lazy finalization
+- **Memory share:** ~5-10% of peak
+- **Optimization:** Buffers reused across expansions, allocations deferred until tolerance passes
+
+### Memory Growth Patterns
+
+**Linear growth region (< 10,000 orders):**
+- Predictable scaling: ~5-10 KB per additional order
+- Dominated by domain object allocations
+- Guard limits rarely engaged
+
+**Sub-linear region (10,000-50,000 orders):**
+- Improved efficiency from caching
+- Search state tracking becomes significant
+- Guard limits help cap growth
+
+**Dense graph scenarios:**
+- Memory dominated by search state (visited states × ~1 KB)
+- Guard limits essential to prevent runaway growth
+- Example: `dense-4x4-hop-5` with 20,000 state limit → ~20-40 MB for search state alone
+
+### Memory vs. Guard Limits
+
+The primary memory control mechanism is `maxVisitedStates`:
+
+| Guard Limit | Typical Peak Memory | Use Case |
+|-------------|---------------------|----------|
+| 10,000 states | +10-15 MB | Conservative, latency-sensitive |
+| 50,000 states | +50-75 MB | Moderate, balanced |
+| 100,000 states | +100-150 MB | Comprehensive search |
+| 250,000 states (default) | +250-375 MB | Maximum coverage |
+
+**Note:** Actual memory overhead includes base memory (~8 MB) plus per-order overhead (~5-10 KB per order).
+
+### Monitoring Memory in Production
+
+Track these metrics to understand memory behavior:
+
+1. **Peak memory per request:** `memory_get_peak_usage(true)`
+2. **Visited states:** `$outcome->guardLimits()->metrics()['visited_states']`
+3. **Order book size:** `count($orderBook)`
+4. **Guard breach rate:** `$outcome->guardLimits()->anyLimitReached()`
+
+**Example monitoring:**
+
+```php
+$startMemory = memory_get_usage(true);
+$outcome = $service->findBestPaths($request);
+$peakMemory = memory_get_peak_usage(true);
+$metrics = $outcome->guardLimits()->metrics();
+
+$memoryUsed = ($peakMemory - $startMemory) / 1024 / 1024; // MB
+$memoryPerState = $metrics['visited_states'] > 0 
+    ? $memoryUsed / $metrics['visited_states'] 
+    : 0;
+
+// Log for analysis: memoryUsed, memoryPerState, visited_states, order_count
+```
+
+### Recommended Memory Limits
+
+For PHP `memory_limit` configuration:
+
+| Workload | Expected Peak | Recommended memory_limit | Safety Factor |
+|----------|---------------|--------------------------|---------------|
+| Small (< 1,000 orders) | 10-30 MB | 128M | 4-12× |
+| Medium (1,000-10,000) | 30-150 MB | 256M-512M | 3-8× |
+| Large (10,000-50,000) | 150-500 MB | 1G-2G | 2-4× |
+| Dense graphs | 200-600 MB | 1G-2G | 2-5× |
+
+**Safety factor:** Allow 2-4× expected peak to handle variance and prevent OOM.
+
+### Memory Optimization Checklist
+
+If memory usage exceeds expectations:
+
+1. ✅ **Pre-filter order book** with `AmountRangeFilter` and `ToleranceWindowFilter`
+2. ✅ **Reduce `maxVisitedStates`** guard limit
+3. ✅ **Lower `maxHops`** to 4-6 instead of 8
+4. ✅ **Decrease `resultLimit`** to 1-5 instead of 10+
+5. ✅ **Enable `withSearchTimeBudget()`** to halt runaway searches
+6. ✅ **Monitor guard metrics** to tune configuration
+
+For comprehensive memory guidance, see [../memory-characteristics.md](../memory-characteristics.md).

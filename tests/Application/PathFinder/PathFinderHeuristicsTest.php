@@ -76,7 +76,7 @@ final class PathFinderHeuristicsTest extends TestCase
             ),
         );
 
-        $registry->register(
+        [$registry] = $registry->register(
             'USD',
             new SearchStateRecord(
                 $this->decimal('0.800'),
@@ -113,7 +113,7 @@ final class PathFinderHeuristicsTest extends TestCase
             'USD',
             new SearchStateRecord($this->decimal('2.000'), 3, $signature),
         );
-        $registry->register(
+        [$registry] = $registry->register(
             'USD',
             new SearchStateRecord(
                 $this->decimal('3.000'),
@@ -123,7 +123,7 @@ final class PathFinderHeuristicsTest extends TestCase
             18,
         );
 
-        $netChange = $registry->register(
+        [$registry, $netChange] = $registry->register(
             'USD',
             new SearchStateRecord($this->decimal('1.500'), 1, $signature),
             18,
@@ -166,7 +166,7 @@ final class PathFinderHeuristicsTest extends TestCase
             CurrencyScenarioFactory::money('USD', '5', 0),
         );
 
-        $delta = $registry->register(
+        [$registry, $delta] = $registry->register(
             'USD',
             new SearchStateRecord($this->decimal('0.500'), 0, $alternate),
             self::SCALE,
@@ -189,13 +189,13 @@ final class PathFinderHeuristicsTest extends TestCase
             'USD',
             new SearchStateRecord($this->decimal('4.000'), 5, $alternateSignature),
         );
-        $registry->register(
+        [$registry] = $registry->register(
             'USD',
             new SearchStateRecord($this->decimal('2.750'), 3, $primarySignature),
             18,
         );
 
-        $netChange = $registry->register(
+        [$registry, $netChange] = $registry->register(
             'USD',
             new SearchStateRecord($this->decimal('1.250'), 2, $primarySignature),
             18,

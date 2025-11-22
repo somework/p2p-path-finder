@@ -16,6 +16,8 @@ use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalHelperTrait;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function max;
 
@@ -50,6 +52,8 @@ final class LegMaterializer
     /**
      * @param array{net: Money, gross: Money, grossCeiling: Money} $initialSeed
      *
+     * @throws InvalidInput|PrecisionViolation when path edges cannot be materialized or arithmetic operations fail
+     *
      * @return array{
      *     totalSpent: Money,
      *     totalReceived: Money,
@@ -60,6 +64,36 @@ final class LegMaterializer
      */
     public function materialize(PathEdgeSequence $edges, Money $requestedSpend, array $initialSeed, string $targetCurrency): ?array
     {
+        // Validate entry conditions
+        if ($edges->isEmpty()) {
+            // Cannot materialize empty path
+            return null;
+        }
+
+        $zeroNet = Money::zero($initialSeed['net']->currency(), $initialSeed['net']->scale());
+        if ($initialSeed['net']->isZero() || $initialSeed['net']->lessThan($zeroNet)) {
+            // Invalid initial net seed - must be positive
+            return null;
+        }
+
+        $zeroGross = Money::zero($initialSeed['gross']->currency(), $initialSeed['gross']->scale());
+        if ($initialSeed['gross']->isZero() || $initialSeed['gross']->lessThan($zeroGross)) {
+            // Invalid initial gross seed - must be positive
+            return null;
+        }
+
+        $zeroCeiling = Money::zero($initialSeed['grossCeiling']->currency(), $initialSeed['grossCeiling']->scale());
+        if ($initialSeed['grossCeiling']->isZero() || $initialSeed['grossCeiling']->lessThan($zeroCeiling)) {
+            // Invalid gross ceiling - must be positive
+            return null;
+        }
+
+        $zeroSpend = Money::zero($requestedSpend->currency(), $requestedSpend->scale());
+        if ($requestedSpend->isZero() || $requestedSpend->lessThan($zeroSpend)) {
+            // Invalid requested spend - must be positive
+            return null;
+        }
+
         $legs = [];
         $current = $initialSeed['net'];
         $currentCurrency = $current->currency();
@@ -85,6 +119,7 @@ final class LegMaterializer
             $to = $edge->to();
 
             if ($from !== $currentCurrency) {
+                // Edge sequence is not contiguous - path cannot be materialized
                 return null;
             }
 
@@ -95,6 +130,7 @@ final class LegMaterializer
                 $resolved = $this->resolveBuyLegAmounts($order, $current, $grossSeedForLeg, $grossCeilingForLeg);
 
                 if (null === $resolved) {
+                    // Buy leg cannot be resolved - insufficient budget or order bounds cannot be satisfied
                     return null;
                 }
 
@@ -117,6 +153,7 @@ final class LegMaterializer
                 $resolved = $this->resolveSellLegAmounts($order, $targetEffectiveQuote, $availableBudget);
 
                 if (null === $resolved) {
+                    // Sell leg cannot be resolved - budget exceeded, convergence failed, or order bounds violated
                     return null;
                 }
 
@@ -146,6 +183,7 @@ final class LegMaterializer
         }
 
         if ($currentCurrency !== $targetCurrency) {
+            // Final currency does not match target - path does not reach destination
             return null;
         }
 
@@ -159,6 +197,8 @@ final class LegMaterializer
     }
 
     /**
+     * @throws PrecisionViolation when monetary calculations exceed precision limits
+     *
      * @return array{0: Money, 1: Money, 2: FeeBreakdown}|null
      */
     public function resolveSellLegAmounts(Order $order, Money $targetEffectiveQuote, ?Money $availableQuoteBudget = null): ?array
@@ -177,10 +217,12 @@ final class LegMaterializer
             $received = $rate->convert($spent, $scale);
 
             if (!$bounds->contains($received->withScale(max($received->scale(), $bounds->min()->scale())))) {
+                // Received amount falls outside order bounds
                 return null;
             }
 
             if (null !== $availableQuoteBudget && $spent->greaterThan($availableQuoteBudget)) {
+                // Spent amount exceeds available budget
                 return null;
             }
 
@@ -224,6 +266,7 @@ final class LegMaterializer
                 if ($grossComparable->greaterThan($availableComparable) && !$this->isWithinSellResolutionTolerance($availableComparable, $grossComparable)) {
                     $ratio = $this->calculateSellAdjustmentRatio($availableComparable, $grossComparable, $grossComparisonScale);
                     if (null === $ratio) {
+                        // Cannot calculate adjustment ratio - division by zero or sign mismatch
                         return null;
                     }
 
@@ -232,6 +275,7 @@ final class LegMaterializer
                     $baseAmount = $this->alignBaseScale($bounds->min()->scale(), $bounds->max()->scale(), $baseAmount);
 
                     if ($baseAmount->equals($previousBase)) {
+                        // Base amount adjustment converged to same value - cannot make progress
                         return null;
                     }
 
@@ -259,6 +303,7 @@ final class LegMaterializer
 
             $ratio = $this->calculateSellAdjustmentRatio($targetComparable, $effectiveComparable, $comparisonScale);
             if (null === $ratio) {
+                // Cannot calculate adjustment ratio - division by zero or sign mismatch
                 return null;
             }
 
@@ -267,10 +312,12 @@ final class LegMaterializer
         }
 
         if (!$converged) {
+            // Iterative resolution failed to converge within maximum iterations
             return null;
         }
 
         if (!$bounds->contains($baseAmount->withScale(max($baseAmount->scale(), $bounds->min()->scale())))) {
+            // Calculated base amount falls outside order bounds
             return null;
         }
 
@@ -291,6 +338,7 @@ final class LegMaterializer
             $availableComparable = $availableQuoteBudget->withScale($grossComparisonScale);
 
             if ($grossComparable->greaterThan($availableComparable) && !$this->isWithinSellResolutionTolerance($availableComparable, $grossComparable)) {
+                // Final gross quote exceeds available budget after convergence
                 return null;
             }
         }
@@ -313,6 +361,8 @@ final class LegMaterializer
     }
 
     /**
+     * @throws PrecisionViolation when monetary calculations exceed precision limits
+     *
      * @return array{gross: Money, quote: Money, fees: FeeBreakdown, net: Money}|null
      */
     public function resolveBuyFill(Order $order, Money $netSeed, Money $grossSeed, Money $grossCeiling): ?array
@@ -333,6 +383,7 @@ final class LegMaterializer
             $budgetComparable = $grossCeiling->withScale($minGross->scale());
 
             if ($minGross->greaterThan($budgetComparable)) {
+                // Minimum order fill requires more budget than available ceiling
                 return null;
             }
         }
@@ -362,6 +413,7 @@ final class LegMaterializer
             $grossDecimal = self::scaleDecimal($grossComparable->decimal(), $ratioScale);
 
             if ($grossDecimal->isZero()) {
+                // Gross amount is zero - cannot calculate budget adjustment ratio
                 return null;
             }
 
@@ -369,6 +421,7 @@ final class LegMaterializer
             $ratio = $ceilingDecimal->dividedBy($grossDecimal, $divisionScale, RoundingMode::HALF_UP);
 
             if ($ratio->isZero()) {
+                // Adjustment ratio collapsed to zero - cannot make progress
                 return null;
             }
 
@@ -377,16 +430,20 @@ final class LegMaterializer
             $nextNet = $bounds->clamp($nextNet);
 
             if ($nextNet->equals($netCandidate)) {
+                // Net amount adjustment converged to same value - cannot make progress
                 return null;
             }
 
             $netCandidate = $nextNet;
         }
 
+        // Buy fill adjustment failed to converge within maximum iterations
         return null;
     }
 
     /**
+     * @throws PrecisionViolation when fee calculation or monetary operations exceed precision limits
+     *
      * @return array{
      *     grossQuote: Money,
      *     fees: FeeBreakdown,
@@ -517,6 +574,7 @@ final class LegMaterializer
         $actualDecimal = self::scaleDecimal($actual->decimal(), $scale);
 
         if ($actualDecimal->isZero()) {
+            // Actual amount is zero - cannot calculate adjustment ratio
             return null;
         }
 
@@ -524,6 +582,7 @@ final class LegMaterializer
         $actualNegative = $actualDecimal->isNegative();
 
         if ($targetNegative !== $actualNegative && !$targetDecimal->isZero()) {
+            // Target and actual have different signs - cannot calculate meaningful ratio
             return null;
         }
 

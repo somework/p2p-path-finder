@@ -300,6 +300,81 @@ See [docs/decimal-strategy.md](docs/decimal-strategy.md#canonical-scale-and-roun
 for the full canonical policy, including the working precision applied to ratios and
 intermediate sums.【F:src/Application/PathFinder/PathFinder.php†L166-L212】【F:src/Domain/ValueObject/Money.php†L19-L92】
 
+## Memory Usage
+
+Path search memory scales predictably with order book size and hop depth. Understanding memory characteristics is essential for capacity planning and production deployment.
+
+### Quick Reference
+
+| Order Book Size | Typical Peak Memory | Recommended Guards |
+|-----------------|---------------------|-------------------|
+| 100 orders      | 8-15 MB            | 10k states, 25k expansions |
+| 1,000 orders    | 12-30 MB           | 50k states, 100k expansions |
+| 10,000 orders   | 50-150 MB          | 100k states, 200k expansions |
+| 50,000 orders   | 200-500 MB         | 250k states, 250k expansions |
+
+**Scaling factors:**
+- **Per-order overhead:** ~5-10 KB (domain objects, graph edges)
+- **Per-search-state overhead:** ~1 KB (visited state tracking)
+- **Base memory:** ~6-8 MB (framework, services)
+
+### Configuration for Different Workloads
+
+**Latency-sensitive APIs** (< 50ms target):
+
+```php
+$config = PathSearchConfig::builder()
+    ->withSpendAmount($amount)
+    ->withToleranceBounds('0.00', '0.05')
+    ->withHopLimits(1, 4)
+    ->withSearchGuards(10000, 25000)   // visited states, expansions
+    ->withSearchTimeBudget(50)         // milliseconds
+    ->build();
+```
+
+**Expected memory:** 10-30 MB  
+**Use case:** High-frequency trading, public APIs
+
+**Background processing** (< 500ms tolerance):
+
+```php
+$config = PathSearchConfig::builder()
+    ->withSpendAmount($amount)
+    ->withToleranceBounds('0.00', '0.10')
+    ->withHopLimits(1, 6)
+    ->withSearchGuards(100000, 100000)
+    ->withSearchTimeBudget(500)
+    ->build();
+```
+
+**Expected memory:** 30-150 MB  
+**Use case:** Batch analytics, comprehensive path discovery
+
+### Memory Optimization
+
+1. **Pre-filter order books** before search (30-70% reduction):
+   ```php
+   $filtered = $orderBook
+       ->filtered(new AmountRangeFilter($config))
+       ->filtered(new ToleranceWindowFilter($config));
+   ```
+
+2. **Use conservative guard limits** as primary memory control
+3. **Keep resultLimit low** (1-10) unless alternatives are needed
+4. **Limit hop depth** to 4-6 for most use cases
+5. **Monitor guard metrics** via `SearchGuardReport::metrics()`
+
+### Detailed Analysis
+
+For comprehensive memory characteristics, scaling formulas, production recommendations, and troubleshooting guidance, see [docs/memory-characteristics.md](docs/memory-characteristics.md).
+
+Key topics covered:
+- Per-component memory footprint and scaling factors
+- Practical limits for different deployment scenarios
+- Memory vs. performance trade-offs
+- Monitoring and diagnostic strategies
+- OOM prevention and recovery
+
 ## Exceptions
 
 The library ships with domain-specific exceptions under the
