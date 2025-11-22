@@ -47,6 +47,39 @@ use function strtoupper;
 /**
  * Implementation of a tolerance-aware best-path search through the trading graph.
  *
+ * ## Tolerance and Amplifier
+ *
+ * The PathFinder supports a configurable tolerance parameter (0 ≤ tolerance < 1) that
+ * allows the search to explore paths with slightly worse costs than the current best path.
+ *
+ * **Tolerance Amplifier Formula:**
+ * ```
+ * amplifier = 1 / (1 - tolerance)
+ * ```
+ *
+ * This amplifier is used to calculate the maximum allowed cost during pruning:
+ * ```
+ * maxAllowedCost = bestTargetCost × amplifier
+ * ```
+ *
+ * **Examples:**
+ * - tolerance = 0.0 → amplifier = 1.0 (no tolerance, exact cost matching)
+ * - tolerance = 0.1 → amplifier ≈ 1.111 (allow 11.1% worse paths)
+ * - tolerance = 0.2 → amplifier = 1.25 (allow 25% worse paths)
+ * - tolerance = 0.5 → amplifier = 2.0 (allow 100% worse paths)
+ * - tolerance = 0.9 → amplifier = 10.0 (allow 900% worse paths)
+ *
+ * **Pruning Logic:**
+ *
+ * During the search, when expanding a state, the next state's cost is compared against
+ * the maximum allowed cost. If `nextCost > maxAllowedCost`, the state is pruned and
+ * not added to the search queue. This prevents exploring paths that are too expensive
+ * relative to the best known path.
+ *
+ * The tolerance effectively creates a "window" around the best cost within which paths
+ * are still considered worth exploring. Higher tolerance values allow more exploration
+ * but may find paths with worse costs.
+ *
  * @internal
  */
 final class PathFinder
@@ -430,17 +463,44 @@ final class PathFinder
         return $this->normalizeDecimal($currentProduct->multipliedBy($conversionRate));
     }
 
+    /**
+     * Calculates the maximum allowed cost for pruning based on tolerance.
+     *
+     * This method determines the cost threshold above which states will be pruned
+     * from the search. States with `cost > maxAllowedCost` are not explored.
+     *
+     * **Logic**:
+     * - If no best cost known yet: return null (no pruning)
+     * - If tolerance = 0: maxAllowedCost = bestTargetCost (exact matching)
+     * - If tolerance > 0: maxAllowedCost = bestTargetCost × amplifier
+     *
+     * **Example**:
+     * ```
+     * bestTargetCost = 100
+     * tolerance = 0.2 → amplifier = 1.25
+     * maxAllowedCost = 100 × 1.25 = 125
+     * → Paths with cost ≤ 125 are explored, paths with cost > 125 are pruned
+     * ```
+     *
+     * @param BigDecimal|null $bestTargetCost The best (lowest) cost found so far, or null if none yet
+     *
+     * @return BigDecimal|null Maximum allowed cost, or null if no best cost known
+     */
     private function maxAllowedCost(?BigDecimal $bestTargetCost): ?BigDecimal
     {
+        // No best cost known yet - don't prune anything
         if (null === $bestTargetCost) {
             return null;
         }
 
         // bestTargetCost is already normalized when set
+        
+        // Zero tolerance: only allow paths with cost ≤ bestTargetCost (no amplification)
         if (!$this->hasTolerance()) {
             return $bestTargetCost;
         }
 
+        // Non-zero tolerance: allow paths with cost ≤ (bestTargetCost × amplifier)
         return $this->normalizeDecimal($bestTargetCost->multipliedBy($this->toleranceAmplifier));
     }
 
@@ -756,14 +816,52 @@ final class PathFinder
         return $normalized;
     }
 
+    /**
+     * Calculates the tolerance amplifier used for pruning during search.
+     *
+     * The amplifier determines how much worse a path's cost can be compared to the
+     * best known cost while still being explored.
+     *
+     * **Formula**: `amplifier = 1 / (1 - tolerance)`
+     *
+     * **Special Cases**:
+     * - If tolerance = 0: amplifier = 1.0 (no amplification, exact matching)
+     * - If tolerance approaches 1: amplifier approaches infinity (unlimited exploration)
+     *
+     * **Mathematical Derivation**:
+     *
+     * Given a best cost `C_best` and tolerance `t`, we want to allow paths with cost
+     * up to `C_max = C_best × amplifier`.
+     *
+     * The tolerance represents acceptable degradation: `(C_max - C_best) / C_best ≤ t`
+     *
+     * Solving for amplifier:
+     * ```
+     * (C_max - C_best) / C_best ≤ t
+     * C_max / C_best - 1 ≤ t
+     * C_max / C_best ≤ 1 + t
+     * amplifier ≤ 1 + t
+     * ```
+     *
+     * However, the actual formula used is `1 / (1 - t)` which provides tighter bounds
+     * and better numerical properties, particularly for high tolerance values.
+     *
+     * @param BigDecimal $tolerance Normalized tolerance value (0 ≤ tolerance < 1)
+     *
+     * @return BigDecimal Amplifier value at scale 18
+     */
     private function calculateToleranceAmplifier(BigDecimal $tolerance): BigDecimal
     {
+        // Special case: zero tolerance means no amplification (exact cost matching)
         if ($tolerance->isZero()) {
             return $this->unitValue;
         }
 
+        // Calculate complement: (1 - tolerance)
+        // This represents the "strictness" of the tolerance (closer to 0 = more lenient)
         $complement = $this->unitValue->minus($tolerance);
 
+        // Amplifier = 1 / (1 - tolerance)
         // dividedBy already produces a value at self::SCALE, no need to scale again
         return $this->unitValue->dividedBy($complement, self::SCALE, RoundingMode::HALF_UP);
     }
