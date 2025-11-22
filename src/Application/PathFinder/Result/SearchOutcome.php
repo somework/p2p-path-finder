@@ -12,6 +12,8 @@ use JsonSerializable;
  * @phpstan-template-covariant TPath of mixed
  *
  * @psalm-template-covariant TPath as mixed
+ *
+ * @api
  */
 final class SearchOutcome implements JsonSerializable
 {

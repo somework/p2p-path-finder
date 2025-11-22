@@ -12,6 +12,8 @@ use function max;
 
 /**
  * Immutable representation of a tolerance ratio expressed as a decimal value between 0 and 1.
+ *
+ * @api
  */
 final class DecimalTolerance implements JsonSerializable
 {

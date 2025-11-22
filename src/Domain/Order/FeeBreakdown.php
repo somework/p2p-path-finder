@@ -8,6 +8,8 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 /**
  * Immutable value object describing the fee components for an order fill.
+ *
+ * @api
  */
 final class FeeBreakdown
 {

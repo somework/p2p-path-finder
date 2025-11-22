@@ -15,6 +15,8 @@ use function max;
 
 /**
  * Immutable configuration carrying constraints used by {@see PathFinderService}.
+ *
+ * @api
  */
 final class PathSearchConfig
 {

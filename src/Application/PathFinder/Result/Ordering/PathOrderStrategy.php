@@ -72,6 +72,8 @@ namespace SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering;
  * $service = new PathFinderService($graphBuilder, $customStrategy);
  * ```
  *
+ * @api
+ *
  * @see PathOrderKey For the data available for comparison
  * @see CostHopsSignatureOrderingStrategy For the default implementation
  */
@@ -94,6 +96,8 @@ interface PathOrderStrategy
      *     return $left->insertionOrder() <=> $right->insertionOrder();
      * }
      * ```
+     *
+     * @api
      *
      * @param PathOrderKey $left  The first path to compare
      * @param PathOrderKey $right The second path to compare

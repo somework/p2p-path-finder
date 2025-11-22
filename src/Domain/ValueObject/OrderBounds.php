@@ -9,6 +9,8 @@ use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 /**
  * Represents inclusive lower/upper bounds for the fillable base asset amount of an order.
+ *
+ * @api
  */
 final class OrderBounds
 {

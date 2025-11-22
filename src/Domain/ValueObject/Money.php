@@ -19,6 +19,8 @@ use function sprintf;
  * Money instances always carry their currency code, normalized amount representation and
  * the scale used when interacting with arbitrary precision operations. Instances are created
  * through named constructors to guarantee validation and normalization of their internal state.
+ *
+ * @api
  */
 final class Money
 {

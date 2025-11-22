@@ -13,6 +13,8 @@ use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 /**
  * Aggregated representation of a discovered conversion path.
+ *
+ * @api
  */
 final class PathResult implements JsonSerializable
 {

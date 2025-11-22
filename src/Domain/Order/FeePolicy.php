@@ -120,6 +120,8 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
  *
  * Orders without a fee policy (null) are treated as fee-free.
  *
+ * @api
+ *
  * @see FeeBreakdown For the return type structure
  * @see FeePolicyHelper For validation utilities
  * @see Order For attaching policies to orders
@@ -159,6 +161,8 @@ interface FeePolicy
      *
      * The fingerprint must be globally unique across all policy instances. Two policies with
      * different configurations (even of the same type) must return different fingerprints.
+     *
+     * @api
      *
      * @return non-empty-string A unique identifier for this policy configuration
      *

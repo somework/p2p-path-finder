@@ -33,6 +33,8 @@ use function trim;
 
 /**
  * High level facade orchestrating order filtering, graph building and path search.
+ *
+ * @api
  */
 final class PathFinderService
 {
@@ -50,6 +52,9 @@ final class PathFinderService
      */
     private Closure $pathFinderFactory;
 
+    /**
+     * @api
+     */
     public function __construct(
         private readonly GraphBuilder $graphBuilder,
         ?PathOrderStrategy $orderingStrategy = null,
@@ -143,6 +148,8 @@ final class PathFinderService
      * metadata. Inspect the {@see SearchGuardReport} via helpers like
      * {@see SearchGuardReport::anyLimitReached()} to determine whether the search exhausted its
      * configured protections.
+     *
+     * @api
      *
      * @throws GuardLimitExceeded when the search guard aborts the exploration before exhausting the configured constraints
      * @throws InvalidInput       when the requested target asset identifier is empty

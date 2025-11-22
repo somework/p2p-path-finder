@@ -13,6 +13,8 @@ use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 /**
  * Domain entity describing an order that can be traversed within a path search.
+ *
+ * @api
  */
 final class Order
 {

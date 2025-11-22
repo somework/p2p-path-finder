@@ -22,6 +22,8 @@ use function ksort;
  * Immutable map keyed by currency codes with {@see Money} entries.
  *
  * @implements IteratorAggregate<string, Money>
+ *
+ * @api
  */
 final class MoneyMap implements Countable, IteratorAggregate, JsonSerializable
 {

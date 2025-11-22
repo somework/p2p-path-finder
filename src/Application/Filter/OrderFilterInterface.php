@@ -56,6 +56,8 @@ use SomeWork\P2PPathFinder\Domain\Order\Order;
  * }
  * ```
  *
+ * @api
+ *
  * @see OrderBook::filter() for applying filters to order collections
  * @see CurrencyPairFilter for filtering by asset pair
  * @see MinimumAmountFilter for filtering by minimum order size
@@ -68,6 +70,8 @@ interface OrderFilterInterface
      *
      * This method MUST be side-effect free and MUST NOT modify the order.
      * It should execute in constant time O(1) relative to the order book size.
+     *
+     * @api
      *
      * @param Order $order The order to evaluate (MUST NOT be modified)
      *

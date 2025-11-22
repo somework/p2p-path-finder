@@ -8,6 +8,8 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 /**
  * Value object describing a directed asset pair (base -> quote).
+ *
+ * @api
  */
 final class AssetPair
 {

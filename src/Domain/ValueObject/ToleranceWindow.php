@@ -9,6 +9,8 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 /**
  * Represents a normalized tolerance window with deterministic heuristics.
+ *
+ * @api
  */
 final class ToleranceWindow
 {

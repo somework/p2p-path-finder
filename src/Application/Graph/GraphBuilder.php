@@ -16,6 +16,8 @@ use function sort;
 
 /**
  * Converts a collection of domain orders into a weighted directed graph representation.
+ *
+ * @api
  */
 final class GraphBuilder
 {

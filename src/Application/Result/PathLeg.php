@@ -14,6 +14,8 @@ use function strtoupper;
 
 /**
  * Describes a single conversion leg in a path finder result.
+ *
+ * @api
  */
 final class PathLeg implements JsonSerializable
 {

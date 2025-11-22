@@ -20,6 +20,8 @@ use function count;
  * Immutable ordered collection of {@see PathLeg} instances.
  *
  * @implements IteratorAggregate<int, PathLeg>
+ *
+ * @api
  */
 final class PathLegCollection implements Countable, IteratorAggregate, JsonSerializable
 {

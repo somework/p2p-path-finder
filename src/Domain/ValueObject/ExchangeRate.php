@@ -16,6 +16,8 @@ use function strtoupper;
 
 /**
  * Value object encapsulating an exchange rate between two assets.
+ *
+ * @api
  */
 final class ExchangeRate
 {
