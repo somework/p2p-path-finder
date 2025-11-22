@@ -3,8 +3,7 @@
 This quick example shows how to configure search guard limits when integrating the library
 into an application. The full flow fits in a single script and can be executed in under 15
 minutes during onboarding. Run `php examples/guarded-search-example.php` to reproduce the
-same scenario locally—the latest deterministic output is recorded in
-[`docs/audits/bigdecimal-verification.md`](audits/bigdecimal-verification.md).
+same scenario locally and verify the output is deterministic.
 
 > ℹ️  Tolerance inputs and spend calculations follow the canonical policy described in
 > [docs/decimal-strategy.md](decimal-strategy.md#canonical-scale-and-rounding-policy). Keep

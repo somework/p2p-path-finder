@@ -389,7 +389,6 @@ Custom rules are executed on every PHPStan run. To maintain performance:
 ## Related Documentation
 
 - [Decimal Strategy](decimal-strategy.md) - Overall decimal arithmetic approach
-- [Audits](audits/) - Decimal arithmetic audit results
 - [CONTRIBUTING.md](../CONTRIBUTING.md) - Contribution guidelines including decimal arithmetic rules
 
 ## References

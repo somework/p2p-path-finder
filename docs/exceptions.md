@@ -1167,8 +1167,6 @@ Throwable
 
 **If any NO**: Use existing exception type (`InvalidInput`, `GuardLimitExceeded`, `PrecisionViolation`)
 
-**See**: `docs/audits/additional-exception-types-evaluation.md` for detailed guidance
-
 ---
 
 ## FAQ
@@ -1226,16 +1224,11 @@ catch (InvalidInput $e) {
 
 **A**: No. Use `InvalidInput` for all domain validation. Exception messages provide specific context.
 
-**See**: `docs/audits/additional-exception-types-evaluation.md`
-
 ---
 
 ## References
 
 - Exception classes: `src/Exception/`
-- Error handling audit: `docs/audits/error-handling-audit.md`
-- Exception context review: `docs/audits/exception-context-review.md`
-- Exception types evaluation: `docs/audits/additional-exception-types-evaluation.md`
 - Domain layer validation: `src/Domain/`
 - Application layer validation: `src/Application/`
 

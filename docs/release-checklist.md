@@ -11,8 +11,7 @@ to `Brick\Math\BigDecimal`.
    vendor/bin/phpstan analyse --configuration=phpstan.neon.dist --level=max
    vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php --dry-run --diff
    ```
-2. Execute the guard example script and compare the output to the snapshot recorded in
-   [`docs/audits/bigdecimal-verification.md`](audits/bigdecimal-verification.md):
+2. Execute the guard example script and verify the output is correct and deterministic:
    ```bash
    php examples/guarded-search-example.php
    ```

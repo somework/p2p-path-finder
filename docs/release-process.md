@@ -52,7 +52,6 @@ composer examples
 
 # Manually verify example output matches expected behavior
 php examples/guarded-search-example.php
-# Compare output to docs/audits/bigdecimal-verification.md
 ```
 
 ### 3. Documentation Review ✅
