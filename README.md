@@ -73,6 +73,25 @@ Support services that exist only to back the facade&mdash;for example
 are omitted from the generated API reference to reinforce that they may change without
 notice.【F:src/Application/Service/OrderSpendAnalyzer.php†L17-L23】【F:src/Application/Service/LegMaterializer.php†L19-L25】【F:src/Application/Service/ToleranceEvaluator.php†L16-L23】
 
+## API Documentation
+
+Complete API documentation is available in the following guides:
+
+* **[API Stability Guide](docs/api-stability.md)** – Comprehensive reference documenting
+  the stable public API surface, including all classes, interfaces, methods, and their
+  contracts. This guide distinguishes between stable APIs (marked with `@api`) and
+  internal implementation details (marked with `@internal`).
+* **[API Contracts (JSON Serialization)](docs/api-contracts.md)** – Detailed
+  specification of the JSON serialization format for all public result objects including
+  `PathResult`, `SearchOutcome`, `SearchGuardReport`, `Money`, and related types. Use
+  this guide when integrating with the library's JSON output or building client
+  applications.
+
+The `@api` annotations in the source code mark the definitive public API surface that
+will follow semantic versioning guarantees in 1.0+. Generated API documentation is also
+available in [`docs/api/index.md`](docs/api/index.md), created by running
+`php bin/generate-phpdoc.php`.
+
 ## Design Notes
 
 * **Stable priority queue semantics.** The internal `SearchStateQueue` always prefers
