@@ -9,6 +9,15 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
 /**
  * Value object describing a directed asset pair (base -> quote).
  *
+ * ## Invariants
+ *
+ * - **Distinct assets**: Base and quote must be distinct (after normalization)
+ * - **Valid currencies**: Both must match /^[A-Z]{3,12}$/
+ *
+ * @invariant base != quote (after normalization)
+ * @invariant base matches /^[A-Z]{3,12}$/
+ * @invariant quote matches /^[A-Z]{3,12}$/
+ *
  * @api
  */
 final class AssetPair

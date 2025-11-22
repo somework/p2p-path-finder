@@ -16,6 +16,24 @@ use function max;
 /**
  * Immutable configuration carrying constraints used by {@see PathFinderService}.
  *
+ * ## Invariants
+ *
+ * - **Hop constraints**: minimumHops >= 1, maximumHops >= minimumHops
+ * - **Result limit**: resultLimit >= 1
+ * - **Spend bounds computation**: 
+ *   - minSpend = spendAmount × (1 - toleranceWindow.minimum)
+ *   - maxSpend = spendAmount × (1 + toleranceWindow.maximum)
+ * - **Bounds ordering**: minSpend <= spendAmount <= maxSpend
+ * - **Tolerance resolution**: pathFinderTolerance = override OR toleranceWindow.heuristicTolerance
+ *
+ * @invariant minimumHops >= 1
+ * @invariant maximumHops >= minimumHops
+ * @invariant resultLimit >= 1
+ * @invariant minSpend = spendAmount × (1 - toleranceWindow.minimum)
+ * @invariant maxSpend = spendAmount × (1 + toleranceWindow.maximum)
+ * @invariant minSpend <= spendAmount <= maxSpend
+ * @invariant pathFinderTolerance = override OR toleranceWindow.heuristicTolerance
+ *
  * @api
  */
 final class PathSearchConfig

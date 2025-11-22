@@ -86,6 +86,11 @@ Complete API documentation is available in the following guides:
   `PathResult`, `SearchOutcome`, `SearchGuardReport`, `Money`, and related types. Use
   this guide when integrating with the library's JSON output or building client
   applications.
+* **[Domain Model Invariants](docs/domain-invariants.md)** – Complete specification of
+  all domain invariants enforced by value objects and entities. Documents valid ranges,
+  currency format requirements, scale limitations, and validation rules for `Money`,
+  `ExchangeRate`, `OrderBounds`, `ToleranceWindow`, `Order`, and other core domain
+  types. Essential reading for understanding domain constraints and error conditions.
 
 The `@api` annotations in the source code mark the definitive public API surface that
 will follow semantic versioning guarantees in 1.0+. Generated API documentation is also
