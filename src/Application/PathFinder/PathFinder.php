@@ -161,7 +161,37 @@ final class PathFinder
     }
 
     /**
-     * @param callable(CandidatePath):bool|null $acceptCandidate
+     * Searches for the best paths from source to target with optional acceptance filtering.
+     *
+     * @param Graph                              $graph             The trading graph to search
+     * @param string                             $source            Source currency code
+     * @param string                             $target            Target currency code
+     * @param SpendConstraints|null              $spendConstraints  Optional spend amount constraints
+     * @param callable(CandidatePath):bool|null  $acceptCandidate   Optional callback to filter candidate paths
+     *
+     * ## Acceptance Callback Contract
+     *
+     * The callback is invoked when a path reaches the target node, **before** it's added to results.
+     *
+     * **Signature**: `callable(CandidatePath):bool`
+     *
+     * **Return values**:
+     * - `true`: Accept path (add to results)
+     * - `false`: Reject path (continue search for alternatives)
+     * - `null` callback: Accept all paths (default behavior)
+     *
+     * **Guarantees when callback is invoked**:
+     * - Candidate has valid structure (cost, product, hops, edges, range)
+     * - Path reaches target node
+     * - Path hops ≤ maxHops
+     *
+     * **Timing**: Called AFTER path construction, BEFORE result recording, BEFORE tolerance pruning update
+     *
+     * **Error handling**: Callback exceptions propagate to caller (no exception wrapper)
+     *
+     * **Side effects**: Callback may have side effects but must NOT modify graph or candidate
+     *
+     * **Search continuation**: Search always continues after callback, regardless of return value
      *
      * @throws GuardLimitExceeded              when a configured guard limit is exceeded during search
      * @throws InvalidInput|PrecisionViolation when path construction or arithmetic operations fail
