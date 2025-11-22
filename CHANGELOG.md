@@ -2,43 +2,197 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
-project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
 ### Added
-- Community documentation: contributing guide, code of conduct and security policy to help
-  external collaborators prepare for the `1.0.0-rc` release track.
-- Composer metadata for discoverability (keywords, homepage, support and funding
-  information).
-- `PathResultSet::fromPaths()` factory for assembling ordered collections directly from
-  application-level path payloads without hand-crafting `PathResultSetEntry` objects.
-- BigDecimal determinism audit logs and a release checklist covering the guard example,
-  property suite and quality gates required before tagging a release.
+- Nothing yet
 
 ### Changed
-- README now links to community resources and highlights how the changelog will track
-  progress toward the `1.0.0-rc` milestone.
-- Internal: All arithmetic has migrated from BCMath to `Brick\Math\BigDecimal`. Value
-  objects now expose decimal accessors, documentation covers the canonical rounding
-  policy, and helper guides reference the new decimal fixtures.
-- Composer metadata now describes the deterministic BigDecimal search workflow so
-  Packagist highlights the migration when browsing the package listing.
-- Breaking: `PathFinder::findBestPaths()` now consumes `SpendConstraints` and emits
-  `CandidatePath` instances, replacing the previous associative array payloads.
-  Custom callbacks or integrations must migrate to the new value objects.
-- Breaking: `PathFinderService::findBestPaths()` accepts a
-  `PathSearchRequest` encapsulating the order book, search configuration and
-  target asset. Update service integrations to construct and pass the DTO.
-- Breaking: `PathFinderService` now wires its internal helpers automatically and exposes
-  only the `GraphBuilder` and optional `PathOrderStrategy` in its constructor. Custom
-  runner hooks are limited to the `withRunnerFactory()` helper for testing, so
-  integrations relying on the old multi-argument constructor must be updated.
-- Breaking: `SpendConstraints::bounds()` replaces the previous `SpendRange` exposure while
-  an `internalRange()` helper now carries the implementation detail. Update callers to
-  consume the `bounds()` array payload when inspecting minimum/maximum spend values.
-- Documentation: README no longer recommends injecting custom `pathFinderFactory`
-  callbacks and the generated API reference hides the internal graph plumbing, clarifying
-  which extension points remain supported for integrators.
+- Nothing yet
 
-[Unreleased]: https://github.com/somework/p2p-path-finder/compare/main...HEAD
+### Deprecated
+- Nothing yet
+
+### Removed
+- Nothing yet
+
+### Fixed
+- Nothing yet
+
+### Security
+- Nothing yet
+
+## [0.1.0] - TBD
+
+**First tagged pre-release** - This version represents the initial BigDecimal migration and establishes the foundation for the 1.0.0 stable release.
+
+### Added
+- **Core Pathfinding Engine**:
+  - `PathFinderService` for finding optimal currency conversion paths
+  - `PathFinder` algorithm with Dijkstra-like search
+  - `GraphBuilder` for order book graph construction
+  - `SearchGuards` for resource limit enforcement (expansions, visited states, time budget)
+  
+- **Domain Model**:
+  - `Money` value object with arbitrary precision (Brick\Math\BigDecimal)
+  - `ExchangeRate` value object with deterministic decimal arithmetic
+  - `Order` entity for buy/sell orders
+  - `OrderBounds` for order amount constraints
+  - `ToleranceWindow` for acceptable conversion slippage
+  - `AssetPair` for currency pair representation
+  
+- **Configuration**:
+  - `PathSearchConfig` with builder pattern
+  - `PathSearchRequest` DTO for service requests
+  - Configurable tolerance bounds, hop limits, result limits
+  - Guard limits (expansion limit, visited state limit, time budget)
+  
+- **Extensibility**:
+  - `OrderFilterInterface` for custom order filtering
+  - `PathOrderStrategy` for custom path ranking
+  - `FeePolicy` interface for custom fee calculations
+  - Built-in filters: `MinimumAmountFilter`, `MaximumAmountFilter`, `ToleranceWindowFilter`, `CurrencyPairFilter`
+  - Built-in fee policies: `NoFeePolicy`, `PercentageFeePolicy`, `FixedFeePolicy`, `TieredFeePolicy`, `MakerTakerFeePolicy`
+  
+- **Results**:
+  - `SearchOutcome` with paths and guard reports
+  - `PathResult` with detailed path information
+  - `PathLeg` for individual hop details
+  - `SearchGuardReport` for diagnostics
+  - JSON serialization for all result types
+  
+- **Exception Hierarchy**:
+  - `InvalidInput` for domain validation errors
+  - `GuardLimitExceeded` for resource exhaustion
+  - `PrecisionViolation` for arithmetic precision issues
+  - `InfeasiblePath` for impossible path constraints
+  
+- **Documentation**:
+  - Comprehensive README with quick start and examples
+  - Getting Started Guide (step-by-step tutorial)
+  - Troubleshooting Guide (common issues and solutions)
+  - Architecture Guide (7 Mermaid diagrams, 943 lines)
+  - API Contracts (JSON serialization specification)
+  - API Stability Guide (public API guarantees)
+  - Domain Invariants (value object constraints)
+  - Decimal Strategy (arbitrary precision policy)
+  - Memory Characteristics (optimization guide)
+  - Exception Handling Guide (catch strategies)
+  - Versioning Policy (SemVer, BC breaks, deprecation)
+  - Release Process (pre-release checklist, hotfix procedures)
+  - Support Policy (PHP/library version support timelines)
+  
+- **Examples**:
+  - `guarded-search-example.php` - Complete workflow demonstration
+  - `custom-order-filter.php` - 4 filter implementations
+  - `custom-ordering-strategy.php` - 3 ordering strategies
+  - `custom-fee-policy.php` - 5 fee policy implementations
+  - `error-handling.php` - Comprehensive error handling patterns
+  - `performance-optimization.php` - 4 optimization techniques with benchmarks
+  - `examples/README.md` - Complete examples documentation
+  
+- **Testing**:
+  - Unit tests for all domain objects
+  - Integration tests for PathFinderService
+  - Property-based tests for Money and ExchangeRate
+  - Algorithm correctness tests (ordering determinism, guard enforcement)
+  - Edge case tests (tolerance, hop limits, mandatory segments)
+  - Stress tests (large graphs, adversarial scenarios)
+  - Test coverage > 90%
+  
+- **Quality Tools**:
+  - PHPStan level max with custom rules
+  - PHP CS Fixer for code style
+  - Psalm for additional static analysis
+  - Infection for mutation testing
+  - Custom PHPStan rules for decimal arithmetic enforcement
+  
+- **CI/CD**:
+  - Automated tests on PHP 8.2 and 8.3
+  - Static analysis checks
+  - Code style checks
+  - Example validation
+  - Custom PHPStan rules verification
+  
+- **Community**:
+  - Contributing guide
+  - Code of conduct
+  - Security policy
+  - Issue templates
+  - Pull request templates
+  
+- **Composer**:
+  - Example runner scripts (`composer examples`)
+  - Test runner script (`composer phpunit`)
+  - Quality check scripts (`composer check`, `composer check:full`)
+  - Individual tool scripts (phpstan, psalm, php-cs-fixer, etc.)
+
+### Changed
+- **BigDecimal Migration**: All arithmetic migrated from BCMath to `Brick\Math\BigDecimal` for deterministic precision
+- **Value Object API**: Value objects now expose decimal accessors for internal precision control
+- **PathFinder API**: `findBestPaths()` now uses `SpendConstraints` and returns `CandidatePath` instances (replacing associative arrays)
+- **Service API**: `PathFinderService::findBestPaths()` accepts `PathSearchRequest` DTO (encapsulating order book, config, target asset)
+- **Constructor Simplification**: `PathFinderService` constructor simplified to only require `GraphBuilder` and optional `PathOrderStrategy`
+- **SpendConstraints API**: `bounds()` method replaces `SpendRange` exposure; `internalRange()` for implementation details
+- **Documentation**: README clarifies supported extension points (removed custom `pathFinderFactory` recommendation)
+
+### Deprecated
+- Nothing (this is the first release)
+
+### Removed
+- BCMath arithmetic functions (replaced by BigDecimal)
+- Legacy associative array payloads in `PathFinder` (replaced by value objects)
+- Multi-argument `PathFinderService` constructor (simplified to 1-2 arguments)
+
+### Fixed
+- Floating-point precision issues (eliminated by BigDecimal migration)
+- Rounding inconsistencies in Money and ExchangeRate calculations
+- Edge cases in tolerance amplifier calculations
+
+### Security
+- No security issues to report (this is the first release)
+
+---
+
+## Version History Format
+
+Each version should follow this structure:
+
+```markdown
+## [X.Y.Z] - YYYY-MM-DD
+
+### Added
+- New features, functionality, or capabilities
+
+### Changed
+- Changes to existing functionality (backward compatible in MINOR versions)
+
+### Deprecated
+- Features marked for removal in future versions
+
+### Removed
+- Features removed in this version (requires MAJOR version bump)
+
+### Fixed
+- Bug fixes
+
+### Security
+- Security vulnerability fixes
+```
+
+### Category Guidelines
+
+- **Added**: New features, classes, methods, or configuration options
+- **Changed**: Modifications to existing functionality (BC breaks require MAJOR version)
+- **Deprecated**: Features that will be removed in a future version (minimum 1 MINOR version warning)
+- **Removed**: Features that have been deleted (always requires MAJOR version bump)
+- **Fixed**: Bug fixes that restore intended behavior
+- **Security**: Security vulnerability fixes (always released immediately as hotfix)
+
+### Version Comparison Links
+
+[Unreleased]: https://github.com/somework/p2p-path-finder/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/somework/p2p-path-finder/releases/tag/v0.1.0
