@@ -19,6 +19,11 @@ clear separation between the domain model and application services.
 
 See [docs/local-development.md](docs/local-development.md) for platform validation tips.
 
+## Quick Links
+
+- **[Getting Started Guide](docs/getting-started.md)** – Step-by-step tutorial with working examples
+- **[Troubleshooting Guide](docs/troubleshooting.md)** – Common issues and solutions
+
 ## Architecture overview
 
 The codebase is intentionally split into two layers:
@@ -97,6 +102,13 @@ Complete API documentation is available in the following guides:
   `PrecisionViolation`, `InfeasiblePath`), when they're thrown, message formats, and
   recommended recovery strategies. Includes guidelines for contributors on when to throw
   vs return null, message standardization, and best practices for error handling.
+* **[Getting Started Guide](docs/getting-started.md)** – Beginner-friendly tutorial
+  with step-by-step instructions, complete working examples, and explanations of core
+  concepts. Perfect for new users getting started with the library.
+* **[Troubleshooting Guide](docs/troubleshooting.md)** – Solutions to common issues
+  including "no paths found", guard limit breaches, precision errors, currency
+  mismatches, and performance problems. Includes debugging tips and diagnostic
+  techniques.
 
 The `@api` annotations in the source code mark the definitive public API surface that
 will follow semantic versioning guarantees in 1.0+. Generated API documentation is also
