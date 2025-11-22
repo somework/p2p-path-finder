@@ -509,4 +509,261 @@ final class MoneyTest extends TestCase
         $difference = $complexSum->subtract($a);
         $this->assertTrue($difference->equals($b));
     }
+
+    // ==================== Scale Mismatch Arithmetic Tests ====================
+
+    /**
+     * @test
+     */
+    public function testAdditionWithDifferentScales(): void
+    {
+        // Test scale=2 + scale=8 (should use max scale = 8)
+        $a = Money::fromString('USD', '100.50', 2);
+        $b = Money::fromString('USD', '25.12345678', 8);
+        $sum = $a->add($b);
+
+        $this->assertSame('125.62345678', $sum->amount());
+        $this->assertSame(8, $sum->scale());
+        $this->assertSame('USD', $sum->currency());
+
+        // Test scale=0 + scale=4 (should use max scale = 4)
+        $c = Money::fromString('JPY', '1000', 0);
+        $d = Money::fromString('JPY', '0.5555', 4);
+        $sum2 = $c->add($d);
+
+        $this->assertSame('1000.5555', $sum2->amount());
+        $this->assertSame(4, $sum2->scale());
+
+        // Test scale=4 + scale=2 (should use max scale = 4)
+        $e = Money::fromString('EUR', '99.9999', 4);
+        $f = Money::fromString('EUR', '0.01', 2);
+        $sum3 = $e->add($f);
+
+        $this->assertSame('100.0099', $sum3->amount());
+        $this->assertSame(4, $sum3->scale());
+
+        // Test explicit scale override (lower than both operands)
+        $g = Money::fromString('GBP', '10.12345', 5);
+        $h = Money::fromString('GBP', '20.67890', 5);
+        $sum4 = $g->add($h, 2);
+
+        $this->assertSame('30.80', $sum4->amount());
+        $this->assertSame(2, $sum4->scale());
+
+        // Test explicit scale override (higher than both operands)
+        $i = Money::fromString('CHF', '5.5', 1);
+        $j = Money::fromString('CHF', '4.4', 1);
+        $sum5 = $i->add($j, 6);
+
+        $this->assertSame('9.900000', $sum5->amount());
+        $this->assertSame(6, $sum5->scale());
+    }
+
+    /**
+     * @test
+     */
+    public function testSubtractionWithDifferentScales(): void
+    {
+        // Test scale=8 - scale=2 (should use max scale = 8)
+        $a = Money::fromString('BTC', '1.50000000', 8);
+        $b = Money::fromString('BTC', '0.25', 2);
+        $diff = $a->subtract($b);
+
+        $this->assertSame('1.25000000', $diff->amount());
+        $this->assertSame(8, $diff->scale());
+
+        // Test scale=2 - scale=8 (should use max scale = 8)
+        $c = Money::fromString('ETH', '100.50', 2);
+        $d = Money::fromString('ETH', '25.12345678', 8);
+        $diff2 = $c->subtract($d);
+
+        $this->assertSame('75.37654322', $diff2->amount());
+        $this->assertSame(8, $diff2->scale());
+
+        // Test scale=0 - scale=3 (should use max scale = 3)
+        $e = Money::fromString('USD', '1000', 0);
+        $f = Money::fromString('USD', '0.999', 3);
+        $diff3 = $e->subtract($f);
+
+        $this->assertSame('999.001', $diff3->amount());
+        $this->assertSame(3, $diff3->scale());
+
+        // Test explicit scale override
+        $g = Money::fromString('EUR', '100.123456', 6);
+        $h = Money::fromString('EUR', '50.5', 1);
+        $diff4 = $g->subtract($h, 3);
+
+        $this->assertSame('49.623', $diff4->amount());
+        $this->assertSame(3, $diff4->scale());
+
+        // Test subtraction resulting in very small difference
+        $i = Money::fromString('USD', '10.00000001', 8);
+        $j = Money::fromString('USD', '10.00', 2);
+        $diff5 = $i->subtract($j);
+
+        $this->assertSame('0.00000001', $diff5->amount());
+        $this->assertSame(8, $diff5->scale());
+        $this->assertFalse($diff5->isZero());
+    }
+
+    /**
+     * @test
+     */
+    public function testMultiplicationWithDifferentScales(): void
+    {
+        // Multiply uses the scale of the Money instance by default
+        $a = Money::fromString('USD', '100.50', 2);
+        $result1 = $a->multiply('1.5');
+
+        $this->assertSame('150.75', $result1->amount());
+        $this->assertSame(2, $result1->scale());
+
+        // Test with higher scale on Money instance
+        $b = Money::fromString('BTC', '0.12345678', 8);
+        $result2 = $b->multiply('2.5');
+
+        $this->assertSame('0.30864195', $result2->amount());
+        $this->assertSame(8, $result2->scale());
+
+        // Test with explicit scale override (lower)
+        $c = Money::fromString('ETH', '123.456789', 6);
+        $result3 = $c->multiply('1.111111', 2);
+
+        $this->assertSame('137.17', $result3->amount());
+        $this->assertSame(2, $result3->scale());
+
+        // Test with explicit scale override (higher)
+        $d = Money::fromString('EUR', '50.5', 1);
+        $result4 = $d->multiply('1.23456789', 10);
+
+        $this->assertSame('62.3456784450', $result4->amount());
+        $this->assertSame(10, $result4->scale());
+
+        // Test multiplication with very precise multiplier
+        $e = Money::fromString('USD', '1.00', 2);
+        $result5 = $e->multiply('1.005', 4);
+
+        $this->assertSame('1.0050', $result5->amount());
+        $this->assertSame(4, $result5->scale());
+
+        // Test that scale=0 still works correctly
+        $f = Money::fromString('JPY', '1000', 0);
+        $result6 = $f->multiply('1.5');
+
+        $this->assertSame('1500', $result6->amount());
+        $this->assertSame(0, $result6->scale());
+    }
+
+    /**
+     * @test
+     */
+    public function testDivisionWithDifferentScales(): void
+    {
+        // Divide uses the scale of the Money instance by default
+        $a = Money::fromString('USD', '100.00', 2);
+        $result1 = $a->divide('3');
+
+        $this->assertSame('33.33', $result1->amount());
+        $this->assertSame(2, $result1->scale());
+
+        // Test with higher scale on Money instance
+        $b = Money::fromString('BTC', '1.00000000', 8);
+        $result2 = $b->divide('3');
+
+        $this->assertSame('0.33333333', $result2->amount());
+        $this->assertSame(8, $result2->scale());
+
+        // Test with explicit scale override (lower)
+        $c = Money::fromString('ETH', '100.123456', 6);
+        $result3 = $c->divide('7', 2);
+
+        $this->assertSame('14.30', $result3->amount());
+        $this->assertSame(2, $result3->scale());
+
+        // Test with explicit scale override (higher)
+        $d = Money::fromString('EUR', '50.5', 1);
+        $result4 = $d->divide('3', 10);
+
+        $this->assertSame('16.8333333333', $result4->amount());
+        $this->assertSame(10, $result4->scale());
+
+        // Test division with very small divisor (large result)
+        $e = Money::fromString('USD', '1.00', 2);
+        $result5 = $e->divide('0.01', 2);
+
+        $this->assertSame('100.00', $result5->amount());
+        $this->assertSame(2, $result5->scale());
+
+        // Test that scale=0 rounds to integer
+        $f = Money::fromString('JPY', '1000', 0);
+        $result6 = $f->divide('3');
+
+        $this->assertSame('333', $result6->amount());
+        $this->assertSame(0, $result6->scale());
+    }
+
+    /**
+     * @test
+     */
+    public function testScaleDerivationRules(): void
+    {
+        // Rule 1: Addition/Subtraction use max(left.scale, right.scale)
+        $low = Money::fromString('USD', '10.5', 1);
+        $high = Money::fromString('USD', '20.12345', 5);
+
+        $addResult = $low->add($high);
+        $this->assertSame(5, $addResult->scale());
+        $this->assertSame('30.62345', $addResult->amount());
+
+        $subResult = $high->subtract($low);
+        $this->assertSame(5, $subResult->scale());
+        $this->assertSame('9.62345', $subResult->amount());
+
+        // Rule 2: Multiplication/Division use left.scale
+        $money = Money::fromString('EUR', '100.00', 2);
+        
+        $multResult = $money->multiply('1.123456789');
+        $this->assertSame(2, $multResult->scale());
+        $this->assertSame('112.35', $multResult->amount());
+
+        $divResult = $money->divide('3.123456789');
+        $this->assertSame(2, $divResult->scale());
+        $this->assertSame('32.02', $divResult->amount());
+
+        // Rule 3: Explicit scale override takes precedence
+        $a = Money::fromString('BTC', '1.12345678', 8);
+        $b = Money::fromString('BTC', '2.34', 2);
+
+        $explicitAdd = $a->add($b, 4);
+        $this->assertSame(4, $explicitAdd->scale());
+        $this->assertSame('3.4635', $explicitAdd->amount());
+
+        $explicitMult = $a->multiply('2', 10);
+        $this->assertSame(10, $explicitMult->scale());
+        $this->assertSame('2.2469135600', $explicitMult->amount());
+
+        // Rule 4: Verify scale propagation in chained operations
+        $base = Money::fromString('USD', '100', 0);
+        $add1 = Money::fromString('USD', '0.5', 1);
+        $add2 = Money::fromString('USD', '0.25', 2);
+
+        // First addition: max(0, 1) = 1
+        $chain1 = $base->add($add1);
+        $this->assertSame(1, $chain1->scale());
+        $this->assertSame('100.5', $chain1->amount());
+
+        // Second addition: max(1, 2) = 2
+        $chain2 = $chain1->add($add2);
+        $this->assertSame(2, $chain2->scale());
+        $this->assertSame('100.75', $chain2->amount());
+
+        // Rule 5: Compare operation respects scale
+        $x = Money::fromString('CHF', '10.1', 1);
+        $y = Money::fromString('CHF', '10.10', 2);
+        $this->assertTrue($x->equals($y));
+
+        $z = Money::fromString('CHF', '10.101', 3);
+        $this->assertFalse($x->equals($z));
+        $this->assertTrue($z->greaterThan($x));
+    }
 }

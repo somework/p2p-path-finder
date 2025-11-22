@@ -30,9 +30,25 @@ use function sprintf;
  * - **Precision preservation**: Amounts are stored as BigDecimal and normalized to the
  *   specified scale using HALF_UP rounding
  *
+ * ## Scale Derivation Rules
+ *
+ * Arithmetic operations follow deterministic scale derivation rules to ensure predictable
+ * precision handling:
+ *
+ * - **Addition/Subtraction**: Result scale = max(left.scale, right.scale) unless explicitly
+ *   overridden. This ensures no precision loss from either operand.
+ * - **Multiplication/Division**: Result scale = left.scale (the Money instance's scale) unless
+ *   explicitly overridden. Scalar operands do not influence the result scale.
+ * - **Explicit Override**: All arithmetic operations accept an optional scale parameter that
+ *   takes precedence over default derivation rules.
+ * - **Comparison**: Uses max(left.scale, right.scale, explicitScale) to ensure accurate
+ *   comparison at the highest precision available.
+ *
  * @invariant amount >= 0
  * @invariant scale >= 0 && scale <= 50
  * @invariant currency matches /^[A-Z]{3,12}$/
+ * @invariant add/subtract result scale = max(left.scale, right.scale) OR explicit scale
+ * @invariant multiply/divide result scale = left.scale OR explicit scale
  *
  * @api
  */
