@@ -217,7 +217,7 @@ final class ToleranceAmplifierTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{tolerance: numeric-string, expected: numeric-string}>
+     * @return iterable<string, array{tolerance: numeric-string, expectedValue: numeric-string}>
      */
     public static function provideToleranceAndExpectedAmplifiers(): iterable
     {
@@ -225,62 +225,62 @@ final class ToleranceAmplifierTest extends TestCase
 
         yield 'tolerance 0% → amplifier 1.0' => [
             'tolerance' => '0.0',
-            'expected' => '1.0',
+            'expectedValue' => '1.0',
         ];
 
         yield 'tolerance 10% → amplifier 1.111...' => [
             'tolerance' => '0.1',
-            'expected' => '1.111111111111111111',
+            'expectedValue' => '1.111111111111111111',
         ];
 
         yield 'tolerance 20% → amplifier 1.25' => [
             'tolerance' => '0.2',
-            'expected' => '1.25',
+            'expectedValue' => '1.25',
         ];
 
         yield 'tolerance 25% → amplifier 1.333...' => [
             'tolerance' => '0.25',
-            'expected' => '1.333333333333333333',
+            'expectedValue' => '1.333333333333333333',
         ];
 
         yield 'tolerance 33.33% → amplifier 1.5' => [
             'tolerance' => '0.3333333333',
-            'expected' => '1.500000000000000000',
+            'expectedValue' => '1.500000000000000000',
         ];
 
         yield 'tolerance 50% → amplifier 2.0' => [
             'tolerance' => '0.5',
-            'expected' => '2.0',
+            'expectedValue' => '2.0',
         ];
 
         yield 'tolerance 75% → amplifier 4.0' => [
             'tolerance' => '0.75',
-            'expected' => '4.0',
+            'expectedValue' => '4.0',
         ];
 
         yield 'tolerance 80% → amplifier 5.0' => [
             'tolerance' => '0.8',
-            'expected' => '5.0',
+            'expectedValue' => '5.0',
         ];
 
         yield 'tolerance 90% → amplifier 10.0' => [
             'tolerance' => '0.9',
-            'expected' => '10.0',
+            'expectedValue' => '10.0',
         ];
 
         yield 'tolerance 95% → amplifier 20.0' => [
             'tolerance' => '0.95',
-            'expected' => '20.0',
+            'expectedValue' => '20.0',
         ];
 
         yield 'tolerance 99% → amplifier 100.0' => [
             'tolerance' => '0.99',
-            'expected' => '100.0',
+            'expectedValue' => '100.0',
         ];
 
         yield 'tolerance 99.9% → amplifier 1000.0' => [
             'tolerance' => '0.999',
-            'expected' => '1000.0',
+            'expectedValue' => '1000.0',
         ];
     }
 
