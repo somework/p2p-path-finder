@@ -15,11 +15,21 @@ confidence.
 
 - Follow the project coding style by running:
   ```bash
+  # Quick quality checks (recommended before commit)
+  composer check
+  
+  # Or run individually:
   vendor/bin/phpunit --testdox
-  vendor/bin/phpstan analyse --configuration=phpstan.neon.dist --level=max
+  vendor/bin/phpstan analyse    # Includes custom decimal arithmetic rules
   vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php --dry-run --diff
+  
+  # Full quality suite (includes mutation testing)
+  composer check:full
   ```
   Run the fixer without `--dry-run` if the diff highlights style issues.
+  
+  **Note**: PHPStan automatically runs custom rules that enforce decimal arithmetic
+  consistency. See the "Decimal arithmetic guidelines" section below for details.
 - Keep new public API surface area documented with phpdoc blocks where appropriate and add
   unit tests that cover the behaviour you are changing.
 - Update the [CHANGELOG](CHANGELOG.md) for user-visible changes, especially when a new

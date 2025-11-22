@@ -1,0 +1,103 @@
+name: Custom Rules Check
+
+# This workflow specifically tests custom PHPStan rules for decimal arithmetic
+# It runs the same analysis as the main quality workflow but with explicit
+# reporting to verify custom rules are working correctly.
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'phpstan/**'
+      - 'phpstan.neon.dist'
+      - 'phpstan-baseline.neon'
+      - 'src/**/*.php'
+  pull_request:
+    branches: [ "**" ]
+    paths:
+      - 'phpstan/**'
+      - 'phpstan.neon.dist'
+      - 'phpstan-baseline.neon'
+      - 'src/**/*.php'
+  workflow_dispatch:
+
+jobs:
+  verify-custom-rules:
+    name: Verify Custom PHPStan Rules
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: bcmath
+          ini-values: memory_limit=-1
+
+      - name: Install dependencies
+        uses: ramsey/composer-install@v3
+        with:
+          composer-options: --prefer-dist --no-interaction --no-progress
+          custom-cache-suffix: ${{ hashFiles('composer.json') }}
+
+      - name: Verify custom rules are loaded
+        run: |
+          echo "::group::Checking custom rule files exist"
+          test -f phpstan/Rules/FloatLiteralInArithmeticRule.php && echo "✓ FloatLiteralInArithmeticRule.php"
+          test -f phpstan/Rules/MissingRoundingModeRule.php && echo "✓ MissingRoundingModeRule.php"
+          test -f phpstan/Rules/BCMathFunctionCallRule.php && echo "✓ BCMathFunctionCallRule.php"
+          test -f phpstan/phpstan-custom-rules.neon && echo "✓ phpstan-custom-rules.neon"
+          echo "::endgroup::"
+
+      - name: Run PHPStan with custom rules
+        run: |
+          echo "::group::Running PHPStan analysis"
+          echo "Custom rules enforcing decimal arithmetic consistency:"
+          echo "  1. FloatLiteralInArithmeticRule - Detects float literals in arithmetic"
+          echo "  2. MissingRoundingModeRule - Enforces explicit RoundingMode"
+          echo "  3. BCMathFunctionCallRule - Prohibits BCMath functions"
+          echo ""
+          composer phpstan:custom-rules
+          echo "::endgroup::"
+
+      - name: Test rules catch violations
+        run: |
+          echo "::group::Testing rule detection with intentional violations"
+          
+          # Create temporary test file with violations
+          cat > src/_RuleTest.php << 'EOF'
+          <?php
+          namespace SomeWork\P2PPathFinder;
+          use Brick\Math\BigDecimal;
+          
+          final class _RuleTest {
+              public function test1(): float { return 10.5 + 20.3; }
+              public function test2(): BigDecimal { return BigDecimal::of('10.5')->toScale(2); }
+              public function test3(): string { return bcadd('10', '20', 2); }
+          }
+          EOF
+          
+          # Run PHPStan on test file (should find 4 errors)
+          if vendor/bin/phpstan analyse src/_RuleTest.php --no-progress 2>&1 | grep -q "Found 4 errors"; then
+            echo "✓ Custom rules successfully detected all 4 violations"
+          else
+            echo "✗ Custom rules did not detect expected violations"
+            vendor/bin/phpstan analyse src/_RuleTest.php --no-progress
+            exit 1
+          fi
+          
+          # Clean up
+          rm src/_RuleTest.php
+          echo "::endgroup::"
+
+      - name: Summary
+        run: |
+          echo "✅ Custom PHPStan rules verification completed successfully"
+          echo ""
+          echo "Active rules:"
+          echo "  • FloatLiteralInArithmeticRule (ID: p2pPathFinder.floatLiteral)"
+          echo "  • MissingRoundingModeRule (ID: p2pPathFinder.missingRoundingMode)"
+          echo "  • BCMathFunctionCallRule (ID: p2pPathFinder.bcmathUsage)"
+
