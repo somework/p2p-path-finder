@@ -64,9 +64,19 @@ final class PathFinderService
     }
 
     /**
-     * @internal
+     * Factory hook for testing. NOT PART OF PUBLIC API.
      *
-     * @param Closure(PathSearchRequest):(Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath>) $pathFinderFactory
+     * This method exists solely to enable dependency injection of mock PathFinder
+     * implementations during testing. Production code should NEVER use this method.
+     * Use the standard constructor instead.
+     *
+     * @internal This is for testing only and may change without notice
+     *
+     * @param GraphBuilder                                                                                                      $graphBuilder
+     * @param PathOrderStrategy|null                                                                                            $orderingStrategy
+     * @param Closure(PathSearchRequest):(Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath>) $pathFinderFactory Factory that creates PathFinder runner instances
+     *
+     * @return self Service instance with injected factory (for testing only)
      */
     public static function withRunnerFactory(
         GraphBuilder $graphBuilder,

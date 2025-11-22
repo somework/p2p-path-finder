@@ -12,7 +12,15 @@ use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 use function str_starts_with;
 
 /**
- * Represents the spend boundaries propagated through the search graph.
+ * Represents the spend boundaries derived from tolerance window configuration.
+ *
+ * This value object encapsulates the minimum, maximum, and desired spend amounts
+ * that constrain path finding. It is exposed through PathSearchRequest::spendConstraints()
+ * to provide read-only access to the derived spend boundaries.
+ *
+ * Consumers typically don't need to interact with this directly as the path finding
+ * happens automatically based on the PathSearchConfig. It's provided for transparency
+ * into how the tolerance window translates to actual spend constraints.
  */
 final class SpendConstraints
 {

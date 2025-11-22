@@ -14,7 +14,11 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
 /**
  * Represents a candidate path discovered by the search algorithm.
  *
- * @internal
+ * This class is used internally by PathFinderService and is not exposed to consumers.
+ * The callback that receives CandidatePath instances is created inside PathFinderService
+ * and never passed to consumer code. Consumers interact with PathResult instead.
+ *
+ * @internal This is an internal value object and may change without notice
  */
 final class CandidatePath
 {
