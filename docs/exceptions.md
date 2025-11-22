@@ -179,32 +179,79 @@ private function maxAllowedCost(?BigDecimal $bestTargetCost): ?BigDecimal
 - Resource limits reached (expansions, states, time)
 - Configuration specifies throwing on limit breach
 
-### Example
+### Opt-In Exception Pattern
+
+**Key Feature**: `GuardLimitExceeded` is **opt-in** via configuration.
+
+**Default Behavior**: Return `SearchOutcome` with guard report metadata (no exception)
+
+**Exception Mode**: Enable via `throwOnGuardLimit` configuration
 
 ```php
-// PathFinderService
-if ($config->throwOnGuardLimit() && $guardLimits->anyLimitReached()) {
-    throw new GuardLimitExceeded(
-        sprintf(
-            'Search terminated: %s',
-            $this->formatGuardLimitMessage($config, $guardLimits)
-        )
-    );
+// Default mode (recommended) - No exception, check metadata
+$config = PathSearchConfigBuilder::create(...)
+    ->build();
+
+$result = $service->findBestPaths($request);
+if ($result->guardLimits()->anyLimitReached()) {
+    // Handle partial results gracefully
+}
+
+// Exception mode (opt-in)
+$config = PathSearchConfigBuilder::create(...)
+    ->withGuardLimitException(true)  // Opt-in to throwing
+    ->build();
+
+try {
+    $result = $service->findBestPaths($request);
+} catch (GuardLimitExceeded $e) {
+    // Guard limit hit - exception thrown
+    // Message contains: "Search terminated: expansions 5000/5000"
 }
 ```
+
+### Exception Message Format
+
+**Format**: `Search terminated: {limit1 actual/max}, {limit2 actual/max}, ...`
+
+**Examples**:
+```
+Search terminated: expansions 5000/5000
+Search terminated: visited states 2000/2000
+Search terminated: elapsed 523.456ms/500ms
+Search terminated: expansions 5000/5000, visited states 2000/2000
+```
+
+**Context Included**:
+- ✅ Actual value reached
+- ✅ Configured limit
+- ✅ Multiple breaches listed together
+- ✅ Precise timing for time budget
 
 ### Guidelines
 
 ✅ **DO**:
-- Include which limit was exceeded
+- Use default mode (return `SearchOutcome`) for most cases
+- Include which limit was exceeded in message
 - Provide context (current vs limit)
-- Make throwing configurable when appropriate
+- List all breached guards together
 
 ❌ **DON'T**:
 - Use for invalid configuration (use `InvalidInput`)
-- Throw when consumer wants results despite limit
+- Always throw - make it opt-in
+- Lose guard report information
 
-**Note**: `PathFinderService` supports both throwing and non-throwing modes via `throwOnGuardLimit` configuration.
+### Choosing Between Modes
+
+**Use Default Mode (No Exception)** when:
+- Partial results are acceptable
+- Consumer wants to inspect guard report
+- Graceful degradation preferred
+
+**Use Exception Mode** when:
+- Complete results required (partial not acceptable)
+- Consumer prefers exception-based flow control
+- Integration with exception-based error handling
 
 ---
 
@@ -244,73 +291,281 @@ if ($requiredScale < $minimumSafeScale) {
 
 ---
 
-## Convention 5: Reserved - `InfeasiblePath` for Materialization Failures
+## Convention 5: `InfeasiblePath` - User-Space Exception
 
-### When to Use (Future)
+### Important: Library Does NOT Throw This Exception
 
-**Throw `InfeasiblePath` when**:
-- Path found but cannot be materialized
-- Orders insufficient for path execution
-- Liquidity constraints prevent execution
+**`InfeasiblePath` is a user-space exception** for application logic, NOT thrown by the P2P Path Finder library.
 
-### Example (Proposed)
+**Purpose**: Signal that no viable path exists for required business operation in consumer application.
+
+### Why Library Doesn't Throw It
+
+1. **Library returns empty results gracefully**: `SearchOutcome` with empty paths collection
+2. **"Infeasible" is application-specific**: Different apps have different viability criteria
+3. **Library doesn't know "why" paths failed**: Insufficient context for meaningful error message
+4. **Consumer can provide better context**: Application knows business requirements
+
+### When Consumers Should Use It
+
+**Throw `InfeasiblePath` in your application when**:
+- Your application requires a path (not optional)
+- Business rules mandate specific path characteristics
+- Custom validation fails on all paths
+- You need to signal path unavailability as an error
+
+### Consumer Usage Examples
+
+#### Example 1: Required Path
 
 ```php
-// PathFinderService (future use)
-$materialized = $this->legMaterializer->materialize($edges, $spend, $initialSeed, $targetCurrency);
+// Application code
+$result = $service->findBestPaths($request);
 
-if (null === $materialized) {
+if ($result->paths()->isEmpty()) {
+    // Application decision: path is required
     throw new InfeasiblePath(
-        'Found path cannot be materialized due to insufficient order liquidity'
+        sprintf(
+            'No viable path from %s to %s with requested constraints: ' .
+            'spend=%s, tolerance=%s-%s, hops=%d-%d',
+            $request->sourceAsset(),
+            $request->targetAsset(),
+            $request->spendAmount()->format(),
+            $config->toleranceBounds()->minimum(),
+            $config->toleranceBounds()->maximum(),
+            $config->minimumHops(),
+            $config->maximumHops()
+        )
     );
 }
 ```
 
-### Current Status
+#### Example 2: Business Rule Violation
 
-⚠️ **Not currently used** - Reserved for future path materialization error handling
+```php
+// Application code - business rule: need 2+ paths for redundancy
+$result = $service->findBestPaths($request);
+
+if (count($result->paths()) < 2) {
+    throw new InfeasiblePath(
+        sprintf(
+            'Insufficient path redundancy for safe execution. ' .
+            'Required: 2 paths, Found: %d',
+            count($result->paths())
+        )
+    );
+}
+```
+
+#### Example 3: Custom Validation Failure
+
+```php
+// Application code - custom validation
+$result = $service->findBestPaths($request);
+
+foreach ($result->paths() as $path) {
+    if ($this->customValidator->canExecute($path)) {
+        return $path;  // Found viable path
+    }
+}
+
+// No path passed custom validation
+throw new InfeasiblePath(
+    'No path meets application-specific execution requirements'
+);
+```
+
+### When NOT to Use It
+
+❌ **DON'T throw** when:
+- Empty results are acceptable outcome
+- Consumer can handle empty results without exception
+- No business requirement for path availability
+
+**Instead**: Check for empty results and handle gracefully:
+
+```php
+// ✅ GOOD: Handle empty results gracefully
+$result = $service->findBestPaths($request);
+
+if ($result->paths()->isEmpty()) {
+    return $this->handleNoPathsAvailable($request);
+}
+```
+
+### Guidelines
+
+✅ **DO**:
+- Use in application layer (not library layer)
+- Provide specific context about why path is required
+- Include constraint details in message
+- Explain what business rule was violated
+
+❌ **DON'T**:
+- Throw from library code
+- Use for optional paths
+- Use when empty results are valid outcome
+- Expect library to throw this exception
 
 ---
 
 ## Error Message Guidelines
 
-### Good Error Messages
+### Standard Message Format
 
-✅ **Be Specific**:
+**Template**: `{What's wrong}. {Context: values/comparison}. {Guidance: if helpful}.`
+
+**Components**:
+1. **What's wrong**: Clear statement of constraint or error
+2. **Context**: Specific values, expected vs actual
+3. **Guidance**: Actionable suggestion (when applicable)
+
+### Guideline 1: Start with What's Wrong
+
+✅ **Be Specific and Direct**:
 ```php
-// Good
-throw new InvalidInput('Money amount cannot be negative. Got: USD -100.00');
+// ✅ GOOD: Clear statement
+throw new InvalidInput('Money amount cannot be negative.');
 
-// Bad
-throw new InvalidInput('Invalid money');
+// ❌ BAD: Vague or indirect
+throw new InvalidInput('Invalid money: negative amount');
 ```
 
-✅ **Include Context**:
-```php
-// Good
-throw new InvalidInput('Maximum hops (3) must be greater than or equal to minimum hops (5).');
+### Guideline 2: Include Context When Available
 
-// Bad
-throw new InvalidInput('Invalid hop configuration');
+✅ **Show Actual Values**:
+```php
+// ✅ GOOD: Includes invalid value
+throw new InvalidInput(
+    sprintf('Money amount cannot be negative. Got: %s %s', $currency, $amount)
+);
+
+// ⚠️ ACCEPTABLE but less helpful
+throw new InvalidInput('Money amount cannot be negative.');
 ```
 
-✅ **Suggest Fix (when possible)**:
+✅ **Show Expected vs Actual for Mismatches**:
 ```php
-// Good
+// ✅ GOOD: Shows both sides
+throw new InvalidInput(
+    sprintf('Currency mismatch. Expected: %s, Got: %s', $expected, $actual)
+);
+
+// ❌ BAD: Missing context
+throw new InvalidInput('Currency mismatch.');
+```
+
+### Guideline 3: Use Consistent Terminology
+
+**Standard Terms**:
+
+| Concept | ✅ Use | ❌ Avoid |
+|---------|--------|----------|
+| Money quantity | amount | value, sum |
+| Currency code | currency | asset (when specific to code) |
+| Path length | hops | steps, jumps |
+| Upper bound | maximum | max (in prose) |
+| Lower bound | minimum | min (in prose) |
+| Guard limit | limit | maximum, threshold |
+
+**Examples**:
+```php
+// ✅ GOOD: Consistent terminology
+throw new InvalidInput('Money amount cannot be negative.');
+throw new InvalidInput('Maximum hops must be at least one.');
+
+// ❌ BAD: Inconsistent
+throw new InvalidInput('Money value cannot be negative.');
+throw new InvalidInput('Max steps must be at least one.');
+```
+
+### Guideline 4: For Numeric Constraints, Show Provided Value
+
+```php
+// ✅ GOOD: Shows what was provided
+throw new InvalidInput(
+    sprintf('Maximum hops must be at least one. Got: %d', $maxHops)
+);
+
+// ⚠️ ACCEPTABLE but less helpful
+throw new InvalidInput('Maximum hops must be at least one.');
+```
+
+### Guideline 5: For Comparisons, Show Both Values
+
+```php
+// ✅ GOOD: Shows both min and max
+throw new InvalidInput(
+    sprintf(
+        'Minimum amount cannot exceed the maximum amount. Min: %s, Max: %s',
+        $min->format(),
+        $max->format()
+    )
+);
+
+// ⚠️ Less helpful
+throw new InvalidInput('Minimum amount cannot exceed the maximum amount.');
+```
+
+### Guideline 6: Include Actionable Guidance When Possible
+
+✅ **Suggest How to Fix**:
+```php
+// ✅ GOOD: Explains problem and solution
 throw new InvalidInput(
     'Tolerance window collapsed to zero range due to insufficient spend amount precision. ' .
     'Increase spend amount scale or adjust tolerance bounds.'
 );
+
+// ⚠️ Less helpful: No guidance
+throw new InvalidInput('Tolerance window collapsed to zero range.');
 ```
 
-### Error Message Format
+### Guideline 7: Keep Messages Concise
 
-**Pattern**: `{What's wrong}. {Specific details}`
+✅ **Be Clear and Concise**:
+```php
+// ✅ GOOD: Clear and brief
+throw new InvalidInput('Division by zero.');
 
-**Examples**:
-- `"Currency cannot be empty."`
-- `"Exchange rate must be greater than zero. Got: -0.5"`
-- `"Minimum amount cannot exceed the maximum amount. Min: 100, Max: 50"`
+// ❌ TOO VERBOSE
+throw new InvalidInput(
+    'The division operation cannot be performed because the divisor value is zero, ' .
+    'which would result in an undefined mathematical result. Please provide a non-zero divisor.'
+);
+```
+
+### Message Examples by Exception Type
+
+**InvalidInput** - Constraint violations:
+```
+Money amount cannot be negative. Got: USD -100.00
+Maximum hops must be at least one. Got: 0
+Currency mismatch. Expected: USD, Got: EUR
+Minimum amount cannot exceed maximum amount. Min: 100, Max: 50
+Currency cannot be empty.
+Division by zero.
+```
+
+**GuardLimitExceeded** - Resource exhaustion:
+```
+Search terminated: expansions 5000/5000
+Search terminated: visited states 2000/2000
+Search terminated: elapsed 523.456ms/500ms
+Search terminated: expansions 5000/5000, visited states 2000/2000
+```
+
+**PrecisionViolation** - Arithmetic precision (future):
+```
+Cannot scale down to 2 decimal places without precision loss. Current scale: 8, Minimum safe scale: 6. Suggested: Use scale >= 6 or accept rounding.
+```
+
+**InfeasiblePath** - User-space path unavailability:
+```
+No viable path from USD to EUR with requested constraints: spend=100.00, tolerance=0.0-0.2, hops=1-4
+Insufficient path redundancy for safe execution. Required: 2 paths, Found: 1
+No path meets application-specific execution requirements
+```
 
 ---
 
