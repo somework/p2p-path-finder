@@ -234,4 +234,138 @@ final class MoneyTest extends TestCase
 
         Money::fromString('USD', '1.00')->add(Money::fromString('EUR', '1.00'));
     }
+
+    // ==================== Scale Boundary Tests ====================
+
+    /**
+     * @test
+     */
+    public function scale_zero_allows_integer_amounts(): void
+    {
+        $money = Money::fromString('USD', '100', 0);
+
+        $this->assertSame('100', $money->amount());
+        $this->assertSame(0, $money->scale());
+        $this->assertSame('USD', $money->currency());
+    }
+
+    /**
+     * @test
+     */
+    public function scale_zero_rounds_decimals_to_integer(): void
+    {
+        $money = Money::fromString('JPY', '123.6', 0);
+
+        $this->assertSame('124', $money->amount());
+        $this->assertSame(0, $money->scale());
+    }
+
+    /**
+     * @test
+     */
+    public function scale_maximum_allows_fifty_decimals(): void
+    {
+        $amount = '1.12345678901234567890123456789012345678901234567890';
+        $money = Money::fromString('BTC', $amount, 50);
+
+        $this->assertSame(50, $money->scale());
+        $this->assertSame('BTC', $money->currency());
+        $this->assertSame('1.12345678901234567890123456789012345678901234567890', $money->amount());
+    }
+
+    /**
+     * @test
+     */
+    public function scale_maximum_handles_rounding_at_boundary(): void
+    {
+        // Input has 51 decimals, should round to 50 using HALF_UP
+        $amount = '1.123456789012345678901234567890123456789012345678905';
+        $money = Money::fromString('ETH', $amount, 50);
+
+        $this->assertSame(50, $money->scale());
+        // The 51st digit is 5, so HALF_UP rounds up the 50th digit
+        $this->assertSame('1.12345678901234567890123456789012345678901234567891', $money->amount());
+    }
+
+    /**
+     * @test
+     */
+    public function negative_scale_throws_exception(): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Scale cannot be negative');
+
+        Money::fromString('USD', '100.00', -1);
+    }
+
+    /**
+     * @test
+     */
+    public function scale_above_maximum_throws_exception(): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Scale cannot exceed 50 decimal places');
+
+        Money::fromString('USD', '100.00', 51);
+    }
+
+    /**
+     * @test
+     */
+    public function scale_boundary_with_scale_method(): void
+    {
+        $money = Money::fromString('USD', '100.123', 3);
+
+        // Scale 0 should work
+        $scaleZero = $money->withScale(0);
+        $this->assertSame('100', $scaleZero->amount());
+
+        // Scale 50 should work
+        $scaleFifty = $money->withScale(50);
+        $this->assertSame(50, $scaleFifty->scale());
+    }
+
+    /**
+     * @test
+     */
+    public function with_scale_rejects_negative_scale(): void
+    {
+        $money = Money::fromString('USD', '100.00', 2);
+
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Scale cannot be negative');
+
+        $money->withScale(-1);
+    }
+
+    /**
+     * @test
+     */
+    public function with_scale_rejects_scale_above_maximum(): void
+    {
+        $money = Money::fromString('USD', '100.00', 2);
+
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Scale cannot exceed 50 decimal places');
+
+        $money->withScale(51);
+    }
+
+    /**
+     * @test
+     */
+    public function arithmetic_operations_work_at_scale_boundaries(): void
+    {
+        // Scale 0
+        $a = Money::fromString('USD', '100', 0);
+        $b = Money::fromString('USD', '50', 0);
+        $sum = $a->add($b);
+        $this->assertSame('150', $sum->amount());
+
+        // Scale 50
+        $c = Money::fromString('BTC', '1.' . str_repeat('1', 50), 50);
+        $d = Money::fromString('BTC', '2.' . str_repeat('2', 50), 50);
+        $sumHigh = $c->add($d);
+        $this->assertSame(50, $sumHigh->scale());
+    }
 }
