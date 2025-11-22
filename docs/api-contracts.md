@@ -117,6 +117,57 @@ Breaking changes to JSON contracts will only occur in major version releases (2.
 
 ---
 
+### DecimalTolerance
+
+**Class**: `SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance`
+
+**Purpose**: Represents a tolerance ratio as a decimal value between 0 and 1.
+
+**JSON Structure**:
+
+A simple numeric string (not an object):
+
+```json
+"0.0123456789"
+```
+
+**Format**:
+- Type: string (numeric)
+- Range: "0.0" to "1.0" (inclusive)
+- Precision: Typically 18 decimal places (canonical scale)
+- Represents a ratio (e.g., "0.05" = 5% tolerance)
+
+**Examples**:
+
+```json
+"0.0000000000"
+```
+Zero tolerance (exact match required)
+
+```json
+"0.0500000000000000000"
+```
+5% tolerance at scale 18
+
+```json
+"1.0000000000000000000"
+```
+100% tolerance (maximum)
+
+**Notes**:
+- Serializes as a plain string, not an object (unlike Money)
+- The string is a decimal ratio between 0 and 1
+- To convert to percentage: multiply by 100 (use `percentage()` method)
+- The scale is not included in JSON (it's internal state)
+- Trailing zeros are preserved for consistency
+
+**Usage in API**:
+- Used in `PathResult.residualTolerance` field
+- Represents remaining tolerance after accounting for a path
+- Always between 0.0 (no tolerance left) and 1.0 (full tolerance remaining)
+
+---
+
 ## Path Results
 
 ### PathResult
