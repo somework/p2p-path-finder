@@ -51,6 +51,14 @@ final class SegmentCapacityTotals
         return $this->mandatory->scale();
     }
 
+    /**
+     * Returns the optional capacity headroom (maximum - mandatory).
+     *
+     * This represents the additional capacity beyond mandatory minimums that
+     * MAY be filled. When headroom is zero, only mandatory segments are relevant.
+     *
+     * @return Money The difference between maximum and mandatory capacity
+     */
     public function optionalHeadroom(): Money
     {
         return $this->maximum->subtract($this->mandatory, $this->scale());
