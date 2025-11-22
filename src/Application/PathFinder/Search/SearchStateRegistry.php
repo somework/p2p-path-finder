@@ -5,6 +5,33 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Application\PathFinder\Search;
 
 /**
+ * Global registry tracking the best states seen at each node across all search paths.
+ *
+ * ## Purpose
+ *
+ * The registry maintains the best (lowest cost, fewest hops) states per node per signature.
+ * This enables:
+ * 1. **Dominance pruning**: Skip expanding states worse than known states
+ * 2. **State counting**: Track unique (node, signature) pairs for guard limits
+ * 3. **Efficiency**: Avoid re-exploring dominated paths
+ *
+ * ## Structure
+ *
+ * ```
+ * SearchStateRegistry
+ *   ├─ Node "USD" → SearchStateRecordCollection
+ *   │    ├─ Signature "range:100-200" → Record(cost:1.0, hops:0)
+ *   │    └─ Signature "range:50-100" → Record(cost:1.5, hops:1)
+ *   └─ Node "GBP" → SearchStateRecordCollection
+ *        └─ Signature "range:80-160" → Record(cost:0.8, hops:1)
+ * ```
+ *
+ * ## Delta Tracking
+ *
+ * `register()` returns a delta indicating state count changes:
+ * - **+1**: New signature registered (increases visited states)
+ * - **0**: Existing signature updated or skipped (no count change)
+ *
  * @internal
  */
 final class SearchStateRegistry

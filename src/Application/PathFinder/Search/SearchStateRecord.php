@@ -51,6 +51,20 @@ final class SearchStateRecord
         return $this->signature;
     }
 
+    /**
+     * Determines if this record dominates another.
+     *
+     * Record A dominates Record B if:
+     * - A.cost ≤ B.cost AND
+     * - A.hops ≤ B.hops
+     *
+     * Dominated records can be safely pruned as they represent strictly worse paths.
+     *
+     * @param self $other The record to compare against
+     * @param int $scale The decimal scale for cost comparison
+     *
+     * @return bool True if this record dominates the other
+     */
     public function dominates(self $other, int $scale): bool
     {
         $comparison = $this->scaleDecimal($this->cost, $scale)
