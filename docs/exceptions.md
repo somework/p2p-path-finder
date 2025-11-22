@@ -869,23 +869,364 @@ try {
 
 ---
 
+## Catch Strategies
+
+### Strategy 1: Catch All Library Exceptions
+
+**Use Case**: Generic error handling for any library error
+
+```php
+use SomeWork\P2PPathFinder\Exception\ExceptionInterface;
+
+try {
+    $result = $service->findBestPaths($request);
+} catch (ExceptionInterface $e) {
+    // Handle all library exceptions
+    $this->logger->error('Path finding failed', [
+        'exception' => $e->getMessage(),
+        'type' => get_class($e),
+    ]);
+    
+    return $this->handlePathFindingError($e);
+}
+```
+
+**Benefits**:
+- ✅ Catches all library exceptions
+- ✅ Simple, catch-all strategy
+- ✅ Good for logging/monitoring
+
+**Drawbacks**:
+- ⚠️ Can't distinguish error types
+- ⚠️ Same handling for all errors
+
+---
+
+### Strategy 2: Catch Specific Exception Types
+
+**Use Case**: Different handling for different error types
+
+```php
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
+
+try {
+    $result = $service->findBestPaths($request);
+} catch (InvalidInput $e) {
+    // Bad input - show error to user
+    return $this->showValidationError($e->getMessage());
+    
+} catch (GuardLimitExceeded $e) {
+    // Resource limit hit - retry with higher limits or return partial
+    $this->logger->warning('Guard limit exceeded', ['exception' => $e]);
+    return $this->retryWithHigherLimits($request);
+    
+} catch (PrecisionViolation $e) {
+    // Arithmetic issue - increase precision or notify admin
+    $this->logger->error('Precision violation', ['exception' => $e]);
+    return $this->handlePrecisionError($e);
+}
+```
+
+**Benefits**:
+- ✅ Tailored handling per error type
+- ✅ Better user experience
+- ✅ Specific recovery strategies
+
+**Drawbacks**:
+- ⚠️ More verbose
+- ⚠️ Need to know exception types
+
+---
+
+### Strategy 3: Check Before Throw (Guard Limits)
+
+**Use Case**: Prefer metadata over exceptions for guard limits
+
+```php
+// Configure to NOT throw on guard limits (default)
+$config = PathSearchConfigBuilder::create(...)
+    ->build();  // throwOnGuardLimit defaults to false
+
+$result = $service->findBestPaths($request);
+
+// Check guard report
+if ($result->guardLimits()->anyLimitReached()) {
+    $this->logger->info('Search limited by guards', [
+        'guardReport' => [
+            'expansions' => $result->guardLimits()->expansions(),
+            'expansionLimit' => $result->guardLimits()->expansionLimit(),
+            'visitedStates' => $result->guardLimits()->visitedStates(),
+            'visitedStateLimit' => $result->guardLimits()->visitedStateLimit(),
+        ],
+    ]);
+    
+    // Decide: accept partial results or retry
+    if ($result->paths()->isEmpty()) {
+        return $this->retryWithHigherLimits($request);
+    }
+}
+
+// Use results (complete or partial)
+return $result->paths();
+```
+
+**Benefits**:
+- ✅ No exception handling needed
+- ✅ Graceful degradation
+- ✅ Full guard context available
+- ✅ Can distinguish partial vs complete
+
+**Recommended**: This is the preferred approach for guard limits.
+
+---
+
+### Strategy 4: Validate Early
+
+**Use Case**: Catch validation errors before expensive operations
+
+```php
+// Validate configuration before search
+try {
+    $config = PathSearchConfigBuilder::create($orderBook, $targetAsset, $tolerance)
+        ->withHopLimits($minHops, $maxHops)
+        ->withResultLimit($topK)
+        ->build();
+} catch (InvalidInput $e) {
+    // Config validation failed - don't proceed
+    return $this->handleConfigError($e);
+}
+
+// Validate orders before processing
+try {
+    $orders = [];
+    foreach ($rawOrders as $rawOrder) {
+        $orders[] = $this->createOrder($rawOrder);  // Throws InvalidInput
+    }
+} catch (InvalidInput $e) {
+    // Order validation failed
+    return $this->handleOrderError($e);
+}
+
+// Now perform search with validated input
+$result = $service->findBestPaths(new PathSearchRequest($orderBook, $config, $targetAsset));
+```
+
+**Benefits**:
+- ✅ Fail fast
+- ✅ Clear error location
+- ✅ Avoid expensive operations with bad input
+
+---
+
+### Strategy 5: Combine Strategies
+
+**Use Case**: Comprehensive error handling
+
+```php
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
+use SomeWork\P2PPathFinder\Exception\ExceptionInterface;
+
+// Step 1: Validate early
+try {
+    $config = $this->buildConfig($request);
+} catch (InvalidInput $e) {
+    return $this->handleValidationError($e);
+}
+
+// Step 2: Perform search with guard metadata (not exceptions)
+try {
+    $result = $service->findBestPaths(new PathSearchRequest($orderBook, $config, $targetAsset));
+} catch (InvalidInput $e) {
+    // Unexpected validation error during search
+    return $this->handleValidationError($e);
+} catch (PrecisionViolation $e) {
+    // Arithmetic precision issue
+    return $this->handlePrecisionError($e);
+} catch (ExceptionInterface $e) {
+    // Any other library exception
+    $this->logger->error('Unexpected error', ['exception' => $e]);
+    throw $e;  // Re-throw unexpected errors
+}
+
+// Step 3: Check guard limits
+if ($result->guardLimits()->anyLimitReached()) {
+    if ($result->paths()->isEmpty()) {
+        // No results due to guards - retry or fail
+        return $this->handleGuardLimitWithNoResults($result);
+    } else {
+        // Partial results - log and continue
+        $this->logger->info('Partial results due to guard limits');
+    }
+}
+
+// Step 4: Check for empty results
+if ($result->paths()->isEmpty()) {
+    // No paths found (search completed, no limits hit)
+    return $this->handleNoPathsFound($request);
+}
+
+// Step 5: Use results
+return $this->processResults($result->paths());
+```
+
+**Benefits**:
+- ✅ Comprehensive coverage
+- ✅ Clear separation of concerns
+- ✅ Graceful degradation
+- ✅ Good logging
+
+---
+
+### Strategy Comparison
+
+| Strategy | Use Case | Complexity | Recommended |
+|----------|----------|------------|-------------|
+| Catch All | Generic error handling | Low | ⚠️ Basic apps only |
+| Catch Specific | Tailored error handling | Medium | ✅ Most apps |
+| Check Metadata | Guard limits | Low | ✅ Preferred for guards |
+| Validate Early | Fail fast | Medium | ✅ Performance-critical |
+| Combined | Production applications | High | ✅ Production use |
+
+---
+
+## Exception Hierarchy Reference
+
+### Complete Hierarchy
+
+```
+Throwable
+  └─ ExceptionInterface (marker interface)
+      │
+      ├─ InvalidInput extends InvalidArgumentException
+      │   Use: Malformed or unsupported input from consumer
+      │   Thrown by: Domain layer, Application layer
+      │   Consumer action: Validate input, show error to user
+      │
+      ├─ GuardLimitExceeded extends RuntimeException
+      │   Use: Search guard rails exceeded (opt-in)
+      │   Thrown by: PathFinderService (when throwOnGuardLimit=true)
+      │   Consumer action: Retry with higher limits or accept partial
+      │
+      ├─ PrecisionViolation extends RuntimeException
+      │   Use: Arithmetic guarantees cannot be upheld
+      │   Thrown by: PathFinder, calculation helpers
+      │   Consumer action: Increase precision, adjust scale
+      │
+      └─ InfeasiblePath extends RuntimeException
+          Use: Path unavailability (user-space)
+          Thrown by: Consumer application (NOT library)
+          Consumer action: Application-specific handling
+```
+
+### Exception Quick Reference
+
+| Exception | When Thrown | Who Throws | Recovery Strategy |
+|-----------|-------------|------------|-------------------|
+| `InvalidInput` | Invalid parameters, constraints violated | Library | Validate input, fix parameters |
+| `GuardLimitExceeded` | Resource limits exceeded (opt-in) | Library | Retry with higher limits |
+| `PrecisionViolation` | Precision guarantees failed | Library | Increase scale/precision |
+| `InfeasiblePath` | Required path not available | **Consumer** | Application-specific |
+
+---
+
 ## For Contributors
 
 ### Before Adding Code
 
 1. **Identify error scenarios** in your feature
-2. **Choose appropriate handling** based on this guide
+2. **Choose appropriate exception type** based on this guide
 3. **Write error tests** for all scenarios
 4. **Document null returns** in PHPDoc
+5. **Follow message guidelines** (what's wrong, context, guidance)
 
 ### Code Review Checklist
 
 - [ ] All invariants validated in constructor
 - [ ] All error scenarios have tests
 - [ ] Exception messages are clear and specific
-- [ ] Null returns are documented
+- [ ] Correct exception type used (InvalidInput, GuardLimitExceeded, etc.)
+- [ ] Null returns documented in PHPDoc
 - [ ] No silent failures
 - [ ] Consistent with existing patterns
+- [ ] Exception messages include context (values, expected vs actual)
+- [ ] Consistent terminology used
+
+### Adding New Exception Types
+
+**Before adding a new exception type, ask**:
+
+1. ✅ Is this a distinct error category?
+2. ✅ Do consumers need to handle it differently?
+3. ✅ Does the exception type convey information the message can't?
+4. ✅ Is it NOT a refinement of existing exceptions?
+
+**If all YES**: Consider adding new exception type
+
+**If any NO**: Use existing exception type (`InvalidInput`, `GuardLimitExceeded`, `PrecisionViolation`)
+
+**See**: `docs/audits/additional-exception-types-evaluation.md` for detailed guidance
+
+---
+
+## FAQ
+
+### Q: Should I throw an exception for empty results?
+
+**A**: No. Empty results are a valid business outcome. Return empty `SearchOutcome` instead.
+
+**See**: "Empty Results Handling" section above
+
+---
+
+### Q: Should I use `GuardLimitExceeded` or check guard metadata?
+
+**A**: Prefer checking guard metadata (default behavior). Use `GuardLimitExceeded` only when you need exception-based flow control.
+
+**See**: "Convention 3: Throw GuardLimitExceeded" section above
+
+---
+
+### Q: When should I use `InfeasiblePath`?
+
+**A**: In your application code when a required path is not available. The library never throws this exception.
+
+**See**: "Convention 5: InfeasiblePath - User-Space Exception" section above
+
+---
+
+### Q: Can I catch `InvalidInput` to handle all validation errors?
+
+**A**: Yes. All input validation errors (domain and application layer) throw `InvalidInput`.
+
+---
+
+### Q: How do I distinguish between order validation and config validation errors?
+
+**A**: Check the exception message. Both throw `InvalidInput`, but the message explains what failed.
+
+```php
+catch (InvalidInput $e) {
+    if (str_contains($e->getMessage(), 'hops')) {
+        // Config error
+    } elseif (str_contains($e->getMessage(), 'order')) {
+        // Order error
+    }
+    // Or just handle all as "invalid input"
+}
+```
+
+**Note**: In most cases, you don't need to distinguish - just show the error message to the user.
+
+---
+
+### Q: Should I create domain-specific exceptions (e.g., `MoneyException`, `OrderException`)?
+
+**A**: No. Use `InvalidInput` for all domain validation. Exception messages provide specific context.
+
+**See**: `docs/audits/additional-exception-types-evaluation.md`
 
 ---
 
@@ -893,6 +1234,8 @@ try {
 
 - Exception classes: `src/Exception/`
 - Error handling audit: `docs/audits/error-handling-audit.md`
+- Exception context review: `docs/audits/exception-context-review.md`
+- Exception types evaluation: `docs/audits/additional-exception-types-evaluation.md`
 - Domain layer validation: `src/Domain/`
 - Application layer validation: `src/Application/`
 
@@ -901,4 +1244,5 @@ try {
 ## Revision History
 
 - **v1.0** (2024-11-22): Initial conventions established based on codebase audit
+- **v1.1** (2024-11-22): Added catch strategies, FAQ, and complete hierarchy reference
 

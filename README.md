@@ -91,6 +91,12 @@ Complete API documentation is available in the following guides:
   currency format requirements, scale limitations, and validation rules for `Money`,
   `ExchangeRate`, `OrderBounds`, `ToleranceWindow`, `Order`, and other core domain
   types. Essential reading for understanding domain constraints and error conditions.
+* **[Exception Handling Guide](docs/exceptions.md)** – Comprehensive guide to the
+  library's exception hierarchy, error handling conventions, and catch strategies.
+  Documents all exception types (`InvalidInput`, `GuardLimitExceeded`,
+  `PrecisionViolation`, `InfeasiblePath`), when they're thrown, message formats, and
+  recommended recovery strategies. Includes guidelines for contributors on when to throw
+  vs return null, message standardization, and best practices for error handling.
 
 The `@api` annotations in the source code mark the definitive public API surface that
 will follow semantic versioning guarantees in 1.0+. Generated API documentation is also
