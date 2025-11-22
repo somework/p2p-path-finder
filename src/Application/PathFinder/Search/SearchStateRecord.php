@@ -61,7 +61,7 @@ final class SearchStateRecord
      * Dominated records can be safely pruned as they represent strictly worse paths.
      *
      * @param self $other The record to compare against
-     * @param int $scale The decimal scale for cost comparison
+     * @param int  $scale The decimal scale for cost comparison
      *
      * @return bool True if this record dominates the other
      */

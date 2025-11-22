@@ -12,6 +12,8 @@ use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 
+use function sprintf;
+
 /**
  * Tests the tolerance amplifier calculation and its mathematical correctness.
  *
@@ -32,7 +34,7 @@ final class ToleranceAmplifierTest extends TestCase
     /**
      * @testdox Tolerance amplifier is 1.0 when tolerance is zero (no amplification)
      */
-    public function testToleranceAmplifierWithZeroTolerance(): void
+    public function test_tolerance_amplifier_with_zero_tolerance(): void
     {
         $pathFinder = new PathFinder(maxHops: 2, tolerance: '0');
         $amplifier = $this->getToleranceAmplifier($pathFinder);
@@ -43,13 +45,13 @@ final class ToleranceAmplifierTest extends TestCase
     /**
      * @testdox Tolerance amplifier calculation is mathematically correct for various tolerance values
      *
-     * @param numeric-string $tolerance      Input tolerance (0 ≤ tolerance < 1)
-     * @param numeric-string $expectedValue  Expected amplifier value: 1 / (1 - tolerance)
+     * @param numeric-string $tolerance     Input tolerance (0 ≤ tolerance < 1)
+     * @param numeric-string $expectedValue Expected amplifier value: 1 / (1 - tolerance)
      *
      * @dataProvider provideToleranceAndExpectedAmplifiers
      */
     #[DataProvider('provideToleranceAndExpectedAmplifiers')]
-    public function testToleranceAmplifierCalculation(string $tolerance, string $expectedValue): void
+    public function test_tolerance_amplifier_calculation(string $tolerance, string $expectedValue): void
     {
         $pathFinder = new PathFinder(maxHops: 2, tolerance: $tolerance);
         $amplifier = $this->getToleranceAmplifier($pathFinder);
@@ -77,7 +79,7 @@ final class ToleranceAmplifierTest extends TestCase
     /**
      * @testdox Tolerance amplifier with medium tolerance (50%) produces correct amplification
      */
-    public function testToleranceAmplifierWithMediumTolerance(): void
+    public function test_tolerance_amplifier_with_medium_tolerance(): void
     {
         // tolerance = 0.5 → amplifier = 1 / (1 - 0.5) = 1 / 0.5 = 2.0
         $pathFinder = new PathFinder(maxHops: 2, tolerance: '0.5');
@@ -95,7 +97,7 @@ final class ToleranceAmplifierTest extends TestCase
     /**
      * @testdox Tolerance amplifier with high tolerance (90%) produces large amplification
      */
-    public function testToleranceAmplifierWithHighTolerance(): void
+    public function test_tolerance_amplifier_with_high_tolerance(): void
     {
         // tolerance = 0.9 → amplifier = 1 / (1 - 0.9) = 1 / 0.1 = 10.0
         $pathFinder = new PathFinder(maxHops: 2, tolerance: '0.9');
@@ -113,7 +115,7 @@ final class ToleranceAmplifierTest extends TestCase
     /**
      * @testdox Tolerance amplifier with near-maximum tolerance (0.999...) produces very large amplification
      */
-    public function testToleranceAmplifierWithNearMaxTolerance(): void
+    public function test_tolerance_amplifier_with_near_max_tolerance(): void
     {
         // tolerance = 0.999999999999999999 → amplifier = 1 / (1 - 0.999999999999999999) = very large
         $tolerance = '0.999999999999999999';
@@ -140,7 +142,7 @@ final class ToleranceAmplifierTest extends TestCase
     /**
      * @testdox Tolerance amplifier respects upper bound constraint to prevent overflow
      */
-    public function testToleranceAmplifierWithUpperBoundConstraint(): void
+    public function test_tolerance_amplifier_with_upper_bound_constraint(): void
     {
         // PathFinder clamps tolerance to toleranceUpperBound (1 - epsilon)
         // This test verifies extreme tolerance values are handled safely
@@ -160,7 +162,7 @@ final class ToleranceAmplifierTest extends TestCase
     /**
      * @testdox maxAllowedCost correctly applies amplifier to best target cost
      */
-    public function testMaxAllowedCostWithAmplifier(): void
+    public function test_max_allowed_cost_with_amplifier(): void
     {
         // tolerance = 0.2 → amplifier = 1 / (1 - 0.2) = 1.25
         $pathFinder = new PathFinder(maxHops: 2, tolerance: '0.2');
@@ -183,7 +185,7 @@ final class ToleranceAmplifierTest extends TestCase
     /**
      * @testdox maxAllowedCost returns best cost when tolerance is zero (no amplification)
      */
-    public function testMaxAllowedCostWithZeroTolerance(): void
+    public function test_max_allowed_cost_with_zero_tolerance(): void
     {
         $pathFinder = new PathFinder(maxHops: 2, tolerance: '0');
 
@@ -203,7 +205,7 @@ final class ToleranceAmplifierTest extends TestCase
     /**
      * @testdox maxAllowedCost returns null when no best cost exists yet
      */
-    public function testMaxAllowedCostWithNoBestCost(): void
+    public function test_max_allowed_cost_with_no_best_cost(): void
     {
         $pathFinder = new PathFinder(maxHops: 2, tolerance: '0.1');
 
@@ -298,4 +300,3 @@ final class ToleranceAmplifierTest extends TestCase
         return $amplifier;
     }
 }
-

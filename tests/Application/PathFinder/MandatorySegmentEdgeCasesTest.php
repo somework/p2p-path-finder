@@ -32,17 +32,17 @@ final class MandatorySegmentEdgeCasesTest extends TestCase
     /**
      * @testdox Segments with mandatory capacity exceeding spend constraints are handled correctly
      */
-    public function testMandatorySegmentsExceedingConstraints(): void
+    public function test_mandatory_segments_exceeding_constraints(): void
     {
         // Create an order with high minimum (due to fees)
         // This creates a mandatory segment that may exceed our spend amount
         $orderBook = new OrderBook();
-        
+
         // Order with min=200, max=500 (mandatory segment [200,200] + optional [0,300])
         $orderBook->add(OrderFactory::buy('USD', 'EUR', '200.000', '500.000', '1.200', 3, 3));
 
         $graph = (new GraphBuilder())->build(iterator_to_array($orderBook));
-        
+
         // Try to spend only 100 USD (less than the 200 USD minimum)
         $spendConstraints = SpendConstraints::fromScalars('USD', '100.000', '100.000', '100.000');
 
@@ -55,7 +55,7 @@ final class MandatorySegmentEdgeCasesTest extends TestCase
         );
 
         $result = $pathFinder->findBestPaths($graph, 'USD', 'EUR', $spendConstraints, null);
-        
+
         // PathFinder should find no valid paths since we can't meet the mandatory minimum
         // (spend amount 100 < mandatory minimum 200)
         self::assertCount(0, $result->paths()->toArray(), 'Should find no paths when spend < mandatory minimum');
@@ -64,7 +64,7 @@ final class MandatorySegmentEdgeCasesTest extends TestCase
     /**
      * @testdox All-mandatory vs mixed segments are aggregated correctly
      */
-    public function testAllMandatoryVsMixedSegments(): void
+    public function test_all_mandatory_vs_mixed_segments(): void
     {
         // Test Case 1: Edge with only mandatory segment (no optional headroom)
         $allMandatory = EdgeSegmentCollection::fromArray([
@@ -93,7 +93,7 @@ final class MandatorySegmentEdgeCasesTest extends TestCase
     /**
      * @testdox Zero mandatory capacity (all optional) is aggregated correctly
      */
-    public function testZeroMandatoryCapacity(): void
+    public function test_zero_mandatory_capacity(): void
     {
         // Edge with only optional segments (no mandatory minimum)
         $allOptional = EdgeSegmentCollection::fromArray([
@@ -110,7 +110,7 @@ final class MandatorySegmentEdgeCasesTest extends TestCase
     /**
      * @testdox Segment pruner correctly prunes when optional headroom is zero
      */
-    public function testMandatorySegmentPruningZeroHeadroom(): void
+    public function test_mandatory_segment_pruning_zero_headroom(): void
     {
         $pruner = new SegmentPruner(EdgeSegmentCollection::MEASURE_QUOTE);
 
@@ -131,7 +131,7 @@ final class MandatorySegmentEdgeCasesTest extends TestCase
     /**
      * @testdox Segment pruner correctly handles boundaries with mixed capacities
      */
-    public function testMandatorySegmentPruningAtBoundaries(): void
+    public function test_mandatory_segment_pruning_at_boundaries(): void
     {
         $pruner = new SegmentPruner(EdgeSegmentCollection::MEASURE_QUOTE);
 
@@ -147,14 +147,14 @@ final class MandatorySegmentEdgeCasesTest extends TestCase
 
         // Should keep mandatory + non-zero optionals, prune zero-capacity optional
         self::assertCount(3, $pruned, 'Should keep mandatory + 2 non-zero optionals');
-        
+
         // First should be mandatory
         self::assertTrue($pruned[0]->isMandatory(), 'First segment should be mandatory');
-        
+
         // Remaining should be optionals sorted by max capacity DESC
         self::assertFalse($pruned[1]->isMandatory(), 'Second should be optional');
         self::assertFalse($pruned[2]->isMandatory(), 'Third should be optional');
-        
+
         // Verify sorting: higher max capacity first
         self::assertSame('100.000', $pruned[1]->quote()->max()->amount());
         self::assertSame('25.000', $pruned[2]->quote()->max()->amount());
@@ -163,38 +163,38 @@ final class MandatorySegmentEdgeCasesTest extends TestCase
     /**
      * @testdox Segment collection correctly represents order bounds
      */
-    public function testSegmentCollectionRepresentsOrderBounds(): void
+    public function test_segment_collection_represents_order_bounds(): void
     {
         // Simulate what GraphBuilder creates for an order with min/max bounds
         // When hasFees=true and minBase > 0, GraphBuilder creates:
         // 1. Mandatory segment [min, min]
         // 2. Optional segment [0, max-min]
-        
+
         $segments = EdgeSegmentCollection::fromArray([
             $this->segment(true, '100.000', '100.000'),  // Mandatory [100,100]
             $this->segment(false, '0.000', '400.000'),   // Optional [0,400]
         ]);
-        
+
         // Verify capacity totals match expected order bounds
         $totals = $segments->capacityTotals(EdgeSegmentCollection::MEASURE_BASE, 3);
         self::assertNotNull($totals);
-        
+
         // Mandatory should equal the order minimum (100)
         self::assertSame('100.000', $totals->mandatory()->amount());
-        
+
         // Maximum should equal the order maximum (100 + 400 = 500)
         self::assertSame('500.000', $totals->maximum()->amount());
-        
+
         // Headroom should be max - min (400)
         self::assertSame('400.000', $totals->optionalHeadroom()->amount());
-        
+
         // This structure correctly represents an order with bounds [100, 500]
     }
 
     /**
      * @testdox Multiple mandatory segments are aggregated correctly
      */
-    public function testMultipleMandatorySegments(): void
+    public function test_multiple_mandatory_segments(): void
     {
         // Edge with multiple mandatory segments (unusual but should be handled)
         $segments = EdgeSegmentCollection::fromArray([
@@ -205,13 +205,13 @@ final class MandatorySegmentEdgeCasesTest extends TestCase
 
         $totals = $segments->capacityTotals(EdgeSegmentCollection::MEASURE_QUOTE, 3);
         self::assertNotNull($totals);
-        
+
         // Mandatory = sum of all mandatory mins = 50 + 30 = 80
         self::assertSame('80.000', $totals->mandatory()->amount());
-        
+
         // Maximum = sum of all maxes = 50 + 30 + 100 = 180
         self::assertSame('180.000', $totals->maximum()->amount());
-        
+
         // Headroom = 180 - 80 = 100
         self::assertSame('100.000', $totals->optionalHeadroom()->amount());
     }
@@ -219,7 +219,7 @@ final class MandatorySegmentEdgeCasesTest extends TestCase
     /**
      * @testdox Segment sorting is stable and deterministic
      */
-    public function testSegmentSortingDeterminism(): void
+    public function test_segment_sorting_determinism(): void
     {
         $pruner = new SegmentPruner(EdgeSegmentCollection::MEASURE_QUOTE);
 
@@ -251,7 +251,7 @@ final class MandatorySegmentEdgeCasesTest extends TestCase
         // Since both optionals have max=100, sort by min DESC: 20 before 10
         self::assertSame('20.000', $pruned1[1]->quote()->min()->amount());
         self::assertSame('10.000', $pruned1[2]->quote()->min()->amount());
-        
+
         self::assertSame('20.000', $pruned2[1]->quote()->min()->amount());
         self::assertSame('10.000', $pruned2[2]->quote()->min()->amount());
     }
@@ -278,4 +278,3 @@ final class MandatorySegmentEdgeCasesTest extends TestCase
         );
     }
 }
-

@@ -7,6 +7,8 @@ namespace SomeWork\P2PPathFinder\Tests\Application\PathFinder\Guard;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\PathFinder\Guard\SearchGuards;
 
+use const PHP_INT_MAX;
+
 final class SearchGuardsTest extends TestCase
 {
     public function test_it_reports_expansion_guard_breaches(): void
@@ -219,7 +221,7 @@ final class SearchGuardsTest extends TestCase
     /**
      * @testdox Multiple guards (expansion + time + visited) reached simultaneously
      */
-    public function testMultipleGuardsBreachedSimultaneously(): void
+    public function test_multiple_guards_breached_simultaneously(): void
     {
         $now = 0.0;
         $clock = static function () use (&$now): float {
@@ -260,7 +262,7 @@ final class SearchGuardsTest extends TestCase
     /**
      * @testdox Expansion limit of exactly 1 allows only one expansion
      */
-    public function testGuardWithExactlyOneExpansion(): void
+    public function test_guard_with_exactly_one_expansion(): void
     {
         $clock = static fn (): float => 0.0;
         $guards = new SearchGuards(1, null, $clock);
@@ -281,7 +283,7 @@ final class SearchGuardsTest extends TestCase
     /**
      * @testdox Time budget of 0ms immediately blocks expansion
      */
-    public function testGuardWithZeroMillisecondTimeBudget(): void
+    public function test_guard_with_zero_millisecond_time_budget(): void
     {
         $now = 0.0;
         $clock = static function () use (&$now): float {
@@ -302,7 +304,7 @@ final class SearchGuardsTest extends TestCase
     /**
      * @testdox Guards with PHP_INT_MAX limits behave as effectively unlimited
      */
-    public function testGuardsWithMaxIntLimits(): void
+    public function test_guards_with_max_int_limits(): void
     {
         $clock = static fn (): float => 0.0;
         $guards = new SearchGuards(PHP_INT_MAX, null, $clock);
@@ -324,7 +326,7 @@ final class SearchGuardsTest extends TestCase
     /**
      * @testdox Time budget with microsecond precision works correctly
      */
-    public function testTimeBudgetWithMicrosecondPrecision(): void
+    public function test_time_budget_with_microsecond_precision(): void
     {
         $now = 0.0;
         $clock = static function () use (&$now): float {
@@ -351,7 +353,7 @@ final class SearchGuardsTest extends TestCase
     /**
      * @testdox Expansion limit reached before time budget
      */
-    public function testExpansionLimitReachedBeforeTimeBudget(): void
+    public function test_expansion_limit_reached_before_time_budget(): void
     {
         $now = 0.0;
         $clock = static function () use (&$now): float {
@@ -378,7 +380,7 @@ final class SearchGuardsTest extends TestCase
     /**
      * @testdox Time budget reached before expansion limit
      */
-    public function testTimeBudgetReachedBeforeExpansionLimit(): void
+    public function test_time_budget_reached_before_expansion_limit(): void
     {
         $now = 0.0;
         $clock = static function () use (&$now): float {
@@ -406,7 +408,7 @@ final class SearchGuardsTest extends TestCase
     /**
      * @testdox Visited states guard triggered while other guards not reached
      */
-    public function testVisitedStatesGuardWithoutOtherLimits(): void
+    public function test_visited_states_guard_without_other_limits(): void
     {
         $clock = static fn (): float => 0.0;
         $guards = new SearchGuards(1000, null, $clock);
@@ -430,7 +432,7 @@ final class SearchGuardsTest extends TestCase
     /**
      * @testdox Guards work correctly after repeated canExpand calls without recording
      */
-    public function testRepeatedCanExpandCallsWithoutRecording(): void
+    public function test_repeated_can_expand_calls_without_recording(): void
     {
         $now = 0.0;
         $clock = static function () use (&$now): float {
@@ -471,7 +473,7 @@ final class SearchGuardsTest extends TestCase
      * after time budget is reached if expansion limit hasn't been reached. In practice,
      * this doesn't cause issues because the search loop breaks on first false return.
      */
-    public function testMultipleCanExpandChecksAfterTimeBudget(): void
+    public function test_multiple_can_expand_checks_after_time_budget(): void
     {
         $now = 0.0;
         $clock = static function () use (&$now): float {
@@ -497,7 +499,7 @@ final class SearchGuardsTest extends TestCase
     /**
      * @testdox Zero expansion limit with time budget still blocks immediately
      */
-    public function testZeroExpansionLimitOverridesTimeBudget(): void
+    public function test_zero_expansion_limit_overrides_time_budget(): void
     {
         $now = 0.0;
         $clock = static function () use (&$now): float {
@@ -520,4 +522,3 @@ final class SearchGuardsTest extends TestCase
         self::assertSame(0, $report->expansions());
     }
 }
-

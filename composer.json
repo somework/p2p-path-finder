@@ -5,10 +5,18 @@
     "license": "GPL-3.0-or-later",
     "keywords": [
         "path-finding",
+        "pathfinding",
         "p2p",
         "exchange",
         "graph",
-        "routing"
+        "graph-algorithms",
+        "routing",
+        "dijkstra",
+        "order-book",
+        "trading",
+        "currency-conversion",
+        "bigdecimal",
+        "arbitrary-precision"
     ],
     "homepage": "https://github.com/somework/p2p-path-finder",
     "support": {
@@ -93,8 +101,14 @@
     },
     "config": {
         "sort-packages": true,
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
         "allow-plugins": {
             "infection/extension-installer": true
         }
+    },
+    "suggest": {
+        "ext-json": "Required for JSON serialization of search results",
+        "ext-mbstring": "Improves string handling performance"
     }
 }

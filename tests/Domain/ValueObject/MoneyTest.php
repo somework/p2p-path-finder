@@ -80,10 +80,7 @@ final class MoneyTest extends TestCase
         yield 'upper bound length' => [str_repeat('Z', 12)];
     }
 
-    /**
-     * @test
-     */
-    public function rejects_negative_amounts(): void
+    public function test_rejects_negative_amounts(): void
     {
         $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Money amount cannot be negative');
@@ -92,10 +89,9 @@ final class MoneyTest extends TestCase
     }
 
     /**
-     * @test
      * @dataProvider provideNegativeAmounts
      */
-    public function rejects_various_negative_amounts(string $amount, int $scale): void
+    public function test_rejects_various_negative_amounts(string $amount, int $scale): void
     {
         $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Money amount cannot be negative');
@@ -115,10 +111,7 @@ final class MoneyTest extends TestCase
         yield 'negative with high precision' => ['amount' => '-0.00000001', 'scale' => 8];
     }
 
-    /**
-     * @test
-     */
-    public function allows_zero_amount(): void
+    public function test_allows_zero_amount(): void
     {
         $money = Money::fromString('USD', '0.00', 2);
 
@@ -126,10 +119,7 @@ final class MoneyTest extends TestCase
         $this->assertTrue($money->isZero());
     }
 
-    /**
-     * @test
-     */
-    public function allows_positive_amounts(): void
+    public function test_allows_positive_amounts(): void
     {
         $money = Money::fromString('USD', '100.50', 2);
 
@@ -137,10 +127,7 @@ final class MoneyTest extends TestCase
         $this->assertFalse($money->isZero());
     }
 
-    /**
-     * @test
-     */
-    public function zero_from_constructor_is_non_negative(): void
+    public function test_zero_from_constructor_is_non_negative(): void
     {
         $zero = Money::zero('EUR', 2);
 
@@ -237,10 +224,7 @@ final class MoneyTest extends TestCase
 
     // ==================== Scale Boundary Tests ====================
 
-    /**
-     * @test
-     */
-    public function scale_zero_allows_integer_amounts(): void
+    public function test_scale_zero_allows_integer_amounts(): void
     {
         $money = Money::fromString('USD', '100', 0);
 
@@ -249,10 +233,7 @@ final class MoneyTest extends TestCase
         $this->assertSame('USD', $money->currency());
     }
 
-    /**
-     * @test
-     */
-    public function scale_zero_rounds_decimals_to_integer(): void
+    public function test_scale_zero_rounds_decimals_to_integer(): void
     {
         $money = Money::fromString('JPY', '123.6', 0);
 
@@ -260,10 +241,7 @@ final class MoneyTest extends TestCase
         $this->assertSame(0, $money->scale());
     }
 
-    /**
-     * @test
-     */
-    public function scale_maximum_allows_fifty_decimals(): void
+    public function test_scale_maximum_allows_fifty_decimals(): void
     {
         $amount = '1.12345678901234567890123456789012345678901234567890';
         $money = Money::fromString('BTC', $amount, 50);
@@ -273,10 +251,7 @@ final class MoneyTest extends TestCase
         $this->assertSame('1.12345678901234567890123456789012345678901234567890', $money->amount());
     }
 
-    /**
-     * @test
-     */
-    public function scale_maximum_handles_rounding_at_boundary(): void
+    public function test_scale_maximum_handles_rounding_at_boundary(): void
     {
         // Input has 51 decimals, should round to 50 using HALF_UP
         $amount = '1.123456789012345678901234567890123456789012345678905';
@@ -287,10 +262,7 @@ final class MoneyTest extends TestCase
         $this->assertSame('1.12345678901234567890123456789012345678901234567891', $money->amount());
     }
 
-    /**
-     * @test
-     */
-    public function negative_scale_throws_exception(): void
+    public function test_negative_scale_throws_exception(): void
     {
         $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Scale cannot be negative');
@@ -298,10 +270,7 @@ final class MoneyTest extends TestCase
         Money::fromString('USD', '100.00', -1);
     }
 
-    /**
-     * @test
-     */
-    public function scale_above_maximum_throws_exception(): void
+    public function test_scale_above_maximum_throws_exception(): void
     {
         $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Scale cannot exceed 50 decimal places');
@@ -309,10 +278,7 @@ final class MoneyTest extends TestCase
         Money::fromString('USD', '100.00', 51);
     }
 
-    /**
-     * @test
-     */
-    public function scale_boundary_with_scale_method(): void
+    public function test_scale_boundary_with_scale_method(): void
     {
         $money = Money::fromString('USD', '100.123', 3);
 
@@ -325,10 +291,7 @@ final class MoneyTest extends TestCase
         $this->assertSame(50, $scaleFifty->scale());
     }
 
-    /**
-     * @test
-     */
-    public function with_scale_rejects_negative_scale(): void
+    public function test_with_scale_rejects_negative_scale(): void
     {
         $money = Money::fromString('USD', '100.00', 2);
 
@@ -338,10 +301,7 @@ final class MoneyTest extends TestCase
         $money->withScale(-1);
     }
 
-    /**
-     * @test
-     */
-    public function with_scale_rejects_scale_above_maximum(): void
+    public function test_with_scale_rejects_scale_above_maximum(): void
     {
         $money = Money::fromString('USD', '100.00', 2);
 
@@ -351,10 +311,7 @@ final class MoneyTest extends TestCase
         $money->withScale(51);
     }
 
-    /**
-     * @test
-     */
-    public function arithmetic_operations_work_at_scale_boundaries(): void
+    public function test_arithmetic_operations_work_at_scale_boundaries(): void
     {
         // Scale 0
         $a = Money::fromString('USD', '100', 0);
@@ -363,18 +320,15 @@ final class MoneyTest extends TestCase
         $this->assertSame('150', $sum->amount());
 
         // Scale 50
-        $c = Money::fromString('BTC', '1.' . str_repeat('1', 50), 50);
-        $d = Money::fromString('BTC', '2.' . str_repeat('2', 50), 50);
+        $c = Money::fromString('BTC', '1.'.str_repeat('1', 50), 50);
+        $d = Money::fromString('BTC', '2.'.str_repeat('2', 50), 50);
         $sumHigh = $c->add($d);
         $this->assertSame(50, $sumHigh->scale());
     }
 
     // ==================== Extreme Value Tests ====================
 
-    /**
-     * @test
-     */
-    public function testVeryLargeAmount(): void
+    public function test_very_large_amount(): void
     {
         // Test very large amounts (hundreds of digits)
         $veryLargeAmount = '999999999999999999999999999.99';
@@ -401,10 +355,7 @@ final class MoneyTest extends TestCase
         $this->assertFalse($larger->equals($smaller));
     }
 
-    /**
-     * @test
-     */
-    public function testVerySmallAmount(): void
+    public function test_very_small_amount(): void
     {
         // Test very small amounts with high precision scale
         $verySmallAmount = '0.00000000000000000001';
@@ -416,7 +367,7 @@ final class MoneyTest extends TestCase
         $this->assertFalse($money->isZero());
 
         // Test extremely small amount at maximum scale (50)
-        $extremelySmall = '0.' . str_repeat('0', 49) . '1';
+        $extremelySmall = '0.'.str_repeat('0', 49).'1';
         $smallWithMaxScale = Money::fromString('ETH', $extremelySmall, 50);
 
         $this->assertSame(50, $smallWithMaxScale->scale());
@@ -437,10 +388,7 @@ final class MoneyTest extends TestCase
         $this->assertSame('0.00', $roundedDown->amount());
     }
 
-    /**
-     * @test
-     */
-    public function testArithmeticWithExtremeValues(): void
+    public function test_arithmetic_with_extreme_values(): void
     {
         // Test addition with very large amounts
         $large1 = Money::fromString('USD', '999999999999999999999999999.99', 2);
@@ -498,13 +446,13 @@ final class MoneyTest extends TestCase
         $this->assertTrue($halved->equals($base));
 
         // Test extreme boundary: maximum scale with complex arithmetic
-        $a = Money::fromString('CRYPTO', '1.' . str_repeat('1', 50), 50);
-        $b = Money::fromString('CRYPTO', '2.' . str_repeat('2', 50), 50);
+        $a = Money::fromString('CRYPTO', '1.'.str_repeat('1', 50), 50);
+        $b = Money::fromString('CRYPTO', '2.'.str_repeat('2', 50), 50);
         $complexSum = $a->add($b);
-        
+
         // Verify the result has correct scale
         $this->assertSame(50, $complexSum->scale());
-        
+
         // Verify arithmetic integrity: (a + b) - a should equal b
         $difference = $complexSum->subtract($a);
         $this->assertTrue($difference->equals($b));
@@ -512,10 +460,7 @@ final class MoneyTest extends TestCase
 
     // ==================== Scale Mismatch Arithmetic Tests ====================
 
-    /**
-     * @test
-     */
-    public function testAdditionWithDifferentScales(): void
+    public function test_addition_with_different_scales(): void
     {
         // Test scale=2 + scale=8 (should use max scale = 8)
         $a = Money::fromString('USD', '100.50', 2);
@@ -559,10 +504,7 @@ final class MoneyTest extends TestCase
         $this->assertSame(6, $sum5->scale());
     }
 
-    /**
-     * @test
-     */
-    public function testSubtractionWithDifferentScales(): void
+    public function test_subtraction_with_different_scales(): void
     {
         // Test scale=8 - scale=2 (should use max scale = 8)
         $a = Money::fromString('BTC', '1.50000000', 8);
@@ -606,10 +548,7 @@ final class MoneyTest extends TestCase
         $this->assertFalse($diff5->isZero());
     }
 
-    /**
-     * @test
-     */
-    public function testMultiplicationWithDifferentScales(): void
+    public function test_multiplication_with_different_scales(): void
     {
         // Multiply uses the scale of the Money instance by default
         $a = Money::fromString('USD', '100.50', 2);
@@ -654,10 +593,7 @@ final class MoneyTest extends TestCase
         $this->assertSame(0, $result6->scale());
     }
 
-    /**
-     * @test
-     */
-    public function testDivisionWithDifferentScales(): void
+    public function test_division_with_different_scales(): void
     {
         // Divide uses the scale of the Money instance by default
         $a = Money::fromString('USD', '100.00', 2);
@@ -702,10 +638,7 @@ final class MoneyTest extends TestCase
         $this->assertSame(0, $result6->scale());
     }
 
-    /**
-     * @test
-     */
-    public function testScaleDerivationRules(): void
+    public function test_scale_derivation_rules(): void
     {
         // Rule 1: Addition/Subtraction use max(left.scale, right.scale)
         $low = Money::fromString('USD', '10.5', 1);
@@ -721,7 +654,7 @@ final class MoneyTest extends TestCase
 
         // Rule 2: Multiplication/Division use left.scale
         $money = Money::fromString('EUR', '100.00', 2);
-        
+
         $multResult = $money->multiply('1.123456789');
         $this->assertSame(2, $multResult->scale());
         $this->assertSame('112.35', $multResult->amount());

@@ -14,6 +14,8 @@ use SomeWork\P2PPathFinder\Application\Result\PathResult;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
+use function is_int;
+
 /**
  * Tests that verify JSON serialization contracts match the documented API contracts.
  *
@@ -24,10 +26,7 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
  */
 final class SerializationContractTest extends TestCase
 {
-    /**
-     * @test
-     */
-    public function money_json_structure_matches_documentation(): void
+    public function test_money_json_structure_matches_documentation(): void
     {
         // Money is serialized through PathResult/PathLeg, not directly
         // We test it through a PathResult to verify the structure
@@ -58,10 +57,7 @@ final class SerializationContractTest extends TestCase
         $this->assertSame(2, $moneyJson['scale']);
     }
 
-    /**
-     * @test
-     */
-    public function money_json_preserves_trailing_zeros(): void
+    public function test_money_json_preserves_trailing_zeros(): void
     {
         $result = new PathResult(
             Money::fromString('USD', '100.00', 2),
@@ -76,10 +72,7 @@ final class SerializationContractTest extends TestCase
         $this->assertSame(6, $moneyJson['scale']);
     }
 
-    /**
-     * @test
-     */
-    public function money_json_handles_large_amounts(): void
+    public function test_money_json_handles_large_amounts(): void
     {
         $result = new PathResult(
             Money::fromString('BTC', '999999999.123456789012345678', 18),
@@ -95,10 +88,7 @@ final class SerializationContractTest extends TestCase
         $this->assertSame(18, $moneyJson['scale']);
     }
 
-    /**
-     * @test
-     */
-    public function money_json_handles_zero_amounts(): void
+    public function test_money_json_handles_zero_amounts(): void
     {
         $result = new PathResult(
             Money::fromString('USD', '0.00', 2),
@@ -114,10 +104,7 @@ final class SerializationContractTest extends TestCase
         $this->assertSame(2, $moneyJson['scale']);
     }
 
-    /**
-     * @test
-     */
-    public function money_map_json_structure_matches_documentation(): void
+    public function test_money_map_json_structure_matches_documentation(): void
     {
         $map = MoneyMap::fromList([
             Money::fromString('USD', '1.50', 2),
@@ -145,10 +132,7 @@ final class SerializationContractTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
-    public function money_map_empty_json_is_empty_object(): void
+    public function test_money_map_empty_json_is_empty_object(): void
     {
         $map = MoneyMap::empty();
         $json = $map->jsonSerialize();
@@ -157,10 +141,7 @@ final class SerializationContractTest extends TestCase
         $this->assertCount(0, $json, 'Empty map should be empty array');
     }
 
-    /**
-     * @test
-     */
-    public function decimal_tolerance_json_is_numeric_string(): void
+    public function test_decimal_tolerance_json_is_numeric_string(): void
     {
         $tolerance = DecimalTolerance::fromNumericString('0.0500000000000000000', 18);
         $json = $tolerance->jsonSerialize();
@@ -170,10 +151,7 @@ final class SerializationContractTest extends TestCase
         $this->assertSame('0.050000000000000000', $json);
     }
 
-    /**
-     * @test
-     */
-    public function decimal_tolerance_zero_json(): void
+    public function test_decimal_tolerance_zero_json(): void
     {
         $tolerance = DecimalTolerance::zero();
         $json = $tolerance->jsonSerialize();
@@ -182,10 +160,7 @@ final class SerializationContractTest extends TestCase
         $this->assertMatchesRegularExpression('/^0\.0+$/', $json, 'Zero tolerance must be string of 0.0...');
     }
 
-    /**
-     * @test
-     */
-    public function path_leg_json_structure_matches_documentation(): void
+    public function test_path_leg_json_structure_matches_documentation(): void
     {
         $leg = new PathLeg(
             'USD',
@@ -224,10 +199,7 @@ final class SerializationContractTest extends TestCase
         $this->assertSame('EUR', $json['received']['currency']);
     }
 
-    /**
-     * @test
-     */
-    public function path_leg_json_with_no_fees(): void
+    public function test_path_leg_json_with_no_fees(): void
     {
         $leg = new PathLeg(
             'USD',
@@ -243,10 +215,7 @@ final class SerializationContractTest extends TestCase
         $this->assertCount(0, $json['fees'], 'Empty fees should be empty array');
     }
 
-    /**
-     * @test
-     */
-    public function path_leg_collection_json_is_array_of_legs(): void
+    public function test_path_leg_collection_json_is_array_of_legs(): void
     {
         $legs = PathLegCollection::fromList([
             new PathLeg(
@@ -283,10 +252,7 @@ final class SerializationContractTest extends TestCase
         $this->assertSame($json[0]['to'], $json[1]['from'], 'Path legs must be continuous');
     }
 
-    /**
-     * @test
-     */
-    public function path_leg_collection_empty_json_is_empty_array(): void
+    public function test_path_leg_collection_empty_json_is_empty_array(): void
     {
         $legs = PathLegCollection::empty();
         $json = $legs->jsonSerialize();
@@ -295,10 +261,7 @@ final class SerializationContractTest extends TestCase
         $this->assertCount(0, $json);
     }
 
-    /**
-     * @test
-     */
-    public function path_result_json_structure_matches_documentation(): void
+    public function test_path_result_json_structure_matches_documentation(): void
     {
         $result = new PathResult(
             Money::fromString('USD', '100.00', 2),
@@ -334,10 +297,7 @@ final class SerializationContractTest extends TestCase
         $this->assertMatchesRegularExpression('/^\d+\.\d+$/', $json['residualTolerance']);
     }
 
-    /**
-     * @test
-     */
-    public function path_result_json_with_complete_path(): void
+    public function test_path_result_json_with_complete_path(): void
     {
         $legs = PathLegCollection::fromList([
             new PathLeg(
@@ -380,10 +340,7 @@ final class SerializationContractTest extends TestCase
         $this->assertSame(['EUR', 'JPY'], $feeKeys, 'Fee currencies must be sorted');
     }
 
-    /**
-     * @test
-     */
-    public function search_guard_report_json_structure_matches_documentation(): void
+    public function test_search_guard_report_json_structure_matches_documentation(): void
     {
         $report = SearchGuardReport::fromMetrics(
             expansions: 342,
@@ -412,7 +369,7 @@ final class SerializationContractTest extends TestCase
 
         $this->assertIsInt($json['limits']['expansions']);
         $this->assertIsInt($json['limits']['visited_states']);
-        $this->assertTrue(is_int($json['limits']['time_budget_ms']) || is_null($json['limits']['time_budget_ms']));
+        $this->assertTrue(is_int($json['limits']['time_budget_ms']) || null === $json['limits']['time_budget_ms']);
 
         // Verify 'metrics' object
         $this->assertIsArray($json['metrics']);
@@ -439,10 +396,7 @@ final class SerializationContractTest extends TestCase
         $this->assertIsBool($json['breached']['any']);
     }
 
-    /**
-     * @test
-     */
-    public function search_guard_report_json_with_null_time_budget(): void
+    public function test_search_guard_report_json_with_null_time_budget(): void
     {
         $report = SearchGuardReport::fromMetrics(
             expansions: 100,
@@ -459,10 +413,7 @@ final class SerializationContractTest extends TestCase
         $this->assertFalse($json['breached']['time_budget'], 'time_budget breach must be false when limit is null');
     }
 
-    /**
-     * @test
-     */
-    public function search_guard_report_json_detects_breaches(): void
+    public function test_search_guard_report_json_detects_breaches(): void
     {
         $report = SearchGuardReport::fromMetrics(
             expansions: 10001,
@@ -481,10 +432,7 @@ final class SerializationContractTest extends TestCase
         $this->assertTrue($json['breached']['any'], 'any should be true when limits breached');
     }
 
-    /**
-     * @test
-     */
-    public function search_outcome_json_structure_matches_documentation(): void
+    public function test_search_outcome_json_structure_matches_documentation(): void
     {
         $paths = \SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet::fromPaths(
             new \SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy(6),
@@ -519,10 +467,7 @@ final class SerializationContractTest extends TestCase
         $this->assertArrayHasKey('breached', $json['guards']);
     }
 
-    /**
-     * @test
-     */
-    public function search_outcome_json_with_empty_paths(): void
+    public function test_search_outcome_json_with_empty_paths(): void
     {
         $paths = \SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet::empty();
         $guards = SearchGuardReport::none();
@@ -535,10 +480,7 @@ final class SerializationContractTest extends TestCase
         $this->assertCount(0, $json['paths'], 'Empty paths should be empty array');
     }
 
-    /**
-     * @test
-     */
-    public function json_serialization_round_trip_preserves_structure(): void
+    public function test_json_serialization_round_trip_preserves_structure(): void
     {
         $result = new PathResult(
             Money::fromString('USD', '100.00', 2),
@@ -556,10 +498,7 @@ final class SerializationContractTest extends TestCase
         $this->assertSame($json, $decoded, 'JSON structure must survive round-trip');
     }
 
-    /**
-     * @test
-     */
-    public function json_field_names_use_snake_case_where_appropriate(): void
+    public function test_json_field_names_use_snake_case_where_appropriate(): void
     {
         $report = SearchGuardReport::idle(5000, 10000, 1000);
         $json = $report->jsonSerialize();
@@ -570,4 +509,3 @@ final class SerializationContractTest extends TestCase
         $this->assertArrayHasKey('elapsed_ms', $json['metrics'], 'Should use snake_case');
     }
 }
-

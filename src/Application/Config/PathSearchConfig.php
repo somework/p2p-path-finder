@@ -20,7 +20,7 @@ use function max;
  *
  * - **Hop constraints**: minimumHops >= 1, maximumHops >= minimumHops
  * - **Result limit**: resultLimit >= 1
- * - **Spend bounds computation**: 
+ * - **Spend bounds computation**:
  *   - minSpend = spendAmount × (1 - toleranceWindow.minimum)
  *   - maxSpend = spendAmount × (1 + toleranceWindow.maximum)
  * - **Bounds ordering**: minSpend <= spendAmount <= maxSpend

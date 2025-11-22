@@ -565,10 +565,7 @@ final class OrderTest extends TestCase
 
     // ==================== Order Consistency Validation Tests (0002.11) ====================
 
-    /**
-     * @test
-     */
-    public function testOrderWithBoundsCurrencyMismatchThrowsException(): void
+    public function test_order_with_bounds_currency_mismatch_throws_exception(): void
     {
         // Bounds must be in base currency
         $this->expectException(InvalidInput::class);
@@ -584,10 +581,7 @@ final class OrderTest extends TestCase
         new Order(OrderSide::BUY, $assetPair, $bounds, $rate);
     }
 
-    /**
-     * @test
-     */
-    public function testOrderWithBoundsCurrencyMatchingQuoteThrowsException(): void
+    public function test_order_with_bounds_currency_matching_quote_throws_exception(): void
     {
         // Bounds in quote currency should be rejected
         $this->expectException(InvalidInput::class);
@@ -603,10 +597,7 @@ final class OrderTest extends TestCase
         new Order(OrderSide::SELL, $assetPair, $bounds, $rate);
     }
 
-    /**
-     * @test
-     */
-    public function testOrderWithRateBaseCurrencyMismatchThrowsException(): void
+    public function test_order_with_rate_base_currency_mismatch_throws_exception(): void
     {
         // Rate base must match asset pair base
         $this->expectException(InvalidInput::class);
@@ -622,10 +613,7 @@ final class OrderTest extends TestCase
         new Order(OrderSide::BUY, $assetPair, $bounds, $rate);
     }
 
-    /**
-     * @test
-     */
-    public function testOrderWithRateQuoteCurrencyMismatchThrowsException(): void
+    public function test_order_with_rate_quote_currency_mismatch_throws_exception(): void
     {
         // Rate quote must match asset pair quote
         $this->expectException(InvalidInput::class);
@@ -641,10 +629,7 @@ final class OrderTest extends TestCase
         new Order(OrderSide::BUY, $assetPair, $bounds, $rate);
     }
 
-    /**
-     * @test
-     */
-    public function testOrderWithFeeCurrencyMismatch(): void
+    public function test_order_with_fee_currency_mismatch(): void
     {
         // Fee in wrong currency should be rejected during calculation
         $policy = new class implements FeePolicy {
@@ -668,10 +653,7 @@ final class OrderTest extends TestCase
         $order->calculateEffectiveQuoteAmount(CurrencyScenarioFactory::money('BTC', '0.500', 3));
     }
 
-    /**
-     * @test
-     */
-    public function testOrderValidationPassesWithConsistentCurrencies(): void
+    public function test_order_validation_passes_with_consistent_currencies(): void
     {
         // All currencies properly aligned should work
         $assetPair = AssetPair::fromString('ETH', 'USDT');
@@ -693,10 +675,7 @@ final class OrderTest extends TestCase
 
     // ==================== Fee Policy Edge Case Tests (0002.12) ====================
 
-    /**
-     * @test
-     */
-    public function testFeeExceedsAmountAllowedByImplementation(): void
+    public function test_fee_exceeds_amount_allowed_by_implementation(): void
     {
         // Fee larger than quote amount - implementation allows but caller must validate
         // This documents that the Order class doesn't prevent excessive fees
@@ -705,6 +684,7 @@ final class OrderTest extends TestCase
             {
                 // Fee is 50% of quote amount
                 $fee = $quoteAmount->multiply('0.5', $quoteAmount->scale());
+
                 return FeeBreakdown::forQuote($fee);
             }
 
@@ -721,16 +701,13 @@ final class OrderTest extends TestCase
 
         // Quote = 15000, Fee = 7500, Effective = 7500
         self::assertTrue($effectiveQuote->equals(CurrencyScenarioFactory::money('USD', '7500.000', 3)));
-        
+
         // Verify fee reduces effective quote significantly
         $rawQuote = $order->calculateQuoteAmount($baseAmount);
         self::assertTrue($effectiveQuote->lessThan($rawQuote));
     }
 
-    /**
-     * @test
-     */
-    public function testFeeEqualsAmountResultsInZero(): void
+    public function test_fee_equals_amount_results_in_zero(): void
     {
         // Fee exactly equals quote amount (100% fee)
         $policy = new class implements FeePolicy {
@@ -756,10 +733,7 @@ final class OrderTest extends TestCase
         self::assertSame('0.000', $effectiveQuote->amount());
     }
 
-    /**
-     * @test
-     */
-    public function testZeroFee(): void
+    public function test_zero_fee(): void
     {
         // Zero fee policy
         $policy = new class implements FeePolicy {
@@ -785,10 +759,7 @@ final class OrderTest extends TestCase
         self::assertTrue($effectiveQuote->equals(CurrencyScenarioFactory::money('USD', '15000.000', 3)));
     }
 
-    /**
-     * @test
-     */
-    public function testNullFeeBreakdownBehavior(): void
+    public function test_null_fee_breakdown_behavior(): void
     {
         // Test with null fee breakdown (no fees)
         $policy = new class implements FeePolicy {
@@ -814,10 +785,7 @@ final class OrderTest extends TestCase
         self::assertTrue($effectiveQuote->equals($rawQuote));
     }
 
-    /**
-     * @test
-     */
-    public function testFeeAccumulationAcrossOrders(): void
+    public function test_fee_accumulation_across_orders(): void
     {
         // Test multiple orders with fees accumulate correctly
         $fee10Percent = $this->percentageFeePolicy('0.10');
@@ -867,10 +835,7 @@ final class OrderTest extends TestCase
         self::assertTrue($effective2->lessThan($rawQuote2));
     }
 
-    /**
-     * @test
-     */
-    public function testVerySmallFee(): void
+    public function test_very_small_fee(): void
     {
         // Very small fee (1 satoshi equivalent)
         $policy = new class implements FeePolicy {
@@ -904,10 +869,7 @@ final class OrderTest extends TestCase
         self::assertSame('14999.999', $effectiveQuote->amount());
     }
 
-    /**
-     * @test
-     */
-    public function testFeePolicyWithBothBaseAndQuoteFees(): void
+    public function test_fee_policy_with_both_base_and_quote_fees(): void
     {
         // Policy that charges both base and quote fees
         $policy = new class implements FeePolicy {
@@ -915,6 +877,7 @@ final class OrderTest extends TestCase
             {
                 $baseFee = $baseAmount->multiply('0.01', $baseAmount->scale());
                 $quoteFee = $quoteAmount->multiply('0.02', $quoteAmount->scale());
+
                 return FeeBreakdown::of($baseFee, $quoteFee);
             }
 
@@ -941,10 +904,7 @@ final class OrderTest extends TestCase
         self::assertTrue($grossBase->equals(CurrencyScenarioFactory::money('BTC', '1.010', 3)));
     }
 
-    /**
-     * @test
-     */
-    public function testFeeLargerThanBaseAmount(): void
+    public function test_fee_larger_than_base_amount(): void
     {
         // Base fee exceeds base amount
         $policy = new class implements FeePolicy {
@@ -952,6 +912,7 @@ final class OrderTest extends TestCase
             {
                 // Fee is 200% of base amount
                 $fee = $baseAmount->multiply('2.0', $baseAmount->scale());
+
                 return FeeBreakdown::forBase($fee);
             }
 

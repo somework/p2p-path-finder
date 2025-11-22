@@ -8,11 +8,14 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
 use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
+
+use function chr;
+use function count;
+use function ord;
 
 /**
  * Integration tests verifying SearchGuardReport metrics accurately reflect actual search activity.
@@ -31,7 +34,7 @@ final class SearchGuardReportAccuracyTest extends TestCase
     /**
      * @testdox Expansion count matches actual number of states expanded from queue
      */
-    public function testExpansionCountAccuracy(): void
+    public function test_expansion_count_accuracy(): void
     {
         // Create a small graph with known structure:
         // USD -> EUR -> GBP -> JPY (linear chain, 3 edges)
@@ -68,7 +71,7 @@ final class SearchGuardReportAccuracyTest extends TestCase
     /**
      * @testdox Visited state count matches unique states registered in search
      */
-    public function testVisitedStateCountAccuracy(): void
+    public function test_visited_state_count_accuracy(): void
     {
         // Create a graph with multiple paths to same destination
         // USD -> EUR -> GBP
@@ -107,7 +110,7 @@ final class SearchGuardReportAccuracyTest extends TestCase
     /**
      * @testdox Elapsed time measurement is reasonable and non-negative
      */
-    public function testElapsedTimeReasonable(): void
+    public function test_elapsed_time_reasonable(): void
     {
         $orderBook = new OrderBook();
         $orderBook->add(OrderFactory::buy('USD', 'EUR', '50.000', '200.000', '1.100', 3, 3));
@@ -146,14 +149,14 @@ final class SearchGuardReportAccuracyTest extends TestCase
     /**
      * @testdox Expansion breach flag is set correctly when limit is reached
      */
-    public function testExpansionBreachFlagCorrect(): void
+    public function test_expansion_breach_flag_correct(): void
     {
         // Create a larger graph to ensure we hit the expansion limit
         $orderBook = new OrderBook();
         // Create a fan-out: USD -> A, B, C, D, E
         // Each connects to target
         for ($i = 0; $i < 5; ++$i) {
-            $intermediate = chr(ord('A') + $i) . chr(ord('A') + $i) . chr(ord('A') + $i);
+            $intermediate = chr(ord('A') + $i).chr(ord('A') + $i).chr(ord('A') + $i);
             $orderBook->add(OrderFactory::buy('USD', $intermediate, '50.000', '200.000', '1.100', 3, 3));
             $orderBook->add(OrderFactory::buy($intermediate, 'EUR', '50.000', '200.000', '1.100', 3, 3));
         }
@@ -190,13 +193,13 @@ final class SearchGuardReportAccuracyTest extends TestCase
     /**
      * @testdox Visited states breach flag is set correctly when limit is reached
      */
-    public function testVisitedStatesBreachFlagCorrect(): void
+    public function test_visited_states_breach_flag_correct(): void
     {
         // Create a graph with many nodes
         $orderBook = new OrderBook();
         for ($i = 0; $i < 10; ++$i) {
-            $nodeA = chr(ord('A') + $i) . chr(ord('A') + $i) . chr(ord('A') + $i);
-            $nodeB = chr(ord('B') + $i) . chr(ord('B') + $i) . chr(ord('B') + $i);
+            $nodeA = chr(ord('A') + $i).chr(ord('A') + $i).chr(ord('A') + $i);
+            $nodeB = chr(ord('B') + $i).chr(ord('B') + $i).chr(ord('B') + $i);
             $orderBook->add(OrderFactory::buy('USD', $nodeA, '50.000', '200.000', '1.100', 3, 3));
             $orderBook->add(OrderFactory::buy($nodeA, $nodeB, '50.000', '200.000', '1.100', 3, 3));
             $orderBook->add(OrderFactory::buy($nodeB, 'EUR', '50.000', '200.000', '1.100', 3, 3));
@@ -230,13 +233,13 @@ final class SearchGuardReportAccuracyTest extends TestCase
     /**
      * @testdox Time budget breach flag is set correctly when limit is reached
      */
-    public function testTimeBudgetBreachFlagCorrect(): void
+    public function test_time_budget_breach_flag_correct(): void
     {
         // Create a large enough graph to ensure time budget is hit
         $orderBook = new OrderBook();
         for ($i = 0; $i < 20; ++$i) {
-            $nodeA = chr(ord('A') + ($i % 26)) . chr(ord('A') + (($i + 1) % 26)) . chr(ord('A') + (($i + 2) % 26));
-            $nodeB = chr(ord('B') + ($i % 26)) . chr(ord('B') + (($i + 1) % 26)) . chr(ord('B') + (($i + 2) % 26));
+            $nodeA = chr(ord('A') + ($i % 26)).chr(ord('A') + (($i + 1) % 26)).chr(ord('A') + (($i + 2) % 26));
+            $nodeB = chr(ord('B') + ($i % 26)).chr(ord('B') + (($i + 1) % 26)).chr(ord('B') + (($i + 2) % 26));
             $orderBook->add(OrderFactory::buy('USD', $nodeA, '50.000', '200.000', '1.100', 3, 3));
             $orderBook->add(OrderFactory::buy($nodeA, $nodeB, '50.000', '200.000', '1.100', 3, 3));
             $orderBook->add(OrderFactory::buy($nodeB, 'EUR', '50.000', '200.000', '1.100', 3, 3));
@@ -262,7 +265,7 @@ final class SearchGuardReportAccuracyTest extends TestCase
         // Time budget should likely be reached (though this is timing-dependent)
         // If not reached, at least verify the time budget limit is set correctly
         self::assertSame(1, $guardReport->timeBudgetLimit(), 'Time budget limit should be 1ms');
-        
+
         if ($guardReport->timeBudgetReached()) {
             self::assertGreaterThanOrEqual(1.0, $guardReport->elapsedMilliseconds(), 'Elapsed time should be >= 1ms if budget reached');
             self::assertTrue($guardReport->anyLimitReached(), 'anyLimitReached() should return true');
@@ -272,7 +275,7 @@ final class SearchGuardReportAccuracyTest extends TestCase
     /**
      * @testdox No breach flags set when limits are not reached
      */
-    public function testNoBreachFlagsWhenLimitsNotReached(): void
+    public function test_no_breach_flags_when_limits_not_reached(): void
     {
         // Simple graph that completes quickly
         $orderBook = new OrderBook();
@@ -310,7 +313,7 @@ final class SearchGuardReportAccuracyTest extends TestCase
     /**
      * @testdox Expansion count equals visited states in simple linear search
      */
-    public function testExpansionEqualsVisitedInLinearSearch(): void
+    public function test_expansion_equals_visited_in_linear_search(): void
     {
         // Linear chain: each expansion visits exactly one new state
         $orderBook = new OrderBook();
@@ -336,7 +339,7 @@ final class SearchGuardReportAccuracyTest extends TestCase
         // (allowing for bootstrap state which might not count as visited)
         self::assertGreaterThan(0, $guardReport->expansions(), 'Should have expansions');
         self::assertGreaterThan(0, $guardReport->visitedStates(), 'Should have visited states');
-        
+
         // Visited states should be close to expansions for linear path
         $difference = abs($guardReport->expansions() - $guardReport->visitedStates());
         self::assertLessThanOrEqual(2, $difference, 'In linear search, visited states should be within 2 of expansions');
@@ -345,7 +348,7 @@ final class SearchGuardReportAccuracyTest extends TestCase
     /**
      * @testdox Metrics are consistent across multiple searches on same graph
      */
-    public function testMetricsConsistentAcrossSearches(): void
+    public function test_metrics_consistent_across_searches(): void
     {
         $orderBook = new OrderBook();
         $orderBook->add(OrderFactory::buy('USD', 'EUR', '50.000', '200.000', '1.100', 3, 3));
@@ -394,4 +397,3 @@ final class SearchGuardReportAccuracyTest extends TestCase
         return $count;
     }
 }
-

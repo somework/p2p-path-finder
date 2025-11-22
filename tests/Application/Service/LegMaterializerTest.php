@@ -318,7 +318,6 @@ final class LegMaterializerTest extends TestCase
         self::assertNull($method->invoke($materializer, $target, $actual, 3));
     }
 
-
     public function test_calculate_sell_adjustment_ratio_returns_precise_ratio(): void
     {
         $materializer = new LegMaterializer();
@@ -734,7 +733,6 @@ final class LegMaterializerTest extends TestCase
 
         $zeroActual = Money::fromString('USD', '0.000', 3);
         self::assertNull($method->invoke($materializer, $target, $zeroActual, 3));
-
     }
 
     public function test_align_base_scale_respects_bounds_precision(): void
@@ -823,7 +821,6 @@ final class LegMaterializerTest extends TestCase
         self::assertNull($result, 'Expected null when gross seed is zero');
     }
 
-
     public function test_materialize_rejects_zero_gross_ceiling(): void
     {
         $order = OrderFactory::buy('USD', 'EUR', '10.000', '200.000', '0.900', 3, 3);
@@ -848,7 +845,6 @@ final class LegMaterializerTest extends TestCase
         self::assertNull($result, 'Expected null when gross ceiling is zero');
     }
 
-
     public function test_materialize_rejects_zero_requested_spend(): void
     {
         $order = OrderFactory::buy('USD', 'EUR', '10.000', '200.000', '0.900', 3, 3);
@@ -872,7 +868,6 @@ final class LegMaterializerTest extends TestCase
 
         self::assertNull($result, 'Expected null when requested spend is zero');
     }
-
 
     /**
      * @param list<GraphEdge> $edges

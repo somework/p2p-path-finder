@@ -148,8 +148,8 @@ interface FeePolicy
      * **Performance**: This method may be called thousands of times during a search.
      * Keep computation fast and avoid expensive operations.
      *
-     * @param OrderSide $side       The order side (BUY or SELL)
-     * @param Money     $baseAmount The amount being traded in the base asset
+     * @param OrderSide $side        The order side (BUY or SELL)
+     * @param Money     $baseAmount  The amount being traded in the base asset
      * @param Money     $quoteAmount The amount being traded in the quote asset
      *
      * @return FeeBreakdown The calculated fee breakdown

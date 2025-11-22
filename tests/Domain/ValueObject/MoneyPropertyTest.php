@@ -44,12 +44,12 @@ final class MoneyPropertyTest extends TestCase
     }
 
     /**
-     * Property: Addition is commutative: a + b = b + a
+     * Property: Addition is commutative: a + b = b + a.
      *
      * For any two Money values a and b with the same currency,
      * a + b should equal b + a.
      */
-    public function testMoneyAdditionIsCommutative(): void
+    public function test_money_addition_is_commutative(): void
     {
         $limit = $this->iterationLimit(100, 10, 'P2P_MONEY_PROPERTY_ITERATIONS');
 
@@ -77,12 +77,12 @@ final class MoneyPropertyTest extends TestCase
     }
 
     /**
-     * Property: Addition is associative: (a + b) + c = a + (b + c)
+     * Property: Addition is associative: (a + b) + c = a + (b + c).
      *
      * For any three Money values a, b, and c with the same currency,
      * grouping doesn't matter for addition.
      */
-    public function testMoneyAdditionIsAssociative(): void
+    public function test_money_addition_is_associative(): void
     {
         $limit = $this->iterationLimit(100, 10, 'P2P_MONEY_PROPERTY_ITERATIONS');
 
@@ -111,12 +111,12 @@ final class MoneyPropertyTest extends TestCase
     }
 
     /**
-     * Property: Subtraction is the inverse of addition: (a + b) - b = a
+     * Property: Subtraction is the inverse of addition: (a + b) - b = a.
      *
      * For any two Money values a and b with the same currency,
      * adding b to a and then subtracting b should yield a.
      */
-    public function testMoneySubtractionInverse(): void
+    public function test_money_subtraction_inverse(): void
     {
         $limit = $this->iterationLimit(100, 10, 'P2P_MONEY_PROPERTY_ITERATIONS');
 
@@ -143,11 +143,11 @@ final class MoneyPropertyTest extends TestCase
     }
 
     /**
-     * Property: Zero is the additive identity: a + 0 = a
+     * Property: Zero is the additive identity: a + 0 = a.
      *
      * Adding zero to any Money value should return an equivalent value.
      */
-    public function testZeroIsAdditiveIdentity(): void
+    public function test_zero_is_additive_identity(): void
     {
         $limit = $this->iterationLimit(100, 10, 'P2P_MONEY_PROPERTY_ITERATIONS');
 
@@ -171,11 +171,11 @@ final class MoneyPropertyTest extends TestCase
     }
 
     /**
-     * Property: Subtraction of self yields zero: a - a = 0
+     * Property: Subtraction of self yields zero: a - a = 0.
      *
      * Subtracting a Money value from itself should yield zero.
      */
-    public function testSubtractionOfSelfYieldsZero(): void
+    public function test_subtraction_of_self_yields_zero(): void
     {
         $limit = $this->iterationLimit(100, 10, 'P2P_MONEY_PROPERTY_ITERATIONS');
 
@@ -197,13 +197,13 @@ final class MoneyPropertyTest extends TestCase
     }
 
     /**
-     * Property: Multiplication distributes over addition: a * (b + c) ≈ (a * b) + (a * c)
+     * Property: Multiplication distributes over addition: a * (b + c) ≈ (a * b) + (a * c).
      *
      * For scalar multiplication, distribution over addition should hold approximately.
      * Note: Exact equality may not hold due to rounding in intermediate calculations,
      * but the results should be very close.
      */
-    public function testMultiplicationDistributesOverAddition(): void
+    public function test_multiplication_distributes_over_addition(): void
     {
         $limit = $this->iterationLimit(100, 10, 'P2P_MONEY_PROPERTY_ITERATIONS');
 
@@ -237,11 +237,11 @@ final class MoneyPropertyTest extends TestCase
     }
 
     /**
-     * Property: Multiplication by one is identity: a * 1 = a
+     * Property: Multiplication by one is identity: a * 1 = a.
      *
      * Multiplying by one should return an equivalent value.
      */
-    public function testMultiplicationByOneIsIdentity(): void
+    public function test_multiplication_by_one_is_identity(): void
     {
         $limit = $this->iterationLimit(100, 10, 'P2P_MONEY_PROPERTY_ITERATIONS');
 
@@ -263,11 +263,11 @@ final class MoneyPropertyTest extends TestCase
     }
 
     /**
-     * Property: Multiplication by zero yields zero: a * 0 = 0
+     * Property: Multiplication by zero yields zero: a * 0 = 0.
      *
      * Multiplying any amount by zero should yield zero.
      */
-    public function testMultiplicationByZeroYieldsZero(): void
+    public function test_multiplication_by_zero_yields_zero(): void
     {
         $limit = $this->iterationLimit(100, 10, 'P2P_MONEY_PROPERTY_ITERATIONS');
 
@@ -289,12 +289,12 @@ final class MoneyPropertyTest extends TestCase
     }
 
     /**
-     * Property: Division is inverse of multiplication: (a * b) / b = a
+     * Property: Division is inverse of multiplication: (a * b) / b = a.
      *
      * For non-zero scalar b, multiplying by b and then dividing by b
      * should yield approximately the original value (within rounding).
      */
-    public function testDivisionIsInverseOfMultiplication(): void
+    public function test_division_is_inverse_of_multiplication(): void
     {
         $limit = $this->iterationLimit(100, 10, 'P2P_MONEY_PROPERTY_ITERATIONS');
 
@@ -321,11 +321,11 @@ final class MoneyPropertyTest extends TestCase
     }
 
     /**
-     * Property: Comparison is consistent with arithmetic: if a < b, then a + c < b + c
+     * Property: Comparison is consistent with arithmetic: if a < b, then a + c < b + c.
      *
      * Adding the same value to both sides preserves ordering.
      */
-    public function testComparisonConsistentWithAddition(): void
+    public function test_comparison_consistent_with_addition(): void
     {
         $limit = $this->iterationLimit(100, 10, 'P2P_MONEY_PROPERTY_ITERATIONS');
 
@@ -362,7 +362,7 @@ final class MoneyPropertyTest extends TestCase
      * Note: Converting to a lower scale may involve rounding, so equality is only
      * guaranteed when increasing scale.
      */
-    public function testScaleNormalizationPreservesEquality(): void
+    public function test_scale_normalization_preserves_equality(): void
     {
         $limit = $this->iterationLimit(100, 10, 'P2P_MONEY_PROPERTY_ITERATIONS');
 
@@ -403,4 +403,3 @@ final class MoneyPropertyTest extends TestCase
         return $this->randomizer->getInt(0, $upperBound);
     }
 }
-

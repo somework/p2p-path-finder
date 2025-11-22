@@ -49,7 +49,7 @@ final class ExchangeRatePropertyTest extends TestCase
      * Converting currency A to B and back to A via inverted rate
      * should yield approximately the original amount.
      */
-    public function testExchangeRateConversionRoundtrip(): void
+    public function test_exchange_rate_conversion_roundtrip(): void
     {
         $limit = $this->iterationLimit(100, 10, 'P2P_EXCHANGE_RATE_PROPERTY_ITERATIONS');
 
@@ -75,7 +75,7 @@ final class ExchangeRatePropertyTest extends TestCase
             // Allow up to 2% difference due to two conversions and rounding
             $diff = abs((float) $originalMoney->amount() - (float) $roundtrip->amount());
             $tolerance = max(0.1, (float) $originalMoney->amount() * 0.02);
-            
+
             self::assertLessThanOrEqual(
                 $tolerance,
                 $diff,
@@ -90,7 +90,7 @@ final class ExchangeRatePropertyTest extends TestCase
      * Inverting a rate twice should yield the original rate (within rounding).
      * Due to scale limitations and HALF_UP rounding, some precision loss is expected.
      */
-    public function testDoubleInversionReturnsOriginalRate(): void
+    public function test_double_inversion_returns_original_rate(): void
     {
         $limit = $this->iterationLimit(100, 10, 'P2P_EXCHANGE_RATE_PROPERTY_ITERATIONS');
 
@@ -108,11 +108,11 @@ final class ExchangeRatePropertyTest extends TestCase
             // Property: invert(invert(rate)) ≈ rate
             self::assertSame($originalRate->baseCurrency(), $doubleInverted->baseCurrency());
             self::assertSame($originalRate->quoteCurrency(), $doubleInverted->quoteCurrency());
-            
+
             // Rates should be close (allow up to 1% difference due to compounding rounding)
             $originalRateFloat = (float) $originalRate->rate();
             $relativeTolerance = max(0.01, $originalRateFloat * 0.01);
-            
+
             self::assertEqualsWithDelta(
                 $originalRateFloat,
                 (float) $doubleInverted->rate(),
@@ -123,11 +123,11 @@ final class ExchangeRatePropertyTest extends TestCase
     }
 
     /**
-     * Property: Conversion is linear: convert(a + b) = convert(a) + convert(b)
+     * Property: Conversion is linear: convert(a + b) = convert(a) + convert(b).
      *
      * Converting the sum should equal the sum of conversions.
      */
-    public function testConversionIsLinear(): void
+    public function test_conversion_is_linear(): void
     {
         $limit = $this->iterationLimit(100, 10, 'P2P_EXCHANGE_RATE_PROPERTY_ITERATIONS');
 
@@ -157,7 +157,7 @@ final class ExchangeRatePropertyTest extends TestCase
             // Property: convert(a + b) ≈ convert(a) + convert(b) (within rounding)
             $diff = abs((float) $convertedSum->amount() - (float) $sumOfConversions->amount());
             $tolerance = max(0.02, (float) $convertedSum->amount() * 0.001);
-            
+
             self::assertLessThanOrEqual(
                 $tolerance,
                 $diff,
@@ -171,7 +171,7 @@ final class ExchangeRatePropertyTest extends TestCase
      *
      * Converting zero should always yield zero, regardless of rate.
      */
-    public function testConvertingZeroYieldsZero(): void
+    public function test_converting_zero_yields_zero(): void
     {
         $limit = $this->iterationLimit(100, 10, 'P2P_EXCHANGE_RATE_PROPERTY_ITERATIONS');
 
@@ -196,11 +196,11 @@ final class ExchangeRatePropertyTest extends TestCase
     }
 
     /**
-     * Property: Conversion preserves ordering: if a < b, then convert(a) < convert(b)
+     * Property: Conversion preserves ordering: if a < b, then convert(a) < convert(b).
      *
      * Converting amounts with a positive rate preserves their relative ordering.
      */
-    public function testConversionPreservesOrdering(): void
+    public function test_conversion_preserves_ordering(): void
     {
         $limit = $this->iterationLimit(100, 10, 'P2P_EXCHANGE_RATE_PROPERTY_ITERATIONS');
 
@@ -231,11 +231,11 @@ final class ExchangeRatePropertyTest extends TestCase
     }
 
     /**
-     * Property: Conversion scales with multiplier: convert(a * k) = convert(a) * k
+     * Property: Conversion scales with multiplier: convert(a * k) = convert(a) * k.
      *
      * Converting a scaled amount is equivalent to scaling the converted amount.
      */
-    public function testConversionScalesWithMultiplier(): void
+    public function test_conversion_scales_with_multiplier(): void
     {
         $limit = $this->iterationLimit(100, 10, 'P2P_EXCHANGE_RATE_PROPERTY_ITERATIONS');
 
@@ -264,7 +264,7 @@ final class ExchangeRatePropertyTest extends TestCase
             // Property: convert(a * k) ≈ convert(a) * k (within rounding)
             $diff = abs((float) $scaledThenConverted->amount() - (float) $convertedThenScaled->amount());
             $tolerance = max(0.1, (float) $scaledThenConverted->amount() * 0.01);
-            
+
             self::assertLessThanOrEqual(
                 $tolerance,
                 $diff,
@@ -278,7 +278,7 @@ final class ExchangeRatePropertyTest extends TestCase
      *
      * A rate of 1.0 from A to B should convert amounts without changing values.
      */
-    public function testIdentityRatePreservesAmount(): void
+    public function test_identity_rate_preserves_amount(): void
     {
         $limit = $this->iterationLimit(100, 10, 'P2P_EXCHANGE_RATE_PROPERTY_ITERATIONS');
 
@@ -306,7 +306,7 @@ final class ExchangeRatePropertyTest extends TestCase
      * Converting through intermediate currency should equal direct conversion
      * (when rates are consistent).
      */
-    public function testRateChainTransitivity(): void
+    public function test_rate_chain_transitivity(): void
     {
         $limit = $this->iterationLimit(100, 10, 'P2P_EXCHANGE_RATE_PROPERTY_ITERATIONS');
 
@@ -347,7 +347,7 @@ final class ExchangeRatePropertyTest extends TestCase
             // Allow up to 5% difference due to multiple conversions and float multiplication
             $diff = abs((float) $convertedABC->amount() - (float) $convertedAC->amount());
             $tolerance = max(0.1, (float) $convertedAC->amount() * 0.05);
-            
+
             self::assertLessThanOrEqual(
                 $tolerance,
                 $diff,
@@ -361,7 +361,7 @@ final class ExchangeRatePropertyTest extends TestCase
      *
      * Inverting a rate should swap the base and quote currencies.
      */
-    public function testInversionSwapsCurrencies(): void
+    public function test_inversion_swaps_currencies(): void
     {
         $limit = $this->iterationLimit(100, 10, 'P2P_EXCHANGE_RATE_PROPERTY_ITERATIONS');
 
@@ -387,7 +387,7 @@ final class ExchangeRatePropertyTest extends TestCase
      *
      * rate * invert(rate) ≈ 1 (within rounding error).
      */
-    public function testRateTimesInverseEqualsOne(): void
+    public function test_rate_times_inverse_equals_one(): void
     {
         $limit = $this->iterationLimit(100, 10, 'P2P_EXCHANGE_RATE_PROPERTY_ITERATIONS');
 
@@ -452,4 +452,3 @@ final class ExchangeRatePropertyTest extends TestCase
         return $currency;
     }
 }
-

@@ -91,12 +91,10 @@ final class Money
         $normalizedCurrency = strtoupper($currency);
 
         $decimal = self::decimalFromString($amount);
-        
+
         // Enforce non-negative amounts: path finding domain has no semantic meaning for negative money
         if ($decimal->isNegative()) {
-            throw new InvalidInput(
-                sprintf('Money amount cannot be negative. Got: %s %s', $normalizedCurrency, $amount)
-            );
+            throw new InvalidInput(sprintf('Money amount cannot be negative. Got: %s %s', $normalizedCurrency, $amount));
         }
 
         $normalizedDecimal = self::scaleDecimal($decimal, $scale);

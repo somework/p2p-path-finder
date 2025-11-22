@@ -7,6 +7,8 @@ namespace SomeWork\P2PPathFinder\Application\Graph;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
+use function sprintf;
+
 /**
  * Aggregates mandatory and maximum segment capacities for a specific measure.
  *
@@ -24,15 +26,7 @@ final class SegmentCapacityTotals
 
         // Enforce mandatory <= maximum invariant (prevents negative headroom)
         if ($mandatory->greaterThan($maximum)) {
-            throw new InvalidInput(
-                sprintf(
-                    'Segment capacity mandatory amount (%s %s) cannot exceed maximum (%s %s).',
-                    $mandatory->currency(),
-                    $mandatory->amount(),
-                    $maximum->currency(),
-                    $maximum->amount()
-                )
-            );
+            throw new InvalidInput(sprintf('Segment capacity mandatory amount (%s %s) cannot exceed maximum (%s %s).', $mandatory->currency(), $mandatory->amount(), $maximum->currency(), $maximum->amount()));
         }
     }
 

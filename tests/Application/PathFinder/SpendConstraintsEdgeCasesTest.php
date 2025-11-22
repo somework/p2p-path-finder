@@ -15,6 +15,8 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
+use function count;
+
 /**
  * Tests for SpendConstraints edge cases to ensure correct behavior at boundaries.
  *
@@ -30,7 +32,7 @@ final class SpendConstraintsEdgeCasesTest extends TestCase
     /**
      * @testdox Desired amount outside min/max bounds is handled correctly
      */
-    public function testDesiredAmountOutsideBounds(): void
+    public function test_desired_amount_outside_bounds(): void
     {
         // Case 1: Desired < Min (should clamp to min during path finding)
         $constraints1 = SpendConstraints::fromScalars('USD', '100.000', '200.000', '50.000');
@@ -51,7 +53,7 @@ final class SpendConstraintsEdgeCasesTest extends TestCase
     /**
      * @testdox Min = Max constraint represents single valid spend amount
      */
-    public function testMinEqualsMaxSpendConstraint(): void
+    public function test_min_equals_max_spend_constraint(): void
     {
         // Single valid spend amount: exactly 100 USD
         $constraints = SpendConstraints::fromScalars('USD', '100.000', '100.000', '100.000');
@@ -84,7 +86,7 @@ final class SpendConstraintsEdgeCasesTest extends TestCase
     /**
      * @testdox Very wide tolerance window creates broad spend range
      */
-    public function testWideToleranceSpendConstraints(): void
+    public function test_wide_tolerance_spend_constraints(): void
     {
         // 99% tolerance: desired ± 99%
         // Desired: 100, Range: [1, 199]
@@ -123,7 +125,7 @@ final class SpendConstraintsEdgeCasesTest extends TestCase
     /**
      * @testdox Constraint violation detection works at boundaries
      */
-    public function testConstraintViolationDetection(): void
+    public function test_constraint_violation_detection(): void
     {
         // Case 1: Requested range entirely above capacity
         $orderBook1 = new OrderBook();
@@ -167,7 +169,7 @@ final class SpendConstraintsEdgeCasesTest extends TestCase
     /**
      * @testdox SpendRange intersection logic works correctly at boundaries
      */
-    public function testSpendRangeIntersectionBoundaries(): void
+    public function test_spend_range_intersection_boundaries(): void
     {
         // Test the clamp method which is used for intersection
         $range = SpendRange::fromBounds(
@@ -199,7 +201,7 @@ final class SpendConstraintsEdgeCasesTest extends TestCase
     /**
      * @testdox Multi-hop constraint propagation narrows range correctly
      */
-    public function testMultiHopConstraintPropagation(): void
+    public function test_multi_hop_constraint_propagation(): void
     {
         // Create a 3-hop path with progressively narrower capacities
         $orderBook = new OrderBook();
@@ -240,7 +242,7 @@ final class SpendConstraintsEdgeCasesTest extends TestCase
     /**
      * @testdox Zero-width range (min = max) propagates correctly
      */
-    public function testZeroWidthRangePropagation(): void
+    public function test_zero_width_range_propagation(): void
     {
         $range = SpendRange::fromBounds(
             Money::fromString('USD', '100.000', 3),
@@ -258,7 +260,7 @@ final class SpendConstraintsEdgeCasesTest extends TestCase
     /**
      * @testdox Constraint with null desired amount is handled correctly
      */
-    public function testConstraintWithNullDesired(): void
+    public function test_constraint_with_null_desired(): void
     {
         $constraints = SpendConstraints::fromScalars('USD', '50.000', '150.000', null);
 
@@ -287,7 +289,7 @@ final class SpendConstraintsEdgeCasesTest extends TestCase
     /**
      * @testdox Currency mismatch in constraint construction is rejected
      */
-    public function testCurrencyMismatchRejection(): void
+    public function test_currency_mismatch_rejection(): void
     {
         $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Desired spend must use the same currency');
@@ -302,7 +304,7 @@ final class SpendConstraintsEdgeCasesTest extends TestCase
     /**
      * @testdox Negative spend constraints are rejected
      */
-    public function testNegativeConstraintsRejection(): void
+    public function test_negative_constraints_rejection(): void
     {
         $this->expectException(InvalidInput::class);
         $this->expectExceptionMessage('Money amount cannot be negative');
@@ -313,7 +315,7 @@ final class SpendConstraintsEdgeCasesTest extends TestCase
     /**
      * @testdox Scale normalization works across constraint bounds
      */
-    public function testScaleNormalizationAcrossBounds(): void
+    public function test_scale_normalization_across_bounds(): void
     {
         // Different scales for min (2), max (3), desired (4)
         $constraints = SpendConstraints::from(
@@ -332,4 +334,3 @@ final class SpendConstraintsEdgeCasesTest extends TestCase
         self::assertSame('100.0000', $constraints->desired()?->amount());
     }
 }
-

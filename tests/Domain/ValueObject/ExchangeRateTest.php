@@ -106,10 +106,7 @@ final class ExchangeRateTest extends TestCase
 
     // ==================== Extreme Rate Tests ====================
 
-    /**
-     * @test
-     */
-    public function testVerySmallExchangeRate(): void
+    public function test_very_small_exchange_rate(): void
     {
         // Test extremely small rate (e.g., 1 BTC = 0.00000001 satoshi unit)
         $verySmallRate = ExchangeRate::fromString('BTC', 'SATS', '0.00000001', 8);
@@ -163,10 +160,7 @@ final class ExchangeRateTest extends TestCase
         $this->assertTrue($result2->greaterThan($result1));
     }
 
-    /**
-     * @test
-     */
-    public function testVeryLargeExchangeRate(): void
+    public function test_very_large_exchange_rate(): void
     {
         // Test very large rate (e.g., USD to hyperinflated currency)
         $veryLargeRate = ExchangeRate::fromString('USD', 'HYP', '100000000.0', 1);
@@ -225,10 +219,7 @@ final class ExchangeRateTest extends TestCase
         $this->assertTrue($bigResult2->greaterThan($bigResult1));
     }
 
-    /**
-     * @test
-     */
-    public function testConversionWithExtremeRates(): void
+    public function test_conversion_with_extreme_rates(): void
     {
         // Test round-trip conversion with very small rate
         $smallRate = ExchangeRate::fromString('BTC', 'MICRO', '0.00000001', 8);
@@ -278,7 +269,7 @@ final class ExchangeRateTest extends TestCase
         // Test explicit scale override with extreme rates
         $extremeRate = ExchangeRate::fromString('XXX', 'YYY', '0.00000001', 8);
         $xMoney = Money::fromString('XXX', '1000000.00', 2);
-        
+
         // Convert with lower scale
         $yLowScale = $extremeRate->convert($xMoney, 2);
         $this->assertSame('0.01', $yLowScale->amount());
@@ -291,7 +282,7 @@ final class ExchangeRateTest extends TestCase
 
         // Test multiple small conversions accumulate correctly
         $accumulateRate = ExchangeRate::fromString('BASE', 'TARGET', '0.00001', 5);
-        
+
         $amount1 = Money::fromString('BASE', '10000.00000', 5);
         $amount2 = Money::fromString('BASE', '20000.00000', 5);
         $amount3 = Money::fromString('BASE', '30000.00000', 5);
@@ -328,10 +319,7 @@ final class ExchangeRateTest extends TestCase
 
     // ==================== Inversion Edge Cases ====================
 
-    /**
-     * @test
-     */
-    public function testDoubleInversion(): void
+    public function test_double_inversion(): void
     {
         // Test that rate.invert().invert() ≈ rate (within precision tolerance)
         // Precision loss is expected due to rounding in the inversion process
@@ -394,10 +382,7 @@ final class ExchangeRateTest extends TestCase
         $this->assertSame('1.05000000', $doubleInverted5->rate());
     }
 
-    /**
-     * @test
-     */
-    public function testIdentityRateInversion(): void
+    public function test_identity_rate_inversion(): void
     {
         // Test that a rate of 1.0 inverts to itself (within precision)
         $identityRate = ExchangeRate::fromString('USD', 'USDT', '1.0', 8);
@@ -436,10 +421,7 @@ final class ExchangeRateTest extends TestCase
         $this->assertSame('USD', $convertedBack->currency());
     }
 
-    /**
-     * @test
-     */
-    public function testNearZeroRateInversion(): void
+    public function test_near_zero_rate_inversion(): void
     {
         // Test rates very close to zero and their inversions
         // Note: Rates cannot be zero or negative per validation
@@ -481,7 +463,7 @@ final class ExchangeRateTest extends TestCase
 
         // Test that double inversion with near-zero rates has more precision loss
         $doubleInverted = $nearZeroRate->invert()->invert();
-        
+
         // With very small rates, expect more rounding error
         // Original: 0.00000001
         // Inverted: 100000000.00000000

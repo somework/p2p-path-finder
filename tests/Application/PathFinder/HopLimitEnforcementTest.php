@@ -34,7 +34,7 @@ final class HopLimitEnforcementTest extends TestCase
     /**
      * @testdox Maximum hops are enforced: paths with more than maxHops are not found
      */
-    public function testMaximumHopsEnforcement(): void
+    public function test_maximum_hops_enforcement(): void
     {
         // Create a linear chain: USD -> EUR -> GBP -> JPY (3 hops)
         $orderBook = new OrderBook();
@@ -60,7 +60,7 @@ final class HopLimitEnforcementTest extends TestCase
     /**
      * @testdox Minimum hops are enforced: optimal 1-hop path is rejected when minHops = 2
      */
-    public function testMinimumHopsEnforcement(): void
+    public function test_minimum_hops_enforcement(): void
     {
         // Create two possible paths:
         // 1. Direct: USD -> EUR (1 hop) - optimal but violates minHops
@@ -85,7 +85,7 @@ final class HopLimitEnforcementTest extends TestCase
 
         // Should find the 2-hop path, not the optimal 1-hop path
         self::assertNotEmpty($paths, 'Expected at least one path satisfying minHops requirement');
-        
+
         foreach ($paths as $path) {
             self::assertGreaterThanOrEqual(2, $path->legs()->count(), 'All paths should have at least minHops legs');
         }
@@ -94,7 +94,7 @@ final class HopLimitEnforcementTest extends TestCase
     /**
      * @testdox When minHops = maxHops, only paths with exactly that hop count are accepted
      */
-    public function testMinHopsEqualsMaxHops(): void
+    public function test_min_hops_equals_max_hops(): void
     {
         // Create multiple paths with different hop counts:
         // 1. USD -> EUR (1 hop)
@@ -123,7 +123,7 @@ final class HopLimitEnforcementTest extends TestCase
 
         // Should find exactly 2-hop paths only
         self::assertNotEmpty($paths, 'Expected to find 2-hop path');
-        
+
         foreach ($paths as $path) {
             self::assertSame(2, $path->legs()->count(), 'All paths should have exactly 2 hops');
         }
@@ -132,12 +132,12 @@ final class HopLimitEnforcementTest extends TestCase
     /**
      * @testdox Callback rejects paths even when search allows them (defense in depth)
      */
-    public function testCallbackRejectsPathRespectingSearchMaxHops(): void
+    public function test_callback_rejects_path_respecting_search_max_hops(): void
     {
         // This tests the two-level enforcement:
         // - PathFinder search uses maxHops from config (passed to constructor)
         // - PathFinderService callback also checks minHops and maxHops
-        
+
         // Create 2-hop path: USD -> EUR -> GBP
         $orderBook = new OrderBook();
         $orderBook->add(OrderFactory::buy('USD', 'EUR', '50.000', '200.000', '1.100', 3, 3));
@@ -162,7 +162,7 @@ final class HopLimitEnforcementTest extends TestCase
     /**
      * @testdox Search terminates expansion when state reaches maxHops
      */
-    public function testSearchTerminatesAtMaxHops(): void
+    public function test_search_terminates_at_max_hops(): void
     {
         // Create a very long chain to test search termination
         // USD -> AAA -> BBB -> CCC -> DDD -> EEE (5 hops total)
@@ -186,7 +186,7 @@ final class HopLimitEnforcementTest extends TestCase
 
         // Target 'EEE' requires 5 hops, but maxHops = 3, so no path found
         self::assertTrue($result->paths()->isEmpty(), 'Search should not find paths beyond maxHops');
-        
+
         // The guard report should show the search DID expand some states
         // (proving search happened but terminated correctly)
         self::assertGreaterThan(0, $result->guardLimits()->expansions(), 'Search should have expanded some states');
@@ -195,7 +195,7 @@ final class HopLimitEnforcementTest extends TestCase
     /**
      * @testdox Path with exactly maxHops is accepted
      */
-    public function testPathWithExactlyMaxHopsIsAccepted(): void
+    public function test_path_with_exactly_max_hops_is_accepted(): void
     {
         // Create 3-hop path: USD -> EUR -> GBP -> JPY
         $orderBook = new OrderBook();
@@ -224,7 +224,7 @@ final class HopLimitEnforcementTest extends TestCase
     /**
      * @testdox Path with exactly minHops is accepted
      */
-    public function testPathWithExactlyMinHopsIsAccepted(): void
+    public function test_path_with_exactly_min_hops_is_accepted(): void
     {
         // Create 2-hop path: USD -> EUR -> GBP
         $orderBook = new OrderBook();
@@ -252,7 +252,7 @@ final class HopLimitEnforcementTest extends TestCase
     /**
      * @testdox Multiple paths with different hop counts are correctly filtered
      */
-    public function testMultiplePathsFilteredByHopLimits(): void
+    public function test_multiple_paths_filtered_by_hop_limits(): void
     {
         // Create multiple paths with different hop counts:
         // Path 1: USD -> EUR (1 hop, good rate)
@@ -281,11 +281,9 @@ final class HopLimitEnforcementTest extends TestCase
 
         // Should find only the 2-hop path, not the better 1-hop or worse 3-hop
         self::assertNotEmpty($paths, 'Should find 2-hop path');
-        
+
         foreach ($paths as $path) {
             self::assertSame(2, $path->legs()->count(), 'All returned paths should have exactly 2 hops');
         }
     }
-
 }
-

@@ -13,6 +13,8 @@ use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
+use function count;
+
 /**
  * Comprehensive algorithm tests including adversarial cases, boundary conditions, and stress tests.
  *
@@ -30,13 +32,13 @@ final class PathFinderAlgorithmStressTest extends TestCase
     /**
      * @testdox Adversarial graph: Complete graph forces maximum state exploration
      */
-    public function testAdversarialGraphCompleteGraph(): void
+    public function test_adversarial_graph_complete_graph(): void
     {
         // Complete graph where every node connects to every other node
         // This maximizes the number of possible paths and state expansions
         $orderBook = new OrderBook();
         $nodes = ['USD', 'EUR', 'GBP', 'JPY', 'CHF'];
-        
+
         // Create complete graph (every pair of nodes has an edge)
         foreach ($nodes as $from) {
             foreach ($nodes as $to) {
@@ -66,7 +68,7 @@ final class PathFinderAlgorithmStressTest extends TestCase
             $guardReport->expansionsReached() || $guardReport->visitedStatesReached() || count($result->paths()->toArray()) > 0,
             'Complete graph should trigger guards or find paths'
         );
-        
+
         // Should still find some paths despite hitting limits
         self::assertGreaterThan(0, count($result->paths()->toArray()), 'Should find at least one path');
     }
@@ -74,13 +76,13 @@ final class PathFinderAlgorithmStressTest extends TestCase
     /**
      * @testdox Adversarial graph: Long linear chain tests hop limit enforcement
      */
-    public function testAdversarialGraphLongLinearChain(): void
+    public function test_adversarial_graph_long_linear_chain(): void
     {
         // Linear chain: A → B → C → D → E → F → G → H
         // Requires exactly 7 hops to reach target
         $orderBook = new OrderBook();
         $chain = ['USD', 'GBP', 'JPY', 'CHF', 'AUD', 'CAD', 'NZD', 'EUR'];
-        
+
         for ($i = 0; $i < count($chain) - 1; ++$i) {
             $orderBook->add(OrderFactory::buy($chain[$i], $chain[$i + 1], '50.000', '150.000', '1.050', 3, 3));
         }
@@ -110,7 +112,7 @@ final class PathFinderAlgorithmStressTest extends TestCase
 
         $result2 = $pathFinder2->findBestPaths($graph, 'USD', 'EUR', null, null);
         $paths2 = $result2->paths()->toArray();
-        
+
         self::assertCount(1, $paths2, 'Should find exactly one path with exact hop count');
         self::assertSame(7, $paths2[0]->hops(), 'Path should have exactly 7 hops');
     }
@@ -118,22 +120,22 @@ final class PathFinderAlgorithmStressTest extends TestCase
     /**
      * @testdox Adversarial graph: Star topology with central hub
      */
-    public function testAdversarialGraphStarTopology(): void
+    public function test_adversarial_graph_star_topology(): void
     {
         // Star topology: All nodes connect through central hub
         // USD → HUB, HUB → EUR, HUB → GBP, HUB → JPY, etc.
         // Forces paths to go through hub, testing state registry efficiency
         $orderBook = new OrderBook();
         $spokes = ['EUR', 'GBP', 'JPY', 'CHF', 'AUD', 'CAD', 'NZD', 'SEK'];
-        
+
         // USD to HUB
         $orderBook->add(OrderFactory::buy('USD', 'HUB', '50.000', '150.000', '1.000', 3, 3));
-        
+
         // HUB to all spokes
         foreach ($spokes as $spoke) {
             $orderBook->add(OrderFactory::buy('HUB', $spoke, '50.000', '150.000', '1.100', 3, 3));
         }
-        
+
         // Spokes back to HUB (creates potential for cycles)
         foreach ($spokes as $spoke) {
             $orderBook->add(OrderFactory::buy($spoke, 'HUB', '50.000', '150.000', '0.900', 3, 3));
@@ -154,11 +156,11 @@ final class PathFinderAlgorithmStressTest extends TestCase
 
         // Should find direct path through hub (USD → HUB → EUR)
         self::assertGreaterThan(0, count($paths), 'Should find path through hub');
-        
+
         // Verify shortest path is 2 hops (USD → HUB → EUR)
-        $shortestHops = min(array_map(fn($p) => $p->hops(), $paths));
+        $shortestHops = min(array_map(fn ($p) => $p->hops(), $paths));
         self::assertSame(2, $shortestHops, 'Shortest path should be 2 hops through hub');
-        
+
         // Verify no cycles (visited state tracking prevents loops)
         $guardReport = $result->guardLimits();
         self::assertLessThan(200, $guardReport->visitedStates(), 'Should efficiently track visited states');
@@ -167,7 +169,7 @@ final class PathFinderAlgorithmStressTest extends TestCase
     /**
      * @testdox Boundary condition: Tolerance = 0% (no tolerance)
      */
-    public function testBoundaryConditionZeroTolerance(): void
+    public function test_boundary_condition_zero_tolerance(): void
     {
         $orderBook = new OrderBook();
         $orderBook->add(OrderFactory::buy('USD', 'EUR', '50.000', '150.000', '1.300', 3, 3));
@@ -189,7 +191,7 @@ final class PathFinderAlgorithmStressTest extends TestCase
 
         // With zero tolerance, should still find the best path
         self::assertGreaterThan(0, count($paths), 'Should find best path even with zero tolerance');
-        
+
         // Best path is the one with lowest cost (best conversion rate)
         $bestPath = $paths[0];
         // Note: May be direct or 2-hop depending on which is discovered first and has better cost
@@ -199,10 +201,10 @@ final class PathFinderAlgorithmStressTest extends TestCase
     /**
      * @testdox Boundary condition: Tolerance = 99.9% (maximum tolerance)
      */
-    public function testBoundaryConditionMaximumTolerance(): void
+    public function test_boundary_condition_maximum_tolerance(): void
     {
         $orderBook = new OrderBook();
-        
+
         // Create paths with very different qualities
         $orderBook->add(OrderFactory::buy('USD', 'EUR', '50.000', '150.000', '2.000', 3, 3)); // Good: 2x
         $orderBook->add(OrderFactory::buy('USD', 'GBP', '50.000', '150.000', '1.010', 3, 3)); // Poor: 1.01x
@@ -228,10 +230,10 @@ final class PathFinderAlgorithmStressTest extends TestCase
     /**
      * @testdox Boundary condition: maxHops = 1 (direct paths only)
      */
-    public function testBoundaryConditionMinimumHops(): void
+    public function test_boundary_condition_minimum_hops(): void
     {
         $orderBook = new OrderBook();
-        
+
         // Direct and indirect paths
         $orderBook->add(OrderFactory::buy('USD', 'EUR', '50.000', '150.000', '1.300', 3, 3));
         $orderBook->add(OrderFactory::buy('USD', 'GBP', '50.000', '150.000', '1.200', 3, 3));
@@ -258,10 +260,10 @@ final class PathFinderAlgorithmStressTest extends TestCase
     /**
      * @testdox Boundary condition: topK = 1 (single best path)
      */
-    public function testBoundaryConditionTopKOne(): void
+    public function test_boundary_condition_top_k_one(): void
     {
         $orderBook = new OrderBook();
-        
+
         // Multiple paths
         $orderBook->add(OrderFactory::buy('USD', 'EUR', '50.000', '150.000', '1.300', 3, 3));
         $orderBook->add(OrderFactory::buy('USD', 'GBP', '50.000', '150.000', '1.200', 3, 3));
@@ -287,12 +289,12 @@ final class PathFinderAlgorithmStressTest extends TestCase
     /**
      * @testdox Guard stress test: Tight expansion limit on complex graph
      */
-    public function testGuardStressTightExpansionLimit(): void
+    public function test_guard_stress_tight_expansion_limit(): void
     {
         // Create moderately complex graph
         $orderBook = new OrderBook();
         $nodes = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'AUD'];
-        
+
         foreach ($nodes as $i => $from) {
             foreach ($nodes as $j => $to) {
                 if ($i < $j) { // Create edges in one direction to avoid too many
@@ -317,7 +319,7 @@ final class PathFinderAlgorithmStressTest extends TestCase
         // Should hit expansion limit
         self::assertTrue($guardReport->expansionsReached(), 'Should hit tight expansion limit');
         self::assertSame(10, $guardReport->expansions(), 'Should reach exactly the expansion limit');
-        
+
         // May or may not find paths (depends on when limit hit)
         // But should not error
         self::assertIsArray($result->paths()->toArray(), 'Should return valid result despite hitting limit');
@@ -326,12 +328,12 @@ final class PathFinderAlgorithmStressTest extends TestCase
     /**
      * @testdox Guard stress test: Tight visited state limit on complex graph
      */
-    public function testGuardStressTightVisitedStateLimit(): void
+    public function test_guard_stress_tight_visited_state_limit(): void
     {
         // Create graph with many branches
         $orderBook = new OrderBook();
         $orderBook->add(OrderFactory::buy('USD', 'HUB', '50.000', '150.000', '1.000', 3, 3));
-        
+
         // Many nodes accessible from hub (use valid currency codes)
         $spokes = ['GBP', 'JPY', 'CHF', 'AUD', 'CAD', 'NZD', 'SEK', 'NOK', 'DKK', 'PLN'];
         foreach ($spokes as $node) {
@@ -354,7 +356,7 @@ final class PathFinderAlgorithmStressTest extends TestCase
 
         // Should hit visited state limit
         self::assertLessThanOrEqual(5, $guardReport->visitedStates(), 'Should respect tight visited state limit');
-        
+
         // May or may not find paths (depends on whether limit hit before reaching target)
         // The important thing is that the limit is respected
         $paths = $result->paths()->toArray();
@@ -364,12 +366,12 @@ final class PathFinderAlgorithmStressTest extends TestCase
     /**
      * @testdox Guard stress test: Tight time budget on complex graph
      */
-    public function testGuardStressTightTimeBudget(): void
+    public function test_guard_stress_tight_time_budget(): void
     {
         // Create graph requiring significant exploration
         $orderBook = new OrderBook();
         $nodes = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'AUD', 'CAD', 'NZD'];
-        
+
         foreach ($nodes as $i => $from) {
             foreach ($nodes as $j => $to) {
                 if ($from !== $to) {
@@ -395,7 +397,7 @@ final class PathFinderAlgorithmStressTest extends TestCase
         // Time budget may or may not be reached (depends on system speed)
         // But should not error and should return valid results
         self::assertIsArray($result->paths()->toArray(), 'Should return valid result with time budget');
-        
+
         // If time budget was reached, verify it was reported
         if ($guardReport->timeBudgetReached()) {
             self::assertGreaterThan(0, $guardReport->elapsedMilliseconds(), 'Should report elapsed time');
@@ -405,7 +407,7 @@ final class PathFinderAlgorithmStressTest extends TestCase
     /**
      * @testdox Large graph: 20 nodes, multiple paths, verifies scalability
      */
-    public function testLargeGraphScalability(): void
+    public function test_large_graph_scalability(): void
     {
         // Create larger graph with 20 nodes (use valid currency codes)
         $orderBook = new OrderBook();
@@ -413,15 +415,15 @@ final class PathFinderAlgorithmStressTest extends TestCase
             'USD', 'EUR', 'GBP', 'JPY', 'CHF', 'AUD', 'CAD', 'NZD', 'SEK', 'NOK',
             'DKK', 'PLN', 'HUF', 'CZK', 'SGD', 'HKD', 'THB', 'MYR', 'INR', 'BRL',
         ];
-        
+
         // Create ring topology + some cross-connections
         for ($i = 0; $i < count($nodes); ++$i) {
             $from = $nodes[$i];
             $to = $nodes[($i + 1) % count($nodes)];
             $orderBook->add(OrderFactory::buy($from, $to, '50.000', '150.000', '1.050', 3, 3));
-            
+
             // Add some shortcuts
-            if ($i % 3 === 0 && $i + 5 < count($nodes)) {
+            if (0 === $i % 3 && $i + 5 < count($nodes)) {
                 $shortcut = $nodes[$i + 5];
                 $orderBook->add(OrderFactory::buy($from, $shortcut, '50.000', '150.000', '1.200', 3, 3));
             }
@@ -444,7 +446,7 @@ final class PathFinderAlgorithmStressTest extends TestCase
         // Should find paths without hitting guards
         self::assertFalse($guardReport->anyLimitReached(), 'Should handle large graph without hitting guards');
         self::assertGreaterThan(0, count($paths), 'Should find paths in large graph');
-        
+
         // Verify paths are reasonable (not too long)
         foreach ($paths as $path) {
             self::assertLessThanOrEqual(10, $path->hops(), 'Paths should respect maxHops limit');
@@ -454,7 +456,7 @@ final class PathFinderAlgorithmStressTest extends TestCase
     /**
      * @testdox Empty graph: No nodes, returns empty result
      */
-    public function testBoundaryConditionEmptyGraph(): void
+    public function test_boundary_condition_empty_graph(): void
     {
         $orderBook = new OrderBook();
         $graph = (new GraphBuilder())->build(iterator_to_array($orderBook));
@@ -471,7 +473,7 @@ final class PathFinderAlgorithmStressTest extends TestCase
 
         // Should return empty result (no error)
         self::assertCount(0, $result->paths()->toArray(), 'Empty graph should yield empty results');
-        
+
         // Guards should be idle
         $guardReport = $result->guardLimits();
         self::assertSame(0, $guardReport->expansions(), 'No expansions in empty graph');
@@ -481,7 +483,7 @@ final class PathFinderAlgorithmStressTest extends TestCase
     /**
      * @testdox Single node graph: Source equals target
      */
-    public function testBoundaryConditionSourceEqualsTarget(): void
+    public function test_boundary_condition_source_equals_target(): void
     {
         $orderBook = new OrderBook();
         $orderBook->add(OrderFactory::buy('USD', 'EUR', '50.000', '150.000', '1.300', 3, 3));
@@ -502,12 +504,12 @@ final class PathFinderAlgorithmStressTest extends TestCase
         // Since source == target, it immediately satisfies the target condition
         // This results in a 0-hop "path" being returned
         $paths = $result->paths()->toArray();
-        
+
         if (count($paths) > 0) {
             // If a path is returned, it should be a 0-hop path
             self::assertSame(0, $paths[0]->hops(), 'Source == target path should have 0 hops');
         }
-        
+
         // This is expected behavior: source == target is satisfied immediately
         self::assertLessThanOrEqual(1, count($paths), 'Source == target should return at most one path');
     }
@@ -515,14 +517,14 @@ final class PathFinderAlgorithmStressTest extends TestCase
     /**
      * @testdox Disconnected graph: Source and target in different components
      */
-    public function testBoundaryConditionDisconnectedGraph(): void
+    public function test_boundary_condition_disconnected_graph(): void
     {
         $orderBook = new OrderBook();
-        
+
         // Component 1: USD ↔ EUR
         $orderBook->add(OrderFactory::buy('USD', 'EUR', '50.000', '150.000', '1.300', 3, 3));
         $orderBook->add(OrderFactory::buy('EUR', 'USD', '50.000', '150.000', '0.750', 3, 3));
-        
+
         // Component 2: GBP ↔ JPY (disconnected)
         $orderBook->add(OrderFactory::buy('GBP', 'JPY', '50.000', '150.000', '1.200', 3, 3));
         $orderBook->add(OrderFactory::buy('JPY', 'GBP', '50.000', '150.000', '0.800', 3, 3));
@@ -541,7 +543,7 @@ final class PathFinderAlgorithmStressTest extends TestCase
 
         // Should return empty (no path between disconnected components)
         self::assertCount(0, $result->paths()->toArray(), 'Disconnected components should yield empty results');
-        
+
         // Should not exhaust guards (early termination)
         $guardReport = $result->guardLimits();
         self::assertFalse($guardReport->anyLimitReached(), 'Should terminate early in disconnected graph');
@@ -550,7 +552,7 @@ final class PathFinderAlgorithmStressTest extends TestCase
     /**
      * @testdox Spend constraints: Very tight constraints prune paths aggressively
      */
-    public function testBoundaryConditionTightSpendConstraints(): void
+    public function test_boundary_condition_tight_spend_constraints(): void
     {
         $orderBook = new OrderBook();
         $orderBook->add(OrderFactory::buy('USD', 'EUR', '50.000', '150.000', '1.300', 3, 3));
@@ -574,11 +576,10 @@ final class PathFinderAlgorithmStressTest extends TestCase
 
         // Should still find paths (constraints are carried through)
         self::assertGreaterThan(0, count($paths), 'Should find paths with tight spend constraints');
-        
+
         // Paths should have spend range information
         foreach ($paths as $path) {
             self::assertNotNull($path->range(), 'Path should carry spend range information');
         }
     }
 }
-

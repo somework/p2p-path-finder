@@ -340,11 +340,11 @@ final class PathFinder
     /**
      * Searches for the best paths from source to target with optional acceptance filtering.
      *
-     * @param Graph                              $graph             The trading graph to search
-     * @param string                             $source            Source currency code
-     * @param string                             $target            Target currency code
-     * @param SpendConstraints|null              $spendConstraints  Optional spend amount constraints
-     * @param callable(CandidatePath):bool|null  $acceptCandidate   Optional callback to filter candidate paths
+     * @param Graph                             $graph            The trading graph to search
+     * @param string                            $source           Source currency code
+     * @param string                            $target           Target currency code
+     * @param SpendConstraints|null             $spendConstraints Optional spend amount constraints
+     * @param callable(CandidatePath):bool|null $acceptCandidate  Optional callback to filter candidate paths
      *
      * ## Acceptance Callback Contract
      *
@@ -701,7 +701,7 @@ final class PathFinder
         }
 
         // bestTargetCost is already normalized when set
-        
+
         // Zero tolerance: only allow paths with cost ≤ bestTargetCost (no amplification)
         if (!$this->hasTolerance()) {
             return $bestTargetCost;
@@ -818,7 +818,7 @@ final class PathFinder
      * When segments exist, uses `mandatory` capacity as the minimum bound (not raw capacity.min).
      * This ensures paths respect order minimums due to fees.
      *
-     * @param GraphEdge $edge The edge to check
+     * @param GraphEdge  $edge  The edge to check
      * @param SpendRange $range The requested spend range
      *
      * @return SpendRange|null Feasible intersection range, or null if edge cannot satisfy constraints
@@ -899,7 +899,7 @@ final class PathFinder
      * Amounts are clamped to edge capacity during conversion to ensure bounds
      * remain within available liquidity.
      *
-     * @param GraphEdge $edge The edge to traverse
+     * @param GraphEdge  $edge  The edge to traverse
      * @param SpendRange $range The spend range to convert
      *
      * @return SpendRange The converted range in the target currency

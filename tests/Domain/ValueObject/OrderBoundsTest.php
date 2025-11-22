@@ -221,10 +221,7 @@ final class OrderBoundsTest extends TestCase
 
     // ==================== Boundary Edge Case Tests ====================
 
-    /**
-     * @test
-     */
-    public function testMinEqualsMax(): void
+    public function test_min_equals_max(): void
     {
         // Test that min = max creates a valid single-point bounds
         $singleAmount = $this->money('USD', '100.50', 2);
@@ -263,10 +260,7 @@ final class OrderBoundsTest extends TestCase
         self::assertFalse($zeroBounds->contains($this->money('EUR', '0.01', 2)));
     }
 
-    /**
-     * @test
-     */
-    public function testMinGreaterThanMaxThrowsException(): void
+    public function test_min_greater_than_max_throws_exception(): void
     {
         // Test that min > max is properly rejected
         $this->expectException(InvalidInput::class);
@@ -278,10 +272,7 @@ final class OrderBoundsTest extends TestCase
         OrderBounds::from($min, $max);
     }
 
-    /**
-     * @test
-     */
-    public function testMinGreaterThanMaxWithVariousScales(): void
+    public function test_min_greater_than_max_with_various_scales(): void
     {
         // Test min > max with different amounts and scales
         $this->expectException(InvalidInput::class);
@@ -293,10 +284,7 @@ final class OrderBoundsTest extends TestCase
         OrderBounds::from($min, $max);
     }
 
-    /**
-     * @test
-     */
-    public function testMinGreaterThanMaxWithDifferentScales(): void
+    public function test_min_greater_than_max_with_different_scales(): void
     {
         // Test that min > max is detected even with different scales
         $this->expectException(InvalidInput::class);
@@ -309,10 +297,7 @@ final class OrderBoundsTest extends TestCase
         OrderBounds::from($min, $max);
     }
 
-    /**
-     * @test
-     */
-    public function testZeroBounds(): void
+    public function test_zero_bounds(): void
     {
         // Test when both min and max are zero
         $zeroMin = $this->money('USD', '0.00', 2);
@@ -341,10 +326,7 @@ final class OrderBoundsTest extends TestCase
         self::assertTrue($boundsBTC->contains($this->money('BTC', '0.00000000', 8)));
     }
 
-    /**
-     * @test
-     */
-    public function testZeroMinimumWithPositiveMaximum(): void
+    public function test_zero_minimum_with_positive_maximum(): void
     {
         // Test zero as minimum with positive maximum (valid range)
         $bounds = OrderBounds::from(
@@ -369,10 +351,7 @@ final class OrderBoundsTest extends TestCase
         self::assertMoneyAmount($bounds->clamp($this->money('USD', '200.00', 2)), '100.00', 2);
     }
 
-    /**
-     * @test
-     */
-    public function testNegativeBoundsRejectedByMoneyValidation(): void
+    public function test_negative_bounds_rejected_by_money_validation(): void
     {
         // Money value object does not allow negative amounts
         // This test verifies that negative bounds are impossible due to Money's invariants
@@ -386,10 +365,7 @@ final class OrderBoundsTest extends TestCase
         OrderBounds::from($negativeMoney, $this->money('USD', '10.00', 2));
     }
 
-    /**
-     * @test
-     */
-    public function testNegativeMaxBoundsRejectedByMoneyValidation(): void
+    public function test_negative_max_bounds_rejected_by_money_validation(): void
     {
         // Verify that negative max is also rejected
         $this->expectException(InvalidInput::class);
@@ -399,10 +375,7 @@ final class OrderBoundsTest extends TestCase
         $this->money('USD', '-5.00', 2);
     }
 
-    /**
-     * @test
-     */
-    public function testBoundaryPrecisionWithHighScale(): void
+    public function test_boundary_precision_with_high_scale(): void
     {
         // Test boundary behavior with very high precision
         $bounds = OrderBounds::from(
@@ -439,10 +412,7 @@ final class OrderBoundsTest extends TestCase
 
     // ==================== contains() Method Edge Case Tests ====================
 
-    /**
-     * @test
-     */
-    public function testContainsAtMinimum(): void
+    public function test_contains_at_minimum(): void
     {
         // Test that contains() returns true for value exactly at minimum
         $bounds = OrderBounds::from(
@@ -478,10 +448,7 @@ final class OrderBoundsTest extends TestCase
         self::assertTrue($boundsWithZero->contains($this->money('EUR', '0.00', 2)));
     }
 
-    /**
-     * @test
-     */
-    public function testContainsAtMaximum(): void
+    public function test_contains_at_maximum(): void
     {
         // Test that contains() returns true for value exactly at maximum
         $bounds = OrderBounds::from(
@@ -517,10 +484,7 @@ final class OrderBoundsTest extends TestCase
         self::assertTrue($singlePoint->contains($this->money('GBP', '50.00', 2)));
     }
 
-    /**
-     * @test
-     */
-    public function testContainsJustBelowMinimum(): void
+    public function test_contains_just_below_minimum(): void
     {
         // Test that contains() returns false for values just below minimum
         $bounds = OrderBounds::from(
@@ -554,10 +518,7 @@ final class OrderBoundsTest extends TestCase
         self::assertFalse($bounds->contains($this->money('USD', '0.00', 2)));
     }
 
-    /**
-     * @test
-     */
-    public function testContainsJustAboveMaximum(): void
+    public function test_contains_just_above_maximum(): void
     {
         // Test that contains() returns false for values just above maximum
         $bounds = OrderBounds::from(
@@ -599,10 +560,7 @@ final class OrderBoundsTest extends TestCase
         self::assertFalse($singlePoint->contains($this->money('GBP', '50.01', 2)));
     }
 
-    /**
-     * @test
-     */
-    public function testContainsWithScaleMismatch(): void
+    public function test_contains_with_scale_mismatch(): void
     {
         // Test that contains() works correctly when the amount has a different scale than bounds
         $bounds = OrderBounds::from(

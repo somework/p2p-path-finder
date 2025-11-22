@@ -742,10 +742,7 @@ final class PathSearchConfigTest extends TestCase
 
     // ==================== Spend Bounds Computation Tests (0002.10) ====================
 
-    /**
-     * @test
-     */
-    public function testSpendBoundsComputationZeroTolerance(): void
+    public function test_spend_bounds_computation_zero_tolerance(): void
     {
         // Test zero tolerance window produces equal min/max bounds
         $config = PathSearchConfig::builder()
@@ -772,10 +769,7 @@ final class PathSearchConfigTest extends TestCase
         self::assertSame('1.00000000', $configHighScale->maximumSpendAmount()->amount());
     }
 
-    /**
-     * @test
-     */
-    public function testSpendBoundsComputationWideTolerance(): void
+    public function test_spend_bounds_computation_wide_tolerance(): void
     {
         // Test with very wide tolerance window (approaching 100%)
         $config = PathSearchConfig::builder()
@@ -805,10 +799,7 @@ final class PathSearchConfigTest extends TestCase
         self::assertTrue($config2->minimumSpendAmount()->lessThan($config2->maximumSpendAmount()));
     }
 
-    /**
-     * @test
-     */
-    public function testSpendBoundsComputationAtBoundaries(): void
+    public function test_spend_bounds_computation_at_boundaries(): void
     {
         // Test at exact tolerance boundaries
         $config = PathSearchConfig::builder()
@@ -839,10 +830,7 @@ final class PathSearchConfigTest extends TestCase
         self::assertSame(6, $config2->maximumSpendAmount()->scale());
     }
 
-    /**
-     * @test
-     */
-    public function testSpendBoundsComputationWithVariousDesiredAmounts(): void
+    public function test_spend_bounds_computation_with_various_desired_amounts(): void
     {
         // Test small amount
         $config1 = PathSearchConfig::builder()
@@ -885,10 +873,7 @@ final class PathSearchConfigTest extends TestCase
         self::assertSame('1004999.99', $config4->maximumSpendAmount()->amount());
     }
 
-    /**
-     * @test
-     */
-    public function testSpendBoundsFormulaDocumentation(): void
+    public function test_spend_bounds_formula_documentation(): void
     {
         // Document and verify the formula matches documentation
         // Formula: minSpend = spendAmount * (1 - minTolerance)

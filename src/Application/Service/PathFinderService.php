@@ -31,17 +31,17 @@ use function sprintf;
 use function strtoupper;
 use function trim;
 
-    /**
-     * High level facade orchestrating order filtering, graph building and path search.
-     *
-     * @see PathSearchRequest For request structure
-     * @see PathSearchConfig For configuration options
-     * @see SearchOutcome For result structure
-     * @see docs/guarded-search-example.md For complete usage example
-     *
-     * @api
-     */
-    final class PathFinderService
+/**
+ * High level facade orchestrating order filtering, graph building and path search.
+ *
+ * @see PathSearchRequest For request structure
+ * @see PathSearchConfig For configuration options
+ * @see SearchOutcome For result structure
+ * @see docs/guarded-search-example.md For complete usage example
+ *
+ * @api
+ */
+final class PathFinderService
 {
     /**
      * @see DecimalHelperTrait::CANONICAL_SCALE
@@ -82,8 +82,6 @@ use function trim;
      *
      * @internal This is for testing only and may change without notice
      *
-     * @param GraphBuilder                                                                                                      $graphBuilder
-     * @param PathOrderStrategy|null                                                                                            $orderingStrategy
      * @param Closure(PathSearchRequest):(Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath>) $pathFinderFactory Factory that creates PathFinder runner instances
      *
      * @return self Service instance with injected factory (for testing only)

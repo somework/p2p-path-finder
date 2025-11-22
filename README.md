@@ -2,6 +2,9 @@
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/somework/p2p-path-finder/tests.yml?branch=main&label=Tests)](https://github.com/somework/p2p-path-finder/actions/workflows/tests.yml)
 [![Quality](https://img.shields.io/github/actions/workflow/status/somework/p2p-path-finder/quality.yml?branch=main&label=Quality)](https://github.com/somework/p2p-path-finder/actions/workflows/quality.yml)
+[![PHP Version](https://img.shields.io/packagist/php-v/somework/p2p-path-finder)](https://packagist.org/packages/somework/p2p-path-finder)
+[![Latest Release](https://img.shields.io/github/v/release/somework/p2p-path-finder)](https://github.com/somework/p2p-path-finder/releases)
+[![License](https://img.shields.io/github/license/somework/p2p-path-finder)](LICENSE)
 
 A small toolkit for discovering optimal peer-to-peer conversion paths across a set of
 orders. The package focuses on deterministic arithmetic, declarative configuration and

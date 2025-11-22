@@ -14,6 +14,8 @@ use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
+use function count;
+
 /**
  * Tests edge cases for the acceptance callback mechanism.
  *
@@ -28,7 +30,7 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
     /**
      * @testdox Callback that always returns false yields empty results but search completes
      */
-    public function testCallbackAlwaysReturnsFalse(): void
+    public function test_callback_always_returns_false(): void
     {
         $orderBook = new OrderBook();
         $orderBook->add(OrderFactory::buy('USD', 'GBP', '50.000', '150.000', '1.200', 3, 3));
@@ -59,6 +61,7 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
                     'hops' => $candidate->hops(),
                     'cost' => $candidate->cost(),
                 ];
+
                 return false; // Reject all paths
             }
         );
@@ -66,10 +69,10 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
         // Should discover paths but not accept any
         self::assertGreaterThan(0, $invocationCount, 'Callback should be invoked for discovered paths');
         self::assertGreaterThan(0, count($discoveredPaths), 'Should discover multiple paths');
-        
+
         // No results should be returned
         self::assertCount(0, $result->paths()->toArray(), 'Result should be empty when all paths rejected');
-        
+
         // Search should complete normally (no errors)
         $guardReport = $result->guardLimits();
         self::assertFalse($guardReport->anyLimitReached(), 'Search should complete without hitting guards');
@@ -78,18 +81,18 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
     /**
      * @testdox Callback with complex acceptance criteria filters paths correctly
      */
-    public function testCallbackWithComplexCriteria(): void
+    public function test_callback_with_complex_criteria(): void
     {
         // Create multiple paths with different characteristics
         $orderBook = new OrderBook();
-        
+
         // Direct path: USD → EUR (1 hop, best rate)
         $orderBook->add(OrderFactory::buy('USD', 'EUR', '50.000', '150.000', '1.300', 3, 3));
-        
+
         // 2-hop paths
         $orderBook->add(OrderFactory::buy('USD', 'GBP', '50.000', '150.000', '1.200', 3, 3));
         $orderBook->add(OrderFactory::buy('GBP', 'EUR', '50.000', '150.000', '1.100', 3, 3));
-        
+
         // 3-hop path
         $orderBook->add(OrderFactory::buy('USD', 'CHF', '50.000', '150.000', '1.150', 3, 3));
         $orderBook->add(OrderFactory::buy('CHF', 'GBP', '50.000', '150.000', '1.050', 3, 3));
@@ -110,11 +113,11 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
             'USD',
             'EUR',
             null,
-            fn(CandidatePath $c) => $c->hops() === 2
+            fn (CandidatePath $c) => 2 === $c->hops()
         );
 
         $paths = $result->paths()->toArray();
-        
+
         // Should only have 2-hop paths
         self::assertGreaterThan(0, count($paths), 'Should find 2-hop paths');
         foreach ($paths as $path) {
@@ -125,7 +128,7 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
     /**
      * @testdox Callback can collect candidates without accepting any
      */
-    public function testCallbackCollectsWithoutAccepting(): void
+    public function test_callback_collects_without_accepting(): void
     {
         $orderBook = new OrderBook();
         $orderBook->add(OrderFactory::buy('USD', 'GBP', '50.000', '150.000', '1.200', 3, 3));
@@ -156,16 +159,17 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
                     'product' => $candidate->product(),
                     'edgeCount' => $candidate->edges()->count(),
                 ];
+
                 return false; // Don't accept any
             }
         );
 
         // Should have collected candidates
         self::assertGreaterThan(0, count($allCandidates), 'Should collect candidate information');
-        
+
         // But results should be empty
         self::assertCount(0, $result->paths()->toArray(), 'Results should be empty');
-        
+
         // Verify collected data structure
         foreach ($allCandidates as $candidate) {
             self::assertArrayHasKey('hops', $candidate);
@@ -178,14 +182,14 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
     /**
      * @testdox Callback rejection affects tolerance pruning correctly
      */
-    public function testCallbackRejectionAffectsTolerancePruning(): void
+    public function test_callback_rejection_affects_tolerance_pruning(): void
     {
         // Create graph where callback rejection influences which path becomes "best"
         $orderBook = new OrderBook();
-        
+
         // Good direct path (cost ~1.3)
         $orderBook->add(OrderFactory::buy('USD', 'EUR', '50.000', '150.000', '1.300', 3, 3));
-        
+
         // Worse 2-hop path (cost ~1.32)
         $orderBook->add(OrderFactory::buy('USD', 'GBP', '50.000', '150.000', '1.200', 3, 3));
         $orderBook->add(OrderFactory::buy('GBP', 'EUR', '50.000', '150.000', '1.100', 3, 3));
@@ -206,11 +210,11 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
             'USD',
             'EUR',
             null,
-            fn(CandidatePath $c) => $c->hops() >= 2
+            fn (CandidatePath $c) => $c->hops() >= 2
         );
 
         $paths = $result->paths()->toArray();
-        
+
         // Should only have 2-hop path (direct was rejected)
         self::assertGreaterThan(0, count($paths), 'Should find paths');
         self::assertSame(2, $paths[0]->hops(), 'Best path should be 2-hop (direct was rejected)');
@@ -219,7 +223,7 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
     /**
      * @testdox Null callback accepts all paths
      */
-    public function testNullCallbackAcceptsAll(): void
+    public function test_null_callback_accepts_all(): void
     {
         $orderBook = new OrderBook();
         $orderBook->add(OrderFactory::buy('USD', 'EUR', '50.000', '150.000', '1.300', 3, 3));
@@ -240,7 +244,7 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
         $result = $pathFinder->findBestPaths($graph, 'USD', 'EUR', null, null);
 
         $paths = $result->paths()->toArray();
-        
+
         // Should have multiple paths (all discovered paths accepted)
         self::assertGreaterThan(0, count($paths), 'Should find multiple paths with null callback');
     }
@@ -248,10 +252,10 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
     /**
      * @testdox Callback invoked multiple times as paths are discovered
      */
-    public function testCallbackInvokedMultipleTimes(): void
+    public function test_callback_invoked_multiple_times(): void
     {
         $orderBook = new OrderBook();
-        
+
         // Create multiple paths
         $orderBook->add(OrderFactory::buy('USD', 'EUR', '50.000', '150.000', '1.300', 3, 3));
         $orderBook->add(OrderFactory::buy('USD', 'GBP', '50.000', '150.000', '1.200', 3, 3));
@@ -276,13 +280,14 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
             null,
             function (CandidatePath $candidate) use (&$invocations): bool {
                 $invocations[] = $candidate->hops();
+
                 return true;
             }
         );
 
         // Should be invoked multiple times (once per discovered path)
         self::assertGreaterThanOrEqual(2, count($invocations), 'Callback should be invoked multiple times');
-        
+
         // Invocations should have different hop counts
         $uniqueHops = array_unique($invocations);
         self::assertGreaterThan(1, count($uniqueHops), 'Should discover paths with different hop counts');
@@ -291,7 +296,7 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
     /**
      * @testdox Callback with spend constraints can access range information
      */
-    public function testCallbackAccessesSpendConstraints(): void
+    public function test_callback_accesses_spend_constraints(): void
     {
         $orderBook = new OrderBook();
         $orderBook->add(OrderFactory::buy('USD', 'EUR', '50.000', '150.000', '1.300', 3, 3));
@@ -318,6 +323,7 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
             $constraints,
             function (CandidatePath $candidate) use (&$receivedConstraints): bool {
                 $receivedConstraints = $candidate->range();
+
                 return true;
             }
         );
@@ -331,10 +337,10 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
     /**
      * @testdox Callback respects top-K limit (only accepted paths count toward limit)
      */
-    public function testCallbackRespectsTopKLimit(): void
+    public function test_callback_respects_top_k_limit(): void
     {
         $orderBook = new OrderBook();
-        
+
         // Create many potential paths
         $orderBook->add(OrderFactory::buy('USD', 'EUR', '50.000', '150.000', '1.300', 3, 3));
         $orderBook->add(OrderFactory::buy('USD', 'GBP', '50.000', '150.000', '1.200', 3, 3));
@@ -358,11 +364,11 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
             'USD',
             'EUR',
             null,
-            fn(CandidatePath $c) => true // Accept all
+            fn (CandidatePath $c) => true // Accept all
         );
 
         $paths = $result->paths()->toArray();
-        
+
         // Should respect top-K limit
         self::assertLessThanOrEqual($topK, count($paths), 'Should respect topK limit');
     }
@@ -370,7 +376,7 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
     /**
      * @testdox Callback can use side effects for logging or metrics
      */
-    public function testCallbackSideEffectsForLogging(): void
+    public function test_callback_side_effects_for_logging(): void
     {
         $orderBook = new OrderBook();
         $orderBook->add(OrderFactory::buy('USD', 'GBP', '50.000', '150.000', '1.200', 3, 3));
@@ -402,19 +408,19 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
             null,
             function (CandidatePath $candidate) use (&$metrics): bool {
                 ++$metrics['totalCandidates'];
-                
+
                 $cost = (float) $candidate->cost();
-                $metrics['minCost'] = $metrics['minCost'] === null ? $cost : min($metrics['minCost'], $cost);
-                $metrics['maxCost'] = $metrics['maxCost'] === null ? $cost : max($metrics['maxCost'], $cost);
-                
+                $metrics['minCost'] = null === $metrics['minCost'] ? $cost : min($metrics['minCost'], $cost);
+                $metrics['maxCost'] = null === $metrics['maxCost'] ? $cost : max($metrics['maxCost'], $cost);
+
                 // Accept only 2-hop paths
-                $accept = $candidate->hops() === 2;
+                $accept = 2 === $candidate->hops();
                 if ($accept) {
                     ++$metrics['acceptedCandidates'];
                 } else {
                     ++$metrics['rejectedCandidates'];
                 }
-                
+
                 return $accept;
             }
         );
@@ -424,7 +430,7 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
         self::assertGreaterThan(0, $metrics['acceptedCandidates'], 'Should accept some candidates');
         self::assertNotNull($metrics['minCost'], 'Should track min cost');
         self::assertNotNull($metrics['maxCost'], 'Should track max cost');
-        
+
         // Verify metrics consistency
         self::assertSame(
             $metrics['totalCandidates'],
@@ -436,7 +442,7 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
     /**
      * @testdox Callback exception propagates to caller
      */
-    public function testCallbackExceptionPropagates(): void
+    public function test_callback_exception_propagates(): void
     {
         $orderBook = new OrderBook();
         $orderBook->add(OrderFactory::buy('USD', 'EUR', '50.000', '150.000', '1.300', 3, 3));
@@ -465,4 +471,3 @@ final class AcceptanceCallbackEdgeCasesTest extends TestCase
         );
     }
 }
-
