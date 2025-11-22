@@ -381,8 +381,11 @@ try {
     echo "\nSearch metrics:\n";
     echo "  Expansions: {$guardReport->expansions()}\n";
     echo "  Visited states: {$guardReport->visitedStates()}\n";
-} catch (\Exception $e) {
-    echo "Error: " . $e->getMessage() . "\n";
+} catch (\Throwable $e) {
+    fwrite(STDERR, "\n✗ Example failed with unexpected error:\n");
+    fwrite(STDERR, "  " . get_class($e) . ": " . $e->getMessage() . "\n");
+    fwrite(STDERR, "  at " . $e->getFile() . ":" . $e->getLine() . "\n");
+    exit(1); // Failure
 }
 
 echo "\n=== Example Complete ===\n";
@@ -393,4 +396,6 @@ echo "3. Use early returns for performance and clarity\n";
 echo "4. Compose multiple simple filters rather than one complex filter\n";
 echo "5. Filters integrate seamlessly with OrderBook and PathFinderService\n";
 echo "6. Pre-filtering reduces graph size and improves search performance\n";
+
+exit(0); // Success
 

@@ -121,6 +121,8 @@ function displayComparison(string $label, array $before, array $after): void
 // Main Demo
 // ============================================================================
 
+try {
+
 echo "\n";
 echo "╔════════════════════════════════════════════════════════════════════════════╗\n";
 echo "║                    Performance Optimization Demo                           ║\n";
@@ -142,7 +144,7 @@ echo "Pre-filtering the order book removes irrelevant orders BEFORE graph constr
 echo "reducing both memory usage and search time.\n\n";
 
 $orderBook = createLargeOrderBook(500);
-echo "Created order book with {$orderBook->count()} orders\n\n";
+echo "Created order book with " . iterator_count($orderBook) . " orders\n\n";
 
 $spendAmount = Money::fromString('USD', '100.00', 2);
 $config = PathSearchConfig::builder()
@@ -172,14 +174,14 @@ echo "  Filtering for orders: min >= $10 (10% of spend), max <= $10,000 (100x sp
 
 $amountFiltered = measurePerformance(function () use ($orderBook, $config, $service, $spendAmount) {
     // Pre-filter orders by amount
-    $minFilter = new MinimumAmountFilter($spendAmount->multipliedBy('0.1'));
-    $maxFilter = new MaximumAmountFilter($spendAmount->multipliedBy('100.0'));
+    $minFilter = new MinimumAmountFilter($spendAmount->multiply('0.1'));
+    $maxFilter = new MaximumAmountFilter($spendAmount->multiply('100.0'));
     
     $filteredOrders = iterator_to_array($orderBook->filter($minFilter, $maxFilter));
     $filteredBook = new OrderBook($filteredOrders);
     
     echo "  Orders after filtering: " . count($filteredOrders) . 
-         " (" . round((count($filteredOrders) / $orderBook->count()) * 100, 1) . "% of original)\n";
+         " (" . round((count($filteredOrders) / iterator_count($orderBook)) * 100, 1) . "% of original)\n";
     
     $request = new PathSearchRequest($filteredBook, $config, 'EUR');
     return $service->findBestPaths($request);
@@ -196,15 +198,17 @@ echo "\nScenario 1c: With tolerance window filtering (on top of amount filtering
 
 $fullyFiltered = measurePerformance(function () use ($orderBook, $config, $service, $spendAmount) {
     // Apply both amount and tolerance filters
-    $minFilter = new MinimumAmountFilter($spendAmount->multipliedBy('0.1'));
-    $maxFilter = new MaximumAmountFilter($spendAmount->multipliedBy('100.0'));
-    $toleranceFilter = new ToleranceWindowFilter($config);
+    $minFilter = new MinimumAmountFilter($spendAmount->multiply('0.1'));
+    $maxFilter = new MaximumAmountFilter($spendAmount->multiply('100.0'));
+    // ToleranceWindowFilter needs a reference rate and tolerance - create a USD/EUR rate for demonstration
+    $referenceRate = ExchangeRate::fromString('USD', 'EUR', '0.92', 6);
+    $toleranceFilter = new ToleranceWindowFilter($referenceRate, '0.05'); // 5% tolerance
     
     $filteredOrders = iterator_to_array($orderBook->filter($minFilter, $maxFilter, $toleranceFilter));
     $filteredBook = new OrderBook($filteredOrders);
     
     echo "  Orders after filtering: " . count($filteredOrders) . 
-         " (" . round((count($filteredOrders) / $orderBook->count()) * 100, 1) . "% of original)\n";
+         " (" . round((count($filteredOrders) / iterator_count($orderBook)) * 100, 1) . "% of original)\n";
     
     $request = new PathSearchRequest($filteredBook, $config, 'EUR');
     return $service->findBestPaths($request);
@@ -233,8 +237,8 @@ echo "miss some paths. Higher limits are more thorough but use more resources.\n
 
 $optimizedOrderBook = new OrderBook(
     iterator_to_array($orderBook->filter(
-        new MinimumAmountFilter($spendAmount->multipliedBy('0.1')),
-        new MaximumAmountFilter($spendAmount->multipliedBy('100.0'))
+        new MinimumAmountFilter($spendAmount->multiply('0.1')),
+        new MaximumAmountFilter($spendAmount->multiply('100.0'))
     ))
 );
 
@@ -545,4 +549,13 @@ echo "╔═══════════════════════�
 echo "║                          Example Complete                                  ║\n";
 echo "╚════════════════════════════════════════════════════════════════════════════╝\n";
 echo "\n";
+
+} catch (\Throwable $e) {
+    fwrite(STDERR, "\n✗ Example failed with unexpected error:\n");
+    fwrite(STDERR, "  " . get_class($e) . ": " . $e->getMessage() . "\n");
+    fwrite(STDERR, "  at " . $e->getFile() . ":" . $e->getLine() . "\n");
+    exit(1); // Failure
+}
+
+exit(0); // Success
 

@@ -461,6 +461,8 @@ function demonstrateFeePolicy(string $name, FeePolicy $feePolicy): void
 // Run Demonstrations
 // ============================================================================
 
+try {
+
 echo "\n";
 echo "╔════════════════════════════════════════════════════════════════════════════╗\n";
 echo "║                       Custom Fee Policy Demo                               ║\n";
@@ -566,4 +568,13 @@ echo "  3. Fees must match the currency of the corresponding Money object\n";
 echo "  4. Different fee models suit different business requirements\n";
 echo "  5. The fingerprint must uniquely identify the policy configuration\n";
 echo "\n";
+
+} catch (\Throwable $e) {
+    fwrite(STDERR, "\n✗ Example failed with unexpected error:\n");
+    fwrite(STDERR, "  " . get_class($e) . ": " . $e->getMessage() . "\n");
+    fwrite(STDERR, "  at " . $e->getFile() . ":" . $e->getLine() . "\n");
+    exit(1); // Failure
+}
+
+exit(0); // Success
 

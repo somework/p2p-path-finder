@@ -35,6 +35,8 @@ use SomeWork\P2PPathFinder\Exception\InfeasiblePath;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
+try {
+
 echo "\n";
 echo "╔════════════════════════════════════════════════════════════════════════════╗\n";
 echo "║                     Error Handling Patterns Example                        ║\n";
@@ -77,9 +79,9 @@ echo "\n";
 
 // Example 1c: Invalid tolerance window
 echo "Example 1c: Invalid tolerance window (min > max)\n";
-echo "Attempting: ToleranceWindow::fromScalars('0.10', '0.05', 2)\n";
+echo "Attempting: ToleranceWindow::fromStrings('0.10', '0.05')\n";
 try {
-    $invalidTolerance = ToleranceWindow::fromScalars('0.10', '0.05', 2); // min must be <= max
+    $invalidTolerance = ToleranceWindow::fromStrings('0.10', '0.05'); // min must be <= max
     echo "✗ Unexpectedly succeeded\n";
 } catch (InvalidInput $e) {
     echo "✓ Caught InvalidInput: {$e->getMessage()}\n";
@@ -168,11 +170,20 @@ echo str_repeat('=', 80) . "\n\n";
 echo "GuardLimitExceeded is thrown when search guard limits are hit AND the\n";
 echo "config is set to throw exceptions on guard breaches.\n\n";
 
-// Create a complex order book that will hit guard limits
+// Create a complex order book that will hit guard limits (using valid 3-letter currency codes)
 $complexOrders = [];
 for ($i = 0; $i < 50; $i++) {
-    $baseCurrency = 'C' . str_pad((string) $i, 2, '0', STR_PAD_LEFT);
-    $quoteCurrency = 'C' . str_pad((string) (($i + 1) % 50), 2, '0', STR_PAD_LEFT);
+    // Generate valid 3-letter currency codes: AAA, AAB, AAC, ..., ABA, ABB, ...
+    $code1 = chr(65 + (int)floor($i / 26));
+    $code2 = chr(65 + (int)floor(($i % 26) / 5));
+    $code3 = chr(65 + ($i % 5));
+    $baseCurrency = $code1 . $code2 . $code3;
+    
+    $nextI = ($i + 1) % 50;
+    $code1Next = chr(65 + (int)floor($nextI / 26));
+    $code2Next = chr(65 + (int)floor(($nextI % 26) / 5));
+    $code3Next = chr(65 + ($nextI % 5));
+    $quoteCurrency = $code1Next . $code2Next . $code3Next;
     
     $complexOrders[] = new Order(
         OrderSide::BUY,
@@ -189,7 +200,7 @@ $complexOrderBook = new OrderBook($complexOrders);
 
 // Configure with VERY tight guard limits and exception mode
 $tightConfig = PathSearchConfig::builder()
-    ->withSpendAmount(Money::fromString('C00', '100.00', 2))
+    ->withSpendAmount(Money::fromString('AAA', '100.00', 2))
     ->withToleranceBounds('0.00', '0.10')
     ->withHopLimits(1, 10)
     ->withSearchGuards(100, 200) // Very low limits!
@@ -199,7 +210,7 @@ $tightConfig = PathSearchConfig::builder()
 echo "Attempting search with tight guard limits (100 states, 200 expansions)...\n";
 try {
     $service = new PathFinderService(new GraphBuilder());
-    $request = new PathSearchRequest($complexOrderBook, $tightConfig, 'C10');
+    $request = new PathSearchRequest($complexOrderBook, $tightConfig, 'ABB');
     $outcome = $service->findBestPaths($request);
     echo "✗ Search completed without hitting guards (increase complexity or lower limits)\n";
 } catch (GuardLimitExceeded $e) {
@@ -227,7 +238,7 @@ echo "Instead, the search returns partial results with guard limit metrics.\n\n"
 
 // Same tight config but WITHOUT exception mode (default behavior)
 $metadataConfig = PathSearchConfig::builder()
-    ->withSpendAmount(Money::fromString('C00', '100.00', 2))
+    ->withSpendAmount(Money::fromString('AAA', '100.00', 2))
     ->withToleranceBounds('0.00', '0.10')
     ->withHopLimits(1, 10)
     ->withSearchGuards(100, 200) // Very low limits
@@ -236,7 +247,7 @@ $metadataConfig = PathSearchConfig::builder()
 
 echo "Running search with guard limits in metadata mode...\n";
 $service = new PathFinderService(new GraphBuilder());
-$request = new PathSearchRequest($complexOrderBook, $metadataConfig, 'C10');
+$request = new PathSearchRequest($complexOrderBook, $metadataConfig, 'ABB');
 $outcome = $service->findBestPaths($request);
 
 echo "✓ Search completed (no exception thrown)\n";
@@ -495,4 +506,16 @@ echo "╔═══════════════════════�
 echo "║                          Example Complete                                  ║\n";
 echo "╚════════════════════════════════════════════════════════════════════════════╝\n";
 echo "\n";
+
+} catch (\Throwable $e) {
+    // Only unexpected errors reach here - all demonstrated errors are caught locally
+    fwrite(STDERR, "\n✗ Example failed with UNEXPECTED error:\n");
+    fwrite(STDERR, "  " . get_class($e) . ": " . $e->getMessage() . "\n");
+    fwrite(STDERR, "  at " . $e->getFile() . ":" . $e->getLine() . "\n\n");
+    fwrite(STDERR, "  This error was NOT one of the demonstrated error scenarios.\n");
+    fwrite(STDERR, "  All expected errors are handled within their respective scenarios.\n");
+    exit(1); // Failure
+}
+
+exit(0); // Success
 

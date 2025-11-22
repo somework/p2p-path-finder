@@ -430,6 +430,8 @@ function demonstrateStrategy(string $name, PathOrderStrategy $strategy): void
 // Run Demonstrations
 // ============================================================================
 
+try {
+
 echo "\n";
 echo "╔════════════════════════════════════════════════════════════════════════════╗\n";
 echo "║                    Custom Path Ordering Strategy Demo                     ║\n";
@@ -523,4 +525,13 @@ echo "╔═══════════════════════�
 echo "║                              Demo Complete                                 ║\n";
 echo "╚════════════════════════════════════════════════════════════════════════════╝\n";
 echo "\n";
+
+} catch (\Throwable $e) {
+    fwrite(STDERR, "\n✗ Example failed with unexpected error:\n");
+    fwrite(STDERR, "  " . get_class($e) . ": " . $e->getMessage() . "\n");
+    fwrite(STDERR, "  at " . $e->getFile() . ":" . $e->getLine() . "\n");
+    exit(1); // Failure
+}
+
+exit(0); // Success
 
