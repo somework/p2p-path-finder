@@ -542,6 +542,78 @@ Consider if you need a new exception type
 
 ---
 
+## Empty Results Handling
+
+### Empty Results are NOT Errors
+
+**Empty results are valid business outcomes**, not error conditions.
+
+**Return empty `SearchOutcome`** when:
+- No orders match filter criteria
+- Source or target currency not in order book
+- No paths exist between source and target
+- All paths exceed tolerance bounds
+- All paths rejected by acceptance callback
+- Search guards limit exploration before finding viable paths
+
+**Throw exceptions** when:
+- Input parameters are invalid (e.g., negative hops)
+- Configuration is malformed (e.g., min > max)
+- System errors occur (e.g., out of memory)
+
+### Example: Handling Empty Results
+
+```php
+$result = $service->findBestPaths($request);
+
+if ($result->paths()->isEmpty()) {
+    // Valid scenario - no paths available
+    // Check guard report to understand why
+    
+    if ($result->guardLimits()->anyLimitReached()) {
+        $this->logger->warning('Search limited by guards', [
+            'guardReport' => $result->guardLimits(),
+        ]);
+        
+        // Decide: accept partial results or retry with higher limits
+    } else {
+        $this->logger->info('No paths found', [
+            'source' => $request->sourceAsset(),
+            'target' => $request->targetAsset(),
+        ]);
+        
+        // Truly no paths available - this is not an error
+    }
+}
+```
+
+### Rationale
+
+1. **Valid Business Outcome**: No paths is an expected scenario in trading
+2. **Guard Report Provides Context**: Consumer can distinguish "no paths" from "search limited"
+3. **Consistent with Query Pattern**: Similar to database/search APIs that return empty collections
+4. **Better Ergonomics**: No forced exception handling for common case
+5. **Exception Reserved for Errors**: Maintains clear separation of concerns
+
+### Comparison
+
+```php
+// ✅ GOOD: Return empty collection
+$result = $service->findBestPaths($request);
+if ($result->paths()->isEmpty()) {
+    // Handle no-results case
+}
+
+// ❌ BAD: Throw exception for no results
+try {
+    $result = $service->findBestPaths($request);
+} catch (InfeasiblePath $e) {
+    // Forced to catch for common "no results" case
+}
+```
+
+---
+
 ## For Contributors
 
 ### Before Adding Code
