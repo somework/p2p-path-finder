@@ -218,4 +218,222 @@ final class OrderBoundsTest extends TestCase
         $clamped2 = $bounds->clamp($this->money('EUR', '15.00000', 5));
         self::assertMoneyAmount($clamped2, '15.00', 2);
     }
+
+    // ==================== Boundary Edge Case Tests ====================
+
+    /**
+     * @test
+     */
+    public function testMinEqualsMax(): void
+    {
+        // Test that min = max creates a valid single-point bounds
+        $singleAmount = $this->money('USD', '100.50', 2);
+        $bounds = OrderBounds::from($singleAmount, $singleAmount);
+
+        // Verify both min and max are the same
+        self::assertMoneyAmount($bounds->min(), '100.50', 2);
+        self::assertMoneyAmount($bounds->max(), '100.50', 2);
+        self::assertTrue($bounds->min()->equals($bounds->max()));
+
+        // Only the exact amount should be contained
+        self::assertTrue($bounds->contains($this->money('USD', '100.50', 2)));
+        self::assertFalse($bounds->contains($this->money('USD', '100.49', 2)));
+        self::assertFalse($bounds->contains($this->money('USD', '100.51', 2)));
+
+        // Clamp should always return the single valid amount
+        self::assertMoneyAmount($bounds->clamp($this->money('USD', '0.01', 2)), '100.50', 2);
+        self::assertMoneyAmount($bounds->clamp($this->money('USD', '100.50', 2)), '100.50', 2);
+        self::assertMoneyAmount($bounds->clamp($this->money('USD', '999.99', 2)), '100.50', 2);
+
+        // Test with different scales
+        $singleHigh = $this->money('BTC', '1.00000000', 8);
+        $boundsHigh = OrderBounds::from($singleHigh, $singleHigh);
+
+        self::assertTrue($boundsHigh->contains($this->money('BTC', '1.00000000', 8)));
+        self::assertFalse($boundsHigh->contains($this->money('BTC', '1.00000001', 8)));
+        self::assertFalse($boundsHigh->contains($this->money('BTC', '0.99999999', 8)));
+
+        // Test with zero as the single point
+        $zeroAmount = $this->money('EUR', '0.00', 2);
+        $zeroBounds = OrderBounds::from($zeroAmount, $zeroAmount);
+
+        self::assertMoneyAmount($zeroBounds->min(), '0.00', 2);
+        self::assertMoneyAmount($zeroBounds->max(), '0.00', 2);
+        self::assertTrue($zeroBounds->contains($this->money('EUR', '0.00', 2)));
+        self::assertFalse($zeroBounds->contains($this->money('EUR', '0.01', 2)));
+    }
+
+    /**
+     * @test
+     */
+    public function testMinGreaterThanMaxThrowsException(): void
+    {
+        // Test that min > max is properly rejected
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Minimum amount cannot exceed the maximum amount.');
+
+        $min = $this->money('USD', '100.00', 2);
+        $max = $this->money('USD', '50.00', 2);
+
+        OrderBounds::from($min, $max);
+    }
+
+    /**
+     * @test
+     */
+    public function testMinGreaterThanMaxWithVariousScales(): void
+    {
+        // Test min > max with different amounts and scales
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Minimum amount cannot exceed the maximum amount.');
+
+        $min = $this->money('BTC', '1.00000001', 8);
+        $max = $this->money('BTC', '1.00000000', 8);
+
+        OrderBounds::from($min, $max);
+    }
+
+    /**
+     * @test
+     */
+    public function testMinGreaterThanMaxWithDifferentScales(): void
+    {
+        // Test that min > max is detected even with different scales
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Minimum amount cannot exceed the maximum amount.');
+
+        // 10.5 > 10.49 even though scales differ
+        $min = $this->money('EUR', '10.5', 1);
+        $max = $this->money('EUR', '10.49', 2);
+
+        OrderBounds::from($min, $max);
+    }
+
+    /**
+     * @test
+     */
+    public function testZeroBounds(): void
+    {
+        // Test when both min and max are zero
+        $zeroMin = $this->money('USD', '0.00', 2);
+        $zeroMax = $this->money('USD', '0.00', 2);
+        $bounds = OrderBounds::from($zeroMin, $zeroMax);
+
+        // Verify both are zero
+        self::assertMoneyAmount($bounds->min(), '0.00', 2);
+        self::assertMoneyAmount($bounds->max(), '0.00', 2);
+        self::assertTrue($bounds->min()->isZero());
+        self::assertTrue($bounds->max()->isZero());
+
+        // Only zero should be contained
+        self::assertTrue($bounds->contains($this->money('USD', '0.00', 2)));
+        self::assertFalse($bounds->contains($this->money('USD', '0.01', 2)));
+
+        // Clamp always returns zero
+        self::assertMoneyAmount($bounds->clamp($this->money('USD', '0.00', 2)), '0.00', 2);
+
+        // Test with high precision zero
+        $zeroBTC = $this->money('BTC', '0.00000000', 8);
+        $boundsBTC = OrderBounds::from($zeroBTC, $zeroBTC);
+
+        self::assertMoneyAmount($boundsBTC->min(), '0.00000000', 8);
+        self::assertMoneyAmount($boundsBTC->max(), '0.00000000', 8);
+        self::assertTrue($boundsBTC->contains($this->money('BTC', '0.00000000', 8)));
+    }
+
+    /**
+     * @test
+     */
+    public function testZeroMinimumWithPositiveMaximum(): void
+    {
+        // Test zero as minimum with positive maximum (valid range)
+        $bounds = OrderBounds::from(
+            $this->money('USD', '0.00', 2),
+            $this->money('USD', '100.00', 2)
+        );
+
+        self::assertMoneyAmount($bounds->min(), '0.00', 2);
+        self::assertMoneyAmount($bounds->max(), '100.00', 2);
+        self::assertTrue($bounds->min()->isZero());
+
+        // Test boundary conditions
+        self::assertTrue($bounds->contains($this->money('USD', '0.00', 2)));
+        self::assertTrue($bounds->contains($this->money('USD', '0.01', 2)));
+        self::assertTrue($bounds->contains($this->money('USD', '50.00', 2)));
+        self::assertTrue($bounds->contains($this->money('USD', '100.00', 2)));
+        self::assertFalse($bounds->contains($this->money('USD', '100.01', 2)));
+
+        // Clamp behavior
+        self::assertMoneyAmount($bounds->clamp($this->money('USD', '0.00', 2)), '0.00', 2);
+        self::assertMoneyAmount($bounds->clamp($this->money('USD', '50.00', 2)), '50.00', 2);
+        self::assertMoneyAmount($bounds->clamp($this->money('USD', '200.00', 2)), '100.00', 2);
+    }
+
+    /**
+     * @test
+     */
+    public function testNegativeBoundsRejectedByMoneyValidation(): void
+    {
+        // Money value object does not allow negative amounts
+        // This test verifies that negative bounds are impossible due to Money's invariants
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Money amount cannot be negative');
+
+        // Attempting to create negative Money should fail
+        $negativeMoney = $this->money('USD', '-10.00', 2);
+
+        // This line should never be reached
+        OrderBounds::from($negativeMoney, $this->money('USD', '10.00', 2));
+    }
+
+    /**
+     * @test
+     */
+    public function testNegativeMaxBoundsRejectedByMoneyValidation(): void
+    {
+        // Verify that negative max is also rejected
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Money amount cannot be negative');
+
+        // Attempting to create negative Money should fail
+        $this->money('USD', '-5.00', 2);
+    }
+
+    /**
+     * @test
+     */
+    public function testBoundaryPrecisionWithHighScale(): void
+    {
+        // Test boundary behavior with very high precision
+        $bounds = OrderBounds::from(
+            $this->money('ETH', '1.000000000000', 12),
+            $this->money('ETH', '2.000000000000', 12)
+        );
+
+        // Test values just at the boundaries
+        self::assertTrue($bounds->contains($this->money('ETH', '1.000000000000', 12)));
+        self::assertFalse($bounds->contains($this->money('ETH', '0.999999999999', 12)));
+        self::assertTrue($bounds->contains($this->money('ETH', '1.000000000001', 12)));
+
+        self::assertTrue($bounds->contains($this->money('ETH', '2.000000000000', 12)));
+        self::assertTrue($bounds->contains($this->money('ETH', '1.999999999999', 12)));
+        self::assertFalse($bounds->contains($this->money('ETH', '2.000000000001', 12)));
+
+        // Clamp at high precision
+        self::assertMoneyAmount(
+            $bounds->clamp($this->money('ETH', '0.500000000000', 12)),
+            '1.000000000000',
+            12
+        );
+        self::assertMoneyAmount(
+            $bounds->clamp($this->money('ETH', '1.500000000000', 12)),
+            '1.500000000000',
+            12
+        );
+        self::assertMoneyAmount(
+            $bounds->clamp($this->money('ETH', '3.000000000000', 12)),
+            '2.000000000000',
+            12
+        );
+    }
 }

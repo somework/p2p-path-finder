@@ -325,4 +325,174 @@ final class ExchangeRateTest extends TestCase
         $doubled = $result1->multiply('2', 14);
         $this->assertTrue($doubled->equals($result2));
     }
+
+    // ==================== Inversion Edge Cases ====================
+
+    /**
+     * @test
+     */
+    public function testDoubleInversion(): void
+    {
+        // Test that rate.invert().invert() ≈ rate (within precision tolerance)
+        // Precision loss is expected due to rounding in the inversion process
+
+        // Test with a simple rate at moderate scale
+        $rate1 = ExchangeRate::fromString('USD', 'EUR', '1.23456789', 8);
+        $inverted1 = $rate1->invert();
+        $doubleInverted1 = $inverted1->invert();
+
+        // The double-inverted rate should be very close to original
+        // Due to rounding, we expect some precision loss
+        $this->assertSame('USD', $doubleInverted1->baseCurrency());
+        $this->assertSame('EUR', $doubleInverted1->quoteCurrency());
+        $this->assertSame(8, $doubleInverted1->scale());
+
+        // With scale 8, double inversion should preserve most precision
+        // Original: 1.23456789
+        // Inverted: 1 / 1.23456789 = 0.81000082... → 0.81000082 (rounded at scale+1, then to scale)
+        // Double:   1 / 0.81000082 = 1.23456789... → 1.23456789 (rounded)
+        // The implementation uses scale+1 for intermediate calculation, preserving precision
+        $this->assertSame('1.23456789', $doubleInverted1->rate());
+
+        // Test with higher precision to minimize loss
+        $rate2 = ExchangeRate::fromString('BTC', 'ETH', '15.5', 12);
+        $doubleInverted2 = $rate2->invert()->invert();
+
+        // Higher scale should give better precision
+        $this->assertSame('BTC', $doubleInverted2->baseCurrency());
+        $this->assertSame('ETH', $doubleInverted2->quoteCurrency());
+        // Should be very close to 15.5
+        $this->assertSame('15.500000000062', $doubleInverted2->rate());
+
+        // Test with scale 2 (lower precision, more rounding)
+        $rate3 = ExchangeRate::fromString('GBP', 'CHF', '1.33', 2);
+        $doubleInverted3 = $rate3->invert()->invert();
+
+        $this->assertSame('GBP', $doubleInverted3->baseCurrency());
+        $this->assertSame('CHF', $doubleInverted3->quoteCurrency());
+        // With low scale, expect more rounding error
+        $this->assertSame('1.33', $doubleInverted3->rate());
+
+        // Test with very precise rate at high scale
+        $rate4 = ExchangeRate::fromString('ASSETA', 'ASSETB', '2.718281828459', 12);
+        $doubleInverted4 = $rate4->invert()->invert();
+
+        // Document precision tolerance: at scale 12, expect ~1e-11 error
+        // Original: 2.718281828459
+        // Should be within reasonable tolerance
+        $original = $rate4->decimal();
+        $recovered = $doubleInverted4->decimal();
+        $difference = $original->minus($recovered)->abs();
+
+        // Tolerance: difference should be very small (< 0.000001)
+        $this->assertTrue($difference->isLessThan('0.000001'));
+
+        // Test with rate close to 1
+        $rate5 = ExchangeRate::fromString('EUR', 'USD', '1.05', 8);
+        $doubleInverted5 = $rate5->invert()->invert();
+
+        $this->assertSame('1.05000000', $doubleInverted5->rate());
+    }
+
+    /**
+     * @test
+     */
+    public function testIdentityRateInversion(): void
+    {
+        // Test that a rate of 1.0 inverts to itself (within precision)
+        $identityRate = ExchangeRate::fromString('USD', 'USDT', '1.0', 8);
+
+        $inverted = $identityRate->invert();
+
+        $this->assertSame('USDT', $inverted->baseCurrency());
+        $this->assertSame('USD', $inverted->quoteCurrency());
+        $this->assertSame('1.00000000', $inverted->rate());
+        $this->assertSame(8, $inverted->scale());
+
+        // Double inversion should also be 1.0
+        $doubleInverted = $inverted->invert();
+        $this->assertSame('USD', $doubleInverted->baseCurrency());
+        $this->assertSame('USDT', $doubleInverted->quoteCurrency());
+        $this->assertSame('1.00000000', $doubleInverted->rate());
+
+        // Test with different scales
+        $identity2 = ExchangeRate::fromString('EUR', 'EURX', '1', 2);
+        $inverted2 = $identity2->invert();
+        $this->assertSame('1.00', $inverted2->rate());
+
+        $identity3 = ExchangeRate::fromString('GBP', 'GBPX', '1.000000', 6);
+        $inverted3 = $identity3->invert();
+        $this->assertSame('1.000000', $inverted3->rate());
+
+        // Test conversion with identity rate
+        $money = Money::fromString('USD', '100.00', 2);
+        $converted = $identityRate->convert($money);
+        $this->assertSame('100.00000000', $converted->amount());
+        $this->assertSame('USDT', $converted->currency());
+
+        // Convert back with inverted identity rate
+        $convertedBack = $inverted->convert($converted, 2);
+        $this->assertSame('100.00', $convertedBack->amount());
+        $this->assertSame('USD', $convertedBack->currency());
+    }
+
+    /**
+     * @test
+     */
+    public function testNearZeroRateInversion(): void
+    {
+        // Test rates very close to zero and their inversions
+        // Note: Rates cannot be zero or negative per validation
+
+        // Test very small rate (close to zero but valid)
+        $nearZeroRate = ExchangeRate::fromString('LARGE', 'SMALL', '0.00000001', 8);
+
+        $this->assertSame('0.00000001', $nearZeroRate->rate());
+
+        // Inversion should produce a very large rate
+        $inverted = $nearZeroRate->invert();
+
+        $this->assertSame('SMALL', $inverted->baseCurrency());
+        $this->assertSame('LARGE', $inverted->quoteCurrency());
+        $this->assertSame('100000000.00000000', $inverted->rate());
+
+        // Test conversion with near-zero rate
+        $largeMoney = Money::fromString('LARGE', '1000000.00000000', 8);
+        $smallConverted = $nearZeroRate->convert($largeMoney);
+        $this->assertSame('0.01000000', $smallConverted->amount());
+
+        // Test conversion with inverted (large) rate
+        $smallMoney = Money::fromString('SMALL', '1.00000000', 8);
+        $largeConverted = $inverted->convert($smallMoney);
+        $this->assertSame('100000000.00000000', $largeConverted->amount());
+
+        // Test even smaller rate at higher scale
+        $veryNearZero = ExchangeRate::fromString('BIG', 'TINY', '0.0000000001', 10);
+        $veryInverted = $veryNearZero->invert();
+
+        $this->assertSame('10000000000.0000000000', $veryInverted->rate());
+
+        // Document precision behavior: at very low scales, inversion may round
+        $lowScaleNearZero = ExchangeRate::fromString('XXX', 'YYY', '0.001', 3);
+        $lowScaleInverted = $lowScaleNearZero->invert();
+
+        // 1 / 0.001 = 1000
+        $this->assertSame('1000.000', $lowScaleInverted->rate());
+
+        // Test that double inversion with near-zero rates has more precision loss
+        $doubleInverted = $nearZeroRate->invert()->invert();
+        
+        // With very small rates, expect more rounding error
+        // Original: 0.00000001
+        // Inverted: 100000000.00000000
+        // Double:   1 / 100000000.00000000 = 0.00000001
+        $this->assertSame('0.00000001', $doubleInverted->rate());
+
+        // Test minimum positive rate (essentially the smallest representable)
+        $minRate = ExchangeRate::fromString('MAX', 'MIN', '0.00000000000001', 14);
+        $minInverted = $minRate->invert();
+
+        // Should produce a very large number
+        $this->assertSame('100000000000000.00000000000000', $minInverted->rate());
+    }
 }
