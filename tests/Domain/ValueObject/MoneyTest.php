@@ -368,4 +368,145 @@ final class MoneyTest extends TestCase
         $sumHigh = $c->add($d);
         $this->assertSame(50, $sumHigh->scale());
     }
+
+    // ==================== Extreme Value Tests ====================
+
+    /**
+     * @test
+     */
+    public function testVeryLargeAmount(): void
+    {
+        // Test very large amounts (hundreds of digits)
+        $veryLargeAmount = '999999999999999999999999999.99';
+        $money = Money::fromString('USD', $veryLargeAmount, 2);
+
+        $this->assertSame('USD', $money->currency());
+        $this->assertSame('999999999999999999999999999.99', $money->amount());
+        $this->assertSame(2, $money->scale());
+        $this->assertFalse($money->isZero());
+
+        // Test even larger amount with high precision
+        $extremelyLarge = '123456789012345678901234567890123456789012345678901234567890.12345678901234567890123456789012345678901234567890';
+        $largeWithScale = Money::fromString('ASSET', $extremelyLarge, 50);
+
+        $this->assertSame(50, $largeWithScale->scale());
+        $this->assertSame('123456789012345678901234567890123456789012345678901234567890.12345678901234567890123456789012345678901234567890', $largeWithScale->amount());
+
+        // Test that large amounts can be compared
+        $smaller = Money::fromString('USD', '999999999999999999999999999.98', 2);
+        $larger = Money::fromString('USD', '999999999999999999999999999.99', 2);
+
+        $this->assertTrue($larger->greaterThan($smaller));
+        $this->assertTrue($smaller->lessThan($larger));
+        $this->assertFalse($larger->equals($smaller));
+    }
+
+    /**
+     * @test
+     */
+    public function testVerySmallAmount(): void
+    {
+        // Test very small amounts with high precision scale
+        $verySmallAmount = '0.00000000000000000001';
+        $money = Money::fromString('BTC', $verySmallAmount, 20);
+
+        $this->assertSame('BTC', $money->currency());
+        $this->assertSame('0.00000000000000000001', $money->amount());
+        $this->assertSame(20, $money->scale());
+        $this->assertFalse($money->isZero());
+
+        // Test extremely small amount at maximum scale (50)
+        $extremelySmall = '0.' . str_repeat('0', 49) . '1';
+        $smallWithMaxScale = Money::fromString('ETH', $extremelySmall, 50);
+
+        $this->assertSame(50, $smallWithMaxScale->scale());
+        $this->assertSame($extremelySmall, $smallWithMaxScale->amount());
+        $this->assertFalse($smallWithMaxScale->isZero());
+
+        // Test that very small amounts can be compared
+        $smaller = Money::fromString('BTC', '0.00000000000000000001', 20);
+        $larger = Money::fromString('BTC', '0.00000000000000000002', 20);
+
+        $this->assertTrue($larger->greaterThan($smaller));
+        $this->assertTrue($smaller->lessThan($larger));
+
+        // Test that rounding to lower scale can result in zero
+        $tinyAmount = Money::fromString('USD', '0.00000001', 8);
+        $roundedDown = $tinyAmount->withScale(2);
+        $this->assertTrue($roundedDown->isZero());
+        $this->assertSame('0.00', $roundedDown->amount());
+    }
+
+    /**
+     * @test
+     */
+    public function testArithmeticWithExtremeValues(): void
+    {
+        // Test addition with very large amounts
+        $large1 = Money::fromString('USD', '999999999999999999999999999.99', 2);
+        $large2 = Money::fromString('USD', '111111111111111111111111111.11', 2);
+        $largeSum = $large1->add($large2);
+
+        $this->assertSame('1111111111111111111111111111.10', $largeSum->amount());
+        $this->assertSame(2, $largeSum->scale());
+
+        // Test subtraction with very large amounts
+        $largeDiff = $largeSum->subtract($large2);
+        $this->assertTrue($largeDiff->equals($large1));
+
+        // Test multiplication with large amounts
+        $largeProduct = Money::fromString('USD', '999999999999999999.99', 2)
+            ->multiply('1.5', 2);
+        $this->assertSame('1499999999999999999.99', $largeProduct->amount());
+
+        // Test division with large amounts
+        $largeQuotient = Money::fromString('USD', '999999999999999999.99', 2)
+            ->divide('3', 2);
+        $this->assertSame('333333333333333333.33', $largeQuotient->amount());
+
+        // Test addition with very small amounts
+        $small1 = Money::fromString('BTC', '0.00000000000000000001', 20);
+        $small2 = Money::fromString('BTC', '0.00000000000000000002', 20);
+        $smallSum = $small1->add($small2);
+
+        $this->assertSame('0.00000000000000000003', $smallSum->amount());
+        $this->assertSame(20, $smallSum->scale());
+
+        // Test subtraction with very small amounts
+        $smallDiff = $smallSum->subtract($small1);
+        $this->assertTrue($smallDiff->equals($small2));
+
+        // Test multiplication with very small amounts
+        $smallProduct = Money::fromString('BTC', '0.00000000000000000001', 20)
+            ->multiply('2', 20);
+        $this->assertSame('0.00000000000000000002', $smallProduct->amount());
+
+        // Test division with very small amounts
+        $smallQuotient = Money::fromString('BTC', '0.00000000000000000002', 20)
+            ->divide('2', 20);
+        $this->assertSame('0.00000000000000000001', $smallQuotient->amount());
+
+        // Test mixed operations: large multiplied by very small
+        $large = Money::fromString('USD', '1000000000000', 10);
+        $result = $large->multiply('0.0000000001', 10);
+        $this->assertSame('100.0000000000', $result->amount());
+
+        // Test that precision is maintained across multiple operations
+        $base = Money::fromString('ETH', '123.456789012345', 12);
+        $doubled = $base->multiply('2', 12);
+        $halved = $doubled->divide('2', 12);
+        $this->assertTrue($halved->equals($base));
+
+        // Test extreme boundary: maximum scale with complex arithmetic
+        $a = Money::fromString('CRYPTO', '1.' . str_repeat('1', 50), 50);
+        $b = Money::fromString('CRYPTO', '2.' . str_repeat('2', 50), 50);
+        $complexSum = $a->add($b);
+        
+        // Verify the result has correct scale
+        $this->assertSame(50, $complexSum->scale());
+        
+        // Verify arithmetic integrity: (a + b) - a should equal b
+        $difference = $complexSum->subtract($a);
+        $this->assertTrue($difference->equals($b));
+    }
 }
