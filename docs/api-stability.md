@@ -438,15 +438,61 @@ $results = $service->findBestPaths($request);
 
 #### `SomeWork\P2PPathFinder\Domain\Order\FeePolicy`
 
-**Purpose**: Strategy for calculating order fees
+**Purpose**: Strategy for calculating fees applied to order fills
 
 **Public Methods**:
-- `calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown` - Calculates fee components
+- `calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown` - Calculates fee components for an order fill
 - `fingerprint(): string` - Returns unique identifier for policy configuration
 
-**Description**: Implement this interface to define custom fee calculation logic. Attached to Order instances.
+**Description**: Implement this interface to define custom fee calculation logic that is attached to `Order` instances. Fees are computed during path finding as the algorithm evaluates how much of an order can be filled given spend constraints.
 
-**Important**: The `fingerprint()` method must return a globally unique string representing the policy configuration. See interface documentation for requirements.
+**When Fees Are Applied**: Fees are calculated during the path finding process when:
+1. The algorithm determines how much of an order can be filled
+2. A candidate path is being evaluated for feasibility
+3. The final path cost is being computed
+
+**Currency Constraints**: Fees MUST be denominated in a currency that matches the order's trading pair:
+- **Base Fees**: Must be in the same currency as the base asset
+- **Quote Fees**: Must be in the same currency as the quote asset
+- **Both**: You can return fees in both currencies if needed
+
+The currency of returned fees MUST match the corresponding Money object's currency, or path finding calculations will fail.
+
+**Calculation Order**: The path finding algorithm calls `calculate()` in this sequence:
+1. **Order Evaluation**: For each order, calculate fees based on proposed fill amounts
+2. **Cost Accumulation**: Fees are added to the path's total cost
+3. **Feasibility Check**: System verifies the path (including fees) fits within spend constraints
+
+**Common Fee Models**:
+- **Percentage Fee**: Fee is a percentage of the traded amount (e.g., 0.5%)
+- **Fixed Fee**: Flat fee per transaction (e.g., $2.50 per order)
+- **Tiered Fee**: Fee rate depends on trade volume (e.g., 0.5% for <$1000, 0.3% for ≥$1000)
+- **Maker/Taker**: Different fees based on order side (BUY vs SELL)
+- **Combined**: Mix of percentage + fixed (e.g., 0.5% + $1.00 minimum)
+
+**Fingerprint Requirements**: The `fingerprint()` method must return a globally unique string representing the policy configuration. Requirements:
+- **Uniqueness**: Different configurations MUST produce different fingerprints
+- **Determinism**: Same configuration MUST always produce same fingerprint
+- **Non-empty**: Must be a non-empty string
+- **Reasonable length**: Recommended ≤255 characters
+
+**Usage**: Attach a fee policy to an order at construction:
+
+```php
+$feePolicy = new PercentageFeePolicy(rate: '0.005', scale: 6);
+$order = new Order($side, $pair, $bounds, $rate, $feePolicy);
+```
+
+Orders without a fee policy (null) are treated as fee-free.
+
+**Example Implementations**: See `examples/custom-fee-policy.php` for comprehensive examples including:
+- `PercentageFeePolicy` - Percentage-based fees (most common model)
+- `FixedFeePolicy` - Flat fee per transaction
+- `TieredFeePolicy` - Volume-based fee tiers
+- `MakerTakerFeePolicy` - Different rates for maker vs taker orders
+- `CombinedFeePolicy` - Percentage with minimum/maximum bounds
+
+**Rationale**: Core extension point for modeling real-world fee structures. Interface is stable with clear contract requirements. Multiple working examples demonstrate proper implementation patterns including currency safety and fingerprint generation.
 
 ---
 
