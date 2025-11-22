@@ -739,4 +739,184 @@ final class PathSearchConfigTest extends TestCase
         self::assertSame('999.99900000', $config->minimumSpendAmount()->amount());
         self::assertSame('1000.00200000', $config->maximumSpendAmount()->amount());
     }
+
+    // ==================== Spend Bounds Computation Tests (0002.10) ====================
+
+    /**
+     * @test
+     */
+    public function testSpendBoundsComputationZeroTolerance(): void
+    {
+        // Test zero tolerance window produces equal min/max bounds
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+            ->withToleranceBounds('0.0', '0.0')
+            ->withHopLimits(1, 3)
+            ->build();
+
+        // With zero tolerance, both bounds should equal the spend amount
+        // Formula: min = spend * (1 - 0.0) = spend * 1.0 = spend
+        //          max = spend * (1 + 0.0) = spend * 1.0 = spend
+        self::assertSame('100.00', $config->minimumSpendAmount()->amount());
+        self::assertSame('100.00', $config->maximumSpendAmount()->amount());
+        self::assertTrue($config->minimumSpendAmount()->equals($config->maximumSpendAmount()));
+
+        // Test with different scales
+        $configHighScale = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('BTC', '1.00000000', 8))
+            ->withToleranceBounds('0.000000000000000000', '0.000000000000000000')
+            ->withHopLimits(1, 2)
+            ->build();
+
+        self::assertSame('1.00000000', $configHighScale->minimumSpendAmount()->amount());
+        self::assertSame('1.00000000', $configHighScale->maximumSpendAmount()->amount());
+    }
+
+    /**
+     * @test
+     */
+    public function testSpendBoundsComputationWideTolerance(): void
+    {
+        // Test with very wide tolerance window (approaching 100%)
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '1000.00', 2))
+            ->withToleranceBounds('0.0', '0.999999999999999999')
+            ->withHopLimits(1, 3)
+            ->build();
+
+        // Formula: min = 1000 * (1 - 0.0) = 1000 * 1.0 = 1000.00
+        //          max = 1000 * (1 + 0.999999999999999999) ≈ 1000 * 2.0 = 2000.00
+        self::assertSame('1000.00', $config->minimumSpendAmount()->amount());
+        self::assertSame('2000.00', $config->maximumSpendAmount()->amount());
+
+        // Test with asymmetric wide window
+        $config2 = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '500.00', 2))
+            ->withToleranceBounds('0.50', '0.80')
+            ->withHopLimits(1, 3)
+            ->build();
+
+        // min = 500 * (1 - 0.50) = 500 * 0.50 = 250.00
+        // max = 500 * (1 + 0.80) = 500 * 1.80 = 900.00
+        self::assertSame('250.00', $config2->minimumSpendAmount()->amount());
+        self::assertSame('900.00', $config2->maximumSpendAmount()->amount());
+
+        // Verify bounds are properly ordered
+        self::assertTrue($config2->minimumSpendAmount()->lessThan($config2->maximumSpendAmount()));
+    }
+
+    /**
+     * @test
+     */
+    public function testSpendBoundsComputationAtBoundaries(): void
+    {
+        // Test at exact tolerance boundaries
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('GBP', '100.00', 2))
+            ->withToleranceBounds('0.10', '0.25')
+            ->withHopLimits(1, 3)
+            ->build();
+
+        // min = 100 * (1 - 0.10) = 100 * 0.90 = 90.00
+        // max = 100 * (1 + 0.25) = 100 * 1.25 = 125.00
+        self::assertSame('90.00', $config->minimumSpendAmount()->amount());
+        self::assertSame('125.00', $config->maximumSpendAmount()->amount());
+
+        // Test with very small tolerance at boundaries
+        $config2 = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('ETH', '10.000000', 6))
+            ->withToleranceBounds('0.000001', '0.000002')
+            ->withHopLimits(1, 2)
+            ->build();
+
+        // min = 10 * (1 - 0.000001) = 10 * 0.999999 = 9.999990
+        // max = 10 * (1 + 0.000002) = 10 * 1.000002 = 10.000020
+        self::assertSame('9.999990', $config2->minimumSpendAmount()->amount());
+        self::assertSame('10.000020', $config2->maximumSpendAmount()->amount());
+
+        // Test formula: result maintains spend amount scale
+        self::assertSame(6, $config2->minimumSpendAmount()->scale());
+        self::assertSame(6, $config2->maximumSpendAmount()->scale());
+    }
+
+    /**
+     * @test
+     */
+    public function testSpendBoundsComputationWithVariousDesiredAmounts(): void
+    {
+        // Test small amount
+        $config1 = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '1.00', 2))
+            ->withToleranceBounds('0.10', '0.20')
+            ->withHopLimits(1, 2)
+            ->build();
+
+        self::assertSame('0.90', $config1->minimumSpendAmount()->amount());
+        self::assertSame('1.20', $config1->maximumSpendAmount()->amount());
+
+        // Test medium amount
+        $config2 = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('EUR', '500.00', 2))
+            ->withToleranceBounds('0.05', '0.15')
+            ->withHopLimits(1, 3)
+            ->build();
+
+        self::assertSame('475.00', $config2->minimumSpendAmount()->amount());
+        self::assertSame('575.00', $config2->maximumSpendAmount()->amount());
+
+        // Test large amount
+        $config3 = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('BTC', '100.00000000', 8))
+            ->withToleranceBounds('0.001', '0.002')
+            ->withHopLimits(1, 2)
+            ->build();
+
+        self::assertSame('99.90000000', $config3->minimumSpendAmount()->amount());
+        self::assertSame('100.20000000', $config3->maximumSpendAmount()->amount());
+
+        // Test very large amount
+        $config4 = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '999999.99', 2))
+            ->withToleranceBounds('0.001', '0.005')
+            ->withHopLimits(1, 3)
+            ->build();
+
+        self::assertSame('998999.99', $config4->minimumSpendAmount()->amount());
+        self::assertSame('1004999.99', $config4->maximumSpendAmount()->amount());
+    }
+
+    /**
+     * @test
+     */
+    public function testSpendBoundsFormulaDocumentation(): void
+    {
+        // Document and verify the formula matches documentation
+        // Formula: minSpend = spendAmount * (1 - minTolerance)
+        //          maxSpend = spendAmount * (1 + maxTolerance)
+
+        $spend = Money::fromString('USD', '1000.00', 2);
+        $minTol = '0.20'; // 20%
+        $maxTol = '0.30'; // 30%
+
+        $config = new PathSearchConfig(
+            $spend,
+            ToleranceWindow::fromStrings($minTol, $maxTol),
+            1,
+            3,
+        );
+
+        // Expected: min = 1000 * (1 - 0.20) = 1000 * 0.80 = 800.00
+        //           max = 1000 * (1 + 0.30) = 1000 * 1.30 = 1300.00
+        self::assertSame('800.00', $config->minimumSpendAmount()->amount());
+        self::assertSame('1300.00', $config->maximumSpendAmount()->amount());
+
+        // Verify the tolerance values are preserved
+        self::assertSame('0.200000000000000000', $config->minimumTolerance());
+        self::assertSame('0.300000000000000000', $config->maximumTolerance());
+
+        // Verify derived bounds are within sensible range
+        self::assertTrue($config->minimumSpendAmount()->lessThan($spend));
+        self::assertTrue($config->maximumSpendAmount()->greaterThan($spend));
+        self::assertTrue($config->minimumSpendAmount()->lessThan($config->maximumSpendAmount()));
+    }
 }
