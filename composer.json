@@ -2,6 +2,7 @@
     "name": "somework/p2p-path-finder",
     "description": "Deterministic Brick\\Math BigDecimal path-finding toolkit for order-driven conversions",
     "type": "library",
+    "license": "GPL-3.0-or-later",
     "keywords": [
         "path-finding",
         "p2p",

@@ -750,6 +750,12 @@ All commands rely on development dependencies declared in `composer.json`.
 - **[Contributing Guide](CONTRIBUTING.md)** – How to contribute
 - **[Changelog](CHANGELOG.md)** – Version history
 
+### Versioning and Releases
+
+- **[Versioning Policy](docs/versioning.md)** – Semantic versioning, BC breaks, and deprecation policies
+- **[Release Process](docs/release-process.md)** – How releases are created and published
+- **[Support Policy](docs/support.md)** – PHP/library version support and EOL timelines
+
 ---
 
 ## Contributing
