@@ -358,6 +358,8 @@ final class Money
 
     /**
      * @psalm-mutation-free
+     *
+     * @psalm-suppress ImpureMethodCall BigDecimal is immutable, toScale returns a new instance
      */
     private static function scaleDecimal(BigDecimal $decimal, int $scale): BigDecimal
     {
@@ -368,6 +370,8 @@ final class Money
 
     /**
      * @psalm-mutation-free
+     *
+     * @psalm-suppress ImpureMethodCall BigDecimal is immutable, __toString returns string representation
      *
      * @return numeric-string
      */
