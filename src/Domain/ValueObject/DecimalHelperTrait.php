@@ -75,26 +75,26 @@ trait DecimalHelperTrait
 
     /**
      * @psalm-mutation-free
+     *
+     * @psalm-suppress ImpureMethodCall BigDecimal is immutable, toScale returns a new instance
      */
     private static function scaleDecimal(BigDecimal $decimal, int $scale): BigDecimal
     {
         self::assertScale($scale);
 
-        /** @psalm-suppress ImpureMethodCall BigDecimal is immutable, toScale returns a new instance */
         return $decimal->toScale($scale, RoundingMode::HALF_UP);
     }
 
     /**
      * @psalm-mutation-free
      *
+     * @psalm-suppress ImpureMethodCall BigDecimal is immutable, __toString returns string representation
+     *
      * @return numeric-string
      */
     private static function decimalToString(BigDecimal $decimal, int $scale): string
     {
-        /**
-         * @var numeric-string $result
-         * @psalm-suppress ImpureMethodCall BigDecimal is immutable, __toString returns string representation
-         */
+        /** @var numeric-string $result */
         $result = self::scaleDecimal($decimal, $scale)->__toString();
 
         return $result;
