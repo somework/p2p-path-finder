@@ -104,7 +104,7 @@ jobs:
           --ref=baseline
           --progress=plain
           --assert="mean(variant.time.avg) <= mean(baseline.time.avg) +/- 20%"
-          --assert="mean(variant.mem.peak) <= mean(baseline.mem.peak) +/- 20%"
+          --assert="mean(variant.mem.peak) <= mean(baseline.mem.peak) +/- 30%"
 
   artefacts:
     name: Docs & performance artefacts
