@@ -61,6 +61,7 @@ final class PathLegCollection implements Countable, IteratorAggregate, JsonSeria
         /** @var list<PathLeg> $normalized */
         $normalized = [];
         foreach ($legs as $leg) {
+            /* @phpstan-ignore-next-line instanceof.alwaysTrue */
             if (!$leg instanceof PathLeg) {
                 throw new InvalidInput('Every path leg must be an instance of PathLeg.');
             }

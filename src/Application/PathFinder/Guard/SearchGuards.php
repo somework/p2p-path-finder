@@ -39,14 +39,19 @@ final class SearchGuards
     ) {
         $clock ??= static fn (): float => microtime(true);
 
-        $this->clock = $clock instanceof Closure ? $clock : Closure::fromCallable($clock);
-        $this->startedAt = ($this->clock)();
+        $clockClosure = $clock instanceof Closure ? $clock : Closure::fromCallable($clock);
+        $this->clock = $clockClosure;
+        /** @var float $startTime */
+        $startTime = $clockClosure();
+        $this->startedAt = $startTime;
     }
 
     public function canExpand(): bool
     {
         if (null !== $this->timeBudgetMs && !$this->timeBudgetReached) {
-            $now = ($this->clock)();
+            $clockClosure = $this->clock;
+            /** @var float $now */
+            $now = $clockClosure();
             $elapsedMilliseconds = ($now - $this->startedAt) * 1000.0;
 
             if ($elapsedMilliseconds >= (float) $this->timeBudgetMs) {
@@ -76,7 +81,9 @@ final class SearchGuards
 
     public function finalize(int $visitedStates, int $visitedStateLimit, bool $visitedGuardReached): SearchGuardReport
     {
-        $now = ($this->clock)();
+        $clockClosure = $this->clock;
+        /** @var float $now */
+        $now = $clockClosure();
         $elapsedMilliseconds = ($now - $this->startedAt) * 1000.0;
 
         if (null !== $this->timeBudgetMs && !$this->timeBudgetReached && $elapsedMilliseconds >= (float) $this->timeBudgetMs) {

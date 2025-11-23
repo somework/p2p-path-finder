@@ -59,6 +59,7 @@ final class EdgeSegmentCollection implements Countable, IteratorAggregate, JsonS
         }
 
         foreach ($segments as $segment) {
+            /* @phpstan-ignore-next-line instanceof.alwaysTrue */
             if (!$segment instanceof EdgeSegment) {
                 throw new InvalidInput('Graph edge segments must be instances of EdgeSegment.');
             }

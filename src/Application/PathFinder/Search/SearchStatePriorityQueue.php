@@ -32,10 +32,12 @@ final class SearchStatePriorityQueue extends SplPriorityQueue
      */
     public function compare(mixed $priority1, mixed $priority2): int
     {
+        /* @phpstan-ignore-next-line instanceof.alwaysTrue */
         if (!$priority1 instanceof SearchStatePriority) {
             throw new InvalidArgumentException('Search state priority queue expects search state priorities.');
         }
 
+        /* @phpstan-ignore-next-line instanceof.alwaysTrue */
         if (!$priority2 instanceof SearchStatePriority) {
             throw new InvalidArgumentException('Search state priority queue expects search state priorities.');
         }

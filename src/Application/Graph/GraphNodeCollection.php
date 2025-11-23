@@ -63,6 +63,7 @@ final class GraphNodeCollection implements Countable, IteratorAggregate, JsonSer
         $order = [];
 
         foreach ($nodes as $node) {
+            /* @phpstan-ignore-next-line instanceof.alwaysTrue */
             if (!$node instanceof GraphNode) {
                 throw new InvalidInput('Every graph node must be an instance of GraphNode.');
             }

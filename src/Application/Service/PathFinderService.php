@@ -53,7 +53,7 @@ final class PathFinderService
     private readonly ToleranceEvaluator $toleranceEvaluator;
     private readonly PathOrderStrategy $orderingStrategy;
     /**
-     * @var Closure(PathSearchRequest):Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath>
+     * @var Closure(PathSearchRequest): (Closure(Graph, (callable(CandidatePath): bool)): SearchOutcome<CandidatePath>)
      */
     private Closure $pathFinderFactory;
 
@@ -82,7 +82,7 @@ final class PathFinderService
      *
      * @internal This is for testing only and may change without notice
      *
-     * @param Closure(PathSearchRequest):(Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath>) $pathFinderFactory Factory that creates PathFinder runner instances
+     * @param Closure(PathSearchRequest): (Closure(Graph, (callable(CandidatePath): bool)): SearchOutcome<CandidatePath>) $pathFinderFactory Factory that creates PathFinder runner instances
      *
      * @return self Service instance with injected factory (for testing only)
      */
@@ -93,7 +93,7 @@ final class PathFinderService
     ): self {
         $service = new self($graphBuilder, $orderingStrategy);
 
-        /** @var Closure(PathSearchRequest):Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath> $typedFactory */
+        /** @var Closure(PathSearchRequest): (Closure(Graph, (callable(CandidatePath): bool)): SearchOutcome<CandidatePath>) $typedFactory */
         $typedFactory = $pathFinderFactory;
         $service->pathFinderFactory = $typedFactory;
 
@@ -101,7 +101,7 @@ final class PathFinderService
     }
 
     /**
-     * @return Closure(PathSearchRequest):Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath>
+     * @return Closure(PathSearchRequest): (Closure(Graph, (callable(CandidatePath): bool)): SearchOutcome<CandidatePath>)
      */
     private static function createDefaultRunnerFactory(PathOrderStrategy $strategy): Closure
     {
