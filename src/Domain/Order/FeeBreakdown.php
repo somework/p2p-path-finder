@@ -8,6 +8,19 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 /**
  * Immutable value object describing the fee components for an order fill.
+ *
+ * ## Invariants
+ *
+ * - **Optional fees**: Both baseFee and quoteFee are nullable (null = no fee)
+ * - **Zero equivalence**: null and zero Money are treated equivalently
+ * - **Merge behavior**: merge() sums fees component-wise
+ *
+ * @invariant baseFee is null OR baseFee is Money
+ * @invariant quoteFee is null OR quoteFee is Money
+ * @invariant isZero() ≡ (baseFee == null || baseFee->isZero()) && (quoteFee == null || quoteFee->isZero())
+ * @invariant merge() sums fees component-wise (base with base, quote with quote)
+ *
+ * @api
  */
 final class FeeBreakdown
 {

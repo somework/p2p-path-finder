@@ -174,6 +174,13 @@ final class EdgeSegmentCollection implements Countable, IteratorAggregate, JsonS
     }
 
     /**
+     * Accumulates capacity metrics for mandatory and maximum totals.
+     *
+     * Aggregation Rules:
+     * - Mandatory capacity = sum of min values from mandatory segments only
+     * - Maximum capacity = sum of max values from ALL segments (mandatory + optional)
+     * - Optional headroom = maximum - mandatory
+     *
      * @param array{currency: string|null, scale: int, mandatory: Money|null, maximum: Money|null} $metric
      */
     private static function accumulateMetrics(array &$metric, EdgeCapacity $capacity, bool $isMandatory): void

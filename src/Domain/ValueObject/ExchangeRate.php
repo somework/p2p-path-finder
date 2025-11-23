@@ -16,6 +16,28 @@ use function strtoupper;
 
 /**
  * Value object encapsulating an exchange rate between two assets.
+ *
+ * ## Invariants
+ *
+ * - **Distinct currencies**: Base and quote currencies must be distinct (case-insensitive)
+ * - **Positive rate**: Exchange rate must be strictly positive (> 0)
+ * - **Valid currencies**: Both currencies must match /^[A-Z]{3,12}$/
+ * - **Scale bounds**: Scale must be 0 <= scale <= 50
+ * - **Rate inversion**: invert() returns rate with swapped currencies and inverted value
+ *
+ * @invariant baseCurrency != quoteCurrency (case-insensitive)
+ * @invariant rate > 0
+ * @invariant scale >= 0 && scale <= 50
+ * @invariant baseCurrency matches /^[A-Z]{3,12}$/
+ * @invariant quoteCurrency matches /^[A-Z]{3,12}$/
+ * @invariant invert() swaps currencies and returns 1 / rate
+ * @invariant invert()->invert() ≈ original (within rounding error)
+ *
+ * @see Order::effectiveRate() For fee-adjusted rates
+ * @see Money::multiply() For rate application
+ * @see AssetPair For currency pair representation
+ *
+ * @api
  */
 final class ExchangeRate
 {

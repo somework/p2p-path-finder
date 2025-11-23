@@ -16,6 +16,32 @@ use function sprintf;
 use function usort;
 
 /**
+ * Filters and sorts edge segments based on capacity availability.
+ *
+ * ## Purpose
+ *
+ * The SegmentPruner removes zero-capacity segments and orders segments to prioritize
+ * those that can best fulfill path requirements. Mandatory segments (representing
+ * minimum order bounds) are always preserved and placed first.
+ *
+ * ## Pruning Strategy
+ *
+ * 1. **Zero Optional Headroom**: If `mandatory == maximum`, discard all optional segments
+ * 2. **Positive Headroom**: Keep mandatory segments + non-zero optional segments
+ * 3. **Zero-Capacity**: Always discard optional segments with max capacity == 0
+ *
+ * ## Sorting Strategy
+ *
+ * Segments are ordered by:
+ * 1. **Type**: Mandatory segments before optional segments
+ * 2. **Max Capacity**: Higher max capacity first (DESC)
+ * 3. **Min Capacity**: Higher min capacity first (DESC, tie-breaker)
+ *
+ * ## Mandatory vs Optional Segments
+ *
+ * - **Mandatory**: Represents capacity that MUST be filled (e.g., order minimums due to fees)
+ * - **Optional**: Represents additional capacity that MAY be filled up to the maximum
+ *
  * @internal
  */
 final class SegmentPruner

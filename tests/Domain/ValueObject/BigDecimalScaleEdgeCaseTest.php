@@ -249,27 +249,11 @@ final class BigDecimalScaleEdgeCaseTest extends TestCase
         self::assertSame('1', $rounded->amount());
     }
 
-    public function test_half_up_rounding_at_negative_half(): void
-    {
-        $money = Money::fromString('USD', '-0.5', 1);
-
-        $rounded = $money->withScale(0);
-        // HALF_UP rounds -0.5 to -1 (away from zero)
-        self::assertSame('-1', $rounded->amount());
-    }
-
     public function test_half_up_rounding_positive_values(): void
     {
         self::assertSame('2', Money::fromString('USD', '1.5', 1)->withScale(0)->amount());
         self::assertSame('3', Money::fromString('USD', '2.5', 1)->withScale(0)->amount());
         self::assertSame('4', Money::fromString('USD', '3.5', 1)->withScale(0)->amount());
-    }
-
-    public function test_half_up_rounding_negative_values(): void
-    {
-        self::assertSame('-2', Money::fromString('USD', '-1.5', 1)->withScale(0)->amount());
-        self::assertSame('-3', Money::fromString('USD', '-2.5', 1)->withScale(0)->amount());
-        self::assertSame('-4', Money::fromString('USD', '-3.5', 1)->withScale(0)->amount());
     }
 
     public function test_half_up_rounding_consistency_across_scales(): void
@@ -294,31 +278,6 @@ final class BigDecimalScaleEdgeCaseTest extends TestCase
 
             self::assertSame($expected, $rounded->amount(), "Failed at scale $scale");
         }
-    }
-
-    // ==================== Negative Value Rounding Symmetry ====================
-
-    public function test_negative_value_rounding_symmetry(): void
-    {
-        $positive = Money::fromString('USD', '1.556', 3);
-        $negative = Money::fromString('USD', '-1.556', 3);
-
-        $posRounded = $positive->withScale(2);
-        $negRounded = $negative->withScale(2);
-
-        self::assertSame('1.56', $posRounded->amount());
-        self::assertSame('-1.56', $negRounded->amount());
-    }
-
-    public function test_negative_operations_preserve_sign(): void
-    {
-        $negative = Money::fromString('USD', '-100.00', 2);
-
-        $doubled = $negative->multiply('2', 2);
-        self::assertSame('-200.00', $doubled->amount());
-
-        $halved = $negative->divide('2', 2);
-        self::assertSame('-50.00', $halved->amount());
     }
 
     // ==================== Exchange Rate Conversion at Scale Extremes ====================

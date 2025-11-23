@@ -19,6 +19,42 @@ use function sprintf;
  * Money instances always carry their currency code, normalized amount representation and
  * the scale used when interacting with arbitrary precision operations. Instances are created
  * through named constructors to guarantee validation and normalization of their internal state.
+ *
+ * ## Invariants
+ *
+ * - **Non-negative amounts**: Money amounts must be >= 0. Negative amounts have no semantic
+ *   meaning in the path-finding domain (orders, spends, receives, fees are all naturally
+ *   non-negative). Construction with negative amounts throws InvalidInput.
+ * - **Valid currency**: Currency code must be 3-12 uppercase letters matching /^[A-Z]{3,12}$/
+ * - **Scale bounds**: Scale must be 0 <= scale <= 50 to prevent memory/performance issues
+ * - **Precision preservation**: Amounts are stored as BigDecimal and normalized to the
+ *   specified scale using HALF_UP rounding
+ *
+ * ## Scale Derivation Rules
+ *
+ * Arithmetic operations follow deterministic scale derivation rules to ensure predictable
+ * precision handling:
+ *
+ * - **Addition/Subtraction**: Result scale = max(left.scale, right.scale) unless explicitly
+ *   overridden. This ensures no precision loss from either operand.
+ * - **Multiplication/Division**: Result scale = left.scale (the Money instance's scale) unless
+ *   explicitly overridden. Scalar operands do not influence the result scale.
+ * - **Explicit Override**: All arithmetic operations accept an optional scale parameter that
+ *   takes precedence over default derivation rules.
+ * - **Comparison**: Uses max(left.scale, right.scale, explicitScale) to ensure accurate
+ *   comparison at the highest precision available.
+ *
+ * @invariant amount >= 0
+ * @invariant scale >= 0 && scale <= 50
+ * @invariant currency matches /^[A-Z]{3,12}$/
+ * @invariant add/subtract result scale = max(left.scale, right.scale) OR explicit scale
+ * @invariant multiply/divide result scale = left.scale OR explicit scale
+ *
+ * @see ExchangeRate::convert() For currency conversion
+ * @see MoneyMap For aggregating multiple Money instances
+ * @see docs/domain-invariants.md#money For complete constraint specification
+ *
+ * @api
  */
 final class Money
 {
@@ -37,13 +73,31 @@ final class Money
      * @param int            $scale    number of decimal digits to retain after normalization
      *
      * @throws InvalidInput|PrecisionViolation when the currency or amount fail validation
+     *
+     * @example
+     * ```php
+     * // Fiat currencies (typically 2 decimal places)
+     * $usd = Money::fromString('USD', '100.50', 2);
+     * $eur = Money::fromString('EUR', '92.00', 2);
+     *
+     * // Cryptocurrencies (higher precision)
+     * $btc = Money::fromString('BTC', '0.00420000', 8);
+     * $eth = Money::fromString('ETH', '1.500000000000000000', 18);
+     * ```
      */
     public static function fromString(string $currency, string $amount, int $scale = 2): self
     {
         self::assertCurrency($currency);
         $normalizedCurrency = strtoupper($currency);
 
-        $normalizedDecimal = self::scaleDecimal(self::decimalFromString($amount), $scale);
+        $decimal = self::decimalFromString($amount);
+
+        // Enforce non-negative amounts: path finding domain has no semantic meaning for negative money
+        if ($decimal->isNegative()) {
+            throw new InvalidInput(sprintf('Money amount cannot be negative. Got: %s %s', $normalizedCurrency, $amount));
+        }
+
+        $normalizedDecimal = self::scaleDecimal($decimal, $scale);
 
         return new self($normalizedCurrency, $normalizedDecimal, $scale);
     }

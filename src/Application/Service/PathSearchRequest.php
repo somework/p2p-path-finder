@@ -18,6 +18,8 @@ use function trim;
  * Immutable request DTO carrying the dependencies required to run a path search.
  *
  * @psalm-immutable
+ *
+ * @api
  */
 final class PathSearchRequest
 {

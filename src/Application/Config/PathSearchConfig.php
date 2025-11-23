@@ -15,6 +15,31 @@ use function max;
 
 /**
  * Immutable configuration carrying constraints used by {@see PathFinderService}.
+ *
+ * ## Invariants
+ *
+ * - **Hop constraints**: minimumHops >= 1, maximumHops >= minimumHops
+ * - **Result limit**: resultLimit >= 1
+ * - **Spend bounds computation**:
+ *   - minSpend = spendAmount × (1 - toleranceWindow.minimum)
+ *   - maxSpend = spendAmount × (1 + toleranceWindow.maximum)
+ * - **Bounds ordering**: minSpend <= spendAmount <= maxSpend
+ * - **Tolerance resolution**: pathFinderTolerance = override OR toleranceWindow.heuristicTolerance
+ *
+ * @invariant minimumHops >= 1
+ * @invariant maximumHops >= minimumHops
+ * @invariant resultLimit >= 1
+ * @invariant minSpend = spendAmount × (1 - toleranceWindow.minimum)
+ * @invariant maxSpend = spendAmount × (1 + toleranceWindow.maximum)
+ * @invariant minSpend <= spendAmount <= maxSpend
+ * @invariant pathFinderTolerance = override OR toleranceWindow.heuristicTolerance
+ *
+ * @see PathSearchConfigBuilder For fluent construction
+ * @see PathSearchRequest For how config is used
+ * @see docs/getting-started.md#configuring-a-path-search For usage guide
+ * @see docs/domain-invariants.md#pathsearchconfig For complete constraints
+ *
+ * @api
  */
 final class PathSearchConfig
 {

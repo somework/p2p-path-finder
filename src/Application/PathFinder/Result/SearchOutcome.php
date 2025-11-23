@@ -12,6 +12,13 @@ use JsonSerializable;
  * @phpstan-template-covariant TPath of mixed
  *
  * @psalm-template-covariant TPath as mixed
+ *
+ * @see PathResultSet For the paths collection
+ * @see SearchGuardReport For guard metrics and limits
+ * @see SearchGuardConfig For configuring guards
+ * @see docs/troubleshooting.md#guard-limits-hit For debugging guard breaches
+ *
+ * @api
  */
 final class SearchOutcome implements JsonSerializable
 {

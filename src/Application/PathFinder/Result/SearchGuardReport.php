@@ -8,6 +8,8 @@ use JsonSerializable;
 
 /**
  * Immutable snapshot describing how the search interacted with its guard rails.
+ *
+ * @api
  */
 final class SearchGuardReport implements JsonSerializable
 {

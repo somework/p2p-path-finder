@@ -13,6 +13,30 @@ use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 /**
  * Domain entity describing an order that can be traversed within a path search.
+ *
+ * ## Invariants
+ *
+ * - **Currency consistency**: All components must align with AssetPair
+ *   - Bounds must be in base currency
+ *   - Effective rate base/quote must match asset pair base/quote
+ *   - Base fees (if present) must be in base currency
+ *   - Quote fees (if present) must be in quote currency
+ * - **Partial fill validation**: Fill amounts must be within bounds and in base currency
+ * - **Quote calculation**: calculateQuoteAmount = effectiveRate.convert(baseAmount)
+ * - **Effective quote**: calculateEffectiveQuoteAmount = quoteAmount - quoteFee (if present)
+ * - **Gross spend**: calculateGrossBaseSpend = baseAmount + baseFee (if present)
+ *
+ * @invariant bounds.currency == assetPair.base
+ * @invariant effectiveRate.baseCurrency == assetPair.base
+ * @invariant effectiveRate.quoteCurrency == assetPair.quote
+ * @invariant baseFee (if present) in base currency
+ * @invariant quoteFee (if present) in quote currency
+ * @invariant validatePartialFill ensures bounds.contains(amount)
+ * @invariant calculateQuoteAmount = effectiveRate.convert(baseAmount)
+ * @invariant calculateEffectiveQuoteAmount = quoteAmount - quoteFee
+ * @invariant calculateGrossBaseSpend = baseAmount + baseFee
+ *
+ * @api
  */
 final class Order
 {

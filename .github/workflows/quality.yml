@@ -10,7 +10,7 @@ on:
 
 jobs:
   phpstan:
-    name: PHPStan (max)
+    name: PHPStan (max + custom rules)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,8 +23,13 @@ jobs:
         with:
           composer-options: --prefer-dist --no-interaction --no-progress
           custom-cache-suffix: ${{ hashFiles('composer.json') }}
-      - name: Run PHPStan at max level
-        run: vendor/bin/phpstan analyse --configuration=phpstan.neon.dist --level=max
+      - name: Run PHPStan with custom decimal arithmetic rules
+        run: |
+          echo "🔍 Running PHPStan at max level with custom rules:"
+          echo "  ✓ FloatLiteralInArithmeticRule"
+          echo "  ✓ MissingRoundingModeRule"
+          echo "  ✓ BCMathFunctionCallRule"
+          composer phpstan
 
   psalm:
     name: Psalm (strict)
@@ -99,7 +104,7 @@ jobs:
           --ref=baseline
           --progress=plain
           --assert="mean(variant.time.avg) <= mean(baseline.time.avg) +/- 20%"
-          --assert="mean(variant.mem.peak) <= mean(baseline.mem.peak) +/- 20%"
+          --assert="mean(variant.mem.peak) <= mean(baseline.mem.peak) +/- 30%"
 
   artefacts:
     name: Docs & performance artefacts

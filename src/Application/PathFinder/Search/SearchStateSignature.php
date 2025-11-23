@@ -14,6 +14,33 @@ use function strpos;
 use function trim;
 
 /**
+ * Unique identifier for search state properties at a node.
+ *
+ * ## Purpose
+ *
+ * Signatures uniquely identify the "context" of a state:
+ * - Amount range (min/max spend bounds)
+ * - Desired amount
+ * - Route signature (path taken to reach node)
+ *
+ * States with the same signature are considered equivalent for dominance comparison.
+ *
+ * ## Format
+ *
+ * Signature format: `label1:value1|label2:value2|...`
+ *
+ * Example:
+ * ```
+ * range:USD:100.000:200.000:3|desired:USD:150.000:3
+ * ```
+ *
+ * ## Validation
+ *
+ * - Non-empty signature
+ * - No double delimiters (`||`)
+ * - Each segment: `label:value` format
+ * - Labels and values must be non-empty
+ *
  * @internal
  */
 final class SearchStateSignature

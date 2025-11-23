@@ -13,6 +13,8 @@ use function is_int;
 
 /**
  * Fluent builder used to construct {@see PathSearchConfig} instances.
+ *
+ * @api
  */
 final class PathSearchConfigBuilder
 {

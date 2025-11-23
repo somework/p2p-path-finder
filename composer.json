@@ -2,12 +2,21 @@
     "name": "somework/p2p-path-finder",
     "description": "Deterministic Brick\\Math BigDecimal path-finding toolkit for order-driven conversions",
     "type": "library",
+    "license": "GPL-3.0-or-later",
     "keywords": [
         "path-finding",
+        "pathfinding",
         "p2p",
         "exchange",
         "graph",
-        "routing"
+        "graph-algorithms",
+        "routing",
+        "dijkstra",
+        "order-book",
+        "trading",
+        "currency-conversion",
+        "bigdecimal",
+        "arbitrary-precision"
     ],
     "homepage": "https://github.com/somework/p2p-path-finder",
     "support": {
@@ -48,22 +57,58 @@
     "autoload-dev": {
         "psr-4": {
             "SomeWork\\P2PPathFinder\\Tests\\": "tests/",
-            "SomeWork\\P2PPathFinder\\Benchmarks\\": "benchmarks/"
+            "SomeWork\\P2PPathFinder\\Benchmarks\\": "benchmarks/",
+            "SomeWork\\P2PPathFinder\\PHPStan\\": "phpstan/"
         }
     },
     "scripts": {
         "php-cs-fixer": "vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php --allow-risky=yes",
         "infection": "XDEBUG_MODE=coverage vendor/bin/infection --threads=4 --min-msi=80 --min-covered-msi=85",
         "phpstan": "vendor/bin/phpstan analyse",
+        "phpstan:baseline": "vendor/bin/phpstan analyse --generate-baseline",
+        "phpstan:custom-rules": [
+            "@putenv PHPSTAN_CUSTOM_RULES=1",
+            "vendor/bin/phpstan analyse --no-progress --error-format=table"
+        ],
         "phpunit": "vendor/bin/phpunit",
         "psalm": "vendor/bin/psalm --config=psalm.xml.dist --show-info=false",
         "phpdoc": "php bin/generate-phpdoc.php",
-        "phpbench": "php -d memory_limit=-1 -d xdebug.mode=off vendor/bin/phpbench run --config=phpbench.json --report=p2p_aggregate"
+        "phpbench": "php -d memory_limit=-1 -d xdebug.mode=off vendor/bin/phpbench run --config=phpbench.json --report=p2p_aggregate",
+        "examples": [
+            "@examples:custom-order-filter",
+            "@examples:custom-ordering-strategy",
+            "@examples:custom-fee-policy",
+            "@examples:error-handling",
+            "@examples:performance-optimization",
+            "@examples:guarded-search"
+        ],
+        "examples:custom-order-filter": "php examples/custom-order-filter.php",
+        "examples:custom-ordering-strategy": "php examples/custom-ordering-strategy.php",
+        "examples:custom-fee-policy": "php examples/custom-fee-policy.php",
+        "examples:error-handling": "php examples/error-handling.php",
+        "examples:performance-optimization": "php examples/performance-optimization.php",
+        "examples:guarded-search": "php examples/guarded-search-example.php",
+        "check": [
+            "@phpstan",
+            "@psalm",
+            "@php-cs-fixer --dry-run --diff"
+        ],
+        "check:full": [
+            "@check",
+            "@phpunit",
+            "@infection"
+        ]
     },
     "config": {
         "sort-packages": true,
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
         "allow-plugins": {
             "infection/extension-installer": true
         }
+    },
+    "suggest": {
+        "ext-json": "Required for JSON serialization of search results",
+        "ext-mbstring": "Improves string handling performance"
     }
 }

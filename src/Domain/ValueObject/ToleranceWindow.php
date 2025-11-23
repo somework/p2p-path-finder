@@ -9,6 +9,26 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 /**
  * Represents a normalized tolerance window with deterministic heuristics.
+ *
+ * ## Invariants
+ *
+ * - **Tolerance range**: Both minimum and maximum must be in [0, 1) range
+ * - **Bounds ordering**: Minimum must not exceed maximum (min <= max)
+ * - **Canonical scale**: All tolerances normalized to 18 decimal places
+ * - **Heuristic derivation**: heuristicTolerance = (min == max) ? min : max
+ *
+ * @invariant 0 <= minimum < 1
+ * @invariant 0 <= maximum < 1
+ * @invariant minimum <= maximum
+ * @invariant scale = 18 (CANONICAL_SCALE)
+ * @invariant heuristicTolerance = (min == max) ? min : max
+ * @invariant heuristicSource = (min == max) ? 'minimum' : 'maximum'
+ *
+ * @see PathSearchConfig For how tolerance affects search
+ * @see PathFinder For tolerance amplifier algorithm
+ * @see docs/decimal-strategy.md For precision guarantees
+ *
+ * @api
  */
 final class ToleranceWindow
 {

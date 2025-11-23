@@ -9,6 +9,24 @@ use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 /**
  * Represents inclusive lower/upper bounds for the fillable base asset amount of an order.
+ *
+ * ## Invariants
+ *
+ * - **Currency consistency**: Min and max must share the same currency
+ * - **Bounds ordering**: Min amount must not exceed max amount (min <= max)
+ * - **Scale normalization**: Internal scale = max(min.scale, max.scale)
+ * - **Inclusive bounds**: contains() checks min <= amount <= max (inclusive on both ends)
+ *
+ * @invariant min.currency == max.currency
+ * @invariant min <= max
+ * @invariant internal scale = max(min.scale, max.scale)
+ * @invariant contains(amount) checks min <= amount <= max (inclusive)
+ * @invariant clamp(amount) returns value within [min, max]
+ *
+ * @see Order::bounds() For usage in orders
+ * @see docs/domain-invariants.md#orderbounds For complete constraints
+ *
+ * @api
  */
 final class OrderBounds
 {

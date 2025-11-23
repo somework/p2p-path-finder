@@ -49,7 +49,7 @@ final class SpendConstraintsTest extends TestCase
     public function test_from_scalars_rejects_negative_bounds(): void
     {
         $this->expectException(InvalidInput::class);
-        $this->expectExceptionMessage('Spend constraints cannot contain negative values.');
+        $this->expectExceptionMessage('Money amount cannot be negative');
 
         SpendConstraints::fromScalars('USD', '-1', '2');
     }

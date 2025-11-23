@@ -1,0 +1,128 @@
+name: Custom Rules Check
+
+# This workflow specifically tests custom PHPStan rules for decimal arithmetic
+# It runs the same analysis as the main quality workflow but with explicit
+# reporting to verify custom rules are working correctly.
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'phpstan/**'
+      - 'phpstan.neon.dist'
+      - 'phpstan-baseline.neon'
+      - 'src/**/*.php'
+  pull_request:
+    branches: [ "**" ]
+    paths:
+      - 'phpstan/**'
+      - 'phpstan.neon.dist'
+      - 'phpstan-baseline.neon'
+      - 'src/**/*.php'
+  workflow_dispatch:
+
+jobs:
+  verify-custom-rules:
+    name: Verify Custom PHPStan Rules
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: bcmath
+          ini-values: memory_limit=-1
+
+      - name: Install dependencies
+        uses: ramsey/composer-install@v3
+        with:
+          composer-options: --prefer-dist --no-interaction --no-progress
+          custom-cache-suffix: ${{ hashFiles('composer.json') }}
+
+      - name: Verify custom rules are loaded
+        run: |
+          echo "::group::Checking custom rule files exist"
+          test -f phpstan/Rules/FloatLiteralInArithmeticRule.php && echo "✓ FloatLiteralInArithmeticRule.php"
+          test -f phpstan/Rules/MissingRoundingModeRule.php && echo "✓ MissingRoundingModeRule.php"
+          test -f phpstan/Rules/BCMathFunctionCallRule.php && echo "✓ BCMathFunctionCallRule.php"
+          test -f phpstan/phpstan-custom-rules.neon && echo "✓ phpstan-custom-rules.neon"
+          echo "::endgroup::"
+
+      - name: Run PHPStan with custom rules
+        run: |
+          echo "::group::Running PHPStan analysis"
+          echo "Custom rules enforcing decimal arithmetic consistency:"
+          echo "  1. FloatLiteralInArithmeticRule - Detects float literals in arithmetic"
+          echo "  2. MissingRoundingModeRule - Enforces explicit RoundingMode"
+          echo "  3. BCMathFunctionCallRule - Prohibits BCMath functions"
+          echo ""
+          composer phpstan:custom-rules
+          echo "::endgroup::"
+
+      - name: Test rules catch violations
+        run: |
+          echo "::group::Testing rule detection with intentional violations"
+          
+          # Create temporary file outside source tree to avoid pollution
+          TEMP_FILE=$(mktemp --suffix=.php)
+          echo "Created temp file: $TEMP_FILE"
+          
+          cat > "$TEMP_FILE" << 'EOF'
+          <?php
+          namespace SomeWork\P2PPathFinder;
+          use Brick\Math\BigDecimal;
+          
+          final class _RuleCheck {
+              public function violation1(): float { return 10.5 + 20.3; }
+              public function violation2(): BigDecimal { return BigDecimal::of('10.5')->toScale(2); }
+              public function violation3(): string { return bcadd('10', '20', 2); }
+          }
+          EOF
+          
+          # Run PHPStan with JSON output for reliable parsing
+          # Capture stdout and stderr separately, ignore exit code
+          set +e
+          PHPSTAN_OUTPUT=$(vendor/bin/phpstan analyse "$TEMP_FILE" --no-progress --error-format=json --configuration=phpstan.neon.dist 2>&1)
+          PHPSTAN_EXIT=$?
+          set -e
+          
+          echo "PHPStan exit code: $PHPSTAN_EXIT"
+          
+          # Check if output is valid JSON
+          if ! echo "$PHPSTAN_OUTPUT" | jq empty 2>/dev/null; then
+            echo "✗ PHPStan did not produce valid JSON output"
+            echo "Output:"
+            echo "$PHPSTAN_OUTPUT"
+            rm "$TEMP_FILE"
+            exit 1
+          fi
+          
+          # Parse JSON to count errors
+          ERROR_COUNT=$(echo "$PHPSTAN_OUTPUT" | jq -r '.totals.file_errors // 0')
+          
+          if [ "$ERROR_COUNT" -eq 4 ]; then
+            echo "✓ Custom rules successfully detected all 4 violations"
+            echo "$PHPSTAN_OUTPUT" | jq -r '.files | to_entries[] | .value.messages[] | "  - \(.message)"'
+          else
+            echo "✗ Expected 4 errors, found $ERROR_COUNT"
+            echo "$PHPSTAN_OUTPUT" | jq '.'
+            rm "$TEMP_FILE"
+            exit 1
+          fi
+          
+          # Clean up
+          rm "$TEMP_FILE"
+          echo "::endgroup::"
+
+      - name: Summary
+        run: |
+          echo "✅ Custom PHPStan rules verification completed successfully"
+          echo ""
+          echo "Active rules:"
+          echo "  • FloatLiteralInArithmeticRule (ID: p2pPathFinder.floatLiteral)"
+          echo "  • MissingRoundingModeRule (ID: p2pPathFinder.missingRoundingMode)"
+          echo "  • BCMathFunctionCallRule (ID: p2pPathFinder.bcmathUsage)"
+

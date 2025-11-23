@@ -33,6 +33,13 @@ use function trim;
 
 /**
  * High level facade orchestrating order filtering, graph building and path search.
+ *
+ * @see PathSearchRequest For request structure
+ * @see PathSearchConfig For configuration options
+ * @see SearchOutcome For result structure
+ * @see docs/getting-started.md For complete usage examples
+ *
+ * @api
  */
 final class PathFinderService
 {
@@ -50,6 +57,9 @@ final class PathFinderService
      */
     private Closure $pathFinderFactory;
 
+    /**
+     * @api
+     */
     public function __construct(
         private readonly GraphBuilder $graphBuilder,
         ?PathOrderStrategy $orderingStrategy = null,
@@ -64,9 +74,17 @@ final class PathFinderService
     }
 
     /**
-     * @internal
+     * Factory hook for testing. NOT PART OF PUBLIC API.
      *
-     * @param Closure(PathSearchRequest):(Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath>) $pathFinderFactory
+     * This method exists solely to enable dependency injection of mock PathFinder
+     * implementations during testing. Production code should NEVER use this method.
+     * Use the standard constructor instead.
+     *
+     * @internal This is for testing only and may change without notice
+     *
+     * @param Closure(PathSearchRequest):(Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath>) $pathFinderFactory Factory that creates PathFinder runner instances
+     *
+     * @return self Service instance with injected factory (for testing only)
      */
     public static function withRunnerFactory(
         GraphBuilder $graphBuilder,
@@ -134,6 +152,8 @@ final class PathFinderService
      * {@see SearchGuardReport::anyLimitReached()} to determine whether the search exhausted its
      * configured protections.
      *
+     * @api
+     *
      * @throws GuardLimitExceeded when the search guard aborts the exploration before exhausting the configured constraints
      * @throws InvalidInput       when the requested target asset identifier is empty
      * @throws PrecisionViolation when arbitrary precision operations required for cost ordering cannot be performed
@@ -143,6 +163,31 @@ final class PathFinderService
      * @phpstan-return SearchOutcome<PathResult>
      *
      * @psalm-return SearchOutcome<PathResult>
+     *
+     * @example
+     * ```php
+     * // Create configuration
+     * $config = PathSearchConfig::builder()
+     *     ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+     *     ->withToleranceBounds('0.0', '0.10')  // 0-10% tolerance
+     *     ->withHopLimits(1, 3)  // Allow 1-3 hop paths
+     *     ->build();
+     *
+     * // Create request and execute search
+     * $request = new PathSearchRequest($orderBook, $config, 'BTC');
+     * $outcome = $service->findBestPaths($request);
+     *
+     * // Process results
+     * foreach ($outcome->paths() as $path) {
+     *     echo "Route: {$path->route()}\n";
+     *     echo "Receive: {$path->totalReceived()->amount()} BTC\n";
+     * }
+     *
+     * // Check guard limits
+     * if ($outcome->guardLimits()->anyLimitReached()) {
+     *     echo "Search was limited by guard rails\n";
+     * }
+     * ```
      */
     public function findBestPaths(PathSearchRequest $request): SearchOutcome
     {

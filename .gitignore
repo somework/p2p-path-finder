@@ -1,9 +1,36 @@
-/.xdebug/
+# Composer
 /vendor/
-/var/
-/.phpunit.result.cache
+composer.lock
+
+# PHPUnit
 /.phpunit.cache/
+/.phpunit.result.cache
+.phpunit.result.cache
+
+# PHP CS Fixer
 /.php_cs.cache
 /.php-cs-fixer.cache
-.phpunit.result.cache
-composer.lock
+
+# Xdebug
+/.xdebug/
+
+# Build/Cache/Generated files
+/var/
+/coverage/
+/coverage-report/
+/.phpbench/
+
+# IDE files
+/.idea/
+/.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS files
+Thumbs.db
+Desktop.ini
+
+# Infection mutation testing
+/infection.log

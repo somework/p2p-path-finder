@@ -12,6 +12,8 @@ use SomeWork\P2PPathFinder\Domain\Order\Order;
 use Traversable;
 
 /**
+ * @api
+ *
  * @implements IteratorAggregate<int, Order>
  */
 final class OrderBook implements IteratorAggregate
@@ -20,6 +22,8 @@ final class OrderBook implements IteratorAggregate
     private array $orders = [];
 
     /**
+     * @api
+     *
      * @param iterable<Order> $orders
      */
     public function __construct(iterable $orders = [])
@@ -31,6 +35,8 @@ final class OrderBook implements IteratorAggregate
 
     /**
      * Appends an order to the in-memory order book.
+     *
+     * @api
      */
     public function add(Order $order): void
     {
@@ -38,6 +44,8 @@ final class OrderBook implements IteratorAggregate
     }
 
     /**
+     * @api
+     *
      * @return Traversable<int, Order>
      */
     public function getIterator(): Traversable
@@ -46,7 +54,24 @@ final class OrderBook implements IteratorAggregate
     }
 
     /**
+     * @api
+     *
      * @return Generator<int, Order>
+     *
+     * @example
+     * ```php
+     * use SomeWork\P2PPathFinder\Application\Filter\MinimumAmountFilter;
+     * use SomeWork\P2PPathFinder\Application\Filter\MaximumAmountFilter;
+     *
+     * // Apply multiple filters to reduce order book size
+     * $filtered = $orderBook->filter(
+     *     new MinimumAmountFilter(Money::fromString('BTC', '0.01', 8)),
+     *     new MaximumAmountFilter(Money::fromString('BTC', '10.0', 8))
+     * );
+     *
+     * // Filtered orders can be iterated or converted to array
+     * $filteredOrders = iterator_to_array($filtered);
+     * ```
      */
     public function filter(OrderFilterInterface ...$filters): Generator
     {

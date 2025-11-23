@@ -562,4 +562,379 @@ final class OrderTest extends TestCase
 
         self::assertTrue($quote->equals(CurrencyScenarioFactory::money('SATS', '50000000', 4)));
     }
+
+    // ==================== Order Consistency Validation Tests (0002.11) ====================
+
+    public function test_order_with_bounds_currency_mismatch_throws_exception(): void
+    {
+        // Bounds must be in base currency
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Order bounds must be expressed in the base asset.');
+
+        $assetPair = AssetPair::fromString('BTC', 'USD');
+        $bounds = OrderBounds::from(
+            Money::fromString('EUR', '0.100', 3),
+            Money::fromString('EUR', '1.000', 3),
+        );
+        $rate = ExchangeRate::fromString('BTC', 'USD', '30000', 2);
+
+        new Order(OrderSide::BUY, $assetPair, $bounds, $rate);
+    }
+
+    public function test_order_with_bounds_currency_matching_quote_throws_exception(): void
+    {
+        // Bounds in quote currency should be rejected
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Order bounds must be expressed in the base asset.');
+
+        $assetPair = AssetPair::fromString('ETH', 'USD');
+        $bounds = OrderBounds::from(
+            Money::fromString('USD', '1000.00', 2),
+            Money::fromString('USD', '5000.00', 2),
+        );
+        $rate = ExchangeRate::fromString('ETH', 'USD', '2000.00', 2);
+
+        new Order(OrderSide::SELL, $assetPair, $bounds, $rate);
+    }
+
+    public function test_order_with_rate_base_currency_mismatch_throws_exception(): void
+    {
+        // Rate base must match asset pair base
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Effective rate base currency must match asset pair base.');
+
+        $assetPair = AssetPair::fromString('BTC', 'USD');
+        $bounds = OrderBounds::from(
+            Money::fromString('BTC', '0.100', 3),
+            Money::fromString('BTC', '1.000', 3),
+        );
+        $rate = ExchangeRate::fromString('ETH', 'USD', '30000', 2);
+
+        new Order(OrderSide::BUY, $assetPair, $bounds, $rate);
+    }
+
+    public function test_order_with_rate_quote_currency_mismatch_throws_exception(): void
+    {
+        // Rate quote must match asset pair quote
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Effective rate quote currency must match asset pair quote.');
+
+        $assetPair = AssetPair::fromString('BTC', 'USD');
+        $bounds = OrderBounds::from(
+            Money::fromString('BTC', '0.100', 3),
+            Money::fromString('BTC', '1.000', 3),
+        );
+        $rate = ExchangeRate::fromString('BTC', 'EUR', '25000', 2);
+
+        new Order(OrderSide::BUY, $assetPair, $bounds, $rate);
+    }
+
+    public function test_order_with_fee_currency_mismatch(): void
+    {
+        // Fee in wrong currency should be rejected during calculation
+        $policy = new class implements FeePolicy {
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                // Return quote fee in wrong currency
+                return FeeBreakdown::forQuote(Money::fromString('GBP', '10.00', 2));
+            }
+
+            public function fingerprint(): string
+            {
+                return 'wrong-currency-fee';
+            }
+        };
+
+        $order = OrderFactory::buy(feePolicy: $policy);
+
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Fee policy must return money in quote asset currency.');
+
+        $order->calculateEffectiveQuoteAmount(CurrencyScenarioFactory::money('BTC', '0.500', 3));
+    }
+
+    public function test_order_validation_passes_with_consistent_currencies(): void
+    {
+        // All currencies properly aligned should work
+        $assetPair = AssetPair::fromString('ETH', 'USDT');
+        $bounds = OrderBounds::from(
+            Money::fromString('ETH', '0.1', 1),
+            Money::fromString('ETH', '10.0', 1),
+        );
+        $rate = ExchangeRate::fromString('ETH', 'USDT', '2000.00', 2);
+
+        $order = new Order(OrderSide::BUY, $assetPair, $bounds, $rate);
+
+        // Verify construction succeeded
+        self::assertSame('ETH', $order->assetPair()->base());
+        self::assertSame('USDT', $order->assetPair()->quote());
+        self::assertSame('ETH', $order->bounds()->min()->currency());
+        self::assertSame('ETH', $order->effectiveRate()->baseCurrency());
+        self::assertSame('USDT', $order->effectiveRate()->quoteCurrency());
+    }
+
+    // ==================== Fee Policy Edge Case Tests (0002.12) ====================
+
+    public function test_fee_exceeds_amount_allowed_by_implementation(): void
+    {
+        // Fee larger than quote amount - implementation allows but caller must validate
+        // This documents that the Order class doesn't prevent excessive fees
+        $policy = new class implements FeePolicy {
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                // Fee is 50% of quote amount
+                $fee = $quoteAmount->multiply('0.5', $quoteAmount->scale());
+
+                return FeeBreakdown::forQuote($fee);
+            }
+
+            public function fingerprint(): string
+            {
+                return 'large-fee:50%';
+            }
+        };
+
+        $order = OrderFactory::buy(feePolicy: $policy);
+        $baseAmount = CurrencyScenarioFactory::money('BTC', '0.500', 3);
+
+        $effectiveQuote = $order->calculateEffectiveQuoteAmount($baseAmount);
+
+        // Quote = 15000, Fee = 7500, Effective = 7500
+        self::assertTrue($effectiveQuote->equals(CurrencyScenarioFactory::money('USD', '7500.000', 3)));
+
+        // Verify fee reduces effective quote significantly
+        $rawQuote = $order->calculateQuoteAmount($baseAmount);
+        self::assertTrue($effectiveQuote->lessThan($rawQuote));
+    }
+
+    public function test_fee_equals_amount_results_in_zero(): void
+    {
+        // Fee exactly equals quote amount (100% fee)
+        $policy = new class implements FeePolicy {
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                // Fee is exactly 100% of quote amount
+                return FeeBreakdown::forQuote($quoteAmount);
+            }
+
+            public function fingerprint(): string
+            {
+                return 'full-fee:100%';
+            }
+        };
+
+        $order = OrderFactory::buy(feePolicy: $policy);
+        $baseAmount = CurrencyScenarioFactory::money('BTC', '0.500', 3);
+
+        $effectiveQuote = $order->calculateEffectiveQuoteAmount($baseAmount);
+
+        // Quote = 15000, Fee = 15000, Effective = 0
+        self::assertTrue($effectiveQuote->isZero());
+        self::assertSame('0.000', $effectiveQuote->amount());
+    }
+
+    public function test_zero_fee(): void
+    {
+        // Zero fee policy
+        $policy = new class implements FeePolicy {
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                return FeeBreakdown::forQuote(Money::zero($quoteAmount->currency(), $quoteAmount->scale()));
+            }
+
+            public function fingerprint(): string
+            {
+                return 'zero-fee';
+            }
+        };
+
+        $order = OrderFactory::buy(feePolicy: $policy);
+        $baseAmount = CurrencyScenarioFactory::money('BTC', '0.500', 3);
+
+        $effectiveQuote = $order->calculateEffectiveQuoteAmount($baseAmount);
+        $rawQuote = $order->calculateQuoteAmount($baseAmount);
+
+        // With zero fee, effective should equal raw quote
+        self::assertTrue($effectiveQuote->equals($rawQuote));
+        self::assertTrue($effectiveQuote->equals(CurrencyScenarioFactory::money('USD', '15000.000', 3)));
+    }
+
+    public function test_null_fee_breakdown_behavior(): void
+    {
+        // Test with null fee breakdown (no fees)
+        $policy = new class implements FeePolicy {
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                // Return breakdown with null fees
+                return FeeBreakdown::of(null, null);
+            }
+
+            public function fingerprint(): string
+            {
+                return 'null-fees';
+            }
+        };
+
+        $order = OrderFactory::buy(feePolicy: $policy);
+        $baseAmount = CurrencyScenarioFactory::money('BTC', '0.500', 3);
+
+        $effectiveQuote = $order->calculateEffectiveQuoteAmount($baseAmount);
+        $rawQuote = $order->calculateQuoteAmount($baseAmount);
+
+        // Null fees should behave like zero fees
+        self::assertTrue($effectiveQuote->equals($rawQuote));
+    }
+
+    public function test_fee_accumulation_across_orders(): void
+    {
+        // Test multiple orders with fees accumulate correctly
+        $fee10Percent = $this->percentageFeePolicy('0.10');
+
+        $order1 = OrderFactory::createOrder(
+            OrderSide::BUY,
+            'BTC',
+            'USD',
+            '0.1',
+            '1.0',
+            '30000',
+            amountScale: 3,
+            rateScale: 2,
+            feePolicy: $fee10Percent,
+        );
+
+        $order2 = OrderFactory::createOrder(
+            OrderSide::BUY,
+            'ETH',
+            'BTC',
+            '0.1',
+            '10.0',
+            '0.05',
+            amountScale: 3,
+            rateScale: 2,
+            feePolicy: $fee10Percent,
+        );
+
+        // Calculate effective quotes for both orders
+        $base1 = CurrencyScenarioFactory::money('BTC', '0.500', 3);
+        $effective1 = $order1->calculateEffectiveQuoteAmount($base1);
+        // Raw: 15000, Fee: 1500, Effective: 13500
+
+        $base2 = CurrencyScenarioFactory::money('ETH', '1.000', 3);
+        $effective2 = $order2->calculateEffectiveQuoteAmount($base2);
+        // Raw: 0.05, Fee: 0.005, Effective: 0.045
+
+        // Verify fees were applied to both
+        self::assertTrue($effective1->equals(CurrencyScenarioFactory::money('USD', '13500.000', 3)));
+        self::assertTrue($effective2->equals(CurrencyScenarioFactory::money('BTC', '0.045', 3)));
+
+        // Verify fees are cumulative effect
+        $rawQuote1 = $order1->calculateQuoteAmount($base1);
+        $rawQuote2 = $order2->calculateQuoteAmount($base2);
+
+        self::assertTrue($effective1->lessThan($rawQuote1));
+        self::assertTrue($effective2->lessThan($rawQuote2));
+    }
+
+    public function test_very_small_fee(): void
+    {
+        // Very small fee (1 satoshi equivalent)
+        $policy = new class implements FeePolicy {
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                return FeeBreakdown::forQuote(Money::fromString($quoteAmount->currency(), '0.001', 3));
+            }
+
+            public function fingerprint(): string
+            {
+                return 'tiny-fee:0.001';
+            }
+        };
+
+        $order = OrderFactory::createOrder(
+            OrderSide::BUY,
+            'BTC',
+            'USD',
+            '0.1',
+            '1.0',
+            '30000.00',
+            amountScale: 3,
+            rateScale: 2,
+            feePolicy: $policy,
+        );
+
+        $baseAmount = CurrencyScenarioFactory::money('BTC', '0.500', 3);
+        $effectiveQuote = $order->calculateEffectiveQuoteAmount($baseAmount);
+
+        // Quote = 15000.000, Fee = 0.001, Effective = 14999.999
+        self::assertSame('14999.999', $effectiveQuote->amount());
+    }
+
+    public function test_fee_policy_with_both_base_and_quote_fees(): void
+    {
+        // Policy that charges both base and quote fees
+        $policy = new class implements FeePolicy {
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                $baseFee = $baseAmount->multiply('0.01', $baseAmount->scale());
+                $quoteFee = $quoteAmount->multiply('0.02', $quoteAmount->scale());
+
+                return FeeBreakdown::of($baseFee, $quoteFee);
+            }
+
+            public function fingerprint(): string
+            {
+                return 'dual-fee:base-1%:quote-2%';
+            }
+        };
+
+        $order = OrderFactory::buy(feePolicy: $policy);
+        $baseAmount = CurrencyScenarioFactory::money('BTC', '1.000', 3);
+
+        $effectiveQuote = $order->calculateEffectiveQuoteAmount($baseAmount);
+        $grossBase = $order->calculateGrossBaseSpend($baseAmount);
+
+        // Raw quote: 30000
+        // Quote fee (2%): 600
+        // Effective quote: 29400
+        self::assertTrue($effectiveQuote->equals(CurrencyScenarioFactory::money('USD', '29400.000', 3)));
+
+        // Base: 1.000
+        // Base fee (1%): 0.010
+        // Gross base: 1.010
+        self::assertTrue($grossBase->equals(CurrencyScenarioFactory::money('BTC', '1.010', 3)));
+    }
+
+    public function test_fee_larger_than_base_amount(): void
+    {
+        // Base fee exceeds base amount
+        $policy = new class implements FeePolicy {
+            public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
+            {
+                // Fee is 200% of base amount
+                $fee = $baseAmount->multiply('2.0', $baseAmount->scale());
+
+                return FeeBreakdown::forBase($fee);
+            }
+
+            public function fingerprint(): string
+            {
+                return 'excessive-base-fee:200%';
+            }
+        };
+
+        $order = OrderFactory::buy(feePolicy: $policy);
+        $baseAmount = CurrencyScenarioFactory::money('BTC', '0.100', 3);
+
+        $grossBase = $order->calculateGrossBaseSpend($baseAmount);
+
+        // Base: 0.100
+        // Fee: 0.200
+        // Gross: 0.300
+        self::assertTrue($grossBase->equals(CurrencyScenarioFactory::money('BTC', '0.300', 3)));
+
+        // Effective quote should be unaffected by base fee
+        $effectiveQuote = $order->calculateEffectiveQuoteAmount($baseAmount);
+        $rawQuote = $order->calculateQuoteAmount($baseAmount);
+        self::assertTrue($effectiveQuote->equals($rawQuote));
+    }
 }
