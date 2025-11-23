@@ -41,6 +41,7 @@ Run any example directly from the project root:
 php examples/custom-order-filter.php
 php examples/error-handling.php
 php examples/performance-optimization.php
+php examples/bybit-p2p-integration.php
 # ... etc
 ```
 
@@ -59,6 +60,7 @@ composer examples:custom-fee-policy
 composer examples:error-handling
 composer examples:performance-optimization
 composer examples:guarded-search
+composer examples:bybit-p2p-integration
 ```
 
 **Benefits of using composer scripts**:
@@ -246,6 +248,34 @@ Complete workflow demonstrating path search with guard rails and result interpre
 
 ---
 
+#### 7. Bybit P2P API Integration
+**File**: [`bybit-p2p-integration.php`](bybit-p2p-integration.php)
+
+Real-world integration example showing how to fetch P2P trading data from Bybit's API and use it with the PathFinder library.
+
+**What you'll learn**:
+- Mock Bybit P2P API client implementation
+- Mapping Bybit advertisement data to Order objects
+- Handling BUY/SELL order side conversions
+- Fetching data from multiple markets
+- Complete production-ready integration pattern
+- Error handling for API and library errors
+
+**When to use**:
+- You want to integrate with Bybit P2P trading platform
+- You need to work with real exchange APIs
+- You want to see a complete real-world integration example
+- You're building a P2P trading aggregator or optimizer
+
+**API Documentation**:
+- [Bybit P2P Get Ads API](https://bybit-exchange.github.io/docs/p2p/ad/online-ad-list)
+
+**Related docs**:
+- [Getting Started Guide](../docs/getting-started.md)
+- [Error Handling Guide](../docs/exceptions.md)
+
+---
+
 ## Example Details
 
 ### File Statistics
@@ -258,7 +288,8 @@ Complete workflow demonstrating path search with guard rails and result interpre
 | **error-handling.php** | 473 | Production | 7 | All exceptions, production pattern |
 | **performance-optimization.php** | 507 | Production | 12 | 4 techniques, benchmarks |
 | **guarded-search-example.php** | Varies | Production | 1 | Complete workflow |
-| **TOTAL** | **~2,500** | **6 files** | **35+** | **Comprehensive coverage** |
+| **bybit-p2p-integration.php** | 600+ | Production | 5 | API integration, real-world example |
+| **TOTAL** | **~3,100** | **7 files** | **40+** | **Comprehensive coverage** |
 
 ### Example Categories
 
@@ -271,10 +302,11 @@ Complete workflow demonstrating path search with guard rails and result interpre
 **Intermediate**:
 3. `custom-fee-policy.php` - Realistic fee modeling
 4. `custom-ordering-strategy.php` - Custom ranking logic
+5. `bybit-p2p-integration.php` - Real-world API integration
 
 **Advanced**:
-5. `error-handling.php` - Production error handling
-6. `performance-optimization.php` - Performance tuning
+6. `error-handling.php` - Production error handling
+7. `performance-optimization.php` - Performance tuning
 
 #### By Use Case
 
@@ -288,6 +320,8 @@ Complete workflow demonstrating path search with guard rails and result interpre
 | Handle errors in production | `error-handling.php` |
 | Optimize search performance | `performance-optimization.php` |
 | See a complete basic workflow | `guarded-search-example.php` |
+| Integrate with Bybit P2P API | `bybit-p2p-integration.php` |
+| Build a real-world trading app | `bybit-p2p-integration.php` |
 
 ## Related Documentation
 
@@ -379,13 +413,14 @@ If examples don't answer your question:
 ## Summary
 
 This examples directory provides:
-- ✅ **6 comprehensive examples** covering all major use cases
-- ✅ **2,500+ lines** of production-ready code
-- ✅ **35+ demonstration scenarios** showing different patterns
+- ✅ **7 comprehensive examples** covering all major use cases
+- ✅ **3,100+ lines** of production-ready code
+- ✅ **40+ demonstration scenarios** showing different patterns
 - ✅ **Complete workflows** from configuration to result handling
+- ✅ **Real-world integrations** with external APIs (Bybit P2P)
 - ✅ **Measurable improvements** via benchmarks and comparisons
 
-Start with `guarded-search-example.php` for a basic workflow, then explore customization and optimization examples based on your needs.
+Start with `guarded-search-example.php` for a basic workflow, then explore customization and optimization examples based on your needs. Check out `bybit-p2p-integration.php` for a complete real-world API integration example.
 
 **Happy coding!** 🚀
 
