@@ -73,7 +73,7 @@ final class OrderingDeterminismTest extends TestCase
         $firstPathHops = $paths[0]->hops();
         if (count($paths) >= 2) {
             $secondPathHops = $paths[1]->hops();
-            self::assertLessThanOrEqual($firstPathHops, $secondPathHops, 'Path with fewer hops should come first when costs are similar');
+            self::assertLessThanOrEqual($secondPathHops, $firstPathHops, 'Path with fewer hops should come first when costs are similar');
         }
     }
 
