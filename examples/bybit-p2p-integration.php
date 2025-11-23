@@ -372,9 +372,13 @@ if ($outcome1->hasPaths()) {
         echo "    Route: ";
         $route = [];
         foreach ($path->legs() as $leg) {
-            $route[] = $leg->order()->assetPair()->base();
+            $route[] = $leg->from();
         }
-        $route[] = $path->legs()[count($path->legs()) - 1]->order()->assetPair()->quote();
+        // Add the final destination
+        $legs = iterator_to_array($path->legs());
+        if (count($legs) > 0) {
+            $route[] = $legs[count($legs) - 1]->to();
+        }
         echo implode(' → ', $route) . "\n";
         
         echo "\n";
@@ -413,7 +417,7 @@ $outcome2 = $service->findBestPaths($request2);
 if ($outcome2->hasPaths()) {
     echo "✓ Found " . count($outcome2->paths()) . " path(s)\n\n";
     
-    $bestPath = $outcome2->paths()[0];
+    $bestPath = $outcome2->paths()->first();
     echo "  Best Path:\n";
     echo "    Spend: {$bestPath->totalSpent()->amount()} {$bestPath->totalSpent()->currency()}\n";
     echo "    Receive: {$bestPath->totalReceived()->amount()} {$bestPath->totalReceived()->currency()}\n";
@@ -446,8 +450,7 @@ if ($outcome3->hasPaths()) {
         
         foreach ($path->legs() as $legIdx => $leg) {
             $legNum = $legIdx + 1;
-            $order = $leg->order();
-            echo "    Hop {$legNum}: {$order->assetPair()->base()} → {$order->assetPair()->quote()}\n";
+            echo "    Hop {$legNum}: {$leg->from()} → {$leg->to()}\n";
             echo "      Spend: {$leg->spent()->amount()} {$leg->spent()->currency()}\n";
             echo "      Receive: {$leg->received()->amount()} {$leg->received()->currency()}\n";
         }
@@ -537,7 +540,7 @@ function findBybitP2PPath(
         
         // Step 5: Process results
         if ($outcome->hasPaths()) {
-            $bestPath = $outcome->paths()[0];
+            $bestPath = $outcome->paths()->first();
             echo "   ✓ Found optimal path!\n\n";
             echo "   Best Path:\n";
             echo "     Input: {$bestPath->totalSpent()->amount()} {$bestPath->totalSpent()->currency()}\n";
