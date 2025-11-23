@@ -49,6 +49,7 @@ final class PathEdgeSequence implements Countable, IteratorAggregate
         $list = [];
 
         foreach ($edges as $edge) {
+            /* @phpstan-ignore-next-line instanceof.alwaysTrue */
             if (!$edge instanceof PathEdge) {
                 throw new InvalidInput('Path edge sequence elements must be PathEdge instances.');
             }
@@ -67,6 +68,7 @@ final class PathEdgeSequence implements Countable, IteratorAggregate
     public static function fromList(array $edges): self
     {
         foreach ($edges as $edge) {
+            /* @phpstan-ignore-next-line instanceof.alwaysTrue */
             if (!$edge instanceof PathEdge) {
                 throw new InvalidInput('Path edge sequence elements must be PathEdge instances.');
             }

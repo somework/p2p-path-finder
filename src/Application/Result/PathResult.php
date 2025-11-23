@@ -81,7 +81,7 @@ final class PathResult implements JsonSerializable
     }
 
     /**
-     * @throws InvalidInput|PrecisionViolation when the tolerance percentage cannot be calculated at the requested scale
+     * @throws InvalidInput when the tolerance percentage cannot be calculated at the requested scale
      */
     public function residualTolerancePercentage(int $scale = 2): string
     {

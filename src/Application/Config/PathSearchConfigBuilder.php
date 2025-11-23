@@ -7,7 +7,6 @@ namespace SomeWork\P2PPathFinder\Application\Config;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ToleranceWindow;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
-use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function is_int;
 
@@ -45,7 +44,7 @@ final class PathSearchConfigBuilder
     /**
      * Configures the acceptable relative deviation from the desired spend amount.
      *
-     * @throws InvalidInput|PrecisionViolation when tolerance bounds are not valid numeric ratios
+     * @throws InvalidInput when tolerance bounds are not valid numeric ratios
      */
     public function withToleranceBounds(string $minimumTolerance, string $maximumTolerance): self
     {

@@ -49,6 +49,7 @@ final class GraphBuilder
         $currencies = [];
 
         foreach ($orders as $order) {
+            /* @phpstan-ignore-next-line instanceof.alwaysTrue */
             if (!$order instanceof Order) {
                 continue;
             }

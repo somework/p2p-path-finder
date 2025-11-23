@@ -19,7 +19,6 @@ use function count;
 use function get_debug_type;
 use function is_array;
 use function is_object;
-use function method_exists;
 use function sprintf;
 use function usort;
 
@@ -151,6 +150,7 @@ final class PathResultSet implements IteratorAggregate, Countable, JsonSerializa
         $index = 0;
         foreach ($paths as $path) {
             $orderKey = $orderKeyResolver($path, $index);
+            /* @phpstan-ignore-next-line instanceof.alwaysTrue */
             if (!$orderKey instanceof PathOrderKey) {
                 throw new InvalidArgumentException(sprintf('Path order key resolver must return an instance of %s, %s returned.', PathOrderKey::class, get_debug_type($orderKey)));
             }
@@ -229,20 +229,15 @@ final class PathResultSet implements IteratorAggregate, Countable, JsonSerializa
                     return $path->jsonSerialize();
                 }
 
-                if (is_object($path)) {
-                    if (method_exists($path, 'jsonSerialize')) {
-                        /* @psalm-suppress MixedMethodCall */
-                        return $path->jsonSerialize();
-                    }
-
-                    if (method_exists($path, 'toArray')) {
-                        /* @psalm-suppress MixedMethodCall */
-                        return $path->toArray();
-                    }
-                }
-
                 if (is_array($path)) {
                     return $path;
+                }
+
+                // Fallback for objects with toArray method
+                /* @phpstan-ignore function.alreadyNarrowedType */
+                if (is_object($path) && method_exists($path, 'toArray')) {
+                    /* @phpstan-ignore method.notFound */
+                    return $path->toArray();
                 }
 
                 return $path;

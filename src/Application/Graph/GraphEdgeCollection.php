@@ -83,6 +83,7 @@ final class GraphEdgeCollection implements Countable, IteratorAggregate, JsonSer
         $comparator = $resolvedComparator;
 
         foreach ($edges as $edge) {
+            /* @phpstan-ignore-next-line instanceof.alwaysTrue */
             if (!$edge instanceof GraphEdge) {
                 throw new InvalidInput('Every graph edge must be an instance of GraphEdge.');
             }

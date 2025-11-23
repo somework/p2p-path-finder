@@ -58,6 +58,7 @@ final class MoneyMap implements Countable, IteratorAggregate, JsonSerializable
         $normalized = [];
 
         foreach ($entries as $entry) {
+            /* @phpstan-ignore-next-line instanceof.alwaysTrue */
             if (!$entry instanceof Money) {
                 throw new InvalidInput('Money map entries must be instances of Money.');
             }

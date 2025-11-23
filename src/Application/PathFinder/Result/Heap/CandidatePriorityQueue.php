@@ -27,10 +27,12 @@ final class CandidatePriorityQueue extends SplPriorityQueue
      */
     public function compare(mixed $priority1, mixed $priority2): int
     {
+        /* @phpstan-ignore-next-line instanceof.alwaysTrue */
         if (!$priority1 instanceof CandidatePriority) {
             throw new InvalidArgumentException('Candidate priority queue expects candidate priorities.');
         }
 
+        /* @phpstan-ignore-next-line instanceof.alwaysTrue */
         if (!$priority2 instanceof CandidatePriority) {
             throw new InvalidArgumentException('Candidate priority queue expects candidate priorities.');
         }

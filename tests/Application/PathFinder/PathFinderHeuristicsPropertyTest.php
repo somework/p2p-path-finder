@@ -162,6 +162,12 @@ final class PathFinderHeuristicsPropertyTest extends TestCase
 
         $normalized = DecimalMath::normalize($result, $ratioScale + $this->sumExtraScale);
 
+        // Guard against negative intermediate results from arithmetic operations
+        // Money must always be non-negative per domain constraints
+        if (DecimalMath::comp($normalized, '0', $ratioScale + $this->sumExtraScale) < 0) {
+            return $targetMin;
+        }
+
         $interpolated = Money::fromString(
             $targetMin->currency(),
             $normalized,
