@@ -23,6 +23,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/../vendor/autoload.php';
 
+use Brick\Math\RoundingMode;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
@@ -284,17 +285,24 @@ class BybitOrderConverter
         if (isset($ad['symbolInfo']['currency']['scale'])) {
             $currencyScale = (int)$ad['symbolInfo']['currency']['scale'];
         }
-        // Determine order side
-        // Bybit: "0" = buy (user wants to buy token with currency)
-        //        "1" = sell (user wants to sell token for currency)
-        $side = $ad['side'] === '0' ? OrderSide::BUY : OrderSide::SELL;
         
         // For BUY orders: base=currency, quote=token
         // For SELL orders: base=token, quote=currency
         $tokenId = $ad['tokenId'];
         $currencyId = $ad['currencyId'];
         
-        // In Bybit, price = how much currency per token
+        // In Bybit, price = how much currency per token (token -> currency rate)
+        $priceRate = ExchangeRate::fromString($tokenId, $currencyId, $ad['price'], $rateScale);
+        
+        // Determine order side
+        // Bybit: 0 = buy (user wants to buy token with currency)
+        //        1 = sell (user wants to sell token for currency)
+        $sideValue = (int) $ad['side'];
+        if (! in_array($sideValue, [0, 1], true)) {
+            throw new InvalidInput(sprintf('Unexpected Bybit side value "%s".', (string) $ad['side']));
+        }
+        $side = $sideValue === 0 ? OrderSide::BUY : OrderSide::SELL;
+        
         // For BUY: spend currency, get token -> AssetPair(currency, token)
         // For SELL: spend token, get currency -> AssetPair(token, currency)
         if ($side === OrderSide::BUY) {
@@ -303,24 +311,22 @@ class BybitOrderConverter
             $maxAmount = Money::fromString($currencyId, $ad['maxAmount'], $currencyScale);
             $bounds = OrderBounds::from($minAmount, $maxAmount);
             
-            // Exchange rate: currency -> token
-            // Rate = 1 / price (because price is currency per token)
-            $rate = bcdiv('1', $ad['price'], $rateScale);
-            $exchangeRate = ExchangeRate::fromString($currencyId, $tokenId, $rate, $rateScale);
+            // Exchange rate: currency -> token (invert token -> currency)
+            $exchangeRate = $priceRate->invert();
         } else {
             $assetPair = AssetPair::fromString($tokenId, $currencyId);
             
-            // Convert currency bounds to token bounds using price
-            $minToken = bcdiv($ad['minAmount'], $ad['price'], $tokenScale);
-            $maxToken = bcdiv($ad['maxAmount'], $ad['price'], $tokenScale);
+            // Convert currency bounds to token bounds via inverted rate
+            $minCurrency = Money::fromString($currencyId, $ad['minAmount'], $currencyScale);
+            $maxCurrency = Money::fromString($currencyId, $ad['maxAmount'], $currencyScale);
+            $currencyToTokenRate = $priceRate->invert();
             
-            $minAmount = Money::fromString($tokenId, $minToken, $tokenScale);
-            $maxAmount = Money::fromString($tokenId, $maxToken, $tokenScale);
+            $minAmount = $currencyToTokenRate->convert($minCurrency, $tokenScale);
+            $maxAmount = $currencyToTokenRate->convert($maxCurrency, $tokenScale);
             $bounds = OrderBounds::from($minAmount, $maxAmount);
             
             // Exchange rate: token -> currency
-            // Rate = price (currency per token)
-            $exchangeRate = ExchangeRate::fromString($tokenId, $currencyId, $ad['price'], $rateScale);
+            $exchangeRate = $priceRate;
         }
         
         return new Order($side, $assetPair, $bounds, $exchangeRate);
@@ -517,7 +523,11 @@ if ($outcome2->hasPaths()) {
     echo "  Best Path:\n";
     echo "    Spend: {$bestPath->totalSpent()->amount()} {$bestPath->totalSpent()->currency()}\n";
     echo "    Receive: {$bestPath->totalReceived()->amount()} {$bestPath->totalReceived()->currency()}\n";
-    echo "    Effective rate: " . bcdiv($bestPath->totalReceived()->amount(), $bestPath->totalSpent()->amount(), 10) . " BTC/EUR\n";
+    
+    // Calculate effective rate using brick/math (received / spent)
+    $effectiveRate = $bestPath->totalReceived()->decimal()
+        ->dividedBy($bestPath->totalSpent()->decimal(), 10, RoundingMode::HALF_UP);
+    echo "    Effective rate: {$effectiveRate} {$bestPath->totalReceived()->currency()}/{$bestPath->totalSpent()->currency()}\n";
     echo "\n";
 } else {
     echo "✗ No paths found from EUR to BTC\n\n";
