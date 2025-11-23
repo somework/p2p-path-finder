@@ -111,7 +111,7 @@ final class ExchangeRatePropertyTest extends TestCase
 
             // Rates should be close (allow up to 1% difference due to compounding rounding)
             $originalRateFloat = (float) $originalRate->rate();
-            $relativeTolerance = max(0.01, $originalRateFloat * 0.01);
+            $relativeTolerance = max($originalRateFloat * 0.01, 1e-6);
 
             self::assertEqualsWithDelta(
                 $originalRateFloat,
