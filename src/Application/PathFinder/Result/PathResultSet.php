@@ -18,6 +18,7 @@ use function array_slice;
 use function count;
 use function get_debug_type;
 use function is_array;
+use function is_object;
 use function sprintf;
 use function usort;
 
@@ -233,7 +234,9 @@ final class PathResultSet implements IteratorAggregate, Countable, JsonSerializa
                 }
 
                 // Fallback for objects with toArray method
+                /* @phpstan-ignore function.alreadyNarrowedType */
                 if (is_object($path) && method_exists($path, 'toArray')) {
+                    /* @phpstan-ignore method.notFound */
                     return $path->toArray();
                 }
 
