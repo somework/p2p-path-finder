@@ -68,6 +68,8 @@ jobs:
           
           # Create temporary file outside source tree to avoid pollution
           TEMP_FILE=$(mktemp --suffix=.php)
+          echo "Created temp file: $TEMP_FILE"
+          
           cat > "$TEMP_FILE" << 'EOF'
           <?php
           namespace SomeWork\P2PPathFinder;
@@ -81,7 +83,22 @@ jobs:
           EOF
           
           # Run PHPStan with JSON output for reliable parsing
-          PHPSTAN_OUTPUT=$(vendor/bin/phpstan analyse "$TEMP_FILE" --no-progress --error-format=json 2>&1 || true)
+          # Capture stdout and stderr separately, ignore exit code
+          set +e
+          PHPSTAN_OUTPUT=$(vendor/bin/phpstan analyse "$TEMP_FILE" --no-progress --error-format=json --configuration=phpstan.neon.dist 2>&1)
+          PHPSTAN_EXIT=$?
+          set -e
+          
+          echo "PHPStan exit code: $PHPSTAN_EXIT"
+          
+          # Check if output is valid JSON
+          if ! echo "$PHPSTAN_OUTPUT" | jq empty 2>/dev/null; then
+            echo "✗ PHPStan did not produce valid JSON output"
+            echo "Output:"
+            echo "$PHPSTAN_OUTPUT"
+            rm "$TEMP_FILE"
+            exit 1
+          fi
           
           # Parse JSON to count errors
           ERROR_COUNT=$(echo "$PHPSTAN_OUTPUT" | jq -r '.totals.file_errors // 0')
