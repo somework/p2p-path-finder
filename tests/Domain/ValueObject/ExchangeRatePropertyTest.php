@@ -315,7 +315,14 @@ final class ExchangeRatePropertyTest extends TestCase
             $currencyB = $this->randomDistinctCurrency($currencyA);
             $currencyC = $this->randomDistinctCurrency($currencyB);
             // Ensure C is also distinct from A
+            $attempts = 0;
+            $maxAttempts = 100;
             while (strtoupper($currencyC) === strtoupper($currencyA)) {
+                if (++$attempts >= $maxAttempts) {
+                    // Fallback to deterministic distinct value to avoid infinite loop
+                    $currencyC = 'ZZZ' . $attempts;
+                    break;
+                }
                 $currencyC = $this->randomCurrencyCode();
             }
 
