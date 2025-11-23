@@ -320,7 +320,7 @@ final class ExchangeRatePropertyTest extends TestCase
             while (strtoupper($currencyC) === strtoupper($currencyA)) {
                 if (++$attempts >= $maxAttempts) {
                     // Fallback to deterministic distinct value to avoid infinite loop
-                    $currencyC = 'ZZZ' . $attempts;
+                    $currencyC = 'ZZZ'.$attempts;
                     break;
                 }
                 $currencyC = $this->randomCurrencyCode();
@@ -452,10 +452,6 @@ final class ExchangeRatePropertyTest extends TestCase
 
     /**
      * Get a random float between min and max (PHP 8.2 compatible).
-     *
-     * @param float $min
-     * @param float $max
-     * @return float
      */
     private function getFloat(float $min, float $max): float
     {
