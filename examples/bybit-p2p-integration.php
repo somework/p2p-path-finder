@@ -88,28 +88,29 @@ class BybitP2PClient
      * Mock response generator
      * 
      * Returns realistic data matching Bybit's actual API response structure
+     * Based on: https://bybit-exchange.github.io/docs/p2p/ad/online-ad-list
      */
     private function getMockResponse(string $tokenId, string $currencyId, string $side): array
     {
         // Mock data representing different currency pairs and market conditions
         $mockAds = [
             // USD -> USDT market
-            ['tokenId' => 'USDT', 'currencyId' => 'USD', 'side' => '0', 'price' => '1.0001', 'lastQuantity' => '10000', 'minAmount' => '100', 'maxAmount' => '5000'],
-            ['tokenId' => 'USDT', 'currencyId' => 'USD', 'side' => '0', 'price' => '1.0002', 'lastQuantity' => '20000', 'minAmount' => '50', 'maxAmount' => '10000'],
-            ['tokenId' => 'USDT', 'currencyId' => 'USD', 'side' => '1', 'price' => '0.9999', 'lastQuantity' => '15000', 'minAmount' => '100', 'maxAmount' => '8000'],
+            ['tokenId' => 'USDT', 'currencyId' => 'USD', 'side' => '0', 'price' => '1.0001', 'lastQuantity' => '10000', 'minAmount' => '100', 'maxAmount' => '5000', 'nickName' => 'USDTrader1'],
+            ['tokenId' => 'USDT', 'currencyId' => 'USD', 'side' => '0', 'price' => '1.0002', 'lastQuantity' => '20000', 'minAmount' => '50', 'maxAmount' => '10000', 'nickName' => 'USDTrader2'],
+            ['tokenId' => 'USDT', 'currencyId' => 'USD', 'side' => '1', 'price' => '0.9999', 'lastQuantity' => '15000', 'minAmount' => '100', 'maxAmount' => '8000', 'nickName' => 'USDSeller'],
             
             // EUR -> USDT market
-            ['tokenId' => 'USDT', 'currencyId' => 'EUR', 'side' => '0', 'price' => '0.92', 'lastQuantity' => '20000', 'minAmount' => '20', 'maxAmount' => '18400'],
-            ['tokenId' => 'USDT', 'currencyId' => 'EUR', 'side' => '0', 'price' => '0.93', 'lastQuantity' => '10000', 'minAmount' => '200', 'maxAmount' => '9300'],
-            ['tokenId' => 'USDT', 'currencyId' => 'EUR', 'side' => '1', 'price' => '0.91', 'lastQuantity' => '5000', 'minAmount' => '10', 'maxAmount' => '4550'],
+            ['tokenId' => 'USDT', 'currencyId' => 'EUR', 'side' => '0', 'price' => '0.92', 'lastQuantity' => '20000', 'minAmount' => '20', 'maxAmount' => '18400', 'nickName' => 'EuroTrader'],
+            ['tokenId' => 'USDT', 'currencyId' => 'EUR', 'side' => '0', 'price' => '0.93', 'lastQuantity' => '10000', 'minAmount' => '200', 'maxAmount' => '9300', 'nickName' => 'cjmtest'],
+            ['tokenId' => 'USDT', 'currencyId' => 'EUR', 'side' => '1', 'price' => '0.91', 'lastQuantity' => '5000', 'minAmount' => '10', 'maxAmount' => '4550', 'nickName' => 'Saaaul'],
             
             // USDT -> BTC market
-            ['tokenId' => 'BTC', 'currencyId' => 'USDT', 'side' => '0', 'price' => '0.000025', 'lastQuantity' => '2.5', 'minAmount' => '500', 'maxAmount' => '50000'],
-            ['tokenId' => 'BTC', 'currencyId' => 'USDT', 'side' => '0', 'price' => '0.000026', 'lastQuantity' => '5.0', 'minAmount' => '1000', 'maxAmount' => '100000'],
+            ['tokenId' => 'BTC', 'currencyId' => 'USDT', 'side' => '0', 'price' => '0.000025', 'lastQuantity' => '2.5', 'minAmount' => '500', 'maxAmount' => '50000', 'nickName' => 'BTCBuyer1'],
+            ['tokenId' => 'BTC', 'currencyId' => 'USDT', 'side' => '0', 'price' => '0.000026', 'lastQuantity' => '5.0', 'minAmount' => '1000', 'maxAmount' => '100000', 'nickName' => 'BTCBuyer2'],
             
             // GBP -> USDT market
-            ['tokenId' => 'USDT', 'currencyId' => 'GBP', 'side' => '0', 'price' => '0.79', 'lastQuantity' => '8000', 'minAmount' => '100', 'maxAmount' => '6320'],
-            ['tokenId' => 'USDT', 'currencyId' => 'GBP', 'side' => '1', 'price' => '0.78', 'lastQuantity' => '12000', 'minAmount' => '50', 'maxAmount' => '9360'],
+            ['tokenId' => 'USDT', 'currencyId' => 'GBP', 'side' => '0', 'price' => '0.79', 'lastQuantity' => '8000', 'minAmount' => '100', 'maxAmount' => '6320', 'nickName' => 'GBPTrader'],
+            ['tokenId' => 'USDT', 'currencyId' => 'GBP', 'side' => '1', 'price' => '0.78', 'lastQuantity' => '12000', 'minAmount' => '50', 'maxAmount' => '9360', 'nickName' => 'GBPSeller'],
         ];
         
         // Filter ads based on request parameters
@@ -119,25 +120,106 @@ class BybitP2PClient
                 && $ad['side'] === $side;
         });
         
-        // Build response in Bybit's format
+        // Determine scale based on token/currency type
+        $tokenScale = ($tokenId === 'BTC') ? 8 : 4;
+        $currencyScale = ($currencyId === 'USDT') ? 4 : 2;
+        
+        // Build response in Bybit's exact format
         $items = [];
         foreach ($filteredAds as $idx => $ad) {
             $items[] = [
                 'id' => (string)(1899658238346616832 + $idx),
+                'accountId' => (string)(290120 + $idx),
                 'userId' => 290118 + $idx,
-                'nickName' => 'trader' . ($idx + 1),
+                'nickName' => $ad['nickName'],
                 'tokenId' => $ad['tokenId'],
+                'tokenName' => '',
                 'currencyId' => $ad['currencyId'],
-                'side' => $ad['side'],
+                'side' => (int)$ad['side'],
+                'priceType' => 0,
                 'price' => $ad['price'],
+                'premium' => '0',
                 'lastQuantity' => $ad['lastQuantity'],
+                'quantity' => $ad['lastQuantity'],
+                'frozenQuantity' => '0',
+                'executedQuantity' => '0',
                 'minAmount' => $ad['minAmount'],
                 'maxAmount' => $ad['maxAmount'],
+                'remark' => 'Mock advertisement for testing',
+                'status' => 10,
+                'createDate' => (string)(time() * 1000),
                 'payments' => ['14', '377'],
+                'orderNum' => 0,
+                'finishNum' => 0,
                 'recentOrderNum' => 0,
                 'recentExecuteRate' => 0,
+                'fee' => '',
                 'isOnline' => true,
+                'lastLogoutTime' => (string)time(),
+                'blocked' => 'N',
+                'makerContact' => false,
+                'symbolInfo' => [
+                    'id' => '13',
+                    'exchangeId' => '301',
+                    'orgId' => '9001',
+                    'tokenId' => $ad['tokenId'],
+                    'currencyId' => $ad['currencyId'],
+                    'status' => 1,
+                    'lowerLimitAlarm' => 90,
+                    'upperLimitAlarm' => 110,
+                    'itemDownRange' => '70',
+                    'itemUpRange' => '130',
+                    'currencyMinQuote' => $ad['minAmount'],
+                    'currencyMaxQuote' => $ad['maxAmount'],
+                    'currencyLowerMaxQuote' => $ad['minAmount'],
+                    'tokenMinQuote' => '1',
+                    'tokenMaxQuote' => $ad['lastQuantity'],
+                    'kycCurrencyLimit' => '900',
+                    'itemSideLimit' => 3,
+                    'buyFeeRate' => '0',
+                    'sellFeeRate' => '0',
+                    'orderAutoCancelMinute' => 15,
+                    'orderFinishMinute' => 10,
+                    'tradeSide' => 9,
+                    'currency' => [
+                        'id' => '14',
+                        'exchangeId' => '0',
+                        'orgId' => '9001',
+                        'currencyId' => $ad['currencyId'],
+                        'scale' => $currencyScale,
+                    ],
+                    'token' => [
+                        'id' => '1',
+                        'exchangeId' => '0',
+                        'orgId' => '9001',
+                        'tokenId' => $ad['tokenId'],
+                        'scale' => $tokenScale,
+                        'sequence' => 1,
+                    ],
+                    'buyAd' => null,
+                    'sellAd' => null,
+                ],
+                'tradingPreferenceSet' => [
+                    'hasUnPostAd' => 0,
+                    'isKyc' => 1,
+                    'isEmail' => 0,
+                    'isMobile' => 0,
+                    'hasRegisterTime' => 0,
+                    'registerTimeThreshold' => 0,
+                    'orderFinishNumberDay30' => 60,
+                    'completeRateDay30' => '95',
+                    'nationalLimit' => '',
+                    'hasOrderFinishNumberDay30' => 1,
+                    'hasCompleteRateDay30' => 1,
+                    'hasNationalLimit' => 0,
+                ],
+                'version' => 0,
+                'authStatus' => 1,
+                'recommend' => false,
+                'recommendTag' => '',
                 'authTag' => ['BA'],
+                'userType' => $idx % 2 === 0 ? 'ORG' : 'PERSONAL',
+                'itemType' => 'ORIGIN',
                 'paymentPeriod' => 15,
             ];
         }
@@ -149,7 +231,9 @@ class BybitP2PClient
                 'count' => count($items),
                 'items' => $items,
             ],
-            'time_now' => (string)time(),
+            'ext_code' => '',
+            'ext_info' => [],
+            'time_now' => (string)microtime(true),
         ];
     }
 }
@@ -160,7 +244,8 @@ echo str_repeat('=', 80) . "\n\n";
 
 echo "✓ BybitP2PClient class defined\n";
 echo "  - Implements getOnlineAds() method\n";
-echo "  - Returns mock data matching Bybit API format\n";
+echo "  - Returns mock data matching exact Bybit API response format\n";
+echo "  - Includes all fields: symbolInfo, tradingPreferenceSet, authTag, etc.\n";
 echo "  - In production, would make real HTTP requests\n\n";
 
 // ============================================================================
@@ -171,15 +256,18 @@ echo "  - In production, would make real HTTP requests\n\n";
  * Converts Bybit P2P advertisements to PathFinder Order objects
  * 
  * Handles the mapping between Bybit's API format and the library's domain objects.
+ * 
+ * Supports extracting scale information from Bybit's symbolInfo if available,
+ * or falls back to provided defaults.
  */
 class BybitOrderConverter
 {
     /**
      * Convert Bybit ad to PathFinder Order
      * 
-     * @param array $ad Bybit advertisement data
-     * @param int $tokenScale Decimal scale for token (crypto)
-     * @param int $currencyScale Decimal scale for currency (fiat)
+     * @param array $ad Bybit advertisement data (from API response items)
+     * @param int $tokenScale Decimal scale for token (crypto) - default, can be overridden by symbolInfo
+     * @param int $currencyScale Decimal scale for currency (fiat) - default, can be overridden by symbolInfo
      * @param int $rateScale Decimal scale for exchange rate
      * @return Order
      */
@@ -189,6 +277,13 @@ class BybitOrderConverter
         int $currencyScale = 2,
         int $rateScale = 8
     ): Order {
+        // Extract scale from symbolInfo if available (real Bybit API response)
+        if (isset($ad['symbolInfo']['token']['scale'])) {
+            $tokenScale = (int)$ad['symbolInfo']['token']['scale'];
+        }
+        if (isset($ad['symbolInfo']['currency']['scale'])) {
+            $currencyScale = (int)$ad['symbolInfo']['currency']['scale'];
+        }
         // Determine order side
         // Bybit: "0" = buy (user wants to buy token with currency)
         //        "1" = sell (user wants to sell token for currency)
@@ -267,7 +362,8 @@ echo "✓ BybitOrderConverter class defined\n";
 echo "  - convertAdToOrder() - single ad conversion\n";
 echo "  - convertAdsToOrders() - batch conversion\n";
 echo "  - Handles BUY/SELL side mapping\n";
-echo "  - Converts price to exchange rate correctly\n\n";
+echo "  - Converts price to exchange rate correctly\n";
+echo "  - Extracts scale information from symbolInfo automatically\n\n";
 
 // ============================================================================
 // Part 3: Fetch Ads from Multiple Markets
