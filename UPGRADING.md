@@ -17,7 +17,7 @@ This document provides step-by-step instructions for upgrading between major ver
 
 1. **Read the full upgrade guide** for your target version
 2. **Review the CHANGELOG** for all versions between current and target
-3. **Check PHP version requirements** in [docs/support.md](docs/support.md)
+3. **Check PHP version requirements** in [docs/releases-and-support.md](docs/releases-and-support.md)
 4. **Backup your code** or ensure version control is in place
 5. **Run your test suite** to establish a baseline
 
@@ -246,10 +246,8 @@ Your contributions help make upgrades easier for everyone!
 
 ## Related Documentation
 
-- [Versioning Policy](docs/versioning.md) - Semantic versioning rules and BC break policy
-- [Support Policy](docs/support.md) - Version support timelines
+- [Releases and Support Policy](docs/releases-and-support.md) - Versioning, BC breaks, and support timelines
 - [CHANGELOG](CHANGELOG.md) - Detailed change history
-- [Release Process](docs/release-process.md) - How releases are created
 
 ---
 

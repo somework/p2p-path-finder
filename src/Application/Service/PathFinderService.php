@@ -37,7 +37,7 @@ use function trim;
  * @see PathSearchRequest For request structure
  * @see PathSearchConfig For configuration options
  * @see SearchOutcome For result structure
- * @see docs/guarded-search-example.md For complete usage example
+ * @see docs/getting-started.md For complete usage examples
  *
  * @api
  */

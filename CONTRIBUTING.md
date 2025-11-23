@@ -8,7 +8,7 @@ confidence.
 
 1. Fork the repository and clone it locally.
 2. Install dependencies with `composer install`.
-3. Read the [local development notes](docs/local-development.md) for tips on running tests
+3. Run tests locally with `composer phpunit` and quality checks with `composer check`
    and quality checks.
 
 ## Development workflow

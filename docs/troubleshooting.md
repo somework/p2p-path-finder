@@ -1,660 +1,408 @@
 # Troubleshooting Guide
 
-**Version**: 1.0  
-**Last Updated**: 2024-11-22
-
-This guide helps you diagnose and resolve common issues when using the P2P Path Finder library.
-
----
+Quick solutions to common issues when using the P2P Path Finder library.
 
 ## Table of Contents
 
+- [Quick Diagnosis](#quick-diagnosis)
 - [Common Issues](#common-issues)
-  - [No Paths Found](#no-paths-found)
-  - [Guard Limits Hit](#guard-limits-hit)
-  - [Precision Errors](#precision-errors)
-  - [Currency Mismatches](#currency-mismatches)
-  - [Invalid Input Errors](#invalid-input-errors)
 - [Performance Issues](#performance-issues)
-- [Debugging Tips](#debugging-tips)
+- [Debug Checklist](#debug-checklist)
 - [Getting Help](#getting-help)
+
+---
+
+## Quick Diagnosis
+
+| Symptom | Most Likely Cause | Quick Fix |
+|---------|------------------|-----------|
+| **Empty paths** | No connecting orders | Check order book connectivity |
+| **Guard limits hit** | Large order book or deep graph | Increase guard limits or pre-filter orders |
+| **`InvalidInput` exception** | Invalid config/data | Check error message, validate inputs |
+| **Slow searches** | Too many orders or high hop depth | Pre-filter orders, reduce hop limit |
+| **`PrecisionViolation`** | Extreme scale differences | Use reasonable scales (0-30) |
+| **Currency mismatch** | Wrong currency codes | Verify 3-letter ISO codes |
+| **Out of memory** | Guard limits too high | Reduce `maxVisitedStates` |
 
 ---
 
 ## Common Issues
 
-### No Paths Found
+### Issue 1: No Paths Found
 
-**Symptom**: `SearchOutcome::paths()` returns an empty collection.
+**Symptom**: `$outcome->paths()->isEmpty()` returns `true`
 
+**Diagnostic Steps**:
 ```php
-$outcome = $pathFinderService->findBestPaths($request);
-if ($outcome->paths()->isEmpty()) {
-    // No paths found!
-}
+$outcome = $service->findBestPaths($request);
+$report = $outcome->guardLimits();
+
+echo "Expansions: {$report->expansions()}\n";
+echo "Visited states: {$report->visitedStates()}\n";
 ```
 
-#### Causes and Solutions
+**Interpretation**:
 
-**1. No Direct or Indirect Route Exists**
+| Expansions | Diagnosis | Solution |
+|------------|-----------|----------|
+| < 10 | Order book issue | Check if orders connect source to target |
+| 10-100 | Limited connectivity | Increase hop limit or add bridge orders |
+| > 100 | Search explored but found nothing | Widen tolerance or check amount bounds |
 
-**Cause**: The order book doesn't contain orders that connect your source currency to the target currency.
+**Solutions**:
 
-**Solution**:
+1. **Check order book connectivity**:
 ```php
-// Check if any orders exist for your currency pair
-$filteredOrders = $orderBook->filter(
-    new CurrencyPairFilter($sourceCurrency, $targetCurrency)
+// Count orders involving your currencies
+$relevantOrders = $orderBook->filter(
+    new CurrencyPairFilter(['USD', 'BTC', 'EUR'])
 );
-
-if (empty(iterator_to_array($filteredOrders))) {
-    // No direct orders - check for bridge currencies
-    echo "No orders found for {$sourceCurrency} -> {$targetCurrency}\n";
-}
+echo "Relevant orders: " . count(iterator_to_array($relevantOrders)) . "\n";
 ```
 
-**2. Spend Amount Outside Order Bounds**
-
-**Cause**: Your spend amount is below the minimum or above the maximum of all available orders.
-
-**Solution**:
+2. **Widen tolerance window**:
 ```php
-use SomeWork\P2PPathFinder\Application\Filter\MinimumAmountFilter;
-use SomeWork\P2PPathFinder\Application\Filter\MaximumAmountFilter;
-
-// Check if orders exist in your amount range
-$minFilter = new MinimumAmountFilter(
-    Money::fromString('USD', '100.00', 2)
-);
-$maxFilter = new MaximumAmountFilter(
-    Money::fromString('USD', '1000.00', 2)
-);
-
-$inRange = $orderBook->filter($minFilter, $maxFilter);
-if (empty(iterator_to_array($inRange))) {
-    echo "No orders accept amounts in your range\n";
-}
+->withToleranceBounds('0.0', '0.20')  // 0-20% tolerance
 ```
 
-**3. Tolerance Window Too Narrow**
-
-**Cause**: Your tolerance bounds are too restrictive, filtering out all potential paths.
-
-**Solution**:
+3. **Increase hop limit**:
 ```php
-// Try widening the tolerance window
-$config = PathSearchConfig::builder()
-    ->withSpendAmount($spendMoney)
-    ->withToleranceBounds('0.0', '0.20')  // 0-20% tolerance (wider)
-    ->withHopLimits(1, 3)
-    ->build();
+->withHopLimits(1, 5)  // Allow up to 5 hops
 ```
 
-**4. Hop Limit Too Restrictive**
-
-**Cause**: `maximumHops` is too low to reach the target currency.
-
-**Solution**:
+4. **Check amount bounds**:
 ```php
-// Increase maximum hops
-$config = PathSearchConfig::builder()
-    ->withSpendAmount($spendMoney)
-    ->withToleranceBounds('0.05', '0.10')
-    ->withHopLimits(1, 5)  // Allow up to 5 hops
-    ->build();
-```
-
-**5. Mandatory Fees Exceed Spend Amount**
-
-**Cause**: Orders have minimum fees that exceed your spend amount.
-
-**Solution**: Increase your spend amount or find orders with lower fees.
-
-**Diagnostic Tip**:
-```php
-// Enable guard reporting to see search statistics
-$outcome = $pathFinderService->findBestPaths($request);
-$guardReport = $outcome->guardLimits();
-
-echo "Expansions: {$guardReport->expansions()}\n";
-echo "Visited states: {$guardReport->visitedStates()}\n";
-
-// Low expansion count suggests the search space was very limited
-if ($guardReport->expansions() < 10) {
-    echo "Very few paths explored - likely order book issue\n";
-}
+// Ensure spend amount is within order bounds
+$amount = Money::fromString('USD', '100.00', 2);
+$minFilter = new MinimumAmountFilter($amount->multipliedBy('0.1'));
+$maxFilter = new MaximumAmountFilter($amount->multipliedBy('10.0'));
+$viable = $orderBook->filter($minFilter, $maxFilter);
 ```
 
 ---
 
-### Guard Limits Hit
+### Issue 2: Guard Limits Hit
 
-**Symptom**: Search terminates early with partial results or throws `GuardLimitExceeded` exception.
+**Symptom**: `$outcome->guardLimits()->anyLimitReached()` returns `true`
 
+**Diagnostic**:
 ```php
-// Metadata mode (default)
-$outcome = $pathFinderService->findBestPaths($request);
-if ($outcome->guardLimits()->anyLimitReached()) {
-    echo "Search was limited by guards\n";
-    // Partial results available in $outcome->paths()
-}
-
-// Exception mode
-try {
-    $config = PathSearchConfig::builder()
-        ->withSpendAmount($spendMoney)
-        ->withToleranceBounds('0.05', '0.10')
-        ->withHopLimits(1, 3)
-        ->withSearchGuardConfig(
-            SearchGuardConfig::strict()
-                ->withMaxExpansions(5000)
-                ->withThrowOnLimit()  // Enable exception mode
-        )
-        ->build();
-    
-    $outcome = $pathFinderService->findBestPaths($request);
-} catch (GuardLimitExceeded $e) {
-    $report = $e->getReport();
-    echo "Limit reached: {$e->getMessage()}\n";
-}
+$report = $outcome->guardLimits();
+echo "Expansions: {$report->expansions()} / {$report->expansionLimit()}\n";
+echo "States: {$report->visitedStates()} / {$report->visitedStateLimit()}\n";
+echo "Time: {$report->elapsedMilliseconds()}ms\n";
 ```
 
-#### Causes and Solutions
+**Solutions**:
 
-**1. Expansion Limit Reached**
+| If Hitting... | Solution |
+|---------------|----------|
+| **Expansion limit** | Increase `maxExpansions` or pre-filter order book |
+| **Visited states limit** | Increase `maxVisitedStates` or reduce hop depth |
+| **Time budget** | Increase time budget or optimize search space |
 
-**Cause**: The search explored the maximum allowed number of graph nodes.
+**Quick fixes**:
 
-**Solution**:
 ```php
-// Increase expansion limit
-$guardConfig = SearchGuardConfig::strict()
-    ->withMaxExpansions(10000);  // Default is 5000
+// Option 1: Increase limits
+->withSearchGuards(100000, 150000, 500)  // states, expansions, time(ms)
 
-$config = PathSearchConfig::builder()
-    ->withSpendAmount($spendMoney)
-    ->withToleranceBounds('0.05', '0.10')
-    ->withHopLimits(1, 3)
-    ->withSearchGuardConfig($guardConfig)
-    ->build();
+// Option 2: Pre-filter order book
+$filtered = $orderBook->filter(
+    new MinimumAmountFilter($minAmount),
+    new ToleranceWindowFilter($config)
+);
+$request = new PathSearchRequest($filtered, $config, $target);
+
+// Option 3: Reduce hop depth
+->withHopLimits(1, 4)  // Instead of 1, 6
 ```
 
 **Trade-offs**:
-- Higher limits → more memory usage, longer execution
-- Lower limits → faster results, but may miss optimal paths
-
-**2. Visited State Limit Reached**
-
-**Cause**: The search tracked the maximum allowed number of unique node states.
-
-**Solution**:
-```php
-// Increase visited state limit
-$guardConfig = SearchGuardConfig::strict()
-    ->withMaxVisitedStates(20000);  // Default is 10000
-```
-
-**3. Time Budget Exceeded**
-
-**Cause**: The search exceeded the wall-clock time budget.
-
-**Solution**:
-```php
-// Increase time budget (in milliseconds)
-$guardConfig = SearchGuardConfig::strict()
-    ->withTimeBudget(5000);  // 5 seconds (default is 3000ms)
-```
-
-**When to Use Each Guard**:
-
-| Guard | Use Case |
-|-------|----------|
-| **Expansion Limit** | Control computational cost per search |
-| **Visited State Limit** | Control memory usage |
-| **Time Budget** | Enforce strict latency SLA (e.g., API response time) |
-
-**Recommendation**: Use **time budget** for user-facing APIs and **expansion limits** for batch processing.
+- **Higher limits** = More complete results, but slower and more memory
+- **Pre-filtering** = Faster, less memory, but may miss some paths
+- **Lower hops** = Much faster, but may miss multi-hop opportunities
 
 ---
 
-### Precision Errors
+### Issue 3: InvalidInput Exception
 
-**Symptom**: `PrecisionViolation` exception thrown.
+**Symptom**: Exception thrown during configuration or execution
 
+**Common causes**:
+
+| Error Message Contains | Cause | Fix |
+|------------------------|-------|-----|
+| "negative" | Negative amount | Use positive amounts only |
+| "scale" | Invalid scale | Use scale 0-30 |
+| "currency" | Invalid currency code | Use 3-12 letter codes (e.g., "USD", "BTC") |
+| "hops" | min > max hops | Ensure `minHops ≤ maxHops` |
+| "tolerance" | min > max tolerance | Ensure `minTolerance ≤ maxTolerance` |
+| "distinct currencies" | Same base and quote | Use different currencies |
+
+**Prevention**:
 ```php
-try {
-    $config = PathSearchConfig::builder()
-        ->withSpendAmount($spendMoney)
-        ->withToleranceBounds('0.00000001', '0.00000002')  // Too tight!
-        ->build();
-} catch (PrecisionViolation $e) {
-    echo "Precision error: {$e->getMessage()}\n";
+// Validate before library calls
+if ($amount < 0) {
+    throw new \InvalidArgumentException("Amount must be positive");
 }
-```
 
-#### Causes and Solutions
+if ($minHops > $maxHops) {
+    throw new \InvalidArgumentException("Invalid hop range");
+}
 
-**1. Tolerance Window Collapses Due to Scale**
-
-**Cause**: The spend amount's scale is too low to represent the tight tolerance bounds.
-
-**Example**:
-```php
-// WRONG: Scale 2 can't represent tolerance window 0.00000001-0.00000002
-$spendAmount = Money::fromString('USD', '100.00', 2);
+// Then build config safely
 $config = PathSearchConfig::builder()
-    ->withSpendAmount($spendAmount)
-    ->withToleranceBounds('0.00000001', '0.00000002')  // ❌ Collapses!
+    ->withSpendAmount(Money::fromString($currency, $amount, $scale))
+    ->withHopLimits($minHops, $maxHops)
     ->build();
-```
-
-**Solution**: Use higher scale for the spend amount:
-```php
-// CORRECT: Scale 6 can represent the tolerance window
-$spendAmount = Money::fromString('USD', '100.000000', 6);
-$config = PathSearchConfig::builder()
-    ->withSpendAmount($spendAmount)
-    ->withToleranceBounds('0.00000001', '0.00000002')  // ✅ Works
-    ->build();
-```
-
-**Rule of Thumb**: Spend amount scale should be ≥ 6 for tight tolerance windows.
-
-**2. Currency Scale Mismatch**
-
-**Cause**: Mixing different scales across currencies without accounting for precision loss.
-
-**Solution**: Ensure all monetary amounts for a currency use consistent scales:
-```php
-// Define standard scales per currency
-const SCALES = [
-    'USD' => 2,   // Fiat
-    'BTC' => 8,   // Bitcoin
-    'ETH' => 18,  // Ethereum
-];
-
-$spendAmount = Money::fromString('USD', '100.00', SCALES['USD']);
 ```
 
 ---
 
-### Currency Mismatches
+### Issue 4: Slow Performance
 
-**Symptom**: `InvalidInput` exception with "Currency mismatch" message.
+**Symptom**: Searches take > 500ms or use excessive memory
 
+**Diagnostic**:
 ```php
-try {
-    // Trying to add USD + EUR
-    $result = $usdAmount->add($eurAmount, 2);
-} catch (InvalidInput $e) {
-    echo "Currency mismatch: {$e->getMessage()}\n";
-}
+$start = microtime(true);
+$outcome = $service->findBestPaths($request);
+$elapsed = (microtime(true) - $start) * 1000;
+
+echo "Time: {$elapsed}ms\n";
+echo "Memory: " . (memory_get_peak_usage(true) / 1024 / 1024) . "MB\n";
+echo "Expansions: {$outcome->guardLimits()->expansions()}\n";
 ```
 
-#### Causes and Solutions
+**Solutions by order book size**:
 
-**1. Arithmetic on Different Currencies**
+| Order Count | Expected Time | If Slower, Try... |
+|-------------|---------------|-------------------|
+| < 1,000 | < 100ms | Pre-filter by amount/currency |
+| 1,000-10,000 | 100-500ms | Reduce hop limit to 4 |
+| 10,000+ | 500-2000ms | Aggressive filtering + conservative guards |
 
-**Cause**: Attempting operations (add, subtract, compare) on Money objects with different currencies.
+**Performance tuning**:
 
-**Solution**: Convert to a common currency before arithmetic:
 ```php
-// Use exchange rates to convert
-$usdAmount = Money::fromString('USD', '100.00', 2);
-$eurAmount = Money::fromString('EUR', '92.00', 2);
-$rate = ExchangeRate::fromString('EUR', 'USD', '1.0870', 4);
+// 1. Pre-filter aggressively
+$filtered = $orderBook->filter(
+    new MinimumAmountFilter($amount->multipliedBy('0.5')),
+    new MaximumAmountFilter($amount->multipliedBy('2.0')),
+    new CurrencyPairFilter($relevantCurrencies)
+);
+// Expected: 60-80% reduction
 
-// Convert EUR to USD
-$eurInUsd = $rate->convert($eurAmount, 2);
+// 2. Use conservative guards
+->withSearchGuards(25000, 50000)  // visited, expansions
+->withSearchTimeBudget(200)       // 200ms max
 
-// Now you can add them
-$total = $usdAmount->add($eurInUsd, 2);
+// 3. Limit hop depth
+->withHopLimits(1, 4)  // Each hop increases complexity exponentially
+
+// 4. Reduce result limit
+->withResultLimit(5)  // Instead of 20
 ```
 
-**2. Order Book Currency Mismatch**
-
-**Cause**: Orders in the book don't match the source or target currency.
-
-**Solution**: Filter orders by currency pair:
-```php
-use SomeWork\P2PPathFinder\Application\Filter\CurrencyPairFilter;
-
-// Filter orders for specific currency pair
-$filter = new CurrencyPairFilter('USD', 'BTC');
-$filtered = $orderBook->filter($filter);
-```
+See [Memory Characteristics](memory-characteristics.md) for detailed tuning.
 
 ---
 
-### Invalid Input Errors
+### Issue 5: Out of Memory
 
-**Symptom**: `InvalidInput` exception on object construction or configuration.
+**Symptom**: PHP fatal error: "Allowed memory size exhausted"
 
+**Immediate fix**:
 ```php
-try {
-    $money = Money::fromString('USD', '-100.00', 2);
-} catch (InvalidInput $e) {
-    echo "Invalid input: {$e->getMessage()}\n";
-}
+// Reduce guard limits by 50%
+$currentStates = 250000;
+$newStates = 125000;
+
+->withSearchGuards($newStates, $newStates * 2)
 ```
 
-#### Common Validation Failures
+**Long-term solutions**:
 
-**1. Negative Money Amounts**
-
-```php
-// ❌ WRONG: Negative amounts not allowed
-$money = Money::fromString('USD', '-100.00', 2);
-
-// ✅ CORRECT: Use non-negative amounts
-$money = Money::fromString('USD', '100.00', 2);
+1. **Increase PHP memory limit** (in `php.ini`):
+```ini
+memory_limit = 512M  ; or higher
 ```
 
-**Rationale**: In the path-finding domain, negative amounts have no semantic meaning.
-
-**2. Invalid Currency Codes**
-
+2. **Pre-filter order book**:
 ```php
-// ❌ WRONG: Invalid currency code
-$money = Money::fromString('US', '100.00', 2);  // Too short
-
-// ✅ CORRECT: Use standard 3-letter ISO currency codes
-$money = Money::fromString('USD', '100.00', 2);
+// Remove 70% of orders
+$filtered = $orderBook->filter(
+    new MinimumAmountFilter($minAmount),
+    new CurrencyPairFilter($targetCurrencies)
+);
 ```
 
-**Validation Rules**:
-- Must be exactly 3 characters
-- Must be alphabetic (A-Z)
-- Case-insensitive (converted to uppercase)
-
-**3. Invalid Scales**
-
+3. **Use time budget as safety net**:
 ```php
-// ❌ WRONG: Scale too high
-$money = Money::fromString('USD', '100.00', 100);
-
-// ✅ CORRECT: Use reasonable scales (0-30)
-$money = Money::fromString('USD', '100.00', 2);
+->withSearchTimeBudget(200)  // Halt after 200ms
 ```
 
-**Scale Limits**: 0 ≤ scale ≤ 30
+**Memory by guard limit**:
 
-**4. Invalid Tolerance Bounds**
+| Max Visited States | Expected Memory | Recommended PHP Limit |
+|--------------------|-----------------|----------------------|
+| 10,000 | 10-30 MB | 128M |
+| 50,000 | 50-150 MB | 256M |
+| 100,000 | 100-300 MB | 512M |
+| 250,000 | 250-750 MB | 1G |
 
+---
+
+### Issue 6: Currency Mismatch
+
+**Symptom**: `InvalidInput: Currency code must be 3-12 uppercase letters`
+
+**Common mistakes**:
 ```php
-// ❌ WRONG: minimum > maximum
-$config = PathSearchConfig::builder()
-    ->withToleranceBounds('0.10', '0.05')  // Invalid
-    ->build();
+// ❌ Wrong
+Money::fromString('US', '100.00', 2);     // Too short
+Money::fromString('us', '100.00', 2);     // Lowercase
+Money::fromString('$', '100.00', 2);      // Symbol
 
-// ✅ CORRECT: minimum ≤ maximum
-$config = PathSearchConfig::builder()
-    ->withToleranceBounds('0.05', '0.10')  // Valid
-    ->build();
+// ✅ Correct
+Money::fromString('USD', '100.00', 2);
+Money::fromString('EUR', '100.00', 2);
+Money::fromString('BTC', '0.001', 8);
 ```
 
-**5. Invalid Hop Limits**
+**Solution**: Always use ISO 4217 currency codes (3 letters, uppercase).
 
+---
+
+### Issue 7: Precision Errors
+
+**Symptom**: `PrecisionViolation` exception (rare)
+
+**Causes**:
+- Scale > 30 (exceeds library limit)
+- Extreme value differences (e.g., mixing scale 2 and scale 30)
+- Division by near-zero values
+
+**Solutions**:
 ```php
-// ❌ WRONG: minimumHops > maximumHops
-$config = PathSearchConfig::builder()
-    ->withHopLimits(3, 1)  // Invalid
-    ->build();
+// Use reasonable scales
+Money::fromString('USD', '100.00', 2);     // ✅ Good
+Money::fromString('BTC', '0.12345678', 8); // ✅ Good
+Money::fromString('ETH', '1.23456789012345', 35); // ❌ Too high
 
-// ✅ CORRECT: minimumHops ≤ maximumHops
-$config = PathSearchConfig::builder()
-    ->withHopLimits(1, 3)  // Valid
-    ->build();
+// Avoid extreme ratios
+ExchangeRate::fromString('BTC', 'SAT', '100000000', 8); // ✅ Reasonable
+ExchangeRate::fromString('BTC', 'SAT', '100000000', 50); // ❌ Excessive
 ```
 
 ---
 
 ## Performance Issues
 
-### Slow Path Finding
+### Slow Searches
 
-**Symptom**: `findBestPaths()` takes several seconds to complete.
+**Target benchmarks**:
+- 100 orders: < 50ms
+- 1,000 orders: < 200ms
+- 10,000 orders: < 2000ms
 
-#### Causes and Solutions
+**If slower**:
 
-**1. Too Many Orders in Order Book**
-
-**Cause**: Large order book (1000+ orders) without filtering.
-
-**Solution**: Pre-filter orders before searching:
+1. **Profile the search**:
 ```php
-use SomeWork\P2PPathFinder\Application\Filter\ToleranceWindowFilter;
-
-$referenceRate = ExchangeRate::fromString('BTC', 'USD', '30000', 2);
-$toleranceFilter = new ToleranceWindowFilter($referenceRate, '0.10');
-
-// Filter before searching
-$filteredOrders = $orderBook->filter($toleranceFilter);
-$filteredBook = new OrderBook(iterator_to_array($filteredOrders));
-
-// Now search on filtered book
-$request = new PathSearchRequest($filteredBook, $config, 'BTC');
-$outcome = $pathFinderService->findBestPaths($request);
+$report = $outcome->guardLimits();
+$efficiency = $report->expansions() / max(1, count($orderBook));
+// < 10: Efficient
+// 10-50: Normal
+// > 50: Inefficient (pre-filter recommended)
 ```
 
-**Performance Impact**: Filtering 1000 orders to 100 relevant ones can improve search speed 10x.
-
-**2. High `topK` Value**
-
-**Cause**: Requesting many paths (topK > 100) slows down result ordering.
-
-**Solution**: Request only what you need:
-```php
-// ❌ SLOW: Requesting 1000 paths
-$config = PathSearchConfig::builder()
-    ->withSpendAmount($spendMoney)
-    ->withToleranceBounds('0.05', '0.10')
-    ->withTopK(1000)  // Expensive!
-    ->build();
-
-// ✅ FAST: Request 10-20 paths
-$config = PathSearchConfig::builder()
-    ->withSpendAmount($spendMoney)
-    ->withToleranceBounds('0.05', '0.10')
-    ->withTopK(10)  // Sufficient for most use cases
-    ->build();
-```
-
-**3. Wide Tolerance Window + High Max Hops**
-
-**Cause**: Wide tolerance + many hops creates a massive search space.
-
-**Solution**: Use guard rails to limit search:
-```php
-$guardConfig = SearchGuardConfig::strict()
-    ->withMaxExpansions(5000)
-    ->withTimeBudget(3000);  // 3 seconds max
-
-$config = PathSearchConfig::builder()
-    ->withSpendAmount($spendMoney)
-    ->withToleranceBounds('0.05', '0.10')  // Narrower tolerance
-    ->withHopLimits(1, 3)  // Fewer hops
-    ->withSearchGuardConfig($guardConfig)
-    ->build();
-```
-
-**4. Complex Fee Policies**
-
-**Cause**: Fee policies with expensive calculations slow down edge evaluation.
-
-**Solution**: Optimize fee policy implementations:
-```php
-// Cache fee calculations if possible
-class CachedFeePolicy implements FeePolicy
-{
-    private array $cache = [];
-    
-    public function calculate(
-        OrderSide $side,
-        Money $baseAmount,
-        Money $quoteAmount
-    ): FeeBreakdown {
-        $key = "{$side->value}:{$baseAmount->amount()}:{$quoteAmount->amount()}";
-        
-        if (!isset($this->cache[$key])) {
-            $this->cache[$key] = $this->computeFee($baseAmount, $quoteAmount);
-        }
-        
-        return $this->cache[$key];
-    }
-}
-```
+2. **Apply appropriate strategy** (see Issue 4 above)
 
 ### High Memory Usage
 
-**Symptom**: Script uses excessive memory (> 128MB) or hits memory limit.
+**Target memory**:
+- 100 orders: < 20 MB
+- 1,000 orders: < 50 MB
+- 10,000 orders: < 200 MB
 
-#### Causes and Solutions
-
-**1. Large Order Book**
-
-**Solution**: Filter orders or increase PHP memory limit:
-```php
-// Increase memory limit in php.ini or runtime
-ini_set('memory_limit', '256M');
-```
-
-**2. High Visited State Limit**
-
-**Solution**: Reduce visited state limit:
-```php
-$guardConfig = SearchGuardConfig::strict()
-    ->withMaxVisitedStates(5000);  // Lower limit
-```
-
-**3. Requesting Too Many Paths (topK)**
-
-**Solution**: Request fewer paths (see "High topK Value" above).
+**If higher**, see Issue 5 above.
 
 ---
 
-## Debugging Tips
+## Debug Checklist
 
-### Enable Verbose Logging
+When debugging issues, check these in order:
 
+### 1. Verify Input Data
+- [ ] All currency codes are valid (3-12 uppercase letters)
+- [ ] All amounts are positive
+- [ ] All scales are 0-30
+- [ ] Order bounds: min ≤ max
+
+### 2. Check Configuration
+- [ ] Tolerance bounds: 0 ≤ min ≤ max < 1
+- [ ] Hop limits: 1 ≤ min ≤ max ≤ 10
+- [ ] Result limit: ≥ 1
+- [ ] Guard limits: reasonable for order book size
+
+### 3. Inspect Order Book
 ```php
-// Log search progress
-$outcome = $pathFinderService->findBestPaths($request);
-$guardReport = $outcome->guardLimits();
+echo "Total orders: " . count($orderBook) . "\n";
 
-error_log("Search completed:");
-error_log("  Paths found: " . $outcome->paths()->count());
-error_log("  Expansions: {$guardReport->expansions()}");
-error_log("  Visited states: {$guardReport->visitedStates()}");
-error_log("  Time: {$guardReport->elapsedMilliseconds()}ms");
-error_log("  Any limit reached: " . ($guardReport->anyLimitReached() ? 'yes' : 'no'));
-```
-
-### Inspect Individual Paths
-
-```php
-foreach ($outcome->paths() as $path) {
-    echo "Path: {$path->route()}\n";
-    echo "  Cost: {$path->cost()}\n";
-    echo "  Hops: {$path->hops()}\n";
-    echo "  Spent: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()}\n";
-    echo "  Received: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
-    
-    foreach ($path->legs() as $leg) {
-        echo "    {$leg->from()} -> {$leg->to()}: ";
-        echo "Spent {$leg->spent()->amount()}, ";
-        echo "Received {$leg->received()->amount()}\n";
-    }
+// Check connectivity
+$currencies = [];
+foreach ($orderBook as $order) {
+    $currencies[] = $order->assetPair()->base();
+    $currencies[] = $order->assetPair()->quote();
 }
+$uniqueCurrencies = array_unique($currencies);
+echo "Unique currencies: " . count($uniqueCurrencies) . "\n";
+echo "Currencies: " . implode(', ', $uniqueCurrencies) . "\n";
 ```
 
-### Test with Minimal Order Book
-
+### 4. Enable Verbose Logging
 ```php
-// Create a minimal order book for testing
-$orderBook = new OrderBook([
-    Order::buy(
-        AssetPair::fromString('BTC/USD'),
-        OrderBounds::fromStrings('0.1', '1.0', 8),
-        ExchangeRate::fromString('BTC', 'USD', '30000', 2),
-        OrderSide::BUY
+$outcome = $service->findBestPaths($request);
+$report = $outcome->guardLimits();
+
+error_log(json_encode([
+    'paths_found' => $outcome->paths()->count(),
+    'expansions' => $report->expansions(),
+    'visited_states' => $report->visitedStates(),
+    'elapsed_ms' => $report->elapsedMilliseconds(),
+    'limits_reached' => $report->anyLimitReached(),
+    'order_count' => count($orderBook),
+]));
+```
+
+### 5. Test with Minimal Example
+```php
+// Simplest possible search
+$order = new Order(
+    OrderSide::BUY,
+    AssetPair::fromString('BTC', 'USD'),
+    OrderBounds::from(
+        Money::fromString('BTC', '0.01', 8),
+        Money::fromString('BTC', '1.0', 8)
     ),
-]);
+    ExchangeRate::fromString('BTC', 'USD', '30000', 2)
+);
 
-// If this works, gradually add more orders to isolate the issue
-```
+$orderBook = new OrderBook([$order]);
 
-### Use Guard Reports to Diagnose Search Behavior
+$config = PathSearchConfig::builder()
+    ->withSpendAmount(Money::fromString('USD', '1000.00', 2))
+    ->withToleranceBounds('0.0', '0.1')
+    ->withHopLimits(1, 1)
+    ->build();
 
-```php
-$guardReport = $outcome->guardLimits();
+$request = new PathSearchRequest($orderBook, $config, 'BTC');
+$outcome = $service->findBestPaths($request);
 
-// Check if search was constrained
-if ($guardReport->expansionsReached()) {
-    echo "Hit expansion limit - consider increasing or filtering orders\n";
-}
-
-if ($guardReport->visitedStatesReached()) {
-    echo "Hit visited state limit - search space too large\n";
-}
-
-if ($guardReport->timeBudgetReached()) {
-    echo "Hit time budget - search too slow, consider optimizations\n";
-}
-
-// Low expansion count suggests limited search space
-if ($guardReport->expansions() < 100) {
-    echo "Very few expansions - order book may not support your request\n";
-}
-```
-
-### Validate Order Book
-
-```php
-// Check order book size
-$orders = iterator_to_array($orderBook);
-echo "Order book contains " . count($orders) . " orders\n";
-
-// Check for relevant currency pairs
-$sourceCurrency = 'USD';
-$targetCurrency = 'BTC';
-$relevantOrders = 0;
-
-foreach ($orders as $order) {
-    $pair = $order->assetPair();
-    if ($pair->base() === $sourceCurrency || $pair->quote() === $sourceCurrency ||
-        $pair->base() === $targetCurrency || $pair->quote() === $targetCurrency) {
-        $relevantOrders++;
-    }
-}
-
-echo "Found {$relevantOrders} orders involving {$sourceCurrency} or {$targetCurrency}\n";
-```
-
-### Test Exception Handling
-
-```php
-use SomeWork\P2PPathFinder\Exception\ExceptionInterface;
-use SomeWork\P2PPathFinder\Exception\InvalidInput;
-use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
-
-try {
-    $outcome = $pathFinderService->findBestPaths($request);
-} catch (InvalidInput $e) {
-    // Invalid input - fix configuration
-    error_log("Invalid input: " . $e->getMessage());
-    error_log("Trace: " . $e->getTraceAsString());
-} catch (GuardLimitExceeded $e) {
-    // Guard limit exceeded - adjust limits or filters
-    error_log("Guard limit exceeded: " . $e->getMessage());
-    $report = $e->getReport();
-    error_log("  Expansions: {$report->expansions()} / {$report->expansionLimit()}");
-    error_log("  Visited: {$report->visitedStates()} / {$report->visitedStateLimit()}");
-    error_log("  Time: {$report->elapsedMilliseconds()}ms / {$report->timeBudgetLimit()}ms");
-} catch (ExceptionInterface $e) {
-    // Any other library exception
-    error_log("Library error: " . $e->getMessage());
-}
+// Should find exactly 1 path
+assert($outcome->paths()->count() === 1);
 ```
 
 ---
@@ -663,90 +411,54 @@ try {
 
 ### Before Asking for Help
 
-1. **Check this guide** for your specific issue
-2. **Read the error message carefully** - they include helpful context
-3. **Review the relevant documentation**:
-   - [Exception Handling Guide](exceptions.md) for error messages
-   - [Domain Invariants](domain-invariants.md) for validation rules
-   - [API Contracts](api-contracts.md) for JSON structures
-4. **Create a minimal reproducible example** with a small order book
+1. Check this troubleshooting guide
+2. Review [Getting Started Guide](getting-started.md)
+3. Search [GitHub Issues](https://github.com/somework/p2p-path-finder/issues)
+4. Try minimal example (above)
 
-### Reporting Issues
+### When Reporting Issues
 
-When reporting issues, include:
+Include:
+- **Library version**: `composer show somework/p2p-path-finder`
+- **PHP version**: `php -v`
+- **Minimal reproducible example**
+- **Expected vs actual behavior**
+- **Guard report**: `$outcome->guardLimits()->jsonSerialize()`
+- **Error messages**: Full exception message and stack trace
 
-1. **PHP Version**: `php -v`
-2. **Library Version**: Check `composer.json` or `composer show somework/p2p-path-finder`
-3. **Complete Error Message**: Including stack trace
-4. **Minimal Code Example**: That reproduces the issue
-5. **Order Book Size**: Number of orders
-6. **Configuration**: PathSearchConfig values
-
-**Example Issue Report**:
-
+**Example report**:
 ```
-Environment:
-- PHP 8.2.12
-- p2p-path-finder 1.0.0
-- 500 orders in order book
+Library: 1.5.3
+PHP: 8.3.0
 
-Problem:
-No paths found for USD -> BTC
+Issue: No paths found despite having orders
 
-Configuration:
-- Spend amount: USD 100.00 (scale 2)
-- Tolerance: 0.05 - 0.10
-- Hop limits: 1-3
-- topK: 5
+Order book: 1,000 orders connecting USD->EUR->BTC
+Config: 1-4 hops, 0-10% tolerance
+Guard report: 234 expansions, 127 states, no limits hit
 
-Code:
-[minimal example here]
+Expected: At least 1 path
+Actual: Empty paths
 
-Expected: At least one path
-Actual: Empty result set
-
-Guard Report:
-- Expansions: 12 / 5000
-- Visited states: 8 / 10000
-- Time: 5ms / 3000ms
+Code: [minimal example]
 ```
 
-### Resources
+### Support Channels
 
-- **GitHub Issues**: https://github.com/somework/p2p-path-finder/issues
-- **Documentation**: https://github.com/somework/p2p-path-finder/tree/main/docs
-- **Examples**: https://github.com/somework/p2p-path-finder/tree/main/examples
+- **GitHub Issues**: Bug reports and feature requests
+- **GitHub Discussions**: Questions and help
+- **Documentation**: Comprehensive guides in `docs/`
+- **Examples**: Working code in `examples/`
 
 ---
 
-## Quick Reference
+## Related Documentation
 
-### Common Fixes Checklist
-
-- [ ] Order book contains orders for your currency pair
-- [ ] Spend amount is within order bounds
-- [ ] Tolerance window is wide enough (try 0.0 - 0.20)
-- [ ] Max hops is ≥ 3
-- [ ] Currency codes are valid (3 letters, A-Z)
-- [ ] Money amounts are non-negative
-- [ ] Scales are reasonable (0-30)
-- [ ] Guard limits are not too restrictive
-- [ ] topK is reasonable (10-20)
-
-### Performance Tuning Checklist
-
-- [ ] Pre-filter order book before searching
-- [ ] Use reasonable topK (10-20)
-- [ ] Set guard rails (expansion limit, time budget)
-- [ ] Narrow tolerance window if possible
-- [ ] Reduce max hops if possible
-- [ ] Cache fee policy calculations
-- [ ] Increase PHP memory limit if needed
+- [Exception Handling](exceptions.md) - Error handling patterns
+- [Memory Characteristics](memory-characteristics.md) - Performance tuning
+- [Getting Started](getting-started.md) - Basic usage
+- [Domain Invariants](domain-invariants.md) - Validation rules
 
 ---
 
-**Next Steps**: 
-- [Getting Started Guide](getting-started.md) - Step-by-step tutorial
-- [Exception Handling Guide](exceptions.md) - Complete error reference
-- [Domain Invariants](domain-invariants.md) - Validation rules reference
-
+*Most issues can be resolved by checking input validation, adjusting guard limits, or pre-filtering the order book.*

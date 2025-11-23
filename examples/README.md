@@ -243,7 +243,7 @@ Complete workflow demonstrating path search with guard rails and result interpre
 
 **Related docs**:
 - [Getting Started Guide](../docs/getting-started.md)
-- [Guarded Search Example Doc](../docs/guarded-search-example.md)
+- [Getting Started Guide](../docs/getting-started.md)
 
 ---
 

@@ -1,996 +1,527 @@
 # API Stability Guide
 
-This document defines the public API surface of the p2p-path-finder package that will remain stable across minor and patch releases in the 1.0+ series. Classes and methods marked as `@internal` may change without notice and should not be relied upon by consuming applications.
+This document defines the public API surface that remains stable across minor and patch releases in the 1.0+ series. Classes and methods marked as `@internal` may change without notice.
 
 ## Table of Contents
 
-- [Public API (Stable in 1.0+)](#public-api-stable-in-10)
-  - [Core Services](#core-services)
-  - [Configuration](#configuration)
-  - [Request and Response Objects](#request-and-response-objects)
-  - [Extension Points (Interfaces)](#extension-points-interfaces)
-  - [Domain Layer](#domain-layer)
-  - [Graph Building](#graph-building)
-  - [Exceptions](#exceptions)
-- [Internal API (May change without notice)](#internal-api-may-change-without-notice)
-- [Requires Decision](#requires-decision)
+- [Stability Guarantees](#stability-guarantees)
+- [Public API Summary](#public-api-summary)
+- [Internal API](#internal-api)
+- [Extension Points](#extension-points)
+- [Deprecation Policy](#deprecation-policy)
 
 ---
 
-## Public API (Stable in 1.0+)
+## Stability Guarantees
 
-The following classes, interfaces, and methods form the stable public API surface. These are safe to depend on in production applications and will follow semantic versioning guarantees.
+### What is Stable
 
-### Core Services
+**Stable** (follows semver):
+- Classes, methods, and interfaces marked with `@api` tag
+- Public API namespaces (see table below)
+- Method signatures and return types
+- JSON serialization format
+- Exception types and hierarchy
 
-#### `SomeWork\P2PPathFinder\Application\Service\PathFinderService`
+**Changes requiring MAJOR version**:
+- Removing public classes, methods, or interfaces
+- Changing method signatures
+- Changing exception types
+- Removing JSON output fields
+- Breaking behavioral changes
 
-**Purpose**: Main facade for path finding operations
+### What Can Change
 
-**Public Methods**:
-- `__construct(GraphBuilder $graphBuilder, ?PathOrderStrategy $orderingStrategy = null)` - Constructs the service with required dependencies
-- `findBestPaths(PathSearchRequest $request): SearchOutcome` - Searches for optimal conversion paths
+**May change in MINOR versions**:
+- Classes marked with `@internal` tag
+- Internal implementation details
+- Performance characteristics
+- Internal namespaces (Graph, PathFinder internals)
 
-**Description**: The primary entry point for path finding operations. Orchestrates filtering, graph construction, and search execution. The service accepts an optional custom `PathOrderStrategy` for controlling result ordering.
-
-**Usage**: Documented in README.md as the main consumer-facing service.
-
----
-
-#### `SomeWork\P2PPathFinder\Application\OrderBook\OrderBook`
-
-**Purpose**: Container for orders participating in path search
-
-**Public Methods**:
-- `__construct(iterable $orders = [])` - Creates order book from iterable collection
-- `add(Order $order): void` - Appends an order to the book
-- `getIterator(): Traversable` - Returns iterator over orders
-- `filter(OrderFilterInterface ...$filters): Generator` - Filters orders using provided filter strategies
-
-**Description**: Iterable collection of orders that can be filtered before graph construction.
-
----
-
-### Configuration
-
-#### `SomeWork\P2PPathFinder\Application\Config\PathSearchConfig`
-
-**Purpose**: Immutable configuration for path search operations
-
-**Public Methods**:
-- `builder(): PathSearchConfigBuilder` - Returns fluent builder for constructing configurations
-- `spendAmount(): Money` - Returns target spend amount
-- `toleranceWindow(): ToleranceWindow` - Returns tolerance window applied to spend
-- `minimumTolerance(): string` - Returns lower tolerance bound as numeric-string
-- `maximumTolerance(): string` - Returns upper tolerance bound as numeric-string
-- `minimumHops(): int` - Returns minimum hops allowed in results
-- `maximumHops(): int` - Returns maximum hops allowed in results
-- `resultLimit(): int` - Returns maximum number of paths to return
-- `minimumSpendAmount(): Money` - Returns minimum spend after tolerance adjustments
-- `maximumSpendAmount(): Money` - Returns maximum spend after tolerance adjustments
-- `pathFinderTolerance(): string` - Returns tolerance used by search heuristic
-- `pathFinderToleranceSource(): string` - Returns origin of tolerance value
-- `pathFinderMaxExpansions(): int` - Returns maximum state expansions allowed
-- `pathFinderMaxVisitedStates(): int` - Returns maximum unique states tracked
-- `pathFinderTimeBudgetMs(): ?int` - Returns wall-clock budget in milliseconds
-- `throwOnGuardLimit(): bool` - Returns whether guard breaches throw exceptions
-
-**Description**: Captures all parameters used during graph exploration. Built via fluent builder pattern.
+**May change in PATCH versions**:
+- Bug fixes (even if they change behavior to match intended design)
+- Internal refactoring
+- Documentation
+- Performance optimizations
 
 ---
 
-#### `SomeWork\P2PPathFinder\Application\Config\PathSearchConfigBuilder`
+## Public API Summary
 
-**Purpose**: Fluent builder for constructing validated PathSearchConfig instances
+### Namespace Stability Matrix
 
-**Public Methods**:
-- `withSpendAmount(Money $amount): self` - Sets source asset spend amount
-- `withToleranceBounds(string $minimumTolerance, string $maximumTolerance): self` - Configures acceptable deviation from desired spend
-- `withHopLimits(int $minimumHops, int $maximumHops): self` - Sets minimum and maximum hops
-- `withResultLimit(int $limit): self` - Limits number of paths returned
-- `withSearchGuards(int $maxVisitedStates, int $maxExpansions, ?int $timeBudgetMs = null): self` - Configures guard limits
-- `withSearchTimeBudget(?int $timeBudgetMs): self` - Sets wall-clock budget
-- `withGuardLimitException(bool $shouldThrow = true): self` - Enables exception on guard breach
-- `build(): PathSearchConfig` - Builds validated configuration instance
+| Namespace | Stability | Description |
+|-----------|-----------|-------------|
+| `Application\Service\*` | ✅ Public | Entry point services |
+| `Application\OrderBook\*` | ✅ Public | Order book and filtering |
+| `Application\Config\*` | ✅ Public | Configuration builders |
+| `Application\Result\*` | ✅ Public | Search results and DTOs |
+| `Application\PathFinder\Result\*` | ✅ Public | Search outcome and reports |
+| `Domain\**` | ✅ Public | All domain objects |
+| `Exception\**` | ✅ Public | All exceptions |
+| `Application\Graph\*` | ⚠️ Internal | Graph construction internals |
+| `Application\PathFinder\*` | ⚠️ Internal | Search algorithm internals |
 
-**Description**: Part of the public API as documented in README examples.
+### Core Public API Classes
 
----
-
-#### `SomeWork\P2PPathFinder\Application\Config\SearchGuardConfig`
-
-**Purpose**: Configuration for search guard limits
-
-**Public Methods**:
-- `__construct(int $maxVisitedStates, int $maxExpansions, ?int $timeBudgetMs = null)` - Creates guard configuration
-- `defaults(): self` - Returns default guard configuration
-- `maxVisitedStates(): int` - Returns maximum visited states limit
-- `maxExpansions(): int` - Returns maximum expansions limit
-- `timeBudgetMs(): ?int` - Returns time budget in milliseconds
-- `withTimeBudget(?int $timeBudgetMs): self` - Returns copy with updated time budget
-
-**Description**: Encapsulates search guard rail configuration.
-
----
-
-### Request and Response Objects
-
-#### `SomeWork\P2PPathFinder\Application\Service\PathSearchRequest`
-
-**Purpose**: Immutable request DTO carrying dependencies for path search
-
-**Public Methods**:
-- `__construct(OrderBook $orderBook, PathSearchConfig $config, string $targetAsset)` - Creates request with required parameters
-- `orderBook(): OrderBook` - Returns order book
-- `config(): PathSearchConfig` - Returns configuration
-- `targetAsset(): string` - Returns normalized target asset identifier
-- `spendAmount(): Money` - Returns spend amount
-- `sourceAsset(): string` - Returns source asset from spend amount currency
-- `minimumHops(): int` - Returns minimum hops from config
-- `maximumHops(): int` - Returns maximum hops from config
-- `spendConstraints(): SpendConstraints` - Returns derived spend constraints
-
-**Description**: Mandatory DTO passed to `PathFinderService::findBestPaths()`. Normalizes target asset and derives spend constraints.
-
-**Usage**: Documented in README.md as the required request parameter.
-
----
-
-#### `SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints`
-
-**Purpose**: Spend boundaries derived from tolerance window configuration
-
-**Public Methods**:
-- `from(Money $min, Money $max, ?Money $desired = null): self` - Creates constraints from Money instances
-- `fromScalars(string $currency, string $minAmount, string $maxAmount, ?string $desiredAmount = null): self` - Creates from numeric strings
-- `min(): Money` - Returns minimum spend boundary
-- `max(): Money` - Returns maximum spend boundary
-- `desired(): ?Money` - Returns desired spend amount
-- `bounds(): array` - Returns associative array with min/max bounds
-
-**Description**: Value object encapsulating minimum, maximum, and desired spend amounts that constrain path finding. Exposed through `PathSearchRequest::spendConstraints()` to provide transparency into how the tolerance window translates to actual spend constraints.
-
-**Usage Context**: Consumers typically don't need to interact with this directly as path finding happens automatically based on PathSearchConfig. Provided for transparency and advanced use cases where understanding the derived boundaries is useful.
-
----
-
-#### `SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome`
-
-**Purpose**: Container for search results and guard metrics
-
-**Generic Type**: `SearchOutcome<TPath>` where TPath is the result type (typically PathResult)
-
-**Public Methods**:
-- `__construct(PathResultSet $paths, SearchGuardReport $guardLimits)` - Creates outcome
-- `fromResultSet(PathResultSet $paths, SearchGuardReport $guardLimits): self` - Static factory
-- `empty(SearchGuardReport $guardLimits): self` - Creates empty outcome
-- `paths(): PathResultSet` - Returns path results collection
-- `hasPaths(): bool` - Returns whether any paths were found
-- `guardLimits(): SearchGuardReport` - Returns guard metrics
-- `jsonSerialize(): array` - Serializes to JSON-compatible array
-
-**Description**: Returned by `PathFinderService::findBestPaths()`. Contains both path results and guard metrics.
-
-**Usage**: Extensively documented in README.md for accessing results and guard reports.
-
----
-
-#### `SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet`
-
-**Purpose**: Immutable ordered collection of path results
-
-**Generic Type**: `PathResultSet<TPath>`
-
-**Public Methods**:
-- `empty(): self` - Creates empty result set
-- `fromPaths(PathOrderStrategy $orderingStrategy, iterable $paths, callable $orderKeyResolver): self` - Creates from paths with resolver
-- `getIterator(): Traversable` - Returns iterator over paths
-- `count(): int` - Returns number of paths
-- `isEmpty(): bool` - Returns whether collection is empty
-- `toArray(): array` - Returns paths as array
-- `slice(int $offset, ?int $length = null): self` - Returns subset of paths
-- `first(): mixed` - Returns first path or null
-- `jsonSerialize(): array` - Serializes to JSON-compatible array
-
-**Description**: Immutable collection providing iteration, slicing, and serialization helpers. Implements `IteratorAggregate`, `Countable`, and `JsonSerializable`.
-
-**Usage**: Documented in README.md as the return type from `SearchOutcome::paths()`.
-
----
-
-#### `SomeWork\P2PPathFinder\Application\Result\PathResult`
-
-**Purpose**: Aggregated representation of a discovered conversion path
-
-**Public Methods**:
-- `__construct(Money $totalSpent, Money $totalReceived, DecimalTolerance $residualTolerance, ?PathLegCollection $legs = null, ?MoneyMap $feeBreakdown = null)` - Creates path result
-- `totalSpent(): Money` - Returns total amount spent across entire path
-- `totalReceived(): Money` - Returns total amount received at destination
-- `residualTolerance(): DecimalTolerance` - Returns remaining tolerance after path execution
-- `residualTolerancePercentage(int $scale = 2): string` - Returns tolerance as percentage
-- `feeBreakdown(): MoneyMap` - Returns fees by currency
-- `feeBreakdownAsArray(): array` - Returns fees as associative array
-- `legs(): PathLegCollection` - Returns collection of path legs
-- `legsAsArray(): array` - Returns legs as array
-- `toArray(): array` - Returns complete path data as array
-- `jsonSerialize(): array` - Serializes to JSON-compatible array
-
-**Description**: Complete representation of a single path with spent/received amounts, tolerance consumption, fee breakdown, and leg-by-leg details.
-
-**Usage**: Referenced in README.md examples as the result type from `SearchOutcome::paths()`.
-
----
-
-#### `SomeWork\P2PPathFinder\Application\Result\PathLeg`
-
-**Purpose**: Single conversion leg in a path
-
-**Public Methods**:
-- `__construct(string $fromAsset, string $toAsset, Money $spent, Money $received, ?MoneyMap $fees = null)` - Creates path leg
-- `from(): string` - Returns source asset symbol
-- `to(): string` - Returns destination asset symbol
-- `spent(): Money` - Returns amount spent in this leg
-- `received(): Money` - Returns amount received in this leg
-- `fees(): MoneyMap` - Returns fees incurred
-- `feesAsArray(): array` - Returns fees as array
-- `toArray(): array` - Returns leg data as array
-- `jsonSerialize(): array` - Serializes to JSON-compatible array
-
-**Description**: Represents a single hop in a conversion path with from/to assets, spent/received amounts, and fees.
-
----
-
-#### `SomeWork\P2PPathFinder\Application\Result\PathLegCollection`
-
-**Purpose**: Immutable collection of path legs
-
-**Public Methods**:
-- `empty(): self` - Creates empty collection
-- `fromList(array $legs): self` - Creates from array of PathLeg instances
-- `all(): array` - Returns all legs as array
-- `count(): int` - Returns number of legs
-- `isEmpty(): bool` - Returns whether collection is empty
-- `getIterator(): Traversable` - Returns iterator over legs
-- `jsonSerialize(): array` - Serializes to JSON-compatible array
-
-**Description**: Type-safe collection for path legs implementing iteration and serialization.
-
----
-
-#### `SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport`
-
-**Purpose**: Snapshot of search guard metrics
-
-**Public Methods**:
-- `__construct(bool $expansionsReached, bool $visitedStatesReached, bool $timeBudgetReached, int $expansions, int $visitedStates, float $elapsedMilliseconds, int $expansionLimit, int $visitedStateLimit, ?int $timeBudgetLimit)` - Creates report
-- `fromMetrics(int $expansions, int $visitedStates, float $elapsedMilliseconds, int $expansionLimit, int $visitedStateLimit, ?int $timeBudgetLimit, bool $expansionLimitReached = false, bool $visitedStatesReached = false, bool $timeBudgetReached = false): self` - Creates from metrics
-- `idle(int $maxVisitedStates, int $maxExpansions, ?int $timeBudgetMs = null): self` - Creates idle report with zero metrics
-- `none(): self` - Creates minimal report
-- `expansionsReached(): bool` - Returns whether expansion limit was hit
-- `visitedStatesReached(): bool` - Returns whether visited states limit was hit
-- `timeBudgetReached(): bool` - Returns whether time budget was exceeded
-- `anyLimitReached(): bool` - Returns whether any limit was reached
-- `expansions(): int` - Returns actual expansion count
-- `visitedStates(): int` - Returns actual visited states count
-- `elapsedMilliseconds(): float` - Returns elapsed time
-- `expansionLimit(): int` - Returns configured expansion limit
-- `visitedStateLimit(): int` - Returns configured visited state limit
-- `timeBudgetLimit(): ?int` - Returns configured time budget
-- `jsonSerialize(): array` - Serializes to JSON-compatible array
-
-**Description**: Reports on guard rail interactions during search, including which limits were reached and actual metrics.
-
-**Usage**: Extensively documented in README.md for monitoring guard behavior.
-
----
-
-#### `SomeWork\P2PPathFinder\Application\Result\MoneyMap`
-
-**Purpose**: Type-safe map of Money values indexed by currency
-
-**Public Methods**:
-- `empty(): self` - Creates empty map
-- `fromList(array $amounts, bool $merge = false): self` - Creates from array of Money instances
-- `merge(MoneyMap $other): self` - Merges with another map
-- `toArray(): array` - Returns associative array keyed by currency
-- `isEmpty(): bool` - Returns whether map is empty
-- `jsonSerialize(): array` - Serializes to JSON-compatible array
-
-**Description**: Used for fee breakdowns and currency-grouped amounts.
-
----
+| Category | Class | Purpose |
+|----------|-------|---------|
+| **Entry Point** | `PathFinderService` | Main facade for path finding |
+| | `PathSearchRequest` | Request DTO with order book + config |
+| **Configuration** | `PathSearchConfig` | Immutable search configuration |
+| | `PathSearchConfigBuilder` | Fluent configuration builder |
+| | `SearchGuardConfig` | Guard limit configuration |
+| **Results** | `SearchOutcome` | Search results + guard report |
+| | `PathResultSet` | Immutable collection of paths |
+| | `PathResult` | Single path with legs and fees |
+| | `PathLeg` | Single conversion hop |
+| | `SearchGuardReport` | Guard metrics and breach status |
+| **Order Management** | `OrderBook` | Order collection with filtering |
+| **Domain** | `Money` | Monetary amount with currency |
+| | `ExchangeRate` | Conversion rate between currencies |
+| | `Order` | Buy/sell order with bounds |
+| | `OrderBounds` | Min/max amount constraints |
+| | `AssetPair` | Base/quote currency pair |
+| **Exceptions** | `ExceptionInterface` | Marker for all library exceptions |
+| | `InvalidInput` | Input validation failures |
+| | `GuardLimitExceeded` | Resource limit reached (opt-in) |
+| | `PrecisionViolation` | Arithmetic precision errors |
 
 ### Extension Points (Interfaces)
 
-#### `SomeWork\P2PPathFinder\Application\Filter\OrderFilterInterface`
-
-**Purpose**: Strategy for filtering orders before graph construction
-
-**Public Methods**:
-- `accepts(Order $order): bool` - Determines if order satisfies filter conditions
-
-**Description**: Implement this interface to create custom order filters. Used with `OrderBook::filter()`.
-
-**Contract Requirements**:
-- **Performance**: Must be O(1) per order (constant time evaluation)
-- **Immutability**: Must not modify the order being evaluated
-- **Stateless**: Filter evaluation must be side-effect free (pure function)
-- **Thread-safe**: Immutable state after construction
-
-**Best Practices**:
-1. Single Responsibility - each filter checks one criterion
-2. Composition - combine multiple simple filters rather than one complex filter
-3. Early Return - return false as soon as a condition fails
-4. Scale Handling - normalize scales when comparing Money values
-5. Currency Matching - always verify currency compatibility before comparisons
-
-**Built-in Implementations**:
-- `CurrencyPairFilter` - Filters by asset pair
-- `MaximumAmountFilter` - Filters by maximum amount
-- `MinimumAmountFilter` - Filters by minimum amount  
-- `ToleranceWindowFilter` - Filters by tolerance window
-
-**Usage Example**: See `examples/custom-order-filter.php` for comprehensive examples including:
-- Custom filter implementations
-- Filter composition patterns
-- Integration with PathFinderService
-- Performance best practices
+| Interface | Purpose | Implement to... |
+|-----------|---------|-----------------|
+| `OrderFilterInterface` | Filter orders before search | Create custom order filters |
+| `PathOrderStrategy` | Control path ranking | Customize result ordering |
+| `FeePolicy` | Calculate transaction fees | Model complex fee structures |
 
 ---
 
-#### `SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy`
+## Usage Patterns
 
-**Purpose**: Strategy for comparing and ordering path results during search
+### Basic Usage (Always Stable)
 
-**Public Methods**:
-- `compare(PathOrderKey $left, PathOrderKey $right): int` - Compares two path order keys to determine their relative priority
+```php
+use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
+use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
+use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
-**Description**: Implement this interface to customize how paths are ranked and prioritized during search. The strategy determines which paths appear first in search results. This is a key extension point for customizing search behavior based on business requirements.
+// Configuration
+$config = PathSearchConfig::builder()
+    ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+    ->withToleranceBounds('0.00', '0.05')
+    ->withHopLimits(1, 4)
+    ->build();
 
-**Contract Requirements**:
-- **Comparison Semantics**: Return negative if `$left` ranks before `$right`, zero if equal, positive if after
-- **Transitivity**: If A < B and B < C, then A < C must hold
-- **Stability**: Always use `insertionOrder()` as the final tie-breaker to ensure stable sorting
-- **Determinism**: Given the same inputs, always produce the same result
-- **Consistency**: Must satisfy antisymmetry and equality propagation
+// Request
+$request = new PathSearchRequest($orderBook, $config, 'BTC');
 
-**Common Strategies**:
-- **Cost-first** (default): Minimize total path cost, then hops, then route signature
-- **Hops-first**: Minimize number of hops (route complexity), then cost
-- **Hybrid**: Balance cost and hops using weighted scoring
-- **Route-aware**: Prefer certain currencies or exchanges in the path
+// Execute
+$service = new PathFinderService($graphBuilder);
+$outcome = $service->findBestPaths($request);
 
-**Default Implementation**: `CostHopsSignatureOrderingStrategy` - Orders by cost (at scale 6), then hops, then route signature, then insertion order.
+// Access results
+foreach ($outcome->paths() as $path) {
+    echo $path->route();
+    echo $path->totalSpent()->amount();
+    echo $path->totalReceived()->amount();
+}
 
-**Usage**: Pass custom strategy to `PathFinderService` constructor. See `examples/custom-ordering-strategy.php` for comprehensive examples including:
-- `MinimizeHopsStrategy` - Prioritizes simpler paths with fewer hops
-- `WeightedScoringStrategy` - Balances cost and complexity using weighted scores
-- `RoutePreferenceStrategy` - Prefers paths containing specific currencies
+// Check guard limits
+if ($outcome->guardLimits()->anyLimitReached()) {
+    // Handle partial results
+}
+```
+
+**Guarantee**: This pattern will work across all 1.x versions.
+
+### Domain Objects (Always Stable)
+
+```php
+use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
+use SomeWork\P2PPathFinder\Domain\Order\Order;
+
+// Money
+$money = Money::fromString('USD', '100.00', 2);
+$doubled = $money->multipliedBy('2.0', 2);
+$sum = $money->add($other);
+
+// ExchangeRate
+$rate = ExchangeRate::fromString('USD', 'EUR', '0.92', 4);
+$euros = $rate->convert($usd);
+
+// Order
+$order = new Order($side, $assetPair, $bounds, $rate, $feePolicy);
+```
+
+**Guarantee**: All domain object constructors and methods are stable.
+
+### Custom Extensions (Interface Stable)
+
+```php
+use SomeWork\P2PPathFinder\Application\Filter\OrderFilterInterface;
+use SomeWork\P2PPathFinder\Domain\Order\Order;
+
+// Custom filter implementation
+class MyCustomFilter implements OrderFilterInterface
+{
+    public function accepts(Order $order): bool
+    {
+        return $order->effectiveRate()->rate() >= '1.0';
+    }
+}
+
+// Use the filter
+$filtered = $orderBook->filter(new MyCustomFilter());
+```
+
+**Guarantee**: `OrderFilterInterface`, `PathOrderStrategy`, and `FeePolicy` interfaces will not change in 1.x.
+
+---
+
+## Internal API
+
+### Do NOT Depend On These
+
+Classes and namespaces marked `@internal` or in these packages:
+
+**Internal Namespaces**:
+- `Application\Graph\*` - Graph construction internals
+- `Application\PathFinder\*` (except `Result\*`) - Search algorithm internals
+- `Application\Support\*` - Internal utilities
+
+**Why Internal**:
+- Implementation details that may change
+- Performance optimizations may require API changes
+- Not intended for direct consumer use
+
+**Example Internal Classes** (may change without notice):
+- `GraphBuilder` - Implementation detail (use `PathFinderService` instead)
+- `PathFinder` - Search algorithm (use `PathFinderService` instead)
+- `SearchState` - Internal state representation
+- `EdgeSegment` - Graph representation detail
+
+### Safe vs Unsafe Dependencies
+
+**✅ Safe** (Public API):
+```php
+use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
+use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+```
+
+**❌ Unsafe** (Internal API):
+```php
+use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Application\PathFinder\SearchState;
+```
+
+---
+
+## Extension Points
+
+### 1. Custom Order Filters
+
+**Interface**: `Application\Filter\OrderFilterInterface`
+
+**Stability**: Public, stable in 1.x
+
+```php
+interface OrderFilterInterface
+{
+    public function accepts(Order $order): bool;
+}
+```
 
 **Example**:
 ```php
-$customStrategy = new MinimizeHopsStrategy(costScale: 6);
-$service = new PathFinderService($graphBuilder, $customStrategy);
-$results = $service->findBestPaths($request);
+class MinimumLiquidityFilter implements OrderFilterInterface
+{
+    public function __construct(private Money $minimumAmount) {}
+    
+    public function accepts(Order $order): bool
+    {
+        return $order->bounds()->maximum()->compareTo($this->minimumAmount) >= 0;
+    }
+}
 ```
 
-**Rationale**: Core extension point for customizing search prioritization. Interface is stable with clear contract requirements documented. Multiple working examples demonstrate proper implementation patterns.
+### 2. Custom Path Ordering
 
----
+**Interface**: `Application\PathFinder\Result\Ordering\PathOrderStrategy`
 
-#### `SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey`
-
-**Purpose**: Value object containing path attributes for ordering comparisons
-
-**Public Methods**:
-- `__construct(PathCost $cost, int $hops, RouteSignature $routeSignature, int $insertionOrder, array $payload = [])` - Creates order key
-- `cost(): PathCost` - Returns path cost
-- `hops(): int` - Returns hop count
-- `routeSignature(): RouteSignature` - Returns route signature
-- `insertionOrder(): int` - Returns discovery order
-- `payload(): array` - Returns custom payload data
-
-**Description**: Passed to `PathOrderStrategy::compare()` implementations. Contains all attributes needed to make ordering decisions. The `insertionOrder` field must be used as the final tie-breaker to ensure stable sorting.
-
-**Usage**: Received as parameters in custom `PathOrderStrategy::compare()` implementations. Access attributes to implement custom comparison logic.
-
-**Rationale**: Essential for implementing custom PathOrderStrategy. Provides all path attributes needed for ordering decisions. Used in all ordering examples.
-
----
-
-#### `SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost`
-
-**Purpose**: Value object representing normalized path cost for ordering comparisons
-
-**Public Methods**:
-- `__construct(BigDecimal|string $value)` - Creates cost from value
-- `value(): string` - Returns cost as canonical numeric string (18 decimal places)
-- `decimal(): BigDecimal` - Returns underlying BigDecimal representation
-- `equals(PathCost $other): bool` - Checks equality at full precision
-- `compare(PathCost $other, int $scale = 18): int` - Compares costs at specified scale
-
-**Description**: Encapsulates path cost with normalized precision. The `compare()` method allows scale-controlled comparisons, which is useful for ordering strategies that want to ignore insignificant cost differences.
-
-**Usage**: Accessed via `PathOrderKey::cost()` in custom ordering strategies. Use `compare()` method for precise cost comparisons.
-
-**Rationale**: Required for custom ordering strategies that prioritize by cost. Provides scale-aware comparison to avoid floating-point precision issues.
-
----
-
-#### `SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature`
-
-**Purpose**: Value object representing route as currency sequence for deterministic ordering
-
-**Public Methods**:
-- `fromPathEdgeSequence(PathEdgeSequence $edges): self` - Creates from edge sequence
-- `fromString(string $value): self` - Creates from string representation
-- `fromNodes(iterable $nodes): self` - Creates from node sequence
-- `value(): string` - Returns signature string (e.g., "USD->EUR->GBP")
-- `compare(RouteSignature $other): int` - Lexicographically compares signatures
-
-**Description**: Represents a path's route as a sequence of currencies. Used for deterministic ordering when cost and hops are equal. The `compare()` method provides lexicographical comparison.
-
-**Usage**: Accessed via `PathOrderKey::routeSignature()` in custom ordering strategies. Useful for route-aware prioritization or as a tie-breaker.
-
-**Rationale**: Required for custom ordering strategies that consider route composition. Provides deterministic comparison of path routes.
-
----
-
-#### `SomeWork\P2PPathFinder\Domain\Order\FeePolicy`
-
-**Purpose**: Strategy for calculating fees applied to order fills
-
-**Public Methods**:
-- `calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown` - Calculates fee components for an order fill
-- `fingerprint(): string` - Returns unique identifier for policy configuration
-
-**Description**: Implement this interface to define custom fee calculation logic that is attached to `Order` instances. Fees are computed during path finding as the algorithm evaluates how much of an order can be filled given spend constraints.
-
-**When Fees Are Applied**: Fees are calculated during the path finding process when:
-1. The algorithm determines how much of an order can be filled
-2. A candidate path is being evaluated for feasibility
-3. The final path cost is being computed
-
-**Currency Constraints**: Fees MUST be denominated in a currency that matches the order's trading pair:
-- **Base Fees**: Must be in the same currency as the base asset
-- **Quote Fees**: Must be in the same currency as the quote asset
-- **Both**: You can return fees in both currencies if needed
-
-The currency of returned fees MUST match the corresponding Money object's currency, or path finding calculations will fail.
-
-**Calculation Order**: The path finding algorithm calls `calculate()` in this sequence:
-1. **Order Evaluation**: For each order, calculate fees based on proposed fill amounts
-2. **Cost Accumulation**: Fees are added to the path's total cost
-3. **Feasibility Check**: System verifies the path (including fees) fits within spend constraints
-
-**Common Fee Models**:
-- **Percentage Fee**: Fee is a percentage of the traded amount (e.g., 0.5%)
-- **Fixed Fee**: Flat fee per transaction (e.g., $2.50 per order)
-- **Tiered Fee**: Fee rate depends on trade volume (e.g., 0.5% for <$1000, 0.3% for ≥$1000)
-- **Maker/Taker**: Different fees based on order side (BUY vs SELL)
-- **Combined**: Mix of percentage + fixed (e.g., 0.5% + $1.00 minimum)
-
-**Fingerprint Requirements**: The `fingerprint()` method must return a globally unique string representing the policy configuration. Requirements:
-- **Uniqueness**: Different configurations MUST produce different fingerprints
-- **Determinism**: Same configuration MUST always produce same fingerprint
-- **Non-empty**: Must be a non-empty string
-- **Reasonable length**: Recommended ≤255 characters
-
-**Usage**: Attach a fee policy to an order at construction:
+**Stability**: Public, stable in 1.x
 
 ```php
-$feePolicy = new PercentageFeePolicy(rate: '0.005', scale: 6);
-$order = new Order($side, $pair, $bounds, $rate, $feePolicy);
+interface PathOrderStrategy
+{
+    public function compare(PathOrderKey $left, PathOrderKey $right): int;
+}
 ```
 
-Orders without a fee policy (null) are treated as fee-free.
+**Example**:
+```php
+class MinimizeHopsStrategy implements PathOrderStrategy
+{
+    public function compare(PathOrderKey $left, PathOrderKey $right): int
+    {
+        return $left->hops() <=> $right->hops();
+    }
+}
+```
 
-**Example Implementations**: See `examples/custom-fee-policy.php` for comprehensive examples including:
-- `PercentageFeePolicy` - Percentage-based fees (most common model)
-- `FixedFeePolicy` - Flat fee per transaction
-- `TieredFeePolicy` - Volume-based fee tiers
-- `MakerTakerFeePolicy` - Different rates for maker vs taker orders
-- `CombinedFeePolicy` - Percentage with minimum/maximum bounds
+### 3. Custom Fee Policies
 
-**Rationale**: Core extension point for modeling real-world fee structures. Interface is stable with clear contract requirements. Multiple working examples demonstrate proper implementation patterns including currency safety and fingerprint generation.
+**Interface**: `Domain\Order\FeePolicy`
 
----
+**Stability**: Public, stable in 1.x
 
-### Domain Layer
+```php
+interface FeePolicy
+{
+    public function calculate(
+        OrderSide $side,
+        Money $baseAmount,
+        Money $quoteAmount
+    ): FeeBreakdown;
+    
+    public function fingerprint(): string;
+}
+```
 
-#### `SomeWork\P2PPathFinder\Domain\Order\Order`
-
-**Purpose**: Domain entity describing an order that can be traversed in path search
-
-**Public Methods**:
-- `__construct(OrderSide $side, AssetPair $assetPair, OrderBounds $bounds, ExchangeRate $effectiveRate, ?FeePolicy $feePolicy = null)` - Creates order
-- `side(): OrderSide` - Returns BUY or SELL side
-- `assetPair(): AssetPair` - Returns asset pair
-- `bounds(): OrderBounds` - Returns admissible fill bounds for base asset
-- `effectiveRate(): ExchangeRate` - Returns effective exchange rate
-- `feePolicy(): ?FeePolicy` - Returns fee policy if any
-- `validatePartialFill(Money $baseAmount): void` - Validates amount can partially fill order
-- `calculateQuoteAmount(Money $baseAmount): Money` - Calculates quote proceeds for base amount
-- `calculateEffectiveQuoteAmount(Money $baseAmount): Money` - Calculates quote adjusted by fees
-- `calculateGrossBaseSpend(Money $baseAmount, ?FeeBreakdown $feeBreakdown = null): Money` - Calculates total base required including fees
-
-**Description**: Immutable domain entity representing a tradeable order with validation and calculation methods.
-
----
-
-#### `SomeWork\P2PPathFinder\Domain\Order\OrderSide`
-
-**Purpose**: Enum representing order side (BUY or SELL)
-
-**Public Cases**:
-- `OrderSide::BUY` - Buy side order
-- `OrderSide::SELL` - Sell side order
-
-**Description**: Backed enum with string values.
-
----
-
-#### `SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown`
-
-**Purpose**: Container for fee components
-
-**Public Methods**:
-- `none(): self` - Creates zero-fee breakdown
-- `base(Money $baseFee): self` - Creates breakdown with base fee
-- `quote(Money $quoteFee): self` - Creates breakdown with quote fee
-- `both(Money $baseFee, Money $quoteFee): self` - Creates breakdown with both fees
-- `baseFee(): ?Money` - Returns base fee if any
-- `quoteFee(): ?Money` - Returns quote fee if any
-- `isZero(): bool` - Returns whether all fees are zero
-
-**Description**: Value object containing optional base and quote fee amounts.
+**Example**:
+```php
+class TieredFeePolicy implements FeePolicy
+{
+    public function calculate(
+        OrderSide $side,
+        Money $baseAmount,
+        Money $quoteAmount
+    ): FeeBreakdown {
+        $rate = $quoteAmount->toDecimal()->compareTo('1000') >= 0 
+            ? '0.0025'  // 0.25% for >= $1000
+            : '0.005';  // 0.5% for < $1000
+        
+        $fee = $quoteAmount->multiply($rate, $quoteAmount->scale());
+        return FeeBreakdown::forQuote($fee);
+    }
+    
+    public function fingerprint(): string
+    {
+        return 'tiered:0.5%<1k:0.25%>=1k';
+    }
+}
+```
 
 ---
 
-#### `SomeWork\P2PPathFinder\Domain\ValueObject\Money`
+## Deprecation Policy
 
-**Purpose**: Immutable monetary amount with arbitrary precision arithmetic
+### How Deprecations Work
 
-**Public Methods**:
-- `fromString(string $currency, string $amount, int $scale = 2): self` - Creates from string components
-- `zero(string $currency, int $scale = 2): self` - Creates zero-value amount
-- `withScale(int $scale): self` - Returns copy with different scale
-- `currency(): string` - Returns ISO currency code
-- `amount(): string` - Returns normalized numeric-string representation
-- `scale(): int` - Returns scale (fractional digits)
-- `decimal(): BigDecimal` - Returns BigDecimal representation
-- `add(Money $other, ?int $scale = null): self` - Adds another money value
-- `subtract(Money $other, ?int $scale = null): self` - Subtracts another money value
-- `multiply(string $multiplier, ?int $scale = null): self` - Multiplies by scalar
-- `divide(string $divisor, ?int $scale = null): self` - Divides by scalar
-- `compare(Money $other, ?int $scale = null): int` - Compares two values (-1, 0, 1)
-- `equals(Money $other): bool` - Tests equality
-- `greaterThan(Money $other): bool` - Tests if greater than
-- `lessThan(Money $other): bool` - Tests if less than
-- `isZero(): bool` - Tests if amount equals zero
+1. **Announced**: Feature marked `@deprecated` in PHPDoc
+2. **Warning**: `E_USER_DEPRECATED` triggered when used
+3. **Timeline**: Minimum 1 MINOR version before removal
+4. **Removal**: Removed in next MAJOR version
 
-**Description**: Core value object backed by `Brick\Math\BigDecimal`. All arithmetic uses half-up rounding.
+### Deprecation Annotation
 
-**Usage**: Used throughout the package for all monetary amounts.
+```php
+/**
+ * @deprecated since 1.5.0, use newMethod() instead. Will be removed in 2.0.0.
+ */
+public function oldMethod(): void
+{
+    trigger_error(
+        'oldMethod() is deprecated since 1.5.0, use newMethod() instead.',
+        E_USER_DEPRECATED
+    );
+    
+    // Still works, but shows warning
+    $this->newMethod();
+}
+```
 
----
+### Detecting Deprecated Usage
 
-#### `SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate`
+**PHPStan**:
+```bash
+vendor/bin/phpstan analyse  # Reports deprecated usage
+```
 
-**Purpose**: Exchange rate between two assets
+**PHPUnit**:
+```xml
+<phpunit failOnDeprecation="true">
+```
 
-**Public Methods**:
-- `fromString(string $baseCurrency, string $quoteCurrency, string $rate, int $scale = 8): self` - Creates exchange rate
-- `convert(Money $money, ?int $scale = null): self` - Converts base currency amount to quote currency
-- `invert(): self` - Returns inverted rate (quote becomes base)
-- `baseCurrency(): string` - Returns base currency
-- `quoteCurrency(): string` - Returns quote currency
-- `rate(): string` - Returns normalized rate as numeric-string
-- `scale(): int` - Returns scale used for precision
-- `decimal(): BigDecimal` - Returns BigDecimal representation
-
-**Description**: Immutable value object representing currency conversion rates with arbitrary precision.
-
----
-
-#### `SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair`
-
-**Purpose**: Pair of asset symbols
-
-**Public Methods**:
-- `fromString(string $base, string $quote): self` - Creates asset pair
-- `base(): string` - Returns base asset symbol
-- `quote(): string` - Returns quote asset symbol
-
-**Description**: Value object representing a currency pair.
+**Runtime**:
+```php
+set_error_handler(function ($errno, $errstr) {
+    if ($errno === E_USER_DEPRECATED) {
+        error_log("Deprecation: $errstr");
+    }
+});
+```
 
 ---
 
-#### `SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds`
+## JSON Serialization Stability
 
-**Purpose**: Minimum and maximum bounds for order fills
+All public result classes implement `JsonSerializable` with stable output format.
 
-**Public Methods**:
-- `from(Money $min, Money $max): self` - Creates bounds from min/max
-- `min(): Money` - Returns minimum bound
-- `max(): Money` - Returns maximum bound
-- `contains(Money $amount): bool` - Tests if amount is within bounds
-- `clamp(Money $amount): Money` - Clamps amount to bounds
+### Stable JSON Structure
 
-**Description**: Value object enforcing order fill boundaries.
+**SearchOutcome**:
+```json
+{
+  "paths": [ /* array of PathResult */ ],
+  "guards": { /* SearchGuardReport */ }
+}
+```
 
----
+**PathResult**:
+```json
+{
+  "total_spent": {"currency": "USD", "amount": "100.00", "scale": 2},
+  "total_received": {"currency": "BTC", "amount": "0.00333333", "scale": 8},
+  "residual_tolerance": {"ratio": "0.000000000000000000", "percentage": "0.00%"},
+  "fee_breakdown": {"USD": {"currency": "USD", "amount": "0.50", "scale": 2}},
+  "legs": [ /* array of PathLeg */ ]
+}
+```
 
-#### `SomeWork\P2PPathFinder\Domain\ValueObject\ToleranceWindow`
+**Guarantees**:
+- Field names will not change in 1.x
+- Field types will not change in 1.x
+- Fields may be added in MINOR versions (backward compatible)
+- Fields will never be removed in 1.x (only in 2.0+)
 
-**Purpose**: Tolerance bounds for path search
-
-**Public Methods**:
-- `fromStrings(string $minimum, string $maximum): self` - Creates window from numeric-strings
-- `minimum(): string` - Returns minimum tolerance as numeric-string
-- `maximum(): string` - Returns maximum tolerance as numeric-string
-- `scale(): int` - Returns canonical scale (18)
-- `heuristicTolerance(): string` - Returns tolerance used by search heuristic
-- `heuristicSource(): string` - Returns source of heuristic tolerance
-
-**Description**: Value object representing acceptable deviation from desired spend amount.
-
----
-
-#### `SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance`
-
-**Purpose**: Normalized decimal tolerance value
-
-**Public Methods**:
-- `fromNumericString(string $ratio, int $scale): self` - Creates from numeric string
-- `ratio(): string` - Returns tolerance ratio as numeric-string
-- `percentage(int $scale = 2): string` - Returns tolerance as percentage string
-
-**Description**: Represents normalized tolerance ratios with percentage conversion.
+See [API Contracts](api-contracts.md) for complete JSON specification.
 
 ---
 
-### Graph Building
+## Version Compatibility Matrix
 
-#### `SomeWork\P2PPathFinder\Application\Graph\GraphBuilder`
+| Your Code Uses | Compatible Library Versions | Notes |
+|----------------|----------------------------|-------|
+| Public API only | Any 1.x version | ✅ Fully compatible |
+| Extension interfaces | Any 1.x version | ✅ Interfaces stable |
+| Internal classes | Same MINOR version only | ⚠️ May break in MINOR updates |
+| `@internal` classes | Exact version only | ❌ No compatibility guarantee |
 
-**Purpose**: Converts orders into weighted directed graph
+### Upgrade Safety
 
-**Public Methods**:
-- `__construct()` - Creates builder instance
-- `build(iterable $orders): Graph` - Builds graph from orders
+**PATCH upgrades** (1.5.2 → 1.5.3):
+- ✅ Always safe for public API
+- ⚠️ May affect internal API
 
-**Description**: Public service for constructing graph representation from order book. Mentioned in README as part of public API.
+**MINOR upgrades** (1.5.x → 1.6.0):
+- ✅ Safe for public API
+- ✅ New features may be added
+- ⚠️ Internal API may change
+- ⚠️ Check for deprecation warnings
 
-**Usage**: Pass to `PathFinderService` constructor.
-
----
-
-#### `SomeWork\P2PPathFinder\Application\Graph\Graph`
-
-**Purpose**: Immutable graph representation for path finding
-
-**Public Methods**:
-- `__construct(GraphNodeCollection $nodes)` - Creates graph
-- `nodes(): GraphNodeCollection` - Returns all nodes
-- `node(string $currency): ?GraphNode` - Returns specific node
-- `hasNode(string $currency): bool` - Tests if node exists
-
-**Description**: Read-only graph structure used internally by path finder. Publicly accessible as part of graph building API.
-
----
-
-### Exceptions
-
-All exceptions under `SomeWork\P2PPathFinder\Exception` namespace implement `ExceptionInterface`.
-
-#### `SomeWork\P2PPathFinder\Exception\ExceptionInterface`
-
-**Purpose**: Marker interface for all package exceptions
-
-**Description**: Implement to catch all library-originated failures in one clause.
+**MAJOR upgrades** (1.x → 2.0):
+- ⚠️ May have breaking changes
+- ⚠️ Read UPGRADING.md before upgrading
+- ⚠️ Deprecated features removed
+- ⚠️ Test thoroughly before deploying
 
 ---
 
-#### `SomeWork\P2PPathFinder\Exception\InvalidInput`
-
-**Purpose**: Validation failure for configuration or input data
-
-**Description**: Thrown when configuration, path legs, or fee breakdowns fail validation.
-
----
-
-#### `SomeWork\P2PPathFinder\Exception\PrecisionViolation`
-
-**Purpose**: Arithmetic precision limit exceeded
-
-**Description**: Signals arithmetic inputs that cannot be represented within configured decimal precision.
-
----
-
-#### `SomeWork\P2PPathFinder\Exception\GuardLimitExceeded`
-
-**Purpose**: Search guard limit breach
-
-**Description**: Thrown when `PathSearchConfig::withGuardLimitException()` is enabled and configured guardrails (visited states, expansions, or time budget) are reached.
-
-**Usage**: Documented in README.md with opt-in escalation examples.
-
----
-
-#### `SomeWork\P2PPathFinder\Exception\InfeasiblePath`
-
-**Purpose**: No viable path found
-
-**Description**: Indicates that no route satisfies the requested constraints.
-
----
-
-## Internal API (May change without notice)
-
-The following classes are marked `@internal` and are implementation details. They may be refactored, renamed, or removed in minor releases without notice.
-
-### Search Engine
-
-#### `SomeWork\P2PPathFinder\Application\PathFinder\PathFinder` (@internal)
-
-**Purpose**: Internal search algorithm implementation
-
-**Location**: `src/Application/PathFinder/PathFinder.php` (line 50)
-
-**Rationale**: Core search algorithm. Hidden behind `PathFinderService` facade. Not intended for direct consumer use.
-
----
-
-### Support Services
-
-#### `SomeWork\P2PPathFinder\Application\Service\OrderSpendAnalyzer` (@internal)
-
-**Purpose**: Encapsulates filtering orders and determining spend bounds
-
-**Location**: `src/Application/Service/OrderSpendAnalyzer.php` (line 22)
-
-**Rationale**: Internal helper used by `PathFinderService`. Implementation details subject to change.
-
----
-
-#### `SomeWork\P2PPathFinder\Application\Service\LegMaterializer` (@internal)
-
-**Purpose**: Resolves concrete path legs from abstract graph edges
-
-**Location**: `src/Application/Service/LegMaterializer.php` (line 27)
-
-**Rationale**: Internal helper for materializing search results. Complex iterative logic subject to optimization.
-
----
-
-#### `SomeWork\P2PPathFinder\Application\Service\ToleranceEvaluator` (@internal)
-
-**Purpose**: Validates materialized paths against configured tolerance bounds
-
-**Location**: `src/Application/Service/ToleranceEvaluator.php` (line 24)
-
-**Rationale**: Internal helper for tolerance validation. Algorithm may evolve.
-
----
-
-#### `SomeWork\P2PPathFinder\Application\Service\PathFinderService::withRunnerFactory()` (@internal)
-
-**Purpose**: Test-only factory hook for dependency injection
-
-**Location**: `src/Application/Service/PathFinderService.php` (line 71)
-
-**Usage**: Exclusively used in test code (`PathFinderServiceGuardsTest.php`) to inject mock PathFinder implementations for testing guard behavior, exception handling, and edge cases.
-
-**Rationale**: 
-- **Test-only utility**: Zero production usage, only appears in test code (9 test usages)
-- **Purpose**: Enables dependency injection of controlled PathFinder implementations to test:
-  - Guard limit enforcement (expansions, visited states, time budget)
-  - Exception handling when limits are exceeded
-  - Edge cases like empty candidates, mismatched currencies
-- **Not for consumers**: Production code should use the standard `PathFinderService` constructor
-- **May change**: As an internal test utility, this method may be modified or removed without notice
-
-**Warning**: This method is explicitly NOT part of the public API. Consumers should never use it in production code.
-
----
-
-### Internal Search Components
-
-All classes under `src/Application/PathFinder/Search/` namespace are internal implementation details:
-
-- `SearchBootstrap` - Initializes search structures
-- `SearchState` - Represents search state during traversal
-- `SearchStatePriority` - Priority for queue ordering
-- `SearchStatePriorityQueue` - Priority queue implementation
-- `SearchStateRecord` - Record of visited state
-- `SearchStateRecordCollection` - Collection of state records
-- `SearchStateRegistry` - Registry for visited states
-- `SearchStateSignature` - Signature for state deduplication
-- `SearchStateSignatureFormatter` - Formats signatures for comparison
-- `SearchQueueEntry` - Entry in search queue
-- `InsertionOrderCounter` - Tracks insertion order
-- `SegmentPruner` - Prunes infeasible segments
-
-**Rationale**: These are low-level implementation details of the search algorithm that may be optimized or restructured.
-
----
-
-### Internal Result Components
-
-The following result-related components are internal:
-
-- `CandidateResultHeap` - Heap for candidate results
-- `CandidateHeapEntry` - Entry in candidate heap
-- `CandidatePriority` - Priority for candidate ordering
-
-**Rationale**: Internal data structures used during search execution.
-
----
-
-### Internal Value Objects
-
-#### `SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath` (@internal)
-
-**Purpose**: Represents candidate paths during search algorithm execution
-
-**Location**: `src/Application/PathFinder/ValueObject/CandidatePath.php` (line 19)
-
-**Exposure**: Used in internal callback `callable(CandidatePath):bool` within PathFinderService
-
-**Rationale**:
-- **Not exposed to consumers**: The callback is created inside `PathFinderService::findBestPaths()` and consumers never see CandidatePath
-- **Internal implementation detail**: Consumers call `findBestPaths(PathSearchRequest)` and receive `SearchOutcome<PathResult>`
-- **Test-only visibility**: Only appears in internal PathFinder tests
-- **No consumer use case**: PathResult provides all necessary information to consumers
-
-**Warning**: This class is an internal implementation detail. Consumers should never depend on it.
-
----
-
-### Internal Support Classes
-
-- `OrderFillEvaluator` - Evaluates order fills
-- `SerializesMoney` (trait) - Money serialization helper
-
-**Rationale**: Utility classes used internally by services.
-
----
-
-## Requires Decision
-
-The following classes are exposed in public API signatures but may need explicit public/internal designation.
-
-### `SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\CandidatePath`
-
-**Status**: ✅ **DECISION MADE: INTERNAL**
-
-**Analysis**: 
-- Used in internal callback `callable(CandidatePath):bool` within PathFinderService
-- **NOT exposed to consumers**: The callback is created inside `PathFinderService::findBestPaths()` and consumers never interact with CandidatePath directly
-- Consumers call `findBestPaths(PathSearchRequest)` and receive `SearchOutcome<PathResult>`
-- Only used in internal tests
-
-**Decision**: Mark as **INTERNAL**. The callback is an implementation detail of PathFinderService. Consumers interact with PathResult, not CandidatePath.
-
-**Action Taken**: Updated PHPDoc to clarify it's internal and not exposed to consumers.
-
----
-
-
-### Graph Component Classes
-
-The following graph-related classes are used publicly through GraphBuilder but their individual usage is unclear:
-
-- `Graph` - Already marked as PUBLIC above (returned by GraphBuilder)
-- `GraphNode` - Used when traversing Graph
-- `GraphNodeCollection` - Collection of nodes
-- `GraphEdge` - Represents graph edge
-- `GraphEdgeCollection` - Collection of edges
-- `EdgeCapacity` - Capacity bounds for edge
-- `EdgeSegment` - Segment of edge capacity
-- `EdgeSegmentCollection` - Collection of segments
-- `SegmentCapacityTotals` - Totals of segment capacities
-
-**Decision Needed**: Are these classes part of the public Graph API?
-
-**Recommendation**: Mark graph traversal classes as **PUBLIC** since Graph is public and consumers may want to inspect the constructed graph. Mark as read-only data structures with clear documentation that they're immutable view objects.
-
-**Specifically**:
-- `Graph`, `GraphNode`, `GraphNodeCollection` - **PUBLIC** (graph inspection)
-- `GraphEdge`, `GraphEdgeCollection` - **PUBLIC** (graph inspection)  
-- `EdgeCapacity`, `EdgeSegment`, `EdgeSegmentCollection`, `SegmentCapacityTotals` - **PUBLIC** (capacity inspection)
-
-These provide transparency into how the graph is constructed without exposing internal search mechanics.
-
----
-
-### Filter Implementations
-
-The package includes several concrete filter implementations:
-
-- `CurrencyPairFilter`
-- `MaximumAmountFilter`
-- `MinimumAmountFilter`
-- `ToleranceWindowFilter`
-
-**Current Status**: Not documented in README as public API
-
-**Decision Needed**: Should these be part of the stable API?
-
-**Recommendation**: Mark as **PUBLIC**. They're useful implementations of OrderFilterInterface that consumers may want to use directly. Add to public API documentation with usage examples.
-
----
-
-### `SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSetEntry`
-
-**Issue**: Used in PathResultSet::fromEntries() which is marked @internal
-
-**Current Usage**: Internal entry type for result set construction
-
-**Recommendation**: Mark as **INTERNAL**. It's an implementation detail of PathResultSet construction.
-
----
-
-### `SomeWork\P2PPathFinder\Application\Service\MaterializedResult`
-
-**Issue**: Used internally during materialization
-
-**Current Usage**: Internal helper class
-
-**Recommendation**: Mark as **INTERNAL**. Implementation detail.
+## Checking API Stability
+
+### In Your Code
+
+**Safe usage** (public API only):
+```php
+// ✅ These imports are safe
+use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
+use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Exception\ExceptionInterface;
+
+// ✅ Extension interfaces are safe
+use SomeWork\P2PPathFinder\Application\Filter\OrderFilterInterface;
+use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
+```
+
+**Risky usage** (internal API):
+```php
+// ❌ These imports may break in MINOR versions
+use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
+use SomeWork\P2PPathFinder\Application\PathFinder\SearchState;
+```
+
+### With PHPStan
+
+PHPStan can detect internal API usage (requires configuration):
+
+```neon
+# phpstan.neon
+parameters:
+    reportMaybesInMethodSignatures: true
+    reportMaybesInPropertyPhpDocTypes: true
+```
+
+### In Composer
+
+Lock to MAJOR version to avoid breaking changes:
+
+```json
+{
+    "require": {
+        "somework/p2p-path-finder": "^1.0"
+    }
+}
+```
+
+This allows MINOR and PATCH updates (1.0.0 → 1.9.9) but prevents MAJOR updates (2.0.0).
 
 ---
 
 ## Summary
 
-### Public API Count
+### Quick Reference
 
-- **Services**: 2 classes
-- **Configuration**: 3 classes
-- **Request/Response**: 9 classes + 1 generic collection (added SpendConstraints)
-- **Interfaces**: 3 interfaces (extensibility)
-- **Ordering**: 4 classes (PathOrderKey, PathCost, RouteSignature, CostHopsSignatureOrderingStrategy)
-- **Domain Objects**: 10+ value objects and entities
-- **Exceptions**: 5 classes + 1 interface
-- **Graph Building**: 9+ classes
+**✅ Safe to use** (public API):
+- `PathFinderService`
+- `PathSearchConfig` / `PathSearchConfigBuilder`
+- `PathSearchRequest`
+- `SearchOutcome` / `PathResult` / `PathLeg`
+- All domain classes (`Money`, `ExchangeRate`, `Order`, etc.)
+- All exceptions (`InvalidInput`, `GuardLimitExceeded`, etc.)
+- Extension interfaces (`OrderFilterInterface`, `PathOrderStrategy`, `FeePolicy`)
 
-**Total: ~45-50 public classes/interfaces**
+**⚠️ Avoid** (internal API):
+- `GraphBuilder`
+- `PathFinder`
+- `SearchState`
+- Classes marked `@internal`
+- Anything in `Application\Graph\*` or `Application\PathFinder\*` (except `Result\*`)
 
-### Internal API Count
-
-- **Search Engine**: 1 core class (PathFinder)
-- **Support Services**: 4 classes (PathFinderService::withRunnerFactory)
-- **Internal Search Components**: 13+ classes
-- **Internal Result Components**: 3+ classes
-- **Internal Value Objects**: 1 class (CandidatePath)
-- **Internal Support**: 2+ classes
-
-**Total: ~24+ internal classes**
-
-### Requires Decision Count
-
-- **Medium Priority**: 9 items (Graph components)
-- **Low Priority**: 4 items (Filter implementations)
-
-**Total: ~12 items pending categorization** (5 resolved: SpendConstraints → PUBLIC, CandidatePath → INTERNAL, PathOrderKey → PUBLIC, PathCost → PUBLIC, RouteSignature → PUBLIC)
+**📋 Best Practices**:
+1. Only import from public API namespaces
+2. Use extension interfaces for customization
+3. Check for `@deprecated` warnings
+4. Lock to `^1.0` in composer.json
+5. Read CHANGELOG.md before upgrading
+6. Test after MINOR version upgrades
 
 ---
 
-## Version Compatibility Guarantee
+## Related Documentation
 
-Starting from version **1.0.0**:
-
-- **Public API**: Breaking changes only in major versions (2.0.0, 3.0.0, etc.)
-- **Internal API**: May change in any minor version (1.1.0, 1.2.0, etc.) without notice
-- **Deprecation Policy**: Public APIs will be deprecated for at least one minor version before removal in the next major version
+- [Versioning Policy](releases-and-support.md#semantic-versioning) - SemVer rules and BC breaks
+- [API Contracts](api-contracts.md) - JSON serialization format specification
+- [Getting Started Guide](getting-started.md) - Quick start tutorial
+- [Architecture Guide](architecture.md) - System design overview
+- [Generated API Docs](api/index.md) - Complete PHPDoc reference
 
 ---
 
-## Notes
-
-- This document will be updated as API boundaries are refined during 1.0 stabilization
-- All public APIs have comprehensive docblock documentation
-- README.md should be updated to link to this document
-- Consider adding `@api` annotations to public classes to make the distinction explicit in the code
-
+*For detailed method signatures and parameter documentation, see the [generated API documentation](api/index.md).*
