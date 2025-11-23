@@ -66,30 +66,30 @@ jobs:
         run: |
           echo "::group::Testing rule detection with intentional violations"
           
-          # Create temporary test file with violations
-          cat > src/_RuleTest.php << 'EOF'
+          # Create temporary file with violations (not named *Test.php to avoid BCMath rule exclusion)
+          cat > src/_RuleCheck.php << 'EOF'
           <?php
           namespace SomeWork\P2PPathFinder;
           use Brick\Math\BigDecimal;
           
-          final class _RuleTest {
-              public function test1(): float { return 10.5 + 20.3; }
-              public function test2(): BigDecimal { return BigDecimal::of('10.5')->toScale(2); }
-              public function test3(): string { return bcadd('10', '20', 2); }
+          final class _RuleCheck {
+              public function violation1(): float { return 10.5 + 20.3; }
+              public function violation2(): BigDecimal { return BigDecimal::of('10.5')->toScale(2); }
+              public function violation3(): string { return bcadd('10', '20', 2); }
           }
           EOF
           
           # Run PHPStan on test file (should find 4 errors)
-          if vendor/bin/phpstan analyse src/_RuleTest.php --no-progress 2>&1 | grep -q "Found 4 errors"; then
+          if vendor/bin/phpstan analyse src/_RuleCheck.php --no-progress 2>&1 | grep -q "Found 4 errors"; then
             echo "✓ Custom rules successfully detected all 4 violations"
           else
             echo "✗ Custom rules did not detect expected violations"
-            vendor/bin/phpstan analyse src/_RuleTest.php --no-progress
+            vendor/bin/phpstan analyse src/_RuleCheck.php --no-progress
             exit 1
           fi
           
           # Clean up
-          rm src/_RuleTest.php
+          rm src/_RuleCheck.php
           echo "::endgroup::"
 
       - name: Summary
