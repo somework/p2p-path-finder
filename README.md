@@ -121,7 +121,7 @@ $config = PathSearchConfig::builder()
 
 Automatically discover paths through intermediate currencies:
 
-```
+```text
 USD → USDT → BTC       (2 hops)
 USD → EUR → BTC        (2 hops)
 USD → USDT → ETH → BTC (3 hops)

@@ -356,6 +356,8 @@ final class PathFinderAlgorithmStressTest extends TestCase
 
         // Should hit visited state limit
         self::assertLessThanOrEqual(5, $guardReport->visitedStates(), 'Should respect tight visited state limit');
+        self::assertTrue($guardReport->visitedStatesReached(), 'Visited states limit should be reached');
+        self::assertSame(5, $guardReport->visitedStateLimit(), 'Visited state limit should be 5');
 
         // May or may not find paths (depends on whether limit hit before reaching target)
         // The important thing is that the limit is respected

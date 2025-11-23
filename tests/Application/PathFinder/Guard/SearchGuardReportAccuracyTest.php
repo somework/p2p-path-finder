@@ -104,7 +104,7 @@ final class SearchGuardReportAccuracyTest extends TestCase
         self::assertLessThanOrEqual(20, $guardReport->visitedStates(), 'Should not visit more than 20 states for this graph');
 
         // Visited states should be <= expansions (can't visit more states than we expand)
-        self::assertLessThanOrEqual($guardReport->expansions(), $guardReport->visitedStates(), 'Visited states should not exceed expansions');
+        self::assertLessThanOrEqual($guardReport->visitedStates(), $guardReport->expansions(), 'Visited states should not exceed expansions');
     }
 
     /**

@@ -210,7 +210,7 @@ Implementations determine whether specific orders should participate in path fin
 by examining order properties (asset pairs, amounts, fees, etc.) and returning true
 if the order passes the filter criteria.
 
-## Usage
+## Usage (OrderFilterInterface)
 
 Filters are applied via OrderBook::filter() or by pre-filtering orders before
 constructing an OrderBook. Multiple filters can be chained together.
@@ -472,7 +472,7 @@ an appropriate scale to avoid floating-point issues.
 - **Hybrid**: Balance cost and hops using weighted scoring.
 - **Route-aware**: Prefer certain currencies or exchanges in the path.
 
-## Usage with PathFinderService
+### Usage with PathFinderService
 
 Pass your custom strategy to the `PathFinderService` constructor:
 
@@ -493,7 +493,7 @@ Implementations must return:
 - Zero if both paths have equal priority
 - A positive integer if `$right` should be prioritized over `$left`
 
-IMPORTANT**: Always use `insertionOrder()` as the final tie-breaker to ensure
+**IMPORTANT**: Always use `insertionOrder()` as the final tie-breaker to ensure
 stable sorting behavior:
 
 ```php
@@ -1126,7 +1126,7 @@ Fees MUST be denominated in a currency that matches the order's trading pair:
 - **Quote Fees**: Must be in the same currency as `$quoteAmount` (the order's quote asset)
 - **Both**: You can return fees in both currencies if needed
 
-CRITICAL**: The currency of returned fees MUST match the corresponding Money object's
+**CRITICAL**: The currency of returned fees MUST match the corresponding Money object's
 currency, or path finding calculations will fail. The system does NOT perform automatic
 currency conversion for fees.
 
@@ -1196,7 +1196,7 @@ The recommended format ensures uniqueness by including:
 - Scale or precision information when relevant
 - Currency information for fixed fees
 
-## Usage with Orders
+### Usage with Orders
 
 Attach a fee policy to an order at construction:
 
@@ -1217,18 +1217,18 @@ Calculates the fee components to apply for the provided order side and amounts.
 This method is called during path finding to determine fees for a specific order fill.
 It receives the order's side and the proposed fill amounts for both base and quote assets.
 
-Currency Constraints**: Returned fees MUST match the currency of the corresponding
+**Currency Constraints**: Returned fees MUST match the currency of the corresponding
 Money parameter:
 - Base fees must be in `$baseAmount->currency()`
 - Quote fees must be in `$quoteAmount->currency()`
 
-Return Value**: Use `FeeBreakdown` factory methods:
+**Return Value**: Use `FeeBreakdown` factory methods:
 - `FeeBreakdown::none()` - No fees
 - `FeeBreakdown::forBase($baseFee)` - Fee in base currency only
 - `FeeBreakdown::forQuote($quoteFee)` - Fee in quote currency only
 - `FeeBreakdown::of($baseFee, $quoteFee)` - Fees in both currencies
 
-Performance**: This method may be called thousands of times during a search.
+**Performance**: This method may be called thousands of times during a search.
 Keep computation fast and avoid expensive operations.
 
 Parameter $side: OrderSide — The order side (BUY or SELL)

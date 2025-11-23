@@ -74,7 +74,7 @@ final class ExchangeRatePropertyTest extends TestCase
             // Property: roundtrip should approximately equal original
             // Allow up to 2% difference due to two conversions and rounding
             $diff = abs((float) $originalMoney->amount() - (float) $roundtrip->amount());
-            $tolerance = max(0.1, (float) $originalMoney->amount() * 0.02);
+            $tolerance = max(0.001, (float) $originalMoney->amount() * 0.02);
 
             self::assertLessThanOrEqual(
                 $tolerance,

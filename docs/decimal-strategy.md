@@ -178,23 +178,23 @@ The library follows these automatic scale derivation rules:
 
 This section addresses common precision-related problems and their solutions.
 
-### Issue 1: "PrecisionViolation: Scale X exceeds maximum allowed scale (30)"
+### Issue 1: "InvalidInput: Scale must be between 0 and 50"
 
 **Symptom:** Exception thrown when creating Money or ExchangeRate.
 
-**Cause:** Scale parameter is too high (> 30 decimal places).
+**Cause:** Scale parameter is too high (> 50 decimal places).
 
 **Solution:**
 ```php
 // ❌ Wrong: Scale too high
-$money = Money::fromString('BTC', '0.123456789012345678901234567890123', 35);
-// Throws: PrecisionViolation
+$money = Money::fromString('BTC', '0.123456789012345678901234567890123456789012345678901234567890', 60);
+// Throws: InvalidInput
 
-// ✅ Correct: Use scale ≤ 30
-$money = Money::fromString('BTC', '0.12345678901234567890123456789', 29);
+// ✅ Correct: Use scale ≤ 50
+$money = Money::fromString('BTC', '0.12345678901234567890123456789012345678901234567890', 50);
 ```
 
-**Why?** PHP's `BigDecimal` library supports up to 30 decimal places. This is sufficient for all real-world financial calculations.
+**Why?** The library enforces a maximum scale of 50 decimal places. This is sufficient for all real-world financial calculations including high-precision cryptocurrency amounts.
 
 ### Issue 2: "Results differ slightly from expected"
 
@@ -360,8 +360,8 @@ Are you working with money amounts?
 3. **Use higher scales for rates than amounts**
    - If amounts use scale 2, rates should use scale 6+
 
-4. **Don't exceed scale 30**
-   - Maximum supported by `BigDecimal`
+4. **Don't exceed scale 50**
+   - Maximum enforced by the library
 
 5. **Use tolerances in property tests**
    - Complex operations accumulate rounding

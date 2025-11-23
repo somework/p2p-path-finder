@@ -66,8 +66,9 @@ jobs:
         run: |
           echo "::group::Testing rule detection with intentional violations"
           
-          # Create temporary file with violations (not named *Test.php to avoid BCMath rule exclusion)
-          cat > src/_RuleCheck.php << 'EOF'
+          # Create temporary file outside source tree to avoid pollution
+          TEMP_FILE=$(mktemp --suffix=.php)
+          cat > "$TEMP_FILE" << 'EOF'
           <?php
           namespace SomeWork\P2PPathFinder;
           use Brick\Math\BigDecimal;
@@ -79,17 +80,24 @@ jobs:
           }
           EOF
           
-          # Run PHPStan on test file (should find 4 errors)
-          if vendor/bin/phpstan analyse src/_RuleCheck.php --no-progress 2>&1 | grep -q "Found 4 errors"; then
+          # Run PHPStan with JSON output for reliable parsing
+          PHPSTAN_OUTPUT=$(vendor/bin/phpstan analyse "$TEMP_FILE" --no-progress --error-format=json 2>&1 || true)
+          
+          # Parse JSON to count errors
+          ERROR_COUNT=$(echo "$PHPSTAN_OUTPUT" | jq -r '.totals.file_errors // 0')
+          
+          if [ "$ERROR_COUNT" -eq 4 ]; then
             echo "✓ Custom rules successfully detected all 4 violations"
+            echo "$PHPSTAN_OUTPUT" | jq -r '.files | to_entries[] | .value.messages[] | "  - \(.message)"'
           else
-            echo "✗ Custom rules did not detect expected violations"
-            vendor/bin/phpstan analyse src/_RuleCheck.php --no-progress
+            echo "✗ Expected 4 errors, found $ERROR_COUNT"
+            echo "$PHPSTAN_OUTPUT" | jq '.'
+            rm "$TEMP_FILE"
             exit 1
           fi
           
           # Clean up
-          rm src/_RuleCheck.php
+          rm "$TEMP_FILE"
           echo "::endgroup::"
 
       - name: Summary

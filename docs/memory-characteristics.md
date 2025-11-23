@@ -520,7 +520,7 @@ $config = PathSearchConfig::builder()
 
 ### Quick Decision Flowchart
 
-```
+```text
 START
   │
   ├─ What's your latency target?
