@@ -981,6 +981,12 @@ final class PathFinder
             $ratioScale + self::SUM_EXTRA_SCALE,
         );
 
+        // Guard against negative intermediate results from arithmetic operations
+        // Money must always be non-negative per domain constraints
+        if ($baseDecimal->isNegative()) {
+            return $targetRange->min()->withScale($targetScale);
+        }
+
         $converted = $this->moneyFromDecimal(
             $edge->to(),
             $baseDecimal,
