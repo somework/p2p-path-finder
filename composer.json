@@ -80,7 +80,8 @@
             "@examples:custom-fee-policy",
             "@examples:error-handling",
             "@examples:performance-optimization",
-            "@examples:guarded-search"
+            "@examples:guarded-search",
+            "@examples:bybit-p2p-integration"
         ],
         "examples:custom-order-filter": "php examples/custom-order-filter.php",
         "examples:custom-ordering-strategy": "php examples/custom-ordering-strategy.php",
@@ -88,6 +89,7 @@
         "examples:error-handling": "php examples/error-handling.php",
         "examples:performance-optimization": "php examples/performance-optimization.php",
         "examples:guarded-search": "php examples/guarded-search-example.php",
+        "examples:bybit-p2p-integration": "php examples/bybit-p2p-integration.php",
         "check": [
             "@phpstan",
             "@psalm",
