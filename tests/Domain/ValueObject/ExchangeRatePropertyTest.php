@@ -437,10 +437,32 @@ final class ExchangeRatePropertyTest extends TestCase
     {
         // Generate rates between 0.01 and 1000 to cover realistic scenarios
         // while avoiding extreme values that cause excessive rounding errors
-        $exponent = $this->randomizer->getFloat(-2, 3);
-        $rate = max(0.01, 10 ** $exponent * $this->randomizer->getFloat(1.0, 9.99));
+        $exponent = $this->getFloat(-2, 3);
+        $rate = max(0.01, 10 ** $exponent * $this->getFloat(1.0, 9.99));
 
         return (string) $rate;
+    }
+
+    /**
+     * Get a random float between min and max (PHP 8.2 compatible).
+     *
+     * @param float $min
+     * @param float $max
+     * @return float
+     */
+    private function getFloat(float $min, float $max): float
+    {
+        // PHP 8.3+ has native getFloat() method
+        if (method_exists($this->randomizer, 'getFloat')) {
+            return $this->randomizer->getFloat($min, $max);
+        }
+
+        // PHP 8.2 fallback: use getInt() and scale
+        $precision = 1000000;
+        $randomInt = $this->randomizer->getInt(0, $precision);
+        $ratio = $randomInt / $precision;
+
+        return $min + ($ratio * ($max - $min));
     }
 
     private function randomDistinctCurrency(string $existing): string
