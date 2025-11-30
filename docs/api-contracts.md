@@ -471,19 +471,19 @@ An array of [PathLeg](#pathleg) objects:
 
 **Fields**:
 
-| Field     | Type   | Required | Description                              |
-|-----------|--------|----------|------------------------------------------|
-| `limits`  | object | Yes      | Configured search limits                 |
-| `metrics` | object | Yes      | Actual search metrics                    |
-| `breached`| object | Yes      | Boolean flags for limit breaches         |
+| Field      | Type   | Required | Description                      |
+|------------|--------|----------|----------------------------------|
+| `limits`   | object | Yes      | Configured search limits         |
+| `metrics`  | object | Yes      | Actual search metrics            |
+| `breached` | object | Yes      | Boolean flags for limit breaches |
 
 #### `limits` Object
 
-| Field            | Type     | Required | Description                              |
-|------------------|----------|----------|------------------------------------------|
-| `expansions`     | int      | Yes      | Maximum allowed node expansions          |
-| `visited_states` | int      | Yes      | Maximum allowed visited states           |
-| `time_budget_ms` | int|null | Yes      | Time budget in milliseconds (null = unlimited) |
+| Field            | Type | Required | Description                     |
+|------------------|------|----------|---------------------------------|
+| `expansions`     | int  | Yes      | Maximum allowed node expansions |
+| `visited_states` | int  | Yes      | Maximum allowed visited states  |
+| `time_budget_ms` | int  | null     | Yes                             | Time budget in milliseconds (null = unlimited) |
 
 #### `metrics` Object
 

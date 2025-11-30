@@ -14,15 +14,15 @@ Quick solutions to common issues when using the P2P Path Finder library.
 
 ## Quick Diagnosis
 
-| Symptom | Most Likely Cause | Quick Fix |
-|---------|------------------|-----------|
-| **Empty paths** | No connecting orders | Check order book connectivity |
-| **Guard limits hit** | Large order book or deep graph | Increase guard limits or pre-filter orders |
-| **`InvalidInput` exception** | Invalid config/data | Check error message, validate inputs |
-| **Slow searches** | Too many orders or high hop depth | Pre-filter orders, reduce hop limit |
-| **`PrecisionViolation`** | Extreme scale differences | Use reasonable scales (0-30) |
-| **Currency mismatch** | Wrong currency codes | Verify 3-letter ISO codes |
-| **Out of memory** | Guard limits too high | Reduce `maxVisitedStates` |
+| Symptom                      | Most Likely Cause                 | Quick Fix                                  |
+|------------------------------|-----------------------------------|--------------------------------------------|
+| **Empty paths**              | No connecting orders              | Check order book connectivity              |
+| **Guard limits hit**         | Large order book or deep graph    | Increase guard limits or pre-filter orders |
+| **`InvalidInput` exception** | Invalid config/data               | Check error message, validate inputs       |
+| **Slow searches**            | Too many orders or high hop depth | Pre-filter orders, reduce hop limit        |
+| **`PrecisionViolation`**     | Extreme scale differences         | Use reasonable scales (0-30)               |
+| **Currency mismatch**        | Wrong currency codes              | Verify 3-letter ISO codes                  |
+| **Out of memory**            | Guard limits too high             | Reduce `maxVisitedStates`                  |
 
 ---
 
@@ -43,41 +43,41 @@ echo "Visited states: {$report->visitedStates()}\n";
 
 **Interpretation**:
 
-| Expansions | Diagnosis | Solution |
-|------------|-----------|----------|
-| < 10 | Order book issue | Check if orders connect source to target |
-| 10-100 | Limited connectivity | Increase hop limit or add bridge orders |
-| > 100 | Search explored but found nothing | Widen tolerance or check amount bounds |
+| Expansions | Diagnosis                         | Solution                                 |
+|------------|-----------------------------------|------------------------------------------|
+| < 10       | Order book issue                  | Check if orders connect source to target |
+| 10-100     | Limited connectivity              | Increase hop limit or add bridge orders  |
+| > 100      | Search explored but found nothing | Widen tolerance or check amount bounds   |
 
 **Solutions**:
 
 1. **Check order book connectivity**:
-```php
-// Count orders involving your currencies
-$relevantOrders = $orderBook->filter(
-    new CurrencyPairFilter(['USD', 'BTC', 'EUR'])
-);
-echo "Relevant orders: " . count(iterator_to_array($relevantOrders)) . "\n";
-```
+    ```php
+    // Count orders involving your currencies
+    $relevantOrders = $orderBook->filter(
+        new CurrencyPairFilter(['USD', 'BTC', 'EUR'])
+    );
+    echo "Relevant orders: " . count(iterator_to_array($relevantOrders)) . "\n";
+    ```
 
 2. **Widen tolerance window**:
-```php
-->withToleranceBounds('0.0', '0.20')  // 0-20% tolerance
-```
+    ```php
+    ->withToleranceBounds('0.0', '0.20')  // 0-20% tolerance
+    ```
 
 3. **Increase hop limit**:
-```php
-->withHopLimits(1, 5)  // Allow up to 5 hops
-```
+    ```php
+    ->withHopLimits(1, 5)  // Allow up to 5 hops
+    ```
 
 4. **Check amount bounds**:
-```php
-// Ensure spend amount is within order bounds
-$amount = Money::fromString('USD', '100.00', 2);
-$minFilter = new MinimumAmountFilter($amount->multipliedBy('0.1'));
-$maxFilter = new MaximumAmountFilter($amount->multipliedBy('10.0'));
-$viable = $orderBook->filter($minFilter, $maxFilter);
-```
+    ```php
+    // Ensure spend amount is within order bounds
+    $amount = Money::fromString('USD', '100.00', 2);
+    $minFilter = new MinimumAmountFilter($amount->multipliedBy('0.1'));
+    $maxFilter = new MaximumAmountFilter($amount->multipliedBy('10.0'));
+    $viable = $orderBook->filter($minFilter, $maxFilter);
+    ```
 
 ---
 
@@ -95,11 +95,11 @@ echo "Time: {$report->elapsedMilliseconds()}ms\n";
 
 **Solutions**:
 
-| If Hitting... | Solution |
-|---------------|----------|
-| **Expansion limit** | Increase `maxExpansions` or pre-filter order book |
-| **Visited states limit** | Increase `maxVisitedStates` or reduce hop depth |
-| **Time budget** | Increase time budget or optimize search space |
+| If Hitting...            | Solution                                          |
+|--------------------------|---------------------------------------------------|
+| **Expansion limit**      | Increase `maxExpansions` or pre-filter order book |
+| **Visited states limit** | Increase `maxVisitedStates` or reduce hop depth   |
+| **Time budget**          | Increase time budget or optimize search space     |
 
 **Quick fixes**:
 
@@ -131,14 +131,14 @@ $request = new PathSearchRequest($filtered, $config, $target);
 
 **Common causes**:
 
-| Error Message Contains | Cause | Fix |
-|------------------------|-------|-----|
-| "negative" | Negative amount | Use positive amounts only |
-| "scale" | Invalid scale | Use scale 0-30 |
-| "currency" | Invalid currency code | Use 3-12 letter codes (e.g., "USD", "BTC") |
-| "hops" | min > max hops | Ensure `minHops ≤ maxHops` |
-| "tolerance" | min > max tolerance | Ensure `minTolerance ≤ maxTolerance` |
-| "distinct currencies" | Same base and quote | Use different currencies |
+| Error Message Contains | Cause                 | Fix                                        |
+|------------------------|-----------------------|--------------------------------------------|
+| "negative"             | Negative amount       | Use positive amounts only                  |
+| "scale"                | Invalid scale         | Use scale 0-30                             |
+| "currency"             | Invalid currency code | Use 3-12 letter codes (e.g., "USD", "BTC") |
+| "hops"                 | min > max hops        | Ensure `minHops ≤ maxHops`                 |
+| "tolerance"            | min > max tolerance   | Ensure `minTolerance ≤ maxTolerance`       |
+| "distinct currencies"  | Same base and quote   | Use different currencies                   |
 
 **Prevention**:
 ```php
@@ -177,11 +177,11 @@ echo "Expansions: {$outcome->guardLimits()->expansions()}\n";
 
 **Solutions by order book size**:
 
-| Order Count | Expected Time | If Slower, Try... |
-|-------------|---------------|-------------------|
-| < 1,000 | < 100ms | Pre-filter by amount/currency |
-| 1,000-10,000 | 100-500ms | Reduce hop limit to 4 |
-| 10,000+ | 500-2000ms | Aggressive filtering + conservative guards |
+| Order Count  | Expected Time | If Slower, Try...                          |
+|--------------|---------------|--------------------------------------------|
+| < 1,000      | < 100ms       | Pre-filter by amount/currency              |
+| 1,000-10,000 | 100-500ms     | Reduce hop limit to 4                      |
+| 10,000+      | 500-2000ms    | Aggressive filtering + conservative guards |
 
 **Performance tuning**:
 
@@ -246,11 +246,11 @@ $filtered = $orderBook->filter(
 **Memory by guard limit**:
 
 | Max Visited States | Expected Memory | Recommended PHP Limit |
-|--------------------|-----------------|----------------------|
-| 10,000 | 10-30 MB | 128M |
-| 50,000 | 50-150 MB | 256M |
-| 100,000 | 100-300 MB | 512M |
-| 250,000 | 250-750 MB | 1G |
+|--------------------|-----------------|-----------------------|
+| 10,000             | 10-30 MB        | 128M                  |
+| 50,000             | 50-150 MB       | 256M                  |
+| 100,000            | 100-300 MB      | 512M                  |
+| 250,000            | 250-750 MB      | 1G                    |
 
 ---
 

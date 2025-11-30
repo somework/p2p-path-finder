@@ -14,6 +14,10 @@ use PHPStan\Analyser\Scope;
 use PHPStan\Rules\Rule;
 use PHPStan\Rules\RuleErrorBuilder;
 
+use function in_array;
+use function is_string;
+use function sprintf;
+
 /**
  * Detects float literals in arithmetic operations to prevent precision loss.
  *
@@ -100,7 +104,7 @@ final class FloatLiteralInArithmeticRule implements Rule
                 $node->left->value
             ))
                 ->identifier('p2pPathFinder.floatLiteral')
-                ->tip('Convert to string: \'' . $node->left->value . '\'')
+                ->tip('Convert to string: \''.$node->left->value.'\'')
                 ->build();
         }
 
@@ -111,7 +115,7 @@ final class FloatLiteralInArithmeticRule implements Rule
                 $node->right->value
             ))
                 ->identifier('p2pPathFinder.floatLiteral')
-                ->tip('Convert to string: \'' . $node->right->value . '\'')
+                ->tip('Convert to string: \''.$node->right->value.'\'')
                 ->build();
         }
 
@@ -147,7 +151,7 @@ final class FloatLiteralInArithmeticRule implements Rule
                     $methodName
                 ))
                     ->identifier('p2pPathFinder.floatLiteral')
-                    ->tip('Convert to string: \'' . $arg->value->value . '\'')
+                    ->tip('Convert to string: \''.$arg->value->value.'\'')
                     ->build();
             }
         }
@@ -168,10 +172,10 @@ final class FloatLiteralInArithmeticRule implements Rule
     {
         // Check if the node is within an allowed context by looking at function/class names
         $function = $scope->getFunction();
-        if ($function !== null) {
+        if (null !== $function) {
             $functionName = $function->getName();
             foreach (self::ALLOWED_CONTEXTS as $context) {
-                if (stripos($functionName, $context) !== false) {
+                if (false !== stripos($functionName, $context)) {
                     return true;
                 }
             }
@@ -179,10 +183,10 @@ final class FloatLiteralInArithmeticRule implements Rule
 
         // Check class name
         $classReflection = $scope->getClassReflection();
-        if ($classReflection !== null) {
+        if (null !== $classReflection) {
             $className = $classReflection->getName();
             foreach (self::ALLOWED_CONTEXTS as $context) {
-                if (stripos($className, $context) !== false) {
+                if (false !== stripos($className, $context)) {
                     return true;
                 }
             }
@@ -197,7 +201,7 @@ final class FloatLiteralInArithmeticRule implements Rule
                 $literal = $node->right->value;
             }
 
-            if ($literal === 1000.0 || $literal === 1000) {
+            if (1000.0 === $literal || 1000 === $literal) {
                 // Check if the other operand or result is time-related
                 if ($this->isTimeRelatedExpression($node, $scope)) {
                     return true;
@@ -205,7 +209,7 @@ final class FloatLiteralInArithmeticRule implements Rule
             }
 
             // Allow 0.0 comparisons in guard/validation contexts
-            if (($literal === 0.0 || $literal === 0) && ($node instanceof BinaryOp\Smaller || $node instanceof BinaryOp\Greater)) {
+            if ((0.0 === $literal || 0 === $literal) && ($node instanceof BinaryOp\Smaller || $node instanceof BinaryOp\Greater)) {
                 if ($this->isTimeRelatedExpression($node, $scope)) {
                     return true;
                 }
@@ -222,7 +226,7 @@ final class FloatLiteralInArithmeticRule implements Rule
 
         foreach ($variables as $varName) {
             foreach (self::TIME_RELATED_PATTERNS as $pattern) {
-                if (stripos($varName, $pattern) !== false) {
+                if (false !== stripos($varName, $pattern)) {
                     return true;
                 }
             }
@@ -238,11 +242,11 @@ final class FloatLiteralInArithmeticRule implements Rule
     {
         $names = [];
 
-        if ($node instanceof Node\Expr\Variable && is_string($node->name)) {
+        if ($node instanceof Expr\Variable && is_string($node->name)) {
             $names[] = $node->name;
         }
 
-        if ($node instanceof Node\Expr\PropertyFetch) {
+        if ($node instanceof Expr\PropertyFetch) {
             if ($node->name instanceof Node\Identifier) {
                 $names[] = $node->name->toString();
             }
@@ -257,4 +261,3 @@ final class FloatLiteralInArithmeticRule implements Rule
         return $names;
     }
 }
-

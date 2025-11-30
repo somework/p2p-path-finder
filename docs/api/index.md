@@ -431,26 +431,25 @@ extension point for customizing search behavior based on business requirements.
 Implementations MUST adhere to the following contract:
 
 1. **Comparison Semantics**: The `compare()` method must return:
-- **Negative integer** if `$left` should rank BEFORE `$right` (lower rank = higher priority)
-- **Zero** if `$left` and `$right` have equal rank
-- **Positive integer** if `$left` should rank AFTER `$right`
+   - **Negative integer** if `$left` should rank BEFORE `$right` (lower rank = higher priority)
+   - **Zero** if `$left` and `$right` have equal rank
+   - **Positive integer** if `$left` should rank AFTER `$right`
 
 2. **Transitivity**: If A < B and B < C, then A < C must hold.
 
 3. **Stability**: To ensure stable sorting, always fall back to `insertionOrder()` as the
 final tie-breaker when all other attributes are equal:
 
-```php
-if ($result === 0) {
-return $left->insertionOrder() <=> $right->insertionOrder();
-}
-```
+    ```php
+    if ($result === 0) {
+    return $left->insertionOrder() <=> $right->insertionOrder();
+    }
+    ```
 
-4. **Determinism**: Given the same `PathOrderKey` objects, `compare()` must always return
-the same result. Avoid non-deterministic operations like:
-- Random number generation
-- System time or timestamps (unless part of the key data)
-- Unordered data structures (like raw hash sets)
+4. **Determinism**: Given the same `PathOrderKey` objects, `compare()` must always return the same result. Avoid non-deterministic operations like:
+   - Random number generation
+   - System time or timestamps (unless part of the key data)
+   - Unordered data structures (like raw hash sets)
 
 5. **Consistency**: The ordering must be consistent with the mathematical properties of
 comparison. Specifically:

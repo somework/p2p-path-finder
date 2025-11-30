@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/../vendor/autoload.php';
+require __DIR__.'/../vendor/autoload.php';
 
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
@@ -71,9 +71,9 @@ try {
     );
 
     exit(0); // Success
-} catch (\Throwable $e) {
-    fwrite(STDERR, "✗ Example failed with unexpected error:\n");
-    fwrite(STDERR, "  " . get_class($e) . ": " . $e->getMessage() . "\n");
-    fwrite(STDERR, "  at " . $e->getFile() . ":" . $e->getLine() . "\n");
+} catch (Throwable $e) {
+    fwrite(\STDERR, "✗ Example failed with unexpected error:\n");
+    fwrite(\STDERR, '  '.$e::class.': '.$e->getMessage()."\n");
+    fwrite(\STDERR, '  at '.$e->getFile().':'.$e->getLine()."\n");
     exit(1); // Failure
 }

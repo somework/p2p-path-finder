@@ -215,21 +215,21 @@ composer examples:performance-optimization
 
 **Latest benchmarks** (PHP 8.3, Ubuntu 22.04, Xeon vCPU):
 
-| Scenario | Orders | Mean Time | Peak Memory |
-|----------|--------|-----------|-------------|
-| k-best-n1e2 | 100 | 25.5ms | 8.3 MB |
-| k-best-n1e3 | 1,000 | 216.3ms | 12.8 MB |
-| k-best-n1e4 | 10,000 | 2,154.7ms | 59.1 MB |
+| Scenario    | Orders | Mean Time | Peak Memory |
+|-------------|--------|-----------|-------------|
+| k-best-n1e2 | 100    | 25.5ms    | 8.3 MB      |
+| k-best-n1e3 | 1,000  | 216.3ms   | 12.8 MB     |
+| k-best-n1e4 | 10,000 | 2,154.7ms | 59.1 MB     |
 
 > ✅  **Performance Update (2025-11-21):** The BigDecimal migration delivered **85-87% faster runtime** compared to BCMath baseline.
 
 **Memory scales predictably**:
 
-| Order Book Size | Peak Memory | Recommended Guards |
-|-----------------|-------------|--------------------|
-| 100 orders | 8-15 MB | 10k states, 25k expansions |
-| 1,000 orders | 12-30 MB | 50k states, 100k expansions |
-| 10,000 orders | 50-150 MB | 100k states, 200k expansions |
+| Order Book Size | Peak Memory | Recommended Guards           |
+|-----------------|-------------|------------------------------|
+| 100 orders      | 8-15 MB     | 10k states, 25k expansions   |
+| 1,000 orders    | 12-30 MB    | 50k states, 100k expansions  |
+| 10,000 orders   | 50-150 MB   | 100k states, 200k expansions |
 
 **Optimization strategies**:
 

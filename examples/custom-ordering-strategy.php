@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Example: Custom Path Ordering Strategies
+ * Example: Custom Path Ordering Strategies.
  *
  * This example demonstrates how to implement and use custom PathOrderStrategy
  * implementations to control how paths are prioritized during search.
@@ -14,9 +14,8 @@ declare(strict_types=1);
  * Run: php examples/custom-ordering-strategy.php
  */
 
-require __DIR__ . '/../vendor/autoload.php';
+require __DIR__.'/../vendor/autoload.php';
 
-use Brick\Math\BigDecimal;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
@@ -233,6 +232,7 @@ function createSampleOrderBook(): OrderBook
                 bcmul($quoteAmount->amount(), '0.005', 6),
                 6
             );
+
             return FeeBreakdown::forQuote($feeAmount);
         }
 
@@ -251,6 +251,7 @@ function createSampleOrderBook(): OrderBook
                 bcmul($quoteAmount->amount(), '0.01', 6),
                 6
             );
+
             return FeeBreakdown::forQuote($feeAmount);
         }
 
@@ -367,9 +368,9 @@ function createSampleOrderBook(): OrderBook
 function demonstrateStrategy(string $name, PathOrderStrategy $strategy): void
 {
     echo "\n";
-    echo str_repeat('=', 80) . "\n";
+    echo str_repeat('=', 80)."\n";
     echo "Strategy: {$name}\n";
-    echo str_repeat('=', 80) . "\n\n";
+    echo str_repeat('=', 80)."\n\n";
 
     $orderBook = createSampleOrderBook();
     $graphBuilder = new GraphBuilder();
@@ -388,17 +389,18 @@ function demonstrateStrategy(string $name, PathOrderStrategy $strategy): void
 
     if (!$resultSet->hasPaths()) {
         echo "No paths found.\n";
+
         return;
     }
 
     $pathResultSet = $resultSet->paths();
-    echo "Found " . count($pathResultSet) . " path(s):\n\n";
+    echo 'Found '.count($pathResultSet)." path(s):\n\n";
 
     $position = 1;
     foreach ($pathResultSet as $path) {
         $legs = $path->legs();
         $hopCount = count($legs);
-        
+
         if (0 === $hopCount) {
             continue;
         }
@@ -408,9 +410,9 @@ function demonstrateStrategy(string $name, PathOrderStrategy $strategy): void
         $firstLeg = $legArray[0];
         $fullSignature = $firstLeg->from();
         foreach ($legArray as $leg) {
-            $fullSignature .= ' -> ' . $leg->to();
+            $fullSignature .= ' -> '.$leg->to();
         }
-        
+
         $totalSpent = $path->totalSpent();
         $totalReceived = $path->totalReceived();
         $residualTolerance = $path->residualTolerancePercentage(4);
@@ -431,107 +433,104 @@ function demonstrateStrategy(string $name, PathOrderStrategy $strategy): void
 // ============================================================================
 
 try {
+    echo "\n";
+    echo "╔════════════════════════════════════════════════════════════════════════════╗\n";
+    echo "║                    Custom Path Ordering Strategy Demo                     ║\n";
+    echo "╚════════════════════════════════════════════════════════════════════════════╝\n";
 
-echo "\n";
-echo "╔════════════════════════════════════════════════════════════════════════════╗\n";
-echo "║                    Custom Path Ordering Strategy Demo                     ║\n";
-echo "╚════════════════════════════════════════════════════════════════════════════╝\n";
+    echo "\n";
+    echo "This example demonstrates how different ordering strategies affect path ranking.\n";
+    echo "We'll use the same order book but apply different strategies to see how the\n";
+    echo "results change based on different prioritization criteria.\n";
 
-echo "\n";
-echo "This example demonstrates how different ordering strategies affect path ranking.\n";
-echo "We'll use the same order book but apply different strategies to see how the\n";
-echo "results change based on different prioritization criteria.\n";
+    // Demo 1: Default Strategy (Cost-first)
+    demonstrateStrategy(
+        'Default (Cost, Hops, Signature)',
+        new SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy(6)
+    );
 
-// Demo 1: Default Strategy (Cost-first)
-demonstrateStrategy(
-    'Default (Cost, Hops, Signature)',
-    new \SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy(6)
-);
+    // Demo 2: Minimize Hops Strategy
+    demonstrateStrategy(
+        'Minimize Hops First',
+        new MinimizeHopsStrategy(costScale: 6)
+    );
 
-// Demo 2: Minimize Hops Strategy
-demonstrateStrategy(
-    'Minimize Hops First',
-    new MinimizeHopsStrategy(costScale: 6)
-);
+    // Demo 3: Weighted Scoring Strategy
+    demonstrateStrategy(
+        'Weighted Scoring (Cost: 1.0, Hops: 0.5)',
+        new WeightedScoringStrategy(costWeight: 1.0, hopWeight: 0.5, costScale: 6)
+    );
 
-// Demo 3: Weighted Scoring Strategy
-demonstrateStrategy(
-    'Weighted Scoring (Cost: 1.0, Hops: 0.5)',
-    new WeightedScoringStrategy(costWeight: 1.0, hopWeight: 0.5, costScale: 6)
-);
+    // Demo 4: Route Preference Strategy (prefer GBP routes)
+    demonstrateStrategy(
+        'Route Preference (prefer GBP)',
+        new RoutePreferenceStrategy(preferredCurrencies: ['GBP'], costScale: 6)
+    );
 
-// Demo 4: Route Preference Strategy (prefer GBP routes)
-demonstrateStrategy(
-    'Route Preference (prefer GBP)',
-    new RoutePreferenceStrategy(preferredCurrencies: ['GBP'], costScale: 6)
-);
+    // ============================================================================
+    // Determinism Test
+    // ============================================================================
 
-// ============================================================================
-// Determinism Test
-// ============================================================================
+    echo "\n";
+    echo str_repeat('=', 80)."\n";
+    echo "Determinism Test: Running same search 3 times\n";
+    echo str_repeat('=', 80)."\n\n";
 
-echo "\n";
-echo str_repeat('=', 80) . "\n";
-echo "Determinism Test: Running same search 3 times\n";
-echo str_repeat('=', 80) . "\n\n";
+    $orderBook = createSampleOrderBook();
+    $graphBuilder = new GraphBuilder();
+    $strategy = new MinimizeHopsStrategy(6);
+    $service = new PathFinderService($graphBuilder, $strategy);
 
-$orderBook = createSampleOrderBook();
-$graphBuilder = new GraphBuilder();
-$strategy = new MinimizeHopsStrategy(6);
-$service = new PathFinderService($graphBuilder, $strategy);
+    $config = PathSearchConfig::builder()
+        ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+        ->withToleranceBounds('0.00', '0.05')
+        ->withHopLimits(1, 5)
+        ->withResultLimit(3)
+        ->build();
 
-$config = PathSearchConfig::builder()
-    ->withSpendAmount(Money::fromString('USD', '100.00', 2))
-    ->withToleranceBounds('0.00', '0.05')
-    ->withHopLimits(1, 5)
-    ->withResultLimit(3)
-    ->build();
-
-$results = [];
-for ($run = 1; $run <= 3; ++$run) {
-    $request = new PathSearchRequest($orderBook, $config, 'EUR');
-    $resultSet = $service->findBestPaths($request);
-    $signatures = [];
-    $pathResultSet = $resultSet->paths();
-    foreach ($pathResultSet as $path) {
-        $legs = $path->legs();
-        if (count($legs) > 0) {
-            $legArray = iterator_to_array($legs);
-            $firstLeg = $legArray[0];
-            $signature = $firstLeg->from();
-            foreach ($legArray as $leg) {
-                $signature .= ' -> ' . $leg->to();
+    $results = [];
+    for ($run = 1; $run <= 3; ++$run) {
+        $request = new PathSearchRequest($orderBook, $config, 'EUR');
+        $resultSet = $service->findBestPaths($request);
+        $signatures = [];
+        $pathResultSet = $resultSet->paths();
+        foreach ($pathResultSet as $path) {
+            $legs = $path->legs();
+            if (count($legs) > 0) {
+                $legArray = iterator_to_array($legs);
+                $firstLeg = $legArray[0];
+                $signature = $firstLeg->from();
+                foreach ($legArray as $leg) {
+                    $signature .= ' -> '.$leg->to();
+                }
+                $signatures[] = $signature;
             }
-            $signatures[] = $signature;
         }
+        $results[$run] = $signatures;
+
+        echo "Run {$run}: ".implode(', ', $signatures)."\n";
     }
-    $results[$run] = $signatures;
 
-    echo "Run {$run}: " . implode(', ', $signatures) . "\n";
-}
+    // Verify all runs produced the same results
+    $allSame = ($results[1] === $results[2]) && ($results[2] === $results[3]);
 
-// Verify all runs produced the same results
-$allSame = ($results[1] === $results[2]) && ($results[2] === $results[3]);
+    echo "\n";
+    if ($allSame) {
+        echo "✓ Determinism verified: All runs produced identical results\n";
+    } else {
+        echo "✗ Determinism violation: Results differ across runs\n";
+    }
 
-echo "\n";
-if ($allSame) {
-    echo "✓ Determinism verified: All runs produced identical results\n";
-} else {
-    echo "✗ Determinism violation: Results differ across runs\n";
-}
-
-echo "\n";
-echo "╔════════════════════════════════════════════════════════════════════════════╗\n";
-echo "║                              Demo Complete                                 ║\n";
-echo "╚════════════════════════════════════════════════════════════════════════════╝\n";
-echo "\n";
-
-} catch (\Throwable $e) {
-    fwrite(STDERR, "\n✗ Example failed with unexpected error:\n");
-    fwrite(STDERR, "  " . get_class($e) . ": " . $e->getMessage() . "\n");
-    fwrite(STDERR, "  at " . $e->getFile() . ":" . $e->getLine() . "\n");
+    echo "\n";
+    echo "╔════════════════════════════════════════════════════════════════════════════╗\n";
+    echo "║                              Demo Complete                                 ║\n";
+    echo "╚════════════════════════════════════════════════════════════════════════════╝\n";
+    echo "\n";
+} catch (Throwable $e) {
+    fwrite(\STDERR, "\n✗ Example failed with unexpected error:\n");
+    fwrite(\STDERR, '  '.$e::class.': '.$e->getMessage()."\n");
+    fwrite(\STDERR, '  at '.$e->getFile().':'.$e->getLine()."\n");
     exit(1); // Failure
 }
 
 exit(0); // Success
-

@@ -56,10 +56,10 @@ This document provides step-by-step instructions for upgrading between major ver
 
 ## Version Compatibility Matrix
 
-| Your Version | Target Version | Difficulty | Breaking Changes | Required Actions |
-|--------------|----------------|------------|------------------|------------------|
-| **0.x** | 1.0 | Medium | Yes | See [0.x → 1.0](#upgrading-from-0x-to-10) |
-| **1.x** | 2.0 | TBD | TBD | See [1.x → 2.0](#upgrading-from-1x-to-20) (when available) |
+| Your Version | Target Version | Difficulty | Breaking Changes | Required Actions                                           |
+|--------------|----------------|------------|------------------|------------------------------------------------------------|
+| **0.x**      | 1.0            | Medium     | Yes              | See [0.x → 1.0](#upgrading-from-0x-to-10)                  |
+| **1.x**      | 2.0            | TBD        | TBD              | See [1.x → 2.0](#upgrading-from-1x-to-20) (when available) |
 
 ---
 

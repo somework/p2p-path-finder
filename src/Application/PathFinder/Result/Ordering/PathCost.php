@@ -7,7 +7,7 @@ namespace SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering;
 use Brick\Math\BigDecimal;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalHelperTrait;
 
-final class PathCost
+final class PathCost implements \Stringable
 {
     use DecimalHelperTrait;
 

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Example: Custom Fee Policy Implementations
+ * Example: Custom Fee Policy Implementations.
  *
  * This example demonstrates how to implement and use custom FeePolicy implementations
  * to define fee calculation logic for orders. It shows realistic fee scenarios including:
@@ -16,7 +16,7 @@ declare(strict_types=1);
  * Run: php examples/custom-fee-policy.php
  */
 
-require __DIR__ . '/../vendor/autoload.php';
+require __DIR__.'/../vendor/autoload.php';
 
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
@@ -47,7 +47,7 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 final class PercentageFeePolicy implements FeePolicy
 {
     /**
-     * @param string $rate The fee rate as a decimal string (e.g., "0.005" for 0.5%)
+     * @param string $rate  The fee rate as a decimal string (e.g., "0.005" for 0.5%)
      * @param int    $scale The decimal scale for calculations
      */
     public function __construct(
@@ -97,8 +97,8 @@ final class FixedFeePolicy implements FeePolicy
 
     /**
      * @param string $currency The currency for the fee
-     * @param string $amount The fixed fee amount
-     * @param int    $scale The decimal scale
+     * @param string $amount   The fixed fee amount
+     * @param int    $scale    The decimal scale
      */
     public function __construct(
         string $currency,
@@ -153,9 +153,9 @@ final class FixedFeePolicy implements FeePolicy
 final class TieredFeePolicy implements FeePolicy
 {
     /**
-     * @param string $currency Reference currency for tier thresholds
-     * @param list<array{threshold: string, rate: string}> $tiers Ascending tier definitions
-     * @param int $scale Decimal scale for calculations
+     * @param string                                       $currency Reference currency for tier thresholds
+     * @param list<array{threshold: string, rate: string}> $tiers    Ascending tier definitions
+     * @param int                                          $scale    Decimal scale for calculations
      */
     public function __construct(
         private readonly string $currency,
@@ -227,7 +227,7 @@ final class MakerTakerFeePolicy implements FeePolicy
     /**
      * @param string $makerRate Fee rate for maker orders (SELL)
      * @param string $takerRate Fee rate for taker orders (BUY)
-     * @param int    $scale Decimal scale for calculations
+     * @param int    $scale     Decimal scale for calculations
      */
     public function __construct(
         private readonly string $makerRate,
@@ -280,11 +280,11 @@ final class CombinedFeePolicy implements FeePolicy
     private readonly ?Money $maximumFee;
 
     /**
-     * @param string $percentageRate The percentage fee rate
-     * @param string|null $minAmount Minimum fee amount (null for no minimum)
-     * @param string|null $maxAmount Maximum fee amount (null for no cap)
-     * @param string $currency Currency for min/max fees
-     * @param int $scale Decimal scale
+     * @param string      $percentageRate The percentage fee rate
+     * @param string|null $minAmount      Minimum fee amount (null for no minimum)
+     * @param string|null $maxAmount      Maximum fee amount (null for no cap)
+     * @param string      $currency       Currency for min/max fees
+     * @param int         $scale          Decimal scale
      */
     public function __construct(
         private readonly string $percentageRate,
@@ -293,11 +293,11 @@ final class CombinedFeePolicy implements FeePolicy
         string $currency,
         private readonly int $scale = 6,
     ) {
-        $this->minimumFee = $minAmount !== null
+        $this->minimumFee = null !== $minAmount
             ? Money::fromString($currency, $minAmount, $scale)
             : null;
 
-        $this->maximumFee = $maxAmount !== null
+        $this->maximumFee = null !== $maxAmount
             ? Money::fromString($currency, $maxAmount, $scale)
             : null;
     }
@@ -308,14 +308,14 @@ final class CombinedFeePolicy implements FeePolicy
         $percentageFeeAmount = bcmul($quoteAmount->amount(), $this->percentageRate, $this->scale);
 
         // Apply minimum constraint
-        if ($this->minimumFee !== null && $this->minimumFee->currency() === $quoteAmount->currency()) {
+        if (null !== $this->minimumFee && $this->minimumFee->currency() === $quoteAmount->currency()) {
             if (bccomp($percentageFeeAmount, $this->minimumFee->amount(), $this->scale) < 0) {
                 $percentageFeeAmount = $this->minimumFee->amount();
             }
         }
 
         // Apply maximum constraint
-        if ($this->maximumFee !== null && $this->maximumFee->currency() === $quoteAmount->currency()) {
+        if (null !== $this->maximumFee && $this->maximumFee->currency() === $quoteAmount->currency()) {
             if (bccomp($percentageFeeAmount, $this->maximumFee->amount(), $this->scale) > 0) {
                 $percentageFeeAmount = $this->maximumFee->amount();
             }
@@ -328,11 +328,11 @@ final class CombinedFeePolicy implements FeePolicy
 
     public function fingerprint(): string
     {
-        $minPart = $this->minimumFee !== null
+        $minPart = null !== $this->minimumFee
             ? sprintf('%s:%s', $this->minimumFee->currency(), $this->minimumFee->amount())
             : 'none';
 
-        $maxPart = $this->maximumFee !== null
+        $maxPart = null !== $this->maximumFee
             ? sprintf('%s:%s', $this->maximumFee->currency(), $this->maximumFee->amount())
             : 'none';
 
@@ -394,10 +394,10 @@ function createOrderBookWithFees(FeePolicy $feePolicy): OrderBook
 function demonstrateFeePolicy(string $name, FeePolicy $feePolicy): void
 {
     echo "\n";
-    echo str_repeat('=', 80) . "\n";
+    echo str_repeat('=', 80)."\n";
     echo "Fee Policy: {$name}\n";
     echo "Fingerprint: {$feePolicy->fingerprint()}\n";
-    echo str_repeat('=', 80) . "\n\n";
+    echo str_repeat('=', 80)."\n\n";
 
     $orderBook = createOrderBookWithFees($feePolicy);
     $graphBuilder = new GraphBuilder();
@@ -415,11 +415,12 @@ function demonstrateFeePolicy(string $name, FeePolicy $feePolicy): void
 
     if (!$resultSet->hasPaths()) {
         echo "No paths found.\n";
+
         return;
     }
 
     $pathResultSet = $resultSet->paths();
-    echo "Found " . count($pathResultSet) . " path(s):\n\n";
+    echo 'Found '.count($pathResultSet)." path(s):\n\n";
 
     $position = 1;
     foreach ($pathResultSet as $path) {
@@ -434,7 +435,7 @@ function demonstrateFeePolicy(string $name, FeePolicy $feePolicy): void
         $firstLeg = $legArray[0];
         $signature = $firstLeg->from();
         foreach ($legArray as $leg) {
-            $signature .= ' -> ' . $leg->to();
+            $signature .= ' -> '.$leg->to();
         }
 
         // Calculate total fees
@@ -447,10 +448,10 @@ function demonstrateFeePolicy(string $name, FeePolicy $feePolicy): void
         }
 
         echo "  [{$position}] Route: {$signature}\n";
-        echo "      - Hops: " . count($legArray) . "\n";
+        echo '      - Hops: '.count($legArray)."\n";
         echo "      - Spent: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()}\n";
         echo "      - Received: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
-        echo "      - Total Fees: " . (empty($feeStrings) ? "None" : implode(', ', $feeStrings)) . "\n";
+        echo '      - Total Fees: '.(empty($feeStrings) ? 'None' : implode(', ', $feeStrings))."\n";
         echo "\n";
 
         ++$position;
@@ -462,119 +463,116 @@ function demonstrateFeePolicy(string $name, FeePolicy $feePolicy): void
 // ============================================================================
 
 try {
+    echo "\n";
+    echo "╔════════════════════════════════════════════════════════════════════════════╗\n";
+    echo "║                       Custom Fee Policy Demo                               ║\n";
+    echo "╚════════════════════════════════════════════════════════════════════════════╝\n";
 
-echo "\n";
-echo "╔════════════════════════════════════════════════════════════════════════════╗\n";
-echo "║                       Custom Fee Policy Demo                               ║\n";
-echo "╚════════════════════════════════════════════════════════════════════════════╝\n";
+    echo "\n";
+    echo "This example demonstrates different fee policy implementations and how they\n";
+    echo "affect path costs during search. All scenarios use the same order book but\n";
+    echo "apply different fee models.\n";
 
-echo "\n";
-echo "This example demonstrates different fee policy implementations and how they\n";
-echo "affect path costs during search. All scenarios use the same order book but\n";
-echo "apply different fee models.\n";
+    // Demo 1: No Fees (baseline)
+    echo "\n";
+    echo str_repeat('=', 80)."\n";
+    echo "Baseline: No Fees\n";
+    echo str_repeat('=', 80)."\n\n";
 
-// Demo 1: No Fees (baseline)
-echo "\n";
-echo str_repeat('=', 80) . "\n";
-echo "Baseline: No Fees\n";
-echo str_repeat('=', 80) . "\n\n";
-
-$orderBookNoFees = new OrderBook([
-    new Order(
-        OrderSide::BUY,
-        AssetPair::fromString('USD', 'EUR'),
-        OrderBounds::from(
-            Money::fromString('USD', '10.00', 2),
-            Money::fromString('USD', '1000.00', 2),
+    $orderBookNoFees = new OrderBook([
+        new Order(
+            OrderSide::BUY,
+            AssetPair::fromString('USD', 'EUR'),
+            OrderBounds::from(
+                Money::fromString('USD', '10.00', 2),
+                Money::fromString('USD', '1000.00', 2),
+            ),
+            ExchangeRate::fromString('USD', 'EUR', '0.92', 6),
+            null, // No fee policy
         ),
-        ExchangeRate::fromString('USD', 'EUR', '0.92', 6),
-        null, // No fee policy
-    ),
-]);
+    ]);
 
-$service = new PathFinderService(new GraphBuilder());
-$config = PathSearchConfig::builder()
-    ->withSpendAmount(Money::fromString('USD', '100.00', 2))
-    ->withToleranceBounds('0.00', '0.05')
-    ->withHopLimits(1, 1)
-    ->withResultLimit(1)
-    ->build();
+    $service = new PathFinderService(new GraphBuilder());
+    $config = PathSearchConfig::builder()
+        ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+        ->withToleranceBounds('0.00', '0.05')
+        ->withHopLimits(1, 1)
+        ->withResultLimit(1)
+        ->build();
 
-$request = new PathSearchRequest($orderBookNoFees, $config, 'EUR');
-$resultSet = $service->findBestPaths($request);
+    $request = new PathSearchRequest($orderBookNoFees, $config, 'EUR');
+    $resultSet = $service->findBestPaths($request);
 
-if ($resultSet->hasPaths()) {
-    $path = iterator_to_array($resultSet->paths())[0];
-    echo "Received: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
-    echo "(This is the baseline amount without any fees)\n";
-}
+    if ($resultSet->hasPaths()) {
+        $path = iterator_to_array($resultSet->paths())[0];
+        echo "Received: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
+        echo "(This is the baseline amount without any fees)\n";
+    }
 
-// Demo 2: Percentage Fee
-demonstrateFeePolicy(
-    'Percentage Fee (0.5%)',
-    new PercentageFeePolicy(rate: '0.005', scale: 6)
-);
+    // Demo 2: Percentage Fee
+    demonstrateFeePolicy(
+        'Percentage Fee (0.5%)',
+        new PercentageFeePolicy(rate: '0.005', scale: 6)
+    );
 
-// Demo 3: Fixed Fee
-demonstrateFeePolicy(
-    'Fixed Fee ($2.50 in EUR)',
-    new FixedFeePolicy(currency: 'EUR', amount: '2.50', scale: 2)
-);
+    // Demo 3: Fixed Fee
+    demonstrateFeePolicy(
+        'Fixed Fee ($2.50 in EUR)',
+        new FixedFeePolicy(currency: 'EUR', amount: '2.50', scale: 2)
+    );
 
-// Demo 4: Tiered Fee
-demonstrateFeePolicy(
-    'Tiered Fee (0.5% under $500, 0.3% over)',
-    new TieredFeePolicy(
-        currency: 'USD',
-        tiers: [
-            ['threshold' => '0', 'rate' => '0.005'],      // 0.5% default
-            ['threshold' => '500', 'rate' => '0.003'],    // 0.3% over $500
-        ],
-        scale: 6
-    )
-);
+    // Demo 4: Tiered Fee
+    demonstrateFeePolicy(
+        'Tiered Fee (0.5% under $500, 0.3% over)',
+        new TieredFeePolicy(
+            currency: 'USD',
+            tiers: [
+                ['threshold' => '0', 'rate' => '0.005'],      // 0.5% default
+                ['threshold' => '500', 'rate' => '0.003'],    // 0.3% over $500
+            ],
+            scale: 6
+        )
+    );
 
-// Demo 5: Maker/Taker Fee
-demonstrateFeePolicy(
-    'Maker/Taker Fee (0.2% maker / 0.4% taker)',
-    new MakerTakerFeePolicy(
-        makerRate: '0.002',
-        takerRate: '0.004',
-        scale: 6
-    )
-);
+    // Demo 5: Maker/Taker Fee
+    demonstrateFeePolicy(
+        'Maker/Taker Fee (0.2% maker / 0.4% taker)',
+        new MakerTakerFeePolicy(
+            makerRate: '0.002',
+            takerRate: '0.004',
+            scale: 6
+        )
+    );
 
-// Demo 6: Combined Fee
-demonstrateFeePolicy(
-    'Combined Fee (0.5% with $1.00 min, $10.00 max in EUR)',
-    new CombinedFeePolicy(
-        percentageRate: '0.005',
-        minAmount: '1.00',
-        maxAmount: '10.00',
-        currency: 'EUR',
-        scale: 6
-    )
-);
+    // Demo 6: Combined Fee
+    demonstrateFeePolicy(
+        'Combined Fee (0.5% with $1.00 min, $10.00 max in EUR)',
+        new CombinedFeePolicy(
+            percentageRate: '0.005',
+            minAmount: '1.00',
+            maxAmount: '10.00',
+            currency: 'EUR',
+            scale: 6
+        )
+    );
 
-echo "\n";
-echo "╔════════════════════════════════════════════════════════════════════════════╗\n";
-echo "║                              Demo Complete                                 ║\n";
-echo "╚════════════════════════════════════════════════════════════════════════════╝\n";
-echo "\n";
-echo "Key Takeaways:\n";
-echo "  1. Fees directly impact the amount received at the end of a path\n";
-echo "  2. Higher fees increase path cost (used for ranking paths)\n";
-echo "  3. Fees must match the currency of the corresponding Money object\n";
-echo "  4. Different fee models suit different business requirements\n";
-echo "  5. The fingerprint must uniquely identify the policy configuration\n";
-echo "\n";
-
-} catch (\Throwable $e) {
-    fwrite(STDERR, "\n✗ Example failed with unexpected error:\n");
-    fwrite(STDERR, "  " . get_class($e) . ": " . $e->getMessage() . "\n");
-    fwrite(STDERR, "  at " . $e->getFile() . ":" . $e->getLine() . "\n");
+    echo "\n";
+    echo "╔════════════════════════════════════════════════════════════════════════════╗\n";
+    echo "║                              Demo Complete                                 ║\n";
+    echo "╚════════════════════════════════════════════════════════════════════════════╝\n";
+    echo "\n";
+    echo "Key Takeaways:\n";
+    echo "  1. Fees directly impact the amount received at the end of a path\n";
+    echo "  2. Higher fees increase path cost (used for ranking paths)\n";
+    echo "  3. Fees must match the currency of the corresponding Money object\n";
+    echo "  4. Different fee models suit different business requirements\n";
+    echo "  5. The fingerprint must uniquely identify the policy configuration\n";
+    echo "\n";
+} catch (Throwable $e) {
+    fwrite(\STDERR, "\n✗ Example failed with unexpected error:\n");
+    fwrite(\STDERR, '  '.$e::class.': '.$e->getMessage()."\n");
+    fwrite(\STDERR, '  at '.$e->getFile().':'.$e->getLine()."\n");
     exit(1); // Failure
 }
 
 exit(0); // Success
-

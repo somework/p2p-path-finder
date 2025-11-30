@@ -43,12 +43,12 @@ try {
 
 ## Exception Quick Reference
 
-| Exception | When Thrown | Typical Cause | Recovery Strategy |
-|-----------|-------------|---------------|-------------------|
-| **InvalidInput** | Invalid configuration or input | Negative amounts, invalid tolerance bounds, min > max | Validate input before passing to library |
-| **GuardLimitExceeded** | Search guard limit reached (opt-in) | Large order book, dense graph, high hop depth | Increase guard limits or pre-filter orders |
-| **PrecisionViolation** | Arithmetic precision loss | Extreme scale differences, overflow | Use reasonable scales (0-30), check inputs |
-| **InfeasiblePath** | Path cannot be materialized | Reserved for future use | Not currently thrown |
+| Exception              | When Thrown                         | Typical Cause                                         | Recovery Strategy                          |
+|------------------------|-------------------------------------|-------------------------------------------------------|--------------------------------------------|
+| **InvalidInput**       | Invalid configuration or input      | Negative amounts, invalid tolerance bounds, min > max | Validate input before passing to library   |
+| **GuardLimitExceeded** | Search guard limit reached (opt-in) | Large order book, dense graph, high hop depth         | Increase guard limits or pre-filter orders |
+| **PrecisionViolation** | Arithmetic precision loss           | Extreme scale differences, overflow                   | Use reasonable scales (0-30), check inputs |
+| **InfeasiblePath**     | Path cannot be materialized         | Reserved for future use                               | Not currently thrown                       |
 
 ---
 
@@ -445,14 +445,14 @@ public function searchPaths(Request $request): JsonResponse
 
 For REST APIs, map exceptions to HTTP status codes:
 
-| Exception | HTTP Status | Reason | Retry? |
-|-----------|-------------|--------|--------|
-| **InvalidInput** | 400 Bad Request | Client sent invalid data | ❌ Fix input first |
-| **GuardLimitExceeded** | 503 Service Unavailable | Server resource limits | ✅ Yes, with adjusted config |
-| **PrecisionViolation** | 400 Bad Request | Client sent problematic values | ❌ Fix input first |
-| **ExceptionInterface** | 500 Internal Server Error | Unexpected library error | ⚠️ May be transient |
-| **Empty results** | 200 OK | Valid outcome, no paths found | N/A (not an error) |
-| **Guard limits (metadata)** | 200 OK | Partial results available | N/A (not an error) |
+| Exception                   | HTTP Status               | Reason                         | Retry?                      |
+|-----------------------------|---------------------------|--------------------------------|-----------------------------|
+| **InvalidInput**            | 400 Bad Request           | Client sent invalid data       | ❌ Fix input first           |
+| **GuardLimitExceeded**      | 503 Service Unavailable   | Server resource limits         | ✅ Yes, with adjusted config |
+| **PrecisionViolation**      | 400 Bad Request           | Client sent problematic values | ❌ Fix input first           |
+| **ExceptionInterface**      | 500 Internal Server Error | Unexpected library error       | ⚠️ May be transient         |
+| **Empty results**           | 200 OK                    | Valid outcome, no paths found  | N/A (not an error)          |
+| **Guard limits (metadata)** | 200 OK                    | Partial results available      | N/A (not an error)          |
 
 ### Example API Responses
 

@@ -53,10 +53,7 @@ final class OrderBookTest extends TestCase
 
         $rejections = 0;
         $rejectingFilter = new class($rejections) implements OrderFilterInterface {
-            /**
-             * @var int
-             */
-            private $counter;
+            private int $counter;
 
             public function __construct(int &$counter)
             {
@@ -73,10 +70,7 @@ final class OrderBookTest extends TestCase
 
         $fallthroughInvocations = 0;
         $fallthroughFilter = new class($fallthroughInvocations) implements OrderFilterInterface {
-            /**
-             * @var int
-             */
-            private $counter;
+            private int $counter;
 
             public function __construct(int &$counter)
             {

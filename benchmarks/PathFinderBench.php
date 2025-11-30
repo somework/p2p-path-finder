@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Benchmarks;
 
+use PhpBench\Attributes\BeforeMethods;
+use PhpBench\Attributes\ParamProviders;
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
@@ -18,16 +20,16 @@ use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
 use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
+use SomeWork\P2PPathFinder\Tests\Fixture\BottleneckOrderBookFactory;
+use SomeWork\P2PPathFinder\Tests\Support\DecimalMath;
+
 use function array_fill;
 use function array_map;
 use function array_merge;
 use function str_pad;
 use function strlen;
 
-use PhpBench\Attributes\BeforeMethods;
-use PhpBench\Attributes\ParamProviders;
-use SomeWork\P2PPathFinder\Tests\Fixture\BottleneckOrderBookFactory;
-use SomeWork\P2PPathFinder\Tests\Support\DecimalMath;
+use const STR_PAD_LEFT;
 
 #[BeforeMethods('setUp')]
 class PathFinderBench
@@ -440,7 +442,7 @@ class PathFinderBench
                 $candidate = str_pad($candidate, 3, $alphabet[0], STR_PAD_LEFT);
             }
 
-            if ($candidate === 'SRC' || $candidate === 'DST') {
+            if ('SRC' === $candidate || 'DST' === $candidate) {
                 continue;
             }
 

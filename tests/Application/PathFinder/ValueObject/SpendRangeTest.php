@@ -69,6 +69,9 @@ final class SpendRangeTest extends TestCase
         self::assertSame('3.000', $inside->amount());
     }
 
+    /**
+     * @noinspection PhpMissingArrayKeyInspection
+     */
     public function test_from_array_requires_keys(): void
     {
         $this->expectException(InvalidInput::class);
@@ -79,6 +82,9 @@ final class SpendRangeTest extends TestCase
         ]);
     }
 
+    /**
+     * @noinspection PhpParamsInspection
+     */
     public function test_from_array_requires_money_instances(): void
     {
         $this->expectException(InvalidInput::class);

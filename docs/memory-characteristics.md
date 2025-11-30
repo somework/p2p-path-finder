@@ -18,11 +18,11 @@ Based on benchmark profiling with PHP 8.3:
 
 From PhpBench k-best scenarios (PHP 8.3, Ubuntu 22.04):
 
-| Order Book Size | Peak Memory | Orders per MB | Notes |
-|-----------------|-------------|---------------|-------|
-| 100 orders      | 8.3 MB      | ~12 orders/MB | Minimal overhead, mostly framework and graph structure |
-| 1,000 orders    | 12.8 MB     | ~78 orders/MB | Efficient scaling, cached value objects |
-| 10,000 orders   | 59.1 MB     | ~169 orders/MB | Linear scaling maintained, guard limits active |
+| Order Book Size | Peak Memory | Orders per MB  | Notes                                                  |
+|-----------------|-------------|----------------|--------------------------------------------------------|
+| 100 orders      | 8.3 MB      | ~12 orders/MB  | Minimal overhead, mostly framework and graph structure |
+| 1,000 orders    | 12.8 MB     | ~78 orders/MB  | Efficient scaling, cached value objects                |
+| 10,000 orders   | 59.1 MB     | ~169 orders/MB | Linear scaling maintained, guard limits active         |
 
 **Key insight:** Memory scales sub-linearly due to object pooling (zero `Money` cache in `GraphBuilder`), memoized exchange rates, and efficient search state representation.
 
@@ -81,14 +81,14 @@ Where K = resultLimit, H = average hops per path
 
 Based on production testing and benchmark validation:
 
-| Parameter | Conservative | Moderate | Aggressive | Notes |
-|-----------|--------------|----------|------------|-------|
-| **Max order book size** | 5,000 | 20,000 | 50,000 | Orders in single search |
-| **Max hop depth** | 4 | 6 | 8 | Balance accuracy vs. complexity |
-| **Max visited states** | 10,000 | 100,000 | 250,000 | Primary memory control |
-| **Max expansions** | 25,000 | 100,000 | 250,000 | Computation control |
-| **Search time budget** | 50 ms | 500 ms | 2,000 ms | Wall-clock safety net |
-| **Expected peak memory** | 20-50 MB | 50-200 MB | 200-500 MB | Total process memory |
+| Parameter                | Conservative | Moderate  | Aggressive | Notes                           |
+|--------------------------|--------------|-----------|------------|---------------------------------|
+| **Max order book size**  | 5,000        | 20,000    | 50,000     | Orders in single search         |
+| **Max hop depth**        | 4            | 6         | 8          | Balance accuracy vs. complexity |
+| **Max visited states**   | 10,000       | 100,000   | 250,000    | Primary memory control          |
+| **Max expansions**       | 25,000       | 100,000   | 250,000    | Computation control             |
+| **Search time budget**   | 50 ms        | 500 ms    | 2,000 ms   | Wall-clock safety net           |
+| **Expected peak memory** | 20-50 MB     | 50-200 MB | 200-500 MB | Total process memory            |
 
 ### Conservative Profile (Latency-sensitive APIs)
 
@@ -360,12 +360,12 @@ Use this systematic approach to choose appropriate guard limits for your use cas
 
 Choose the category that best matches your requirements:
 
-| Use Case | Latency Target | Memory Budget | Completeness Priority |
-|----------|----------------|---------------|----------------------|
-| **A. Real-time API** | < 50ms | Low (20-50 MB) | Medium (best effort) |
-| **B. User-facing UI** | < 200ms | Moderate (50-150 MB) | High (comprehensive) |
-| **C. Background jobs** | < 1000ms | High (150-300 MB) | Very High (exhaustive) |
-| **D. Analytics/Research** | No limit | Very High (300+ MB) | Maximum (complete) |
+| Use Case                  | Latency Target | Memory Budget        | Completeness Priority  |
+|---------------------------|----------------|----------------------|------------------------|
+| **A. Real-time API**      | < 50ms         | Low (20-50 MB)       | Medium (best effort)   |
+| **B. User-facing UI**     | < 200ms        | Moderate (50-150 MB) | High (comprehensive)   |
+| **C. Background jobs**    | < 1000ms       | High (150-300 MB)    | Very High (exhaustive) |
+| **D. Analytics/Research** | No limit       | Very High (300+ MB)  | Maximum (complete)     |
 
 ### Step 2: Choose Base Guard Limits
 
@@ -431,13 +431,13 @@ $config = PathSearchConfig::builder()
 
 Multiply the base limits from Step 2 by the order book size factor:
 
-| Order Book Size | Multiply Limits By | Memory Adjustment |
-|-----------------|-------------------|-------------------|
-| < 100 orders | 0.5× | -50% (smaller graph) |
-| 100-500 orders | 1.0× | No change (baseline) |
-| 500-2,000 orders | 1.5× | +50% (medium graph) |
-| 2,000-10,000 orders | 2.5× | +150% (large graph) |
-| 10,000+ orders | 4.0× | +300% (very large) |
+| Order Book Size     | Multiply Limits By | Memory Adjustment    |
+|---------------------|--------------------|----------------------|
+| < 100 orders        | 0.5×               | -50% (smaller graph) |
+| 100-500 orders      | 1.0×               | No change (baseline) |
+| 500-2,000 orders    | 1.5×               | +50% (medium graph)  |
+| 2,000-10,000 orders | 2.5×               | +150% (large graph)  |
+| 10,000+ orders      | 4.0×               | +300% (very large)   |
 
 **Example:**
 ```php
@@ -456,12 +456,12 @@ $config = PathSearchConfig::builder()
 
 If your order book has high currency pair diversity (dense graph), apply an additional multiplier:
 
-| Graph Density | Avg. Edges per Node | Additional Multiplier |
-|---------------|---------------------|----------------------|
-| **Sparse** | 1-3 (few currency pairs) | 1.0× (no change) |
-| **Moderate** | 4-10 (typical multi-hop) | 1.5× (+50%) |
-| **Dense** | 11-20 (high diversity) | 2.5× (+150%) |
-| **Very Dense** | 20+ (complete graph) | 4.0× (+300%) |
+| Graph Density  | Avg. Edges per Node      | Additional Multiplier |
+|----------------|--------------------------|-----------------------|
+| **Sparse**     | 1-3 (few currency pairs) | 1.0× (no change)      |
+| **Moderate**   | 4-10 (typical multi-hop) | 1.5× (+50%)           |
+| **Dense**      | 11-20 (high diversity)   | 2.5× (+150%)          |
+| **Very Dense** | 20+ (complete graph)     | 4.0× (+300%)          |
 
 **How to estimate edges per node:**
 - Count unique currency pairs in your order book
@@ -498,13 +498,13 @@ $timeUtilization = $metrics['elapsed_ms'] / $config->searchGuards()->timeBudgetM
 
 **Tuning guide:**
 
-| Utilization | Action | Reason |
-|-------------|--------|--------|
-| **< 20%** | Reduce limits by 50% | Over-provisioned, wasting resources |
-| **20-50%** | Reduce limits by 25% | Slightly over-provisioned |
-| **50-80%** | ✅ **Optimal** | Well-tuned configuration |
-| **80-95%** | Increase limits by 50% | Near saturation, may miss paths |
-| **> 95%** | Increase limits by 100% | Hitting limits frequently |
+| Utilization | Action                  | Reason                              |
+|-------------|-------------------------|-------------------------------------|
+| **< 20%**   | Reduce limits by 50%    | Over-provisioned, wasting resources |
+| **20-50%**  | Reduce limits by 25%    | Slightly over-provisioned           |
+| **50-80%**  | ✅ **Optimal**           | Well-tuned configuration            |
+| **80-95%**  | Increase limits by 50%  | Near saturation, may miss paths     |
+| **> 95%**   | Increase limits by 100% | Hitting limits frequently           |
 
 **Example tuning iteration:**
 ```php
@@ -740,11 +740,11 @@ If OOM occurs in production:
 
 Full benchmark data from PhpBench (PHP 8.3, Ubuntu 22.04, Xeon vCPU):
 
-| Scenario | Orders | Mean Time | Peak Memory | Visited States | Expansions |
-|----------|--------|-----------|-------------|----------------|------------|
-| k-best-n1e2 | 100 | 25.5 ms | 8.3 MB | ~500-1,000 | ~1,500-3,000 |
-| k-best-n1e3 | 1,000 | 216.3 ms | 12.8 MB | ~2,000-5,000 | ~8,000-15,000 |
-| k-best-n1e4 | 10,000 | 2,154.7 ms | 59.1 MB | ~10,000-20,000 | ~40,000-80,000 |
+| Scenario    | Orders | Mean Time  | Peak Memory | Visited States | Expansions     |
+|-------------|--------|------------|-------------|----------------|----------------|
+| k-best-n1e2 | 100    | 25.5 ms    | 8.3 MB      | ~500-1,000     | ~1,500-3,000   |
+| k-best-n1e3 | 1,000  | 216.3 ms   | 12.8 MB     | ~2,000-5,000   | ~8,000-15,000  |
+| k-best-n1e4 | 10,000 | 2,154.7 ms | 59.1 MB     | ~10,000-20,000 | ~40,000-80,000 |
 
 **Notes:**
 - All scenarios use default guard limits (250,000 visited states, 250,000 expansions)
@@ -775,12 +775,12 @@ Full benchmark data from PhpBench (PHP 8.3, Ubuntu 22.04, Xeon vCPU):
 
 Set PHP `memory_limit` based on your workload:
 
-| Workload | Expected Peak | Recommended memory_limit | Safety Factor |
-|----------|---------------|--------------------------|---------------|
-| **Small** (< 1,000 orders) | 10-30 MB | 128M | 4-12× |
-| **Medium** (1,000-10,000) | 30-150 MB | 256M-512M | 3-8× |
-| **Large** (10,000-50,000) | 150-500 MB | 1G-2G | 2-4× |
-| **Dense graphs** | 200-600 MB | 1G-2G | 2-5× |
+| Workload                   | Expected Peak | Recommended memory_limit | Safety Factor |
+|----------------------------|---------------|--------------------------|---------------|
+| **Small** (< 1,000 orders) | 10-30 MB      | 128M                     | 4-12×         |
+| **Medium** (1,000-10,000)  | 30-150 MB     | 256M-512M                | 3-8×          |
+| **Large** (10,000-50,000)  | 150-500 MB    | 1G-2G                    | 2-4×          |
+| **Dense graphs**           | 200-600 MB    | 1G-2G                    | 2-5×          |
 
 **Safety factor:** Allow 2-4× expected peak to handle variance and prevent OOM errors.
 
@@ -788,12 +788,12 @@ Set PHP `memory_limit` based on your workload:
 
 The primary memory control mechanism is `maxVisitedStates`:
 
-| Guard Limit | Typical Peak Memory | Use Case |
-|-------------|---------------------|----------|
-| 10,000 states | +10-15 MB | Conservative, latency-sensitive |
-| 50,000 states | +50-75 MB | Moderate, balanced |
-| 100,000 states | +100-150 MB | Comprehensive search |
-| 250,000 states (default) | +250-375 MB | Maximum coverage |
+| Guard Limit              | Typical Peak Memory | Use Case                        |
+|--------------------------|---------------------|---------------------------------|
+| 10,000 states            | +10-15 MB           | Conservative, latency-sensitive |
+| 50,000 states            | +50-75 MB           | Moderate, balanced              |
+| 100,000 states           | +100-150 MB         | Comprehensive search            |
+| 250,000 states (default) | +250-375 MB         | Maximum coverage                |
 
 **Note:** Actual memory overhead includes base memory (~8 MB) plus per-order overhead (~5-10 KB per order).
 

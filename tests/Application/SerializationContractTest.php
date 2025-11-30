@@ -440,7 +440,7 @@ final class SerializationContractTest extends TestCase
             fn ($p) => new \SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey(
                 new \SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathCost('0'),
                 0,
-                \SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature::fromString(''),
+                \SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\RouteSignature::fromNodes([]),
                 0
             )
         );

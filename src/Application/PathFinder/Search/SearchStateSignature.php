@@ -43,7 +43,7 @@ use function trim;
  *
  * @internal
  */
-final class SearchStateSignature
+final class SearchStateSignature implements \Stringable
 {
     private const SEGMENT_DELIMITER = '|';
     private const LABEL_SEPARATOR = ':';

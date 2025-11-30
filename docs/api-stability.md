@@ -50,50 +50,50 @@ This document defines the public API surface that remains stable across minor an
 
 ### Namespace Stability Matrix
 
-| Namespace | Stability | Description |
-|-----------|-----------|-------------|
-| `Application\Service\*` | ✅ Public | Entry point services |
-| `Application\OrderBook\*` | ✅ Public | Order book and filtering |
-| `Application\Config\*` | ✅ Public | Configuration builders |
-| `Application\Result\*` | ✅ Public | Search results and DTOs |
-| `Application\PathFinder\Result\*` | ✅ Public | Search outcome and reports |
-| `Domain\**` | ✅ Public | All domain objects |
-| `Exception\**` | ✅ Public | All exceptions |
-| `Application\Graph\*` | ⚠️ Internal | Graph construction internals |
-| `Application\PathFinder\*` | ⚠️ Internal | Search algorithm internals |
+| Namespace                         | Stability   | Description                  |
+|-----------------------------------|-------------|------------------------------|
+| `Application\Service\*`           | ✅ Public    | Entry point services         |
+| `Application\OrderBook\*`         | ✅ Public    | Order book and filtering     |
+| `Application\Config\*`            | ✅ Public    | Configuration builders       |
+| `Application\Result\*`            | ✅ Public    | Search results and DTOs      |
+| `Application\PathFinder\Result\*` | ✅ Public    | Search outcome and reports   |
+| `Domain\**`                       | ✅ Public    | All domain objects           |
+| `Exception\**`                    | ✅ Public    | All exceptions               |
+| `Application\Graph\*`             | ⚠️ Internal | Graph construction internals |
+| `Application\PathFinder\*`        | ⚠️ Internal | Search algorithm internals   |
 
 ### Core Public API Classes
 
-| Category | Class | Purpose |
-|----------|-------|---------|
-| **Entry Point** | `PathFinderService` | Main facade for path finding |
-| | `PathSearchRequest` | Request DTO with order book + config |
-| **Configuration** | `PathSearchConfig` | Immutable search configuration |
-| | `PathSearchConfigBuilder` | Fluent configuration builder |
-| | `SearchGuardConfig` | Guard limit configuration |
-| **Results** | `SearchOutcome` | Search results + guard report |
-| | `PathResultSet` | Immutable collection of paths |
-| | `PathResult` | Single path with legs and fees |
-| | `PathLeg` | Single conversion hop |
-| | `SearchGuardReport` | Guard metrics and breach status |
-| **Order Management** | `OrderBook` | Order collection with filtering |
-| **Domain** | `Money` | Monetary amount with currency |
-| | `ExchangeRate` | Conversion rate between currencies |
-| | `Order` | Buy/sell order with bounds |
-| | `OrderBounds` | Min/max amount constraints |
-| | `AssetPair` | Base/quote currency pair |
-| **Exceptions** | `ExceptionInterface` | Marker for all library exceptions |
-| | `InvalidInput` | Input validation failures |
-| | `GuardLimitExceeded` | Resource limit reached (opt-in) |
-| | `PrecisionViolation` | Arithmetic precision errors |
+| Category             | Class                     | Purpose                              |
+|----------------------|---------------------------|--------------------------------------|
+| **Entry Point**      | `PathFinderService`       | Main facade for path finding         |
+|                      | `PathSearchRequest`       | Request DTO with order book + config |
+| **Configuration**    | `PathSearchConfig`        | Immutable search configuration       |
+|                      | `PathSearchConfigBuilder` | Fluent configuration builder         |
+|                      | `SearchGuardConfig`       | Guard limit configuration            |
+| **Results**          | `SearchOutcome`           | Search results + guard report        |
+|                      | `PathResultSet`           | Immutable collection of paths        |
+|                      | `PathResult`              | Single path with legs and fees       |
+|                      | `PathLeg`                 | Single conversion hop                |
+|                      | `SearchGuardReport`       | Guard metrics and breach status      |
+| **Order Management** | `OrderBook`               | Order collection with filtering      |
+| **Domain**           | `Money`                   | Monetary amount with currency        |
+|                      | `ExchangeRate`            | Conversion rate between currencies   |
+|                      | `Order`                   | Buy/sell order with bounds           |
+|                      | `OrderBounds`             | Min/max amount constraints           |
+|                      | `AssetPair`               | Base/quote currency pair             |
+| **Exceptions**       | `ExceptionInterface`      | Marker for all library exceptions    |
+|                      | `InvalidInput`            | Input validation failures            |
+|                      | `GuardLimitExceeded`      | Resource limit reached (opt-in)      |
+|                      | `PrecisionViolation`      | Arithmetic precision errors          |
 
 ### Extension Points (Interfaces)
 
-| Interface | Purpose | Implement to... |
-|-----------|---------|-----------------|
-| `OrderFilterInterface` | Filter orders before search | Create custom order filters |
-| `PathOrderStrategy` | Control path ranking | Customize result ordering |
-| `FeePolicy` | Calculate transaction fees | Model complex fee structures |
+| Interface              | Purpose                     | Implement to...              |
+|------------------------|-----------------------------|------------------------------|
+| `OrderFilterInterface` | Filter orders before search | Create custom order filters  |
+| `PathOrderStrategy`    | Control path ranking        | Customize result ordering    |
+| `FeePolicy`            | Calculate transaction fees  | Model complex fee structures |
 
 ---
 
@@ -354,7 +354,7 @@ vendor/bin/phpstan analyse  # Reports deprecated usage
 
 **PHPUnit**:
 ```xml
-<phpunit failOnDeprecation="true">
+<phpunit failOnDeprecation="true"></phpunit>
 ```
 
 **Runtime**:
@@ -405,12 +405,12 @@ See [API Contracts](api-contracts.md) for complete JSON specification.
 
 ## Version Compatibility Matrix
 
-| Your Code Uses | Compatible Library Versions | Notes |
-|----------------|----------------------------|-------|
-| Public API only | Any 1.x version | ✅ Fully compatible |
-| Extension interfaces | Any 1.x version | ✅ Interfaces stable |
-| Internal classes | Same MINOR version only | ⚠️ May break in MINOR updates |
-| `@internal` classes | Exact version only | ❌ No compatibility guarantee |
+| Your Code Uses       | Compatible Library Versions | Notes                         |
+|----------------------|-----------------------------|-------------------------------|
+| Public API only      | Any 1.x version             | ✅ Fully compatible            |
+| Extension interfaces | Any 1.x version             | ✅ Interfaces stable           |
+| Internal classes     | Same MINOR version only     | ⚠️ May break in MINOR updates |
+| `@internal` classes  | Exact version only          | ❌ No compatibility guarantee  |
 
 ### Upgrade Safety
 

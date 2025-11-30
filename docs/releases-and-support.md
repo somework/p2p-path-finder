@@ -110,10 +110,10 @@ $json = $money->jsonSerialize();
 
 The library supports PHP versions in **active support** or **security support** per the [official PHP release schedule](https://www.php.net/supported-versions.php).
 
-| Library Version | Minimum PHP | Recommended PHP | Testing Matrix |
-|-----------------|-------------|-----------------|----------------|
-| **1.x** | PHP 8.2 | PHP 8.3 | 8.2, 8.3 |
-| **2.x** (future) | TBD | TBD | TBD |
+| Library Version  | Minimum PHP | Recommended PHP | Testing Matrix |
+|------------------|-------------|-----------------|----------------|
+| **1.x**          | PHP 8.2     | PHP 8.3         | 8.2, 8.3       |
+| **2.x** (future) | TBD         | TBD             | TBD            |
 
 ### PHP Version Timeline
 
@@ -140,18 +140,18 @@ PHP version support is dropped when:
 
 ### Support Tiers
 
-| Tier | Versions | Bug Fixes | Security Fixes | New Features |
-|------|----------|-----------|----------------|--------------|
-| **Active** | Latest MINOR (e.g., 1.5.x) | ✅ Yes | ✅ Yes | ✅ Yes |
-| **Maintenance** | Previous MINOR (e.g., 1.4.x) | ⚠️ Critical only | ✅ Yes | ❌ No |
-| **Security** | Previous MAJOR (e.g., 0.x.x) | ❌ No | ✅ Yes (6 months) | ❌ No |
-| **End of Life** | Older versions | ❌ No | ❌ No | ❌ No |
+| Tier            | Versions                     | Bug Fixes        | Security Fixes   | New Features |
+|-----------------|------------------------------|------------------|------------------|--------------|
+| **Active**      | Latest MINOR (e.g., 1.5.x)   | ✅ Yes            | ✅ Yes            | ✅ Yes        |
+| **Maintenance** | Previous MINOR (e.g., 1.4.x) | ⚠️ Critical only | ✅ Yes            | ❌ No         |
+| **Security**    | Previous MAJOR (e.g., 0.x.x) | ❌ No             | ✅ Yes (6 months) | ❌ No         |
+| **End of Life** | Older versions               | ❌ No             | ❌ No             | ❌ No         |
 
 ### Current Support Status
 
-| Version | Status | Bug Fixes Until | Security Fixes Until |
-|---------|--------|-----------------|----------------------|
-| **1.x** (latest) | 🟢 Active | Ongoing | Ongoing |
+| Version          | Status    | Bug Fixes Until | Security Fixes Until |
+|------------------|-----------|-----------------|----------------------|
+| **1.x** (latest) | 🟢 Active | Ongoing         | Ongoing              |
 
 ### Lifecycle Example
 
@@ -214,12 +214,12 @@ Security vulnerabilities receive **highest priority**.
 
 **Response Times**:
 
-| Severity | Response Time | Action |
-|----------|---------------|--------|
-| **Critical** | 24 hours | Immediate hotfix |
-| **High** | 7 days | Hotfix release |
-| **Medium** | Next PATCH | Regular patch cycle |
-| **Low** | Next MINOR | Regular release |
+| Severity     | Response Time | Action              |
+|--------------|---------------|---------------------|
+| **Critical** | 24 hours      | Immediate hotfix    |
+| **High**     | 7 days        | Hotfix release      |
+| **Medium**   | Next PATCH    | Regular patch cycle |
+| **Low**      | Next MINOR    | Regular release     |
 
 ### Security Disclosure
 
@@ -280,7 +280,7 @@ vendor/bin/phpstan analyse  # PHPStan detects deprecated usage
 **During Testing**:
 ```xml
 <!-- phpunit.xml -->
-<phpunit failOnDeprecation="true">
+<phpunit failOnDeprecation="true"></phpunit>
 ```
 
 **In Production**:
@@ -339,12 +339,12 @@ Dependabot alerts enabled on GitHub.
 
 ### Support Channels
 
-| Channel | Purpose | Response Time |
-|---------|---------|---------------|
-| **GitHub Issues** | Bug reports, feature requests | Best effort |
-| **GitHub Discussions** | Questions, help, discussions | Community-driven |
-| **Documentation** | Self-service help | Instant |
-| **Security Email** | Security vulnerabilities | 48 hours |
+| Channel                | Purpose                       | Response Time    |
+|------------------------|-------------------------------|------------------|
+| **GitHub Issues**      | Bug reports, feature requests | Best effort      |
+| **GitHub Discussions** | Questions, help, discussions  | Community-driven |
+| **Documentation**      | Self-service help             | Instant          |
+| **Security Email**     | Security vulnerabilities      | 48 hours         |
 
 ### Before Asking for Help
 

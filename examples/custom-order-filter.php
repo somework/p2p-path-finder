@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Example: Custom Order Filter Implementation
+ * Example: Custom Order Filter Implementation.
  *
  * This example demonstrates how to implement custom OrderFilterInterface filters
  * to pre-filter orders before path finding. It shows best practices including:
@@ -14,7 +14,7 @@ declare(strict_types=1);
  * - Performance-conscious O(1) evaluation
  */
 
-require __DIR__ . '/../vendor/autoload.php';
+require __DIR__.'/../vendor/autoload.php';
 
 use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\Filter\OrderFilterInterface;
@@ -118,7 +118,7 @@ final class FeeFreeOrdersFilter implements OrderFilterInterface
 final class ExchangeRateRangeFilter implements OrderFilterInterface
 {
     /**
-     * @param AssetPair $pair The asset pair to filter
+     * @param AssetPair $pair    The asset pair to filter
      * @param string    $minRate Minimum acceptable rate (numeric-string)
      * @param string    $maxRate Maximum acceptable rate (numeric-string)
      */
@@ -207,6 +207,7 @@ $percentageFee = new class implements FeePolicy {
     public function calculate(OrderSide $side, Money $baseAmount, Money $quoteAmount): FeeBreakdown
     {
         $fee = $quoteAmount->multiply('0.001', $quoteAmount->scale());
+
         return FeeBreakdown::forQuote($fee);
     }
 
@@ -270,7 +271,7 @@ $orders = [
 // Create unfiltered order book
 $unfilteredBook = new OrderBook($orders);
 
-echo "Initial order book: " . count($orders) . " orders\n\n";
+echo 'Initial order book: '.count($orders)." orders\n\n";
 
 // ============================================================================
 // SCENARIO 1: Filter by liquidity depth only
@@ -284,7 +285,7 @@ $liquidityFilter = new LiquidityDepthFilter(
 );
 
 $filteredOrders1 = iterator_to_array($unfilteredBook->filter($liquidityFilter));
-echo "Orders passing liquidity filter: " . count($filteredOrders1) . "\n";
+echo 'Orders passing liquidity filter: '.count($filteredOrders1)."\n";
 echo "  (Excludes order with max 100 USD)\n\n";
 
 // ============================================================================
@@ -297,7 +298,7 @@ echo "Filtering for orders without fee policies...\n\n";
 $feeFreeFilter = new FeeFreeOrdersFilter();
 
 $filteredOrders2 = iterator_to_array($unfilteredBook->filter($feeFreeFilter));
-echo "Fee-free orders: " . count($filteredOrders2) . "\n";
+echo 'Fee-free orders: '.count($filteredOrders2)."\n";
 echo "  (Excludes 1 order with 0.1% fee)\n\n";
 
 // ============================================================================
@@ -314,7 +315,7 @@ $rateFilter = new ExchangeRateRangeFilter(
 );
 
 $filteredOrders3 = iterator_to_array($unfilteredBook->filter($rateFilter));
-echo "Orders in rate range: " . count($filteredOrders3) . "\n";
+echo 'Orders in rate range: '.count($filteredOrders3)."\n";
 echo "  (Keeps 0.92 rate, excludes 0.85 rate)\n\n";
 
 // ============================================================================
@@ -331,7 +332,7 @@ $compositeFilter = new CompositeAndFilter(
 );
 
 $filteredOrders4 = iterator_to_array($unfilteredBook->filter($compositeFilter));
-echo "Orders passing all filters: " . count($filteredOrders4) . "\n";
+echo 'Orders passing all filters: '.count($filteredOrders4)."\n";
 echo "  (Only orders meeting ALL criteria)\n\n";
 
 // ============================================================================
@@ -359,14 +360,14 @@ try {
 
     if ($outcome->hasPaths()) {
         $paths = $outcome->paths();
-        echo "Found " . $paths->count() . " path(s) using fee-free orders\n";
+        echo 'Found '.$paths->count()." path(s) using fee-free orders\n";
 
         foreach ($paths as $idx => $path) {
             $num = $idx + 1;
             echo "\nPath #{$num}:\n";
             echo "  Spent: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()}\n";
             echo "  Received: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
-            echo "  Hops: " . count($path->legsAsArray()) . "\n";
+            echo '  Hops: '.count($path->legsAsArray())."\n";
 
             foreach ($path->legsAsArray() as $legIdx => $leg) {
                 $legNum = $legIdx + 1;
@@ -381,10 +382,10 @@ try {
     echo "\nSearch metrics:\n";
     echo "  Expansions: {$guardReport->expansions()}\n";
     echo "  Visited states: {$guardReport->visitedStates()}\n";
-} catch (\Throwable $e) {
-    fwrite(STDERR, "\n✗ Example failed with unexpected error:\n");
-    fwrite(STDERR, "  " . get_class($e) . ": " . $e->getMessage() . "\n");
-    fwrite(STDERR, "  at " . $e->getFile() . ":" . $e->getLine() . "\n");
+} catch (Throwable $e) {
+    fwrite(\STDERR, "\n✗ Example failed with unexpected error:\n");
+    fwrite(\STDERR, '  '.$e::class.': '.$e->getMessage()."\n");
+    fwrite(\STDERR, '  at '.$e->getFile().':'.$e->getLine()."\n");
     exit(1); // Failure
 }
 
@@ -398,4 +399,3 @@ echo "5. Filters integrate seamlessly with OrderBook and PathFinderService\n";
 echo "6. Pre-filtering reduces graph size and improves search performance\n";
 
 exit(0); // Success
-

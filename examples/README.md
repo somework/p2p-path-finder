@@ -280,16 +280,16 @@ Real-world integration example showing how to fetch P2P trading data from Bybit'
 
 ### File Statistics
 
-| Example | Lines | Status | Scenarios | Key Features |
-|---------|-------|--------|-----------|--------------|
-| **custom-order-filter.php** | 397 | Production | 5 | 4 filters, composition pattern |
-| **custom-ordering-strategy.php** | 527 | Production | 4 | 3 strategies, determinism test |
-| **custom-fee-policy.php** | 570 | Production | 6 | 5 policies, realistic models |
-| **error-handling.php** | 473 | Production | 7 | All exceptions, production pattern |
-| **performance-optimization.php** | 507 | Production | 12 | 4 techniques, benchmarks |
-| **guarded-search-example.php** | Varies | Production | 1 | Complete workflow |
-| **bybit-p2p-integration.php** | 600+ | Production | 5 | API integration, real-world example |
-| **TOTAL** | **~3,100** | **7 files** | **40+** | **Comprehensive coverage** |
+| Example                          | Lines      | Status      | Scenarios | Key Features                        |
+|----------------------------------|------------|-------------|-----------|-------------------------------------|
+| **custom-order-filter.php**      | 397        | Production  | 5         | 4 filters, composition pattern      |
+| **custom-ordering-strategy.php** | 527        | Production  | 4         | 3 strategies, determinism test      |
+| **custom-fee-policy.php**        | 570        | Production  | 6         | 5 policies, realistic models        |
+| **error-handling.php**           | 473        | Production  | 7         | All exceptions, production pattern  |
+| **performance-optimization.php** | 507        | Production  | 12        | 4 techniques, benchmarks            |
+| **guarded-search-example.php**   | Varies     | Production  | 1         | Complete workflow                   |
+| **bybit-p2p-integration.php**    | 600+       | Production  | 5         | API integration, real-world example |
+| **TOTAL**                        | **~3,100** | **7 files** | **40+**   | **Comprehensive coverage**          |
 
 ### Example Categories
 
@@ -312,16 +312,16 @@ Real-world integration example showing how to fetch P2P trading data from Bybit'
 
 **If you want to...**
 
-| Goal | Example |
-|------|---------|
-| Filter orders before search | `custom-order-filter.php` |
-| Change how paths are ranked | `custom-ordering-strategy.php` |
-| Model realistic exchange fees | `custom-fee-policy.php` |
-| Handle errors in production | `error-handling.php` |
-| Optimize search performance | `performance-optimization.php` |
-| See a complete basic workflow | `guarded-search-example.php` |
-| Integrate with Bybit P2P API | `bybit-p2p-integration.php` |
-| Build a real-world trading app | `bybit-p2p-integration.php` |
+| Goal                           | Example                        |
+|--------------------------------|--------------------------------|
+| Filter orders before search    | `custom-order-filter.php`      |
+| Change how paths are ranked    | `custom-ordering-strategy.php` |
+| Model realistic exchange fees  | `custom-fee-policy.php`        |
+| Handle errors in production    | `error-handling.php`           |
+| Optimize search performance    | `performance-optimization.php` |
+| See a complete basic workflow  | `guarded-search-example.php`   |
+| Integrate with Bybit P2P API   | `bybit-p2p-integration.php`    |
+| Build a real-world trading app | `bybit-p2p-integration.php`    |
 
 ## Related Documentation
 

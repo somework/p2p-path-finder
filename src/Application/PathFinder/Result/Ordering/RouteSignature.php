@@ -12,7 +12,7 @@ use function is_int;
 use function sprintf;
 use function trim;
 
-final class RouteSignature
+final class RouteSignature implements \Stringable
 {
     /**
      * @var list<string>

@@ -31,11 +31,11 @@ Value objects enforce invariants through:
 
 **Class**: `SomeWork\P2PPathFinder\Domain\ValueObject\Money`
 
-| Invariant | Rule | Exception Message |
-|-----------|------|-------------------|
-| **Amount** | Must be non-negative (≥ 0) | "Money amount cannot be negative. Got: {currency} {amount}" |
-| **Currency** | 3-12 uppercase letters | "Currency code must be 3-12 uppercase letters. Got: {code}" |
-| **Scale** | 0-50 decimal places | "Scale must be between 0 and 50. Got: {scale}" |
+| Invariant    | Rule                       | Exception Message                                           |
+|--------------|----------------------------|-------------------------------------------------------------|
+| **Amount**   | Must be non-negative (≥ 0) | "Money amount cannot be negative. Got: {currency} {amount}" |
+| **Currency** | 3-12 uppercase letters     | "Currency code must be 3-12 uppercase letters. Got: {code}" |
+| **Scale**    | 0-50 decimal places        | "Scale must be between 0 and 50. Got: {scale}"              |
 
 ### Examples
 
@@ -69,12 +69,12 @@ All operations preserve non-negativity:
 
 **Class**: `SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate`
 
-| Invariant | Rule | Exception Message |
-|-----------|------|-------------------|
-| **Rate** | Must be positive (> 0) | "Exchange rate must be positive. Got: {rate}" |
-| **Currencies** | Base ≠ quote (case-insensitive) | "Exchange rate requires distinct currencies" |
-| **Currency format** | 3-12 uppercase letters each | Same as Money |
-| **Scale** | 0-50 decimal places | Same as Money |
+| Invariant           | Rule                            | Exception Message                             |
+|---------------------|---------------------------------|-----------------------------------------------|
+| **Rate**            | Must be positive (> 0)          | "Exchange rate must be positive. Got: {rate}" |
+| **Currencies**      | Base ≠ quote (case-insensitive) | "Exchange rate requires distinct currencies"  |
+| **Currency format** | 3-12 uppercase letters each     | Same as Money                                 |
+| **Scale**           | 0-50 decimal places             | Same as Money                                 |
 
 ### Examples
 
@@ -104,11 +104,11 @@ ExchangeRate::fromString('usd', 'eur', '0.92', 100);    // ❌ Scale too high
 
 **Class**: `SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds`
 
-| Invariant | Rule | Exception Message |
-|-----------|------|-------------------|
-| **Min/Max** | Min ≤ Max | "Minimum amount cannot exceed the maximum amount" |
-| **Currency** | Both Money objects have same currency | "OrderBounds currencies must match" |
-| **Non-negative** | Both amounts ≥ 0 | Enforced by Money invariants |
+| Invariant        | Rule                                  | Exception Message                                 |
+|------------------|---------------------------------------|---------------------------------------------------|
+| **Min/Max**      | Min ≤ Max                             | "Minimum amount cannot exceed the maximum amount" |
+| **Currency**     | Both Money objects have same currency | "OrderBounds currencies must match"               |
+| **Non-negative** | Both amounts ≥ 0                      | Enforced by Money invariants                      |
 
 ### Examples
 
@@ -146,13 +146,13 @@ OrderBounds::fromStrings('10.00', '1000.00', 2);        // ✅ Convenience metho
 
 **Class**: `SomeWork\P2PPathFinder\Domain\Order\Order`
 
-| Invariant | Rule | Exception Message |
-|-----------|------|-------------------|
-| **Side** | Must be `BUY` or `SELL` enum value | Type error |
-| **Asset Pair** | Valid AssetPair (base ≠ quote) | AssetPair validation |
-| **Bounds** | Valid OrderBounds | OrderBounds validation |
-| **Rate** | Valid ExchangeRate with matching currencies | ExchangeRate validation |
-| **Fee Policy** | Null or implements FeePolicy | Type hint |
+| Invariant      | Rule                                        | Exception Message       |
+|----------------|---------------------------------------------|-------------------------|
+| **Side**       | Must be `BUY` or `SELL` enum value          | Type error              |
+| **Asset Pair** | Valid AssetPair (base ≠ quote)              | AssetPair validation    |
+| **Bounds**     | Valid OrderBounds                           | OrderBounds validation  |
+| **Rate**       | Valid ExchangeRate with matching currencies | ExchangeRate validation |
+| **Fee Policy** | Null or implements FeePolicy                | Type hint               |
 
 ### Examples
 
@@ -199,11 +199,11 @@ Order::sell($assetPair, $bounds, $rate, $side, $feePolicy = null);
 
 **Class**: `SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair`
 
-| Invariant | Rule | Exception Message |
-|-----------|------|-------------------|
-| **Base** | 3-12 uppercase letters | "Base currency must be 3-12 uppercase letters" |
-| **Quote** | 3-12 uppercase letters | "Quote currency must be 3-12 uppercase letters" |
-| **Distinct** | Base ≠ quote (case-insensitive) | "Asset pair requires distinct currencies" |
+| Invariant    | Rule                            | Exception Message                               |
+|--------------|---------------------------------|-------------------------------------------------|
+| **Base**     | 3-12 uppercase letters          | "Base currency must be 3-12 uppercase letters"  |
+| **Quote**    | 3-12 uppercase letters          | "Quote currency must be 3-12 uppercase letters" |
+| **Distinct** | Base ≠ quote (case-insensitive) | "Asset pair requires distinct currencies"       |
 
 ### Examples
 
@@ -227,11 +227,11 @@ AssetPair::fromString('BTC', 'US');      // ❌ Quote too short
 
 **Class**: `SomeWork\P2PPathFinder\Domain\ValueObject\ToleranceWindow`
 
-| Invariant | Rule | Exception Message |
-|-----------|------|-------------------|
-| **Min** | 0 ≤ min < 1 | "Minimum tolerance must be between 0 and 1" |
-| **Max** | 0 ≤ max < 1 | "Maximum tolerance must be between 0 and 1" |
-| **Ordering** | min ≤ max | "Minimum tolerance cannot exceed maximum tolerance" |
+| Invariant    | Rule        | Exception Message                                   |
+|--------------|-------------|-----------------------------------------------------|
+| **Min**      | 0 ≤ min < 1 | "Minimum tolerance must be between 0 and 1"         |
+| **Max**      | 0 ≤ max < 1 | "Maximum tolerance must be between 0 and 1"         |
+| **Ordering** | min ≤ max   | "Minimum tolerance cannot exceed maximum tolerance" |
 
 ### Examples
 
@@ -256,25 +256,25 @@ ToleranceWindow::from('0.0', '1.5', 18);    // ❌ Max > 1
 
 ### Common Validation Errors
 
-| Error Pattern | Cause | Fix |
-|---------------|-------|-----|
-| "negative" in message | Negative amount | Use positive values only |
-| "must be between 0 and 1" | Invalid tolerance | Use range [0, 1) |
-| "distinct currencies" | Same base/quote | Use different currencies |
-| "cannot exceed" | Min > Max | Ensure min ≤ max |
-| "3-12 uppercase letters" | Invalid currency code | Use ISO codes (USD, BTC, etc.) |
-| "Scale must be between 0 and 50" | Invalid scale | Use scale 0-50 |
+| Error Pattern                    | Cause                 | Fix                            |
+|----------------------------------|-----------------------|--------------------------------|
+| "negative" in message            | Negative amount       | Use positive values only       |
+| "must be between 0 and 1"        | Invalid tolerance     | Use range [0, 1)               |
+| "distinct currencies"            | Same base/quote       | Use different currencies       |
+| "cannot exceed"                  | Min > Max             | Ensure min ≤ max               |
+| "3-12 uppercase letters"         | Invalid currency code | Use ISO codes (USD, BTC, etc.) |
+| "Scale must be between 0 and 50" | Invalid scale         | Use scale 0-50                 |
 
 ### Scale Guidelines
 
-| Currency Type | Recommended Scale | Example |
-|---------------|-------------------|---------|
-| **Fiat** | 2 | USD, EUR, GBP |
-| **Crypto (BTC)** | 8 | Bitcoin (satoshi precision) |
-| **Crypto (ETH)** | 18 | Ethereum (wei precision) |
-| **Stablecoins** | 2-8 | USDT, USDC |
-| **Tokens** | 0-18 | Varies by token |
-| **Exchange rates** | 4-8 | Depends on precision needs |
+| Currency Type      | Recommended Scale | Example                     |
+|--------------------|-------------------|-----------------------------|
+| **Fiat**           | 2                 | USD, EUR, GBP               |
+| **Crypto (BTC)**   | 8                 | Bitcoin (satoshi precision) |
+| **Crypto (ETH)**   | 18                | Ethereum (wei precision)    |
+| **Stablecoins**    | 2-8               | USDT, USDC                  |
+| **Tokens**         | 0-18              | Varies by token             |
+| **Exchange rates** | 4-8               | Depends on precision needs  |
 
 ### Currency Code Examples
 
@@ -295,13 +295,13 @@ ToleranceWindow::from('0.0', '1.5', 18);    // ❌ Max > 1
 
 Tolerance represents acceptable deviation as a ratio in range [0, 1):
 
-| Tolerance | Percentage | Interpretation |
-|-----------|------------|----------------|
-| 0.00 | 0% | Exact match only |
-| 0.05 | 5% | Up to 5% worse acceptable |
-| 0.10 | 10% | Up to 10% worse acceptable |
-| 0.20 | 20% | Up to 20% worse acceptable |
-| 0.99 | 99% | Almost any path accepted |
+| Tolerance | Percentage | Interpretation             |
+|-----------|------------|----------------------------|
+| 0.00      | 0%         | Exact match only           |
+| 0.05      | 5%         | Up to 5% worse acceptable  |
+| 0.10      | 10%        | Up to 10% worse acceptable |
+| 0.20      | 20%        | Up to 20% worse acceptable |
+| 0.99      | 99%        | Almost any path accepted   |
 
 **Note**: Tolerance of 1.0 (100%) is not allowed - use 0.99 as maximum.
 

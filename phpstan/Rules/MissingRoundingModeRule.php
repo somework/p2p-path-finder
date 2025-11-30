@@ -11,6 +11,8 @@ use PHPStan\Rules\Rule;
 use PHPStan\Rules\RuleErrorBuilder;
 use PHPStan\Type\ObjectType;
 
+use function count;
+
 /**
  * Detects toScale() calls without explicit RoundingMode parameter.
  *
@@ -36,7 +38,7 @@ final class MissingRoundingModeRule implements Rule
         }
 
         // Only check toScale() method calls
-        if ($node->name->toString() !== 'toScale') {
+        if ('toScale' !== $node->name->toString()) {
             return [];
         }
 
@@ -69,4 +71,3 @@ final class MissingRoundingModeRule implements Rule
         return [];
     }
 }
-

@@ -34,11 +34,11 @@ The library follows a three-layer architecture with strict dependency rules.
 
 ### Layer Overview
 
-| Layer | Responsibility | Example Components |
-|-------|---------------|-------------------|
-| **Domain** | Business entities, value objects, invariants | `Money`, `Order`, `ExchangeRate`, `FeePolicy` |
-| **Application** | Use cases, algorithms, orchestration | `PathFinder`, `GraphBuilder`, `SearchGuards` |
-| **Public API** | Entry points, request/response DTOs | `PathFinderService`, `SearchOutcome`, `PathResult` |
+| Layer           | Responsibility                               | Example Components                                 |
+|-----------------|----------------------------------------------|----------------------------------------------------|
+| **Domain**      | Business entities, value objects, invariants | `Money`, `Order`, `ExchangeRate`, `FeePolicy`      |
+| **Application** | Use cases, algorithms, orchestration         | `PathFinder`, `GraphBuilder`, `SearchGuards`       |
+| **Public API**  | Entry points, request/response DTOs          | `PathFinderService`, `SearchOutcome`, `PathResult` |
 
 ### Dependency Rule
 
@@ -373,11 +373,11 @@ See [examples/custom-fee-policy.php](../examples/custom-fee-policy.php)
 
 ### Memory Scaling
 
-| Order Book Size | Peak Memory | Typical States | Expansions |
-|-----------------|-------------|----------------|------------|
-| 100 orders | 8-15 MB | 500-1,000 | 1,500-3,000 |
-| 1,000 orders | 12-30 MB | 2,000-5,000 | 8,000-15,000 |
-| 10,000 orders | 50-150 MB | 10,000-20,000 | 40,000-80,000 |
+| Order Book Size | Peak Memory | Typical States | Expansions    |
+|-----------------|-------------|----------------|---------------|
+| 100 orders      | 8-15 MB     | 500-1,000      | 1,500-3,000   |
+| 1,000 orders    | 12-30 MB    | 2,000-5,000    | 8,000-15,000  |
+| 10,000 orders   | 50-150 MB   | 10,000-20,000  | 40,000-80,000 |
 
 **Key factors**:
 - ~5-8 KB per order (domain objects)
@@ -444,15 +444,15 @@ See [API Stability Guide](api-stability.md) for complete details.
 
 ### Key Design Decisions
 
-| Decision | Rationale |
-|----------|-----------|
-| **Domain-Driven Design** | Clear domain concepts, enforced invariants |
-| **Immutable Value Objects** | Thread-safe, no defensive copying needed |
-| **BigDecimal Arithmetic** | Exact decimal math, no float errors |
-| **Strategy Pattern** | Customization without modification |
-| **Priority Queue Search** | Efficient best-path discovery (Dijkstra-like) |
-| **Guard Rails** | Prevent runaway searches in production |
-| **Builder Pattern** | Fluent, validated configuration |
+| Decision                    | Rationale                                     |
+|-----------------------------|-----------------------------------------------|
+| **Domain-Driven Design**    | Clear domain concepts, enforced invariants    |
+| **Immutable Value Objects** | Thread-safe, no defensive copying needed      |
+| **BigDecimal Arithmetic**   | Exact decimal math, no float errors           |
+| **Strategy Pattern**        | Customization without modification            |
+| **Priority Queue Search**   | Efficient best-path discovery (Dijkstra-like) |
+| **Guard Rails**             | Prevent runaway searches in production        |
+| **Builder Pattern**         | Fluent, validated configuration               |
 
 ### Architecture Strengths
 
