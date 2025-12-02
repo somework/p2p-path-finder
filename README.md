@@ -169,7 +169,7 @@ See [Decimal Strategy Guide](docs/decimal-strategy.md) for details.
 ### API Reference
 
 - **[API Stability Guide](docs/api-stability.md)** – Public API surface and stability guarantees
-- **[API Contracts](docs/api-contracts.md)** – JSON serialization format specification
+- **[API Contracts](docs/api-contracts.md)** – Object API specification and usage examples
 - **[Domain Invariants](docs/domain-invariants.md)** – Value object constraints and validation
 
 ### Architecture and Internals

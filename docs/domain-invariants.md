@@ -29,7 +29,7 @@ Value objects enforce invariants through:
 
 ## Money Invariants
 
-**Class**: `SomeWork\P2PPathFinder\Domain\ValueObject\Money`
+**Class**: `SomeWork\P2PPathFinder\Domain\Money\Money`
 
 | Invariant    | Rule                       | Exception Message                                           |
 |--------------|----------------------------|-------------------------------------------------------------|
@@ -67,7 +67,7 @@ All operations preserve non-negativity:
 
 ## ExchangeRate Invariants
 
-**Class**: `SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate`
+**Class**: `SomeWork\P2PPathFinder\Domain\Money\ExchangeRate`
 
 | Invariant           | Rule                            | Exception Message                             |
 |---------------------|---------------------------------|-----------------------------------------------|
@@ -102,7 +102,7 @@ ExchangeRate::fromString('usd', 'eur', '0.92', 100);    // ❌ Scale too high
 
 ## OrderBounds Invariants
 
-**Class**: `SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds`
+**Class**: `SomeWork\P2PPathFinder\Domain\Order\OrderBounds`
 
 | Invariant        | Rule                                  | Exception Message                                 |
 |------------------|---------------------------------------|---------------------------------------------------|
@@ -197,7 +197,7 @@ Order::sell($assetPair, $bounds, $rate, $side, $feePolicy = null);
 
 ## AssetPair Invariants
 
-**Class**: `SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair`
+**Class**: `SomeWork\P2PPathFinder\Domain\Money\AssetPair`
 
 | Invariant    | Rule                            | Exception Message                               |
 |--------------|---------------------------------|-------------------------------------------------|
@@ -225,7 +225,7 @@ AssetPair::fromString('BTC', 'US');      // ❌ Quote too short
 
 ## ToleranceWindow Invariants
 
-**Class**: `SomeWork\P2PPathFinder\Domain\ValueObject\ToleranceWindow`
+**Class**: `SomeWork\P2PPathFinder\Domain\Tolerance\ToleranceWindow`
 
 | Invariant    | Rule        | Exception Message                                   |
 |--------------|-------------|-----------------------------------------------------|

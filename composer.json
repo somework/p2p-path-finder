@@ -110,7 +110,6 @@
         }
     },
     "suggest": {
-        "ext-json": "Required for JSON serialization of search results",
         "ext-mbstring": "Improves string handling performance"
     }
 }

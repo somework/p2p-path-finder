@@ -527,7 +527,7 @@ Now that you've learned the basics, explore more advanced topics:
 ### Documentation
 
 - **[API Stability Guide](api-stability.md)** – Complete API reference
-- **[API Contracts](api-contracts.md)** – JSON serialization format
+- **[API Contracts](api-contracts.md)** – Object API specification
 - **[Domain Invariants](domain-invariants.md)** – Validation rules and constraints
 - **[Exception Handling](exceptions.md)** – Error handling guide
 - **[Troubleshooting Guide](troubleshooting.md)** – Common issues and solutions
@@ -537,7 +537,7 @@ Now that you've learned the basics, explore more advanced topics:
 - **Custom Fee Policies**: Implement `FeePolicy` interface for complex fee structures
 - **Custom Order Filters**: Implement `OrderFilterInterface` for advanced filtering
 - **Custom Path Ordering**: Implement `PathOrderStrategy` for custom result ordering
-- **JSON Serialization**: Use `jsonSerialize()` for API responses
+- **Object APIs**: Use strongly-typed methods for accessing data
 
 ### Examples
 

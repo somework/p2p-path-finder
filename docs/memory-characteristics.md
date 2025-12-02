@@ -486,7 +486,7 @@ After deploying with your calculated limits, monitor these metrics:
 ```php
 $outcome = $service->findBestPaths($request);
 $report = $outcome->guardLimits();
-$metrics = $report->jsonSerialize()['metrics'];
+$metrics = $report->expansions(); // Access metrics directly
 
 // Calculate utilization percentages
 $visitedUtilization = $metrics['visited_states'] / $config->searchGuards()->maxVisitedStates();
@@ -655,7 +655,11 @@ For most production use cases:
 $outcome = $service->findBestPaths($request);
 $report = $outcome->guardLimits();
 
-$metrics = $report->jsonSerialize();
+$metrics = [
+    'expansions' => $report->expansions(),
+    'visited_states' => $report->visitedStates(),
+    'elapsed_ms' => $report->elapsedMilliseconds(),
+];
 // {
 //   "limits": {
 //     "expansions": 100000,
@@ -803,7 +807,12 @@ Track these metrics to understand memory behavior:
 $startMemory = memory_get_usage(true);
 $outcome = $service->findBestPaths($request);
 $peakMemory = memory_get_peak_usage(true);
-$metrics = $outcome->guardLimits()->jsonSerialize()['metrics'];
+$report = $outcome->guardLimits();
+$metrics = [
+    'expansions' => $report->expansions(),
+    'visited_states' => $report->visitedStates(),
+    'elapsed_ms' => $report->elapsedMilliseconds(),
+];
 
 $memoryUsed = ($peakMemory - $startMemory) / 1024 / 1024; // MB
 $memoryPerState = $metrics['visited_states'] > 0 

@@ -20,15 +20,14 @@ This document defines the public API surface that remains stable across minor an
 - Classes, methods, and interfaces marked with `@api` tag
 - Public API namespaces (see table below)
 - Method signatures and return types
-- JSON serialization format
+- Object APIs and domain object behavior
 - Exception types and hierarchy
 
 **Changes requiring MAJOR version**:
 - Removing public classes, methods, or interfaces
 - Changing method signatures
 - Changing exception types
-- Removing JSON output fields
-- Breaking behavioral changes
+- Breaking behavioral changes to public APIs
 
 ### What Can Change
 
@@ -52,21 +51,21 @@ This document defines the public API surface that remains stable across minor an
 
 | Namespace                         | Stability   | Description                  |
 |-----------------------------------|-------------|------------------------------|
-| `Application\Service\*`           | ✅ Public    | Entry point services         |
-| `Application\OrderBook\*`         | ✅ Public    | Order book and filtering     |
-| `Application\Config\*`            | ✅ Public    | Configuration builders       |
-| `Application\Result\*`            | ✅ Public    | Search results and DTOs      |
-| `Application\PathFinder\Result\*` | ✅ Public    | Search outcome and reports   |
-| `Domain\**`                       | ✅ Public    | All domain objects           |
-| `Exception\**`                    | ✅ Public    | All exceptions               |
-| `Application\Graph\*`             | ⚠️ Internal | Graph construction internals |
-| `Application\PathFinder\*`        | ⚠️ Internal | Search algorithm internals   |
+| `Application\PathSearch\Service\*` | ✅ Public    | Entry point services         |
+| `Application\PathSearch\Api\*`     | ✅ Public    | API request/response DTOs    |
+| `Application\PathSearch\Config\*`  | ✅ Public    | Configuration builders       |
+| `Application\PathSearch\Result\*`  | ✅ Public    | Search results and DTOs      |
+| `Domain\Money\*`                   | ✅ Public    | Money and currency objects   |
+| `Domain\Order\*`                   | ✅ Public    | Order and order book objects |
+| `Domain\Tolerance\*`               | ✅ Public    | Tolerance and precision objects |
+| `Exception\**`                     | ✅ Public    | All exceptions               |
+| `Application\PathSearch\*`         | ⚠️ Internal | Search algorithm internals   |
 
 ### Core Public API Classes
 
 | Category             | Class                     | Purpose                              |
 |----------------------|---------------------------|--------------------------------------|
-| **Entry Point**      | `PathFinderService`       | Main facade for path finding         |
+| **Entry Point**      | `PathSearchService`       | Main facade for path finding         |
 |                      | `PathSearchRequest`       | Request DTO with order book + config |
 | **Configuration**    | `PathSearchConfig`        | Immutable search configuration       |
 |                      | `PathSearchConfigBuilder` | Fluent configuration builder         |
@@ -182,8 +181,8 @@ $filtered = $orderBook->filter(new MyCustomFilter());
 Classes and namespaces marked `@internal` or in these packages:
 
 **Internal Namespaces**:
-- `Application\Graph\*` - Graph construction internals
-- `Application\PathFinder\*` (except `Result\*`) - Search algorithm internals
+- `Application\PathSearch\Model\Graph\*` - Graph construction internals
+- `Application\PathSearch\*` (except public API namespaces) - Search algorithm internals
 - `Application\Support\*` - Internal utilities
 
 **Why Internal**:
@@ -209,7 +208,7 @@ Classes and namespaces marked `@internal` or in these packages:
 **❌ Unsafe** (Internal API):
 
 ```php
-use SomeWork\P2PPathFinder\Application\PathFinder\SearchState;
+use SomeWork\P2PPathFinder\Application\PathSearch\Engine\SearchState;
 
 ```
 
@@ -245,7 +244,7 @@ class MinimumLiquidityFilter implements OrderFilterInterface
 
 ### 2. Custom Path Ordering
 
-**Interface**: `Application\PathFinder\Result\Ordering\PathOrderStrategy`
+**Interface**: `Application\PathSearch\Engine\Ordering\PathOrderStrategy`
 
 **Stability**: Public, stable in 1.x
 
@@ -362,39 +361,6 @@ set_error_handler(function ($errno, $errstr) {
 
 ---
 
-## JSON Serialization Stability
-
-All public result classes implement `JsonSerializable` with stable output format.
-
-### Stable JSON Structure
-
-**SearchOutcome**:
-```json
-{
-  "paths": [ /* array of PathResult */ ],
-  "guards": { /* SearchGuardReport */ }
-}
-```
-
-**PathResult**:
-```json
-{
-  "total_spent": {"currency": "USD", "amount": "100.00", "scale": 2},
-  "total_received": {"currency": "BTC", "amount": "0.00333333", "scale": 8},
-  "residual_tolerance": {"ratio": "0.000000000000000000", "percentage": "0.00%"},
-  "fee_breakdown": {"USD": {"currency": "USD", "amount": "0.50", "scale": 2}},
-  "legs": [ /* array of PathLeg */ ]
-}
-```
-
-**Guarantees**:
-- Field names will not change in 1.x
-- Field types will not change in 1.x
-- Fields may be added in MINOR versions (backward compatible)
-- Fields will never be removed in 1.x (only in 2.0+)
-
-See [API Contracts](api-contracts.md) for complete JSON specification.
-
 ---
 
 ## Version Compatibility Matrix
@@ -443,7 +409,7 @@ See [API Contracts](api-contracts.md) for complete JSON specification.
 
 ```php
 // ❌ These imports may break in MINOR versions
-use SomeWork\P2PPathFinder\Application\PathFinder\SearchState;
+use SomeWork\P2PPathFinder\Application\PathSearch\Engine\SearchState;
 
 ```
 
@@ -492,7 +458,7 @@ This allows MINOR and PATCH updates (1.0.0 → 1.9.9) but prevents MAJOR updates
 - `PathFinder`
 - `SearchState`
 - Classes marked `@internal`
-- Anything in `Application\Graph\*` or `Application\PathFinder\*` (except `Result\*`)
+- Anything in `Application\PathSearch\*` (except public API namespaces)
 
 **📋 Best Practices**:
 1. Only import from public API namespaces
@@ -507,7 +473,7 @@ This allows MINOR and PATCH updates (1.0.0 → 1.9.9) but prevents MAJOR updates
 ## Related Documentation
 
 - [Versioning Policy](releases-and-support.md#semantic-versioning) - SemVer rules and BC breaks
-- [API Contracts](api-contracts.md) - JSON serialization format specification
+- [API Contracts](api-contracts.md) - Object API specification and usage examples
 - [Getting Started Guide](getting-started.md) - Quick start tutorial
 - [Architecture Guide](architecture.md) - System design overview
 - [Generated API Docs](api/index.md) - Complete PHPDoc reference

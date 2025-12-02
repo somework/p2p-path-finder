@@ -67,19 +67,47 @@ This document provides step-by-step instructions for upgrading between major ver
 
 ### Upgrading from 0.x to 1.0
 
-**Status**: ⏳ Pre-1.0 (not yet released)
+**Status**: ⏳ Pre-1.0 (in development)
 
-Version 1.0 will be the first stable release. If you are using pre-release versions (0.x), expect significant API changes. A detailed migration guide will be provided when 1.0 is released.
+Version 1.0 will be the first stable release with major architectural improvements including comprehensive namespace reorganization.
 
-**Expected BC Breaks** (subject to change):
-- API surface stabilization
-- Potential removal of experimental features
-- Configuration format changes
-- Exception hierarchy adjustments
+#### Namespace Changes
+
+**Breaking Change**: All public class namespaces have been reorganized for better clarity:
+
+| Old Namespace | New Namespace |
+|---------------|---------------|
+| `Application\Service\*` | `Application\PathSearch\Service\*` |
+| `Application\Config\*` | `Application\PathSearch\Config\*` |
+| `Application\Graph\*` | `Application\PathSearch\Model\Graph\*` |
+| `Application\PathFinder\*` | `Application\PathSearch\*` |
+| `Application\Result\*` | `Application\PathSearch\Result\*` |
+| `Domain\ValueObject\*` | `Domain\Money\*`, `Domain\Tolerance\*`, `Domain\Order\*` |
+
+**Migration Required**: Update all import statements in your code:
+
+```php
+// Before
+use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
+use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+
+// After
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
+```
+
+#### Other Changes
+
+- Class names may have changed (e.g., `PathFinderService` → `PathSearchService`)
+- Some internal APIs have been reorganized
+- Exception hierarchy remains stable
+- Domain object behavior is unchanged
 
 **Timeline**:
 - 0.1.0: Initial pre-release (current)
-- 1.0.0-rc.1: First release candidate (planned)
+- 1.0.0-rc.1: Release candidate with final API (planned)
 - 1.0.0: First stable release (planned)
 
 ---

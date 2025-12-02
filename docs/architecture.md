@@ -420,18 +420,19 @@ $config = PathSearchConfig::builder()
 ### Public API (Stable)
 
 **Safe to depend on**:
-- `Application\Service\*` - Entry point services
-- `Application\Config\*` - Configuration builders
-- `Application\OrderBook\*` - Order book and filtering
-- `Application\Result\*` - Search results
-- `Domain\**` - All domain objects
+- `Application\PathSearch\Service\*` - Entry point services
+- `Application\PathSearch\Api\*` - API request/response DTOs
+- `Application\PathSearch\Config\*` - Configuration builders
+- `Application\PathSearch\Result\*` - Search results
+- `Domain\Money\*` - Money and currency objects
+- `Domain\Order\*` - Order and order book objects
+- `Domain\Tolerance\*` - Tolerance and precision objects
 - `Exception\**` - All exceptions
 
 ### Internal API (May Change)
 
 **Avoid depending on**:
-- `Application\Graph\*` - Graph construction internals
-- `Application\PathFinder\*` (except `Result\*`) - Search algorithm internals
+- `Application\PathSearch\*` (except public API namespaces) - Search algorithm internals
 - Classes marked `@internal`
 
 **Why**: Internal APIs may change in MINOR versions for performance or implementation improvements.
