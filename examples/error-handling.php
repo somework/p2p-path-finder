@@ -18,18 +18,18 @@ declare(strict_types=1);
 
 require __DIR__.'/../vendor/autoload.php';
 
-use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
-use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
-use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
-use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
+use SomeWork\P2PPathFinder\Domain\Money\AssetPair;
+use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBook;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBounds;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
-use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
-use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
-use SomeWork\P2PPathFinder\Domain\ValueObject\ToleranceWindow;
+use SomeWork\P2PPathFinder\Domain\Tolerance\ToleranceWindow;
 use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 use SomeWork\P2PPathFinder\Exception\InfeasiblePath;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
@@ -150,7 +150,7 @@ try {
 
     try {
         $request = new PathSearchRequest($validOrderBook, $validConfig, ''); // Empty target!
-        $service = new PathFinderService(new GraphBuilder());
+        $service = new PathSearchService(new GraphBuilder());
         $outcome = $service->findBestPaths($request);
         echo "✗ Unexpectedly succeeded\n";
     } catch (InvalidInput $e) {
@@ -208,7 +208,7 @@ try {
 
     echo "Attempting search with tight guard limits (100 states, 200 expansions)...\n";
     try {
-        $service = new PathFinderService(new GraphBuilder());
+        $service = new PathSearchService(new GraphBuilder());
         $request = new PathSearchRequest($complexOrderBook, $tightConfig, 'ABB');
         $outcome = $service->findBestPaths($request);
         echo "✗ Search completed without hitting guards (increase complexity or lower limits)\n";
@@ -245,7 +245,7 @@ try {
         ->build();
 
     echo "Running search with guard limits in metadata mode...\n";
-    $service = new PathFinderService(new GraphBuilder());
+    $service = new PathSearchService(new GraphBuilder());
     $request = new PathSearchRequest($complexOrderBook, $metadataConfig, 'ABB');
     $outcome = $service->findBestPaths($request);
 
@@ -308,7 +308,7 @@ try {
         ->build();
 
     echo "Searching for USD -> GBP path (no such path exists)...\n";
-    $service = new PathFinderService(new GraphBuilder());
+    $service = new PathSearchService(new GraphBuilder());
     $request = new PathSearchRequest($disconnectedBook, $searchConfig, 'GBP');
     $outcome = $service->findBestPaths($request);
 
@@ -384,7 +384,7 @@ try {
         PathSearchConfig $config,
         string $targetAsset
     ): void {
-        $service = new PathFinderService(new GraphBuilder());
+        $service = new PathSearchService(new GraphBuilder());
 
         try {
             $request = new PathSearchRequest($orderBook, $config, $targetAsset);

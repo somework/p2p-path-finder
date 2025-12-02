@@ -16,21 +16,21 @@ declare(strict_types=1);
 
 require __DIR__.'/../vendor/autoload.php';
 
-use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
-use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
-use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderKey;
-use SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\PathOrderStrategy;
-use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
-use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
-use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
-use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
+use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathOrderKey;
+use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathOrderStrategy;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
+use SomeWork\P2PPathFinder\Domain\Money\AssetPair;
+use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
+use SomeWork\P2PPathFinder\Domain\Order\Fee\FeeBreakdown;
+use SomeWork\P2PPathFinder\Domain\Order\Fee\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBook;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBounds;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
-use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
-use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 
 // ============================================================================
 // Example 1: Minimize Hops First (Simplest Path)
@@ -374,7 +374,7 @@ function demonstrateStrategy(string $name, PathOrderStrategy $strategy): void
 
     $orderBook = createSampleOrderBook();
     $graphBuilder = new GraphBuilder();
-    $service = new PathFinderService($graphBuilder, $strategy);
+    $service = new PathSearchService($graphBuilder, $strategy);
 
     $config = PathSearchConfig::builder()
         ->withSpendAmount(Money::fromString('USD', '100.00', 2))
@@ -446,7 +446,7 @@ try {
     // Demo 1: Default Strategy (Cost-first)
     demonstrateStrategy(
         'Default (Cost, Hops, Signature)',
-        new SomeWork\P2PPathFinder\Application\PathFinder\Result\Ordering\CostHopsSignatureOrderingStrategy(6)
+        new \SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\CostHopsSignatureOrderingStrategy(6)
     );
 
     // Demo 2: Minimize Hops Strategy
@@ -479,7 +479,7 @@ try {
     $orderBook = createSampleOrderBook();
     $graphBuilder = new GraphBuilder();
     $strategy = new MinimizeHopsStrategy(6);
-    $service = new PathFinderService($graphBuilder, $strategy);
+    $service = new PathSearchService($graphBuilder, $strategy);
 
     $config = PathSearchConfig::builder()
         ->withSpendAmount(Money::fromString('USD', '100.00', 2))

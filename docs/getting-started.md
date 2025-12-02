@@ -50,12 +50,7 @@ Let's find the best path to convert **USD to BTC** through a simple order book.
 
 require 'vendor/autoload.php';
 
-use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
-use SomeWork\P2PPathFinder\Domain\Order\Order;
-use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
-use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
-use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
+use SomeWork\P2PPathFinder\Domain\Money\AssetPair;use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;use SomeWork\P2PPathFinder\Domain\Order\Order;use SomeWork\P2PPathFinder\Domain\Order\OrderBook;use SomeWork\P2PPathFinder\Domain\Order\OrderBounds;use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 
 // Create a simple order book with one order
 $orders = [
@@ -80,8 +75,7 @@ $orderBook = new OrderBook($orders);
 ### Step 2: Configure the Search
 
 ```php
-use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;use SomeWork\P2PPathFinder\Domain\Money\Money;
 
 // Spend $1,000 USD
 $spendAmount = Money::fromString('USD', '1000.00', 2);
@@ -103,13 +97,11 @@ $config = PathSearchConfig::builder()
 ### Step 3: Run the Search
 
 ```php
-use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
-use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
-use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
 
 // Create the path finder service
 $graphBuilder = new GraphBuilder();
-$pathFinderService = new PathFinderService($graphBuilder);
+$pathFinderService = new PathSearchService($graphBuilder);
 
 // Create the search request
 $request = new PathSearchRequest(
@@ -280,8 +272,7 @@ The path finder will automatically discover that `USD->EUR->BTC` might be better
 Orders can have fees that reduce the received amount:
 
 ```php
-use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
-use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
+use SomeWork\P2PPathFinder\Domain\Order\Fee\FeeBreakdown;use SomeWork\P2PPathFinder\Domain\Order\Fee\FeePolicy;
 
 // Create a fee policy (1% fee on quote amount)
 $feePolicy = new class implements FeePolicy {
@@ -386,7 +377,7 @@ $longPathConfig = PathSearchConfig::builder()
 **Guard rails** limit the search to prevent excessive computation:
 
 ```php
-use SomeWork\P2PPathFinder\Application\Config\SearchGuardConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Config\SearchGuardConfig;
 
 $guardConfig = SearchGuardConfig::strict()
     ->withMaxExpansions(5000)    // Max graph nodes to explore
@@ -411,9 +402,7 @@ $config = PathSearchConfig::builder()
 You can pre-filter the order book before searching:
 
 ```php
-use SomeWork\P2PPathFinder\Application\Filter\MinimumAmountFilter;
-use SomeWork\P2PPathFinder\Application\Filter\MaximumAmountFilter;
-use SomeWork\P2PPathFinder\Application\Filter\ToleranceWindowFilter;
+use SomeWork\P2PPathFinder\Application\Order\Filter\MaximumAmountFilter;use SomeWork\P2PPathFinder\Application\Order\Filter\MinimumAmountFilter;use SomeWork\P2PPathFinder\Application\Order\Filter\ToleranceWindowFilter;
 
 // Filter by amount range
 $minFilter = new MinimumAmountFilter(
@@ -447,17 +436,7 @@ Here's a complete working example you can run:
 
 require 'vendor/autoload.php';
 
-use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
-use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
-use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
-use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
-use SomeWork\P2PPathFinder\Domain\Order\Order;
-use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
-use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
-use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
+use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;use SomeWork\P2PPathFinder\Domain\Money\AssetPair;use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;use SomeWork\P2PPathFinder\Domain\Money\Money;use SomeWork\P2PPathFinder\Domain\Order\Order;use SomeWork\P2PPathFinder\Domain\Order\OrderBook;use SomeWork\P2PPathFinder\Domain\Order\OrderBounds;use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 
 // 1. Create order book
 $orders = [
@@ -498,7 +477,7 @@ $config = PathSearchConfig::builder()
 
 // 3. Run search
 $graphBuilder = new GraphBuilder();
-$pathFinderService = new PathFinderService($graphBuilder);
+$pathFinderService = new PathSearchService($graphBuilder);
 
 $request = new PathSearchRequest($orderBook, $config, 'BTC');
 $outcome = $pathFinderService->findBestPaths($request);

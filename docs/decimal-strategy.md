@@ -53,7 +53,7 @@ BrickDecimalMath has been removed now that each value object owns its `BigDecima
 normalization rules. Production code constructs decimals directly inside `Money`,
 `ExchangeRate`, tolerance windows, and the search states, eliminating the shared facade.
 Tests and benchmarks that need deterministic numeric strings rely on the 
-`SomeWork\P2PPathFinder\Tests\Support\DecimalMath` helper instead, keeping the
+`SomeWork\P2PPathFinder\Tests\Unit\Support\DecimalMath` helper instead, keeping the
 canonical rounding policy available without reintroducing a production dependency.【F:tests/Support/DecimalMath.php†L1-L120】
 
 ## Scale Application Examples
@@ -63,7 +63,7 @@ Understanding how scales work in practice is key to using the library correctly.
 ### Example 1: Fiat Currency (USD)
 
 ```php
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
 
 // USD typically uses 2 decimal places (cents)
 $amount = Money::fromString('USD', '123.45', 2);
@@ -78,7 +78,7 @@ echo $amount->scale();     // 2
 ### Example 2: Cryptocurrency (BTC)
 
 ```php
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
 
 // Bitcoin typically uses 8 decimal places (satoshis)
 $btc = Money::fromString('BTC', '0.12345678', 8);
@@ -93,8 +93,7 @@ echo $btc->scale();     // 8
 ### Example 3: Exchange Rates
 
 ```php
-use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;use SomeWork\P2PPathFinder\Domain\Money\Money;
 
 // EUR/USD rate with high precision
 $rate = ExchangeRate::fromString('EUR', 'USD', '1.085432', 6);
@@ -111,7 +110,7 @@ echo $dollars->scale();   // 2 (inherits USD scale)
 ### Example 4: Tolerance Windows
 
 ```php
-use SomeWork\P2PPathFinder\Domain\ValueObject\ToleranceWindow;
+use SomeWork\P2PPathFinder\Domain\Tolerance\ToleranceWindow;
 
 // Tolerance: 0% to 5% (5 decimal places for precision)
 $tolerance = ToleranceWindow::fromScalars('0.00000', '0.05000', 5);
@@ -298,8 +297,8 @@ public function testConversionRoundtrip(): void
 **Cause:** Fee is >= 100%, leaving zero or negative effective amount.
 
 **Example:**
+
 ```php
-use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\PercentageFeePolicy;
 
 // ❌ Wrong: 100% fee

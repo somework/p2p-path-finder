@@ -24,17 +24,17 @@ declare(strict_types=1);
 require __DIR__.'/../vendor/autoload.php';
 
 use Brick\Math\RoundingMode;
-use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
-use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
-use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
-use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
+use SomeWork\P2PPathFinder\Domain\Money\AssetPair;
+use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBook;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBounds;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
-use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
-use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 try {
@@ -115,7 +115,7 @@ try {
             ];
 
             // Filter ads based on request parameters
-            $filteredAds = array_filter($mockAds, fn ($ad) => $ad['tokenId'] === $tokenId
+            $filteredAds = array_filter($mockAds, static fn ($ad) => $ad['tokenId'] === $tokenId
                     && $ad['currencyId'] === $currencyId
                     && $ad['side'] === $side);
 
@@ -455,7 +455,7 @@ try {
         ->withSearchGuards(50000, 100000)      // Reasonable limits
         ->build();
 
-    $service = new PathFinderService(new GraphBuilder());
+    $service = new PathSearchService(new GraphBuilder());
     $request1 = new PathSearchRequest($orderBook, $config1, 'BTC');
     $outcome1 = $service->findBestPaths($request1);
 
@@ -638,7 +638,7 @@ try {
 
             // Step 4: Find paths
             echo "4. Searching for optimal paths...\n";
-            $service = new PathFinderService(new GraphBuilder());
+            $service = new PathSearchService(new GraphBuilder());
             $request = new PathSearchRequest($orderBook, $config, $targetToken);
             $outcome = $service->findBestPaths($request);
 

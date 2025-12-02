@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Fixture;
 
-use SomeWork\P2PPathFinder\Domain\Order\FeeBreakdown;
-use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
+use SomeWork\P2PPathFinder\Domain\Order\Fee\FeeBreakdown;
+use SomeWork\P2PPathFinder\Domain\Order\Fee\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
 
 use function implode;
 

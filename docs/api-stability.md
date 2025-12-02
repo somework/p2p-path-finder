@@ -102,10 +102,7 @@ This document defines the public API surface that remains stable across minor an
 ### Basic Usage (Always Stable)
 
 ```php
-use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
-use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
-use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;use SomeWork\P2PPathFinder\Domain\Money\Money;
 
 // Configuration
 $config = PathSearchConfig::builder()
@@ -118,7 +115,7 @@ $config = PathSearchConfig::builder()
 $request = new PathSearchRequest($orderBook, $config, 'BTC');
 
 // Execute
-$service = new PathFinderService($graphBuilder);
+$service = new PathSearchService($graphBuilder);
 $outcome = $service->findBestPaths($request);
 
 // Access results
@@ -139,9 +136,7 @@ if ($outcome->guardLimits()->anyLimitReached()) {
 ### Domain Objects (Always Stable)
 
 ```php
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
-use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
-use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;use SomeWork\P2PPathFinder\Domain\Money\Money;use SomeWork\P2PPathFinder\Domain\Order\Order;
 
 // Money
 $money = Money::fromString('USD', '100.00', 2);
@@ -161,8 +156,7 @@ $order = new Order($side, $assetPair, $bounds, $rate, $feePolicy);
 ### Custom Extensions (Interface Stable)
 
 ```php
-use SomeWork\P2PPathFinder\Application\Filter\OrderFilterInterface;
-use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Order\Filter\OrderFilterInterface;use SomeWork\P2PPathFinder\Domain\Order\Order;
 
 // Custom filter implementation
 class MyCustomFilter implements OrderFilterInterface
@@ -206,17 +200,17 @@ Classes and namespaces marked `@internal` or in these packages:
 ### Safe vs Unsafe Dependencies
 
 **✅ Safe** (Public API):
+
 ```php
-use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
-use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+
+
 ```
 
 **❌ Unsafe** (Internal API):
+
 ```php
-use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\SearchState;
+
 ```
 
 ---
@@ -437,24 +431,20 @@ See [API Contracts](api-contracts.md) for complete JSON specification.
 ### In Your Code
 
 **Safe usage** (public API only):
+
 ```php
 // ✅ These imports are safe
-use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
-use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
-use SomeWork\P2PPathFinder\Exception\ExceptionInterface;
 
 // ✅ Extension interfaces are safe
-use SomeWork\P2PPathFinder\Application\Filter\OrderFilterInterface;
-use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
+
 ```
 
 **Risky usage** (internal API):
+
 ```php
 // ❌ These imports may break in MINOR versions
-use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
 use SomeWork\P2PPathFinder\Application\PathFinder\SearchState;
+
 ```
 
 ### With PHPStan

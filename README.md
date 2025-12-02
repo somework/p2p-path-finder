@@ -41,17 +41,7 @@ Find the best path from USD to BTC:
 
 require 'vendor/autoload.php';
 
-use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
-use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
-use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
-use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
-use SomeWork\P2PPathFinder\Domain\Order\Order;
-use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
-use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
-use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
+use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;use SomeWork\P2PPathFinder\Domain\Money\AssetPair;use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;use SomeWork\P2PPathFinder\Domain\Money\Money;use SomeWork\P2PPathFinder\Domain\Order\Order;use SomeWork\P2PPathFinder\Domain\Order\OrderBook;use SomeWork\P2PPathFinder\Domain\Order\OrderBounds;use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 
 // 1. Create an order book
 $order = new Order(
@@ -74,7 +64,7 @@ $config = PathSearchConfig::builder()
     ->build();
 
 // 3. Run the search
-$service = new PathFinderService(new GraphBuilder());
+$service = new PathSearchService(new GraphBuilder());
 $request = new PathSearchRequest($orderBook, $config, 'BTC');
 $outcome = $service->findBestPaths($request);
 
@@ -132,7 +122,7 @@ USD → USDT → ETH → BTC (3 hops)
 Configure guard limits to balance thoroughness with performance:
 
 ```php
-use SomeWork\P2PPathFinder\Application\Config\SearchGuardConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Config\SearchGuardConfig;
 
 // Latency-sensitive (< 50ms target)
 $guards = SearchGuardConfig::strict()

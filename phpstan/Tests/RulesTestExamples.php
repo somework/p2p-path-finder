@@ -6,7 +6,7 @@ namespace SomeWork\P2PPathFinder\PHPStan\Tests;
 
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
 
 /**
  * Example file demonstrating what the custom PHPStan rules should catch.

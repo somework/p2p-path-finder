@@ -18,20 +18,20 @@ declare(strict_types=1);
 
 require __DIR__.'/../vendor/autoload.php';
 
-use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
-use SomeWork\P2PPathFinder\Application\Filter\MaximumAmountFilter;
-use SomeWork\P2PPathFinder\Application\Filter\MinimumAmountFilter;
-use SomeWork\P2PPathFinder\Application\Filter\ToleranceWindowFilter;
-use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
-use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
-use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\Order\Filter\MaximumAmountFilter;
+use SomeWork\P2PPathFinder\Application\Order\Filter\MinimumAmountFilter;
+use SomeWork\P2PPathFinder\Application\Order\Filter\ToleranceWindowFilter;
+use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
+use SomeWork\P2PPathFinder\Domain\Money\AssetPair;
+use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBook;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBounds;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
-use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
-use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 
 // ============================================================================
 // Helper Functions
@@ -154,11 +154,11 @@ try {
         ->withSearchGuards(50000, 100000)
         ->build();
 
-    $service = new PathFinderService(new GraphBuilder());
+    $service = new PathSearchService(new GraphBuilder());
 
     // Benchmark 1a: Without pre-filtering
     echo "Scenario 1a: Without pre-filtering (baseline)\n";
-    $baseline = measurePerformance(function () use ($orderBook, $config, $service) {
+    $baseline = measurePerformance(static function () use ($orderBook, $config, $service) {
         $request = new PathSearchRequest($orderBook, $config, 'EUR');
 
         return $service->findBestPaths($request);
@@ -172,7 +172,7 @@ try {
     echo "\nScenario 1b: With amount range filtering\n";
     echo "  Filtering for orders: min >= $10 (10% of spend), max <= $10,000 (100x spend)\n";
 
-    $amountFiltered = measurePerformance(function () use ($orderBook, $config, $service, $spendAmount) {
+    $amountFiltered = measurePerformance(static function () use ($orderBook, $config, $service, $spendAmount) {
         // Pre-filter orders by amount
         $minFilter = new MinimumAmountFilter($spendAmount->multiply('0.1'));
         $maxFilter = new MaximumAmountFilter($spendAmount->multiply('100.0'));
@@ -197,7 +197,7 @@ try {
     // Benchmark 1c: With tolerance window filtering (additional)
     echo "\nScenario 1c: With tolerance window filtering (on top of amount filtering)\n";
 
-    $fullyFiltered = measurePerformance(function () use ($orderBook, $config, $service, $spendAmount) {
+    $fullyFiltered = measurePerformance(static function () use ($orderBook, $config, $service, $spendAmount) {
         // Apply both amount and tolerance filters
         $minFilter = new MinimumAmountFilter($spendAmount->multiply('0.1'));
         $maxFilter = new MaximumAmountFilter($spendAmount->multiply('100.0'));
@@ -254,7 +254,7 @@ try {
         ->withSearchGuards(5000, 10000) // Conservative
         ->build();
 
-    $conservative = measurePerformance(function () use ($optimizedOrderBook, $conservativeConfig, $service) {
+    $conservative = measurePerformance(static function () use ($optimizedOrderBook, $conservativeConfig, $service) {
         $request = new PathSearchRequest($optimizedOrderBook, $conservativeConfig, 'EUR');
 
         return $service->findBestPaths($request);
@@ -278,7 +278,7 @@ try {
         ->withSearchGuards(25000, 50000) // Moderate
         ->build();
 
-    $moderate = measurePerformance(function () use ($optimizedOrderBook, $moderateConfig, $service) {
+    $moderate = measurePerformance(static function () use ($optimizedOrderBook, $moderateConfig, $service) {
         $request = new PathSearchRequest($optimizedOrderBook, $moderateConfig, 'EUR');
 
         return $service->findBestPaths($request);
@@ -302,7 +302,7 @@ try {
         ->withSearchGuards(100000, 200000) // Aggressive
         ->build();
 
-    $aggressive = measurePerformance(function () use ($optimizedOrderBook, $aggressiveConfig, $service) {
+    $aggressive = measurePerformance(static function () use ($optimizedOrderBook, $aggressiveConfig, $service) {
         $request = new PathSearchRequest($optimizedOrderBook, $aggressiveConfig, 'EUR');
 
         return $service->findBestPaths($request);
@@ -341,7 +341,7 @@ try {
         ->withSearchGuards(25000, 50000)
         ->build();
 
-    $narrowTolerance = measurePerformance(function () use ($optimizedOrderBook, $narrowConfig, $service) {
+    $narrowTolerance = measurePerformance(static function () use ($optimizedOrderBook, $narrowConfig, $service) {
         $request = new PathSearchRequest($optimizedOrderBook, $narrowConfig, 'EUR');
 
         return $service->findBestPaths($request);
@@ -361,7 +361,7 @@ try {
         ->withSearchGuards(25000, 50000)
         ->build();
 
-    $mediumTolerance = measurePerformance(function () use ($optimizedOrderBook, $mediumConfig, $service) {
+    $mediumTolerance = measurePerformance(static function () use ($optimizedOrderBook, $mediumConfig, $service) {
         $request = new PathSearchRequest($optimizedOrderBook, $mediumConfig, 'EUR');
 
         return $service->findBestPaths($request);
@@ -381,7 +381,7 @@ try {
         ->withSearchGuards(25000, 50000)
         ->build();
 
-    $wideTolerance = measurePerformance(function () use ($optimizedOrderBook, $wideConfig, $service) {
+    $wideTolerance = measurePerformance(static function () use ($optimizedOrderBook, $wideConfig, $service) {
         $request = new PathSearchRequest($optimizedOrderBook, $wideConfig, 'EUR');
 
         return $service->findBestPaths($request);
@@ -418,7 +418,7 @@ try {
         ->withSearchGuards(25000, 50000)
         ->build();
 
-    $shortHops = measurePerformance(function () use ($optimizedOrderBook, $shortConfig, $service) {
+    $shortHops = measurePerformance(static function () use ($optimizedOrderBook, $shortConfig, $service) {
         $request = new PathSearchRequest($optimizedOrderBook, $shortConfig, 'EUR');
 
         return $service->findBestPaths($request);
@@ -440,7 +440,7 @@ try {
         ->withSearchGuards(25000, 50000)
         ->build();
 
-    $mediumHops = measurePerformance(function () use ($optimizedOrderBook, $mediumHopsConfig, $service) {
+    $mediumHops = measurePerformance(static function () use ($optimizedOrderBook, $mediumHopsConfig, $service) {
         $request = new PathSearchRequest($optimizedOrderBook, $mediumHopsConfig, 'EUR');
 
         return $service->findBestPaths($request);
@@ -462,7 +462,7 @@ try {
         ->withSearchGuards(25000, 50000)
         ->build();
 
-    $longHops = measurePerformance(function () use ($optimizedOrderBook, $longHopsConfig, $service) {
+    $longHops = measurePerformance(static function () use ($optimizedOrderBook, $longHopsConfig, $service) {
         $request = new PathSearchRequest($optimizedOrderBook, $longHopsConfig, 'EUR');
 
         return $service->findBestPaths($request);
