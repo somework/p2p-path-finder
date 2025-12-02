@@ -43,7 +43,9 @@ trait ProvidesRandomizedValues
 
     private function powerOfTen(int $scale): int
     {
-        return 10 ** $scale;
+        /* @noinspection UnnecessaryCastingInspection */
+        /* @noinspection PhpCastIsUnnecessaryInspection */
+        return (int) (10 ** $scale);
     }
 
     private function safeUnitsUpperBound(int $scale, int $maxFactor = 9): int
