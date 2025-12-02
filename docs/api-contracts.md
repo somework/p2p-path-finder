@@ -1,165 +1,119 @@
 # API Contracts
 
-This document defines the JSON serialization contracts for all public API types that implement `JsonSerializable`. These contracts are stable as of version 1.0.0 and follow semantic versioning guarantees.
+This document defines the object APIs for all public types in the P2P Path Finder library.
 
 ---
 
-## Table of Contents
+## Current API Contracts
 
-- [Version Compatibility](#version-compatibility)
-- [Common Types](#common-types)
-  - [Money](#money)
-  - [MoneyMap](#moneymap)
-- [Path Results](#path-results)
-  - [PathResult](#pathresult)
-  - [PathLeg](#pathleg)
-  - [PathLegCollection](#pathlegcollection)
-- [Search Results](#search-results)
-  - [SearchOutcome](#searchoutcome)
-  - [SearchGuardReport](#searchguardreport)
-  - [PathResultSet](#pathresultset)
+### Object APIs (Stable)
+
+The following object APIs remain stable and are the recommended way to access data:
 
 ---
 
-## Version Compatibility
-
-**Current Version**: 1.0.0  
-**Last Updated**: 2024
-
-### Stability Guarantees
-
-- **Field Additions**: New optional fields may be added in minor versions (1.x.0)
-- **Field Removals**: Required fields will never be removed in minor versions
-- **Type Changes**: Field types will never change in minor versions
-- **Deprecation**: Deprecated fields will be marked and removed only in major versions
-
-### Breaking Changes
-
-Breaking changes to JSON contracts will only occur in major version releases (2.0.0, 3.0.0, etc.) and will be clearly documented in the changelog and upgrade guide.
-
----
-
-## Common Types
+## Core Domain Types
 
 ### Money
 
-**Class**: `SomeWork\P2PPathFinder\Domain\ValueObject\Money`
+**Class**: `SomeWork\P2PPathFinder\Domain\Money\Money`
 
 **Purpose**: Represents a monetary amount in a specific currency with decimal precision.
 
-**JSON Structure**:
+**API Methods**:
 
-```json
-{
-  "currency": "USD",
-  "amount": "100.50",
-  "scale": 2
-}
+```php
+$money = Money::fromString('USD', '100.50', 2);
+
+echo $money->currency();  // "USD"
+echo $money->amount();    // "100.50"
+echo $money->scale();     // 2
+
+$sum = $money->add($other);
+$doubled = $money->multipliedBy('2.0', 2);
 ```
 
-**Fields**:
-
-| Field      | Type   | Required | Description                                    |
-|------------|--------|----------|------------------------------------------------|
-| `currency` | string | Yes      | ISO currency code (uppercase, e.g., "USD")     |
-| `amount`   | string | Yes      | Decimal amount as numeric string               |
-| `scale`    | int    | Yes      | Decimal places (0-18)                          |
+**Properties**:
+- **Currency**: ISO currency code (uppercase, e.g., "USD")
+- **Amount**: Decimal amount as numeric string for precision
+- **Scale**: Decimal places (0-18)
 
 **Notes**:
-- The `amount` field is a string to preserve precision for very large or very precise numbers
-- The `scale` indicates how many decimal places are significant
-- Trailing zeros are preserved in the `amount` string
-
-**Example**:
-
-```json
-{
-  "currency": "EUR",
-  "amount": "92.123456",
-  "scale": 6
-}
-```
+- Uses arbitrary precision arithmetic (Brick\Math)
+- Amount is a string to preserve precision for large numbers
+- Scale indicates significant decimal places
+- Immutable value object
 
 ---
 
 ### MoneyMap
 
-**Class**: `SomeWork\P2PPathFinder\Application\Result\MoneyMap`
+**Class**: `SomeWork\P2PPathFinder\Domain\Money\MoneyMap`
 
 **Purpose**: Immutable map of currency codes to Money objects, used for fee breakdowns.
 
-**JSON Structure**:
+**API Methods**:
 
-```json
-{
-  "USD": {
-    "currency": "USD",
-    "amount": "1.50",
-    "scale": 2
-  },
-  "EUR": {
-    "currency": "EUR",
-    "amount": "0.45",
-    "scale": 2
-  }
+```php
+$map = MoneyMap::fromList([
+    Money::fromString('USD', '1.50', 2),
+    Money::fromString('EUR', '0.45', 2),
+]);
+
+// Access by currency
+$usdFee = $map->get('USD');
+$hasEur = $map->has('EUR');
+
+// Iterate over all entries
+foreach ($map as $currency => $money) {
+    echo "$currency: {$money->amount()}\n";
 }
 ```
 
 **Structure**:
-- Object with currency codes as keys
-- Each value is a [Money](#money) object
+- Immutable map with currency codes as keys
+- Each value is a Money object
 - Keys are sorted alphabetically
-- Empty map is represented as `{}`
+- Empty map available via `MoneyMap::empty()`
 
 **Notes**:
-- Keys always match the `currency` field of their corresponding value
-- The map is always sorted by currency code for deterministic output
+- Currency keys always match Money object currencies
+- Deterministic ordering for consistent behavior
 
 ---
 
 ### DecimalTolerance
 
-**Class**: `SomeWork\P2PPathFinder\Domain\ValueObject\DecimalTolerance`
+**Class**: `SomeWork\P2PPathFinder\Domain\Tolerance\DecimalTolerance`
 
 **Purpose**: Represents a tolerance ratio as a decimal value between 0 and 1.
 
-**JSON Structure**:
+**API Methods**:
 
-A simple numeric string (not an object):
+```php
+// Create tolerance
+$tolerance = DecimalTolerance::fromNumericString('0.05', 2);
 
-```json
-"0.0123456789"
+// Access values
+echo $tolerance->ratio();        // "0.050000000000000000"
+echo $tolerance->percentage(2);  // "5.00"
+echo $tolerance->scale();        // 2
+
+// Comparisons
+if ($tolerance->isGreaterThanOrEqual('0.03')) {
+    // Tolerance is >= 3%
+}
 ```
 
-**Format**:
-- Type: string (numeric)
-- Range: "0.0" to "1.0" (inclusive)
-- Precision: Typically 18 decimal places (canonical scale)
-- Represents a ratio (e.g., "0.05" = 5% tolerance)
+**Properties**:
+- **Ratio**: Decimal string between "0.0" and "1.0"
+- **Scale**: Decimal precision (canonical scale: 18)
+- **Percentage**: Human-readable percentage string
 
 **Examples**:
-
-```json
-"0.0000000000"
-```
-Zero tolerance (exact match required)
-
-```json
-"0.0500000000000000000"
-```
-5% tolerance at scale 18
-
-```json
-"1.0000000000000000000"
-```
-100% tolerance (maximum)
-
-**Notes**:
-- Serializes as a plain string, not an object (unlike Money)
-- The string is a decimal ratio between 0 and 1
-- To convert to percentage: multiply by 100 (use `percentage()` method)
-- The scale is not included in JSON (it's internal state)
-- Trailing zeros are preserved for consistency
+- `"0.0000000000"` - Zero tolerance (exact match required)
+- `"0.050000000000000000"` - 5% tolerance at scale 18
+- `"1.000000000000000000"` - 100% tolerance (maximum)
 
 **Usage in API**:
 - Used in `PathResult.residualTolerance` field
@@ -172,101 +126,46 @@ Zero tolerance (exact match required)
 
 ### PathResult
 
-**Class**: `SomeWork\P2PPathFinder\Application\Result\PathResult`
+**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResult`
 
 **Purpose**: Aggregated representation of a discovered conversion path.
 
-**JSON Structure**:
+**API Methods**:
 
-```json
-{
-  "totalSpent": {
-    "currency": "USD",
-    "amount": "100.00",
-    "scale": 2
-  },
-  "totalReceived": {
-    "currency": "EUR",
-    "amount": "92.50",
-    "scale": 2
-  },
-  "residualTolerance": "0.0123456789",
-  "feeBreakdown": {
-    "USD": {
-      "currency": "USD",
-      "amount": "0.50",
-      "scale": 2
-    },
-    "EUR": {
-      "currency": "EUR",
-      "amount": "0.45",
-      "scale": 2
-    }
-  },
-  "legs": [
-    {
-      "from": "USD",
-      "to": "GBP",
-      "spent": {
-        "currency": "USD",
-        "amount": "100.00",
-        "scale": 2
-      },
-      "received": {
-        "currency": "GBP",
-        "amount": "80.00",
-        "scale": 2
-      },
-      "fees": {
-        "GBP": {
-          "currency": "GBP",
-          "amount": "0.40",
-          "scale": 2
-        }
-      }
-    },
-    {
-      "from": "GBP",
-      "to": "EUR",
-      "spent": {
-        "currency": "GBP",
-        "amount": "79.60",
-        "scale": 2
-      },
-      "received": {
-        "currency": "EUR",
-        "amount": "92.95",
-        "scale": 2
-      },
-      "fees": {
-        "EUR": {
-          "currency": "EUR",
-          "amount": "0.45",
-          "scale": 2
-        }
-      }
-    }
-  ]
-}
+```php
+// Access totals
+$totalSpent = $path->totalSpent();        // Money object
+$totalReceived = $path->totalReceived();  // Money object
+
+// Access tolerance
+$tolerance = $path->residualTolerance();  // DecimalTolerance object
+$ratio = $tolerance->ratio();             // "0.0123456789"
+$percentage = $tolerance->percentage(2);  // "1.23"
+
+// Access fees
+$feeBreakdown = $path->feeBreakdown();    // MoneyMap object
+$allFees = $path->feeBreakdownAsArray();  // array<string, Money>
+
+// Access legs
+$legs = $path->legs();                    // PathLegCollection object
+$legArray = $path->legsAsArray();         // array of PathLeg objects
+
+// Convenience method (returns array of key properties)
+$summary = $path->toArray();              // For debugging/internal use
 ```
 
-**Fields**:
-
-| Field               | Type                        | Required | Description                                  |
-|---------------------|-----------------------------|----------|----------------------------------------------|
-| `totalSpent`        | [Money](#money)             | Yes      | Total source asset spent                     |
-| `totalReceived`     | [Money](#money)             | Yes      | Total destination asset received             |
-| `residualTolerance` | string                      | Yes      | Remaining tolerance as decimal string        |
-| `feeBreakdown`      | [MoneyMap](#moneymap)       | Yes      | Total fees by currency (may be empty)        |
-| `legs`              | array<[PathLeg](#pathleg)>  | Yes      | Individual conversion legs (may be empty)    |
+**Properties**:
+- **totalSpent**: Money object (source asset amount)
+- **totalReceived**: Money object (destination asset amount)
+- **residualTolerance**: DecimalTolerance object (remaining acceptable slippage)
+- **feeBreakdown**: MoneyMap object (total fees by currency)
+- **legs**: PathLegCollection object (individual conversion steps)
 
 **Notes**:
-- `totalSpent.currency` is always the source asset
-- `totalReceived.currency` is always the destination asset
-- `residualTolerance` is a decimal ratio (e.g., "0.0123" = 1.23% tolerance remaining)
-- `feeBreakdown` aggregates all fees across all legs
-- `legs` may be an empty array for direct conversions or when legs are not materialized
-- The order of `legs` represents the path sequence: first leg converts first asset to intermediate, last leg converts to final asset
+- All amounts use arbitrary precision arithmetic
+- Fee breakdown aggregates fees across all legs by currency
+- Legs represent the conversion path sequence
+- Empty legs possible for direct conversions
 
 **Version History**:
 - 1.0.0: Initial structure
@@ -275,56 +174,46 @@ Zero tolerance (exact match required)
 
 ### PathLeg
 
-**Class**: `SomeWork\P2PPathFinder\Application\Result\PathLeg`
+**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\PathLeg`
 
 **Purpose**: Describes a single conversion leg in a path.
 
-**JSON Structure**:
+**API Methods**:
 
-```json
-{
-  "from": "USD",
-  "to": "GBP",
-  "spent": {
-    "currency": "USD",
-    "amount": "100.00",
-    "scale": 2
-  },
-  "received": {
-    "currency": "GBP",
-    "amount": "79.60",
-    "scale": 2
-  },
-  "fees": {
-    "GBP": {
-      "currency": "GBP",
-      "amount": "0.40",
-      "scale": 2
-    }
-  }
-}
+```php
+// Asset information
+$from = $leg->from();     // "USD"
+$to = $leg->to();         // "GBP"
+
+// Monetary amounts
+$spent = $leg->spent();       // Money object (USD 100.00)
+$received = $leg->received(); // Money object (GBP 79.60)
+
+// Fees
+$fees = $leg->fees();             // MoneyMap object
+$feeArray = $leg->feesAsArray();  // array<string, Money>
+
+// Convenience method
+$summary = $leg->toArray();        // For debugging/internal use
 ```
 
-**Fields**:
-
-| Field      | Type                  | Required | Description                              |
-|------------|-----------------------|----------|------------------------------------------|
-| `from`     | string                | Yes      | Source asset symbol (uppercase)          |
-| `to`       | string                | Yes      | Destination asset symbol (uppercase)     |
-| `spent`    | [Money](#money)       | Yes      | Amount spent in source asset             |
-| `received` | [Money](#money)       | Yes      | Amount received in destination asset     |
-| `fees`     | [MoneyMap](#moneymap) | Yes      | Fees for this leg (may be empty)         |
+**Properties**:
+- **from**: Source asset symbol (uppercase)
+- **to**: Destination asset symbol (uppercase)
+- **spent**: Money object (amount spent)
+- **received**: Money object (amount received, after fees)
+- **fees**: MoneyMap object (fees charged for this leg)
 
 **Constraints**:
-- `spent.currency` MUST equal `from`
-- `received.currency` MUST equal `to`
-- `fees` keys MUST be either `from` or `to` (or both)
-- Asset symbols are always uppercase
+- `spent.currency` always equals `from`
+- `received.currency` always equals `to`
+- `fees` keys are either `from` or `to` currencies
+- All asset symbols are uppercase
 
 **Notes**:
-- The `received` amount is after fees have been deducted
-- `fees` may contain entries for the source asset, destination asset, or both
-- For multi-currency fee scenarios, both currencies may appear in `fees`
+- The `received` amount reflects fees already deducted
+- Fees may be charged in source or destination currency
+- Multi-currency fees supported
 
 **Version History**:
 - 1.0.0: Initial structure
@@ -333,42 +222,39 @@ Zero tolerance (exact match required)
 
 ### PathLegCollection
 
-**Class**: `SomeWork\P2PPathFinder\Application\Result\PathLegCollection`
+**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\PathLegCollection`
 
-**Purpose**: Ordered collection of path legs.
+**Purpose**: Ordered collection of path legs representing a conversion path.
 
-**JSON Structure**:
+**API Methods**:
 
-An array of [PathLeg](#pathleg) objects:
+```php
+$collection = PathLegCollection::fromList([$leg1, $leg2]);
 
-```json
-[
-  {
-    "from": "USD",
-    "to": "GBP",
-    "spent": { "currency": "USD", "amount": "100.00", "scale": 2 },
-    "received": { "currency": "GBP", "amount": "80.00", "scale": 2 },
-    "fees": {}
-  },
-  {
-    "from": "GBP",
-    "to": "EUR",
-    "spent": { "currency": "GBP", "amount": "80.00", "scale": 2 },
-    "received": { "currency": "EUR", "amount": "93.60", "scale": 2 },
-    "fees": {}
-  }
-]
+// Access legs
+$count = $collection->count();
+$firstLeg = $collection->first();
+$specificLeg = $collection->at(0);  // Zero-indexed
+
+// Iterate
+foreach ($collection as $leg) {
+    echo "Convert {$leg->from()} to {$leg->to()}\n";
+}
+
+// Get as array
+$legsArray = $collection->all();    // array of PathLeg objects
+$simpleArray = $collection->toArray(); // For debugging
 ```
 
 **Structure**:
-- Array of PathLeg objects in order
-- Empty collection is represented as `[]`
+- Immutable ordered collection of PathLeg objects
 - Legs are ordered by path sequence
+- Empty collection available via `PathLegCollection::empty()`
 
 **Notes**:
-- The first leg's `from` is the path's source asset
-- The last leg's `to` is the path's destination asset
-- Each leg's `to` should match the next leg's `from` (if any)
+- First leg's `from` is the path's source asset
+- Last leg's `to` is the path's destination asset
+- Each leg's `to` matches next leg's `from` (if any)
 
 ---
 
@@ -376,64 +262,41 @@ An array of [PathLeg](#pathleg) objects:
 
 ### SearchOutcome
 
-**Class**: `SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchOutcome`
+**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Api\Response\SearchOutcome`
 
 **Purpose**: Container for search results and guard metrics.
 
-**JSON Structure**:
+**API Methods**:
 
-```json
-{
-  "paths": [
-    {
-      "totalSpent": {
-        "currency": "USD",
-        "amount": "100.00",
-        "scale": 2
-      },
-      "totalReceived": {
-        "currency": "EUR",
-        "amount": "92.50",
-        "scale": 2
-      },
-      "residualTolerance": "0.0000000000",
-      "feeBreakdown": {},
-      "legs": []
-    }
-  ],
-  "guards": {
-    "limits": {
-      "expansions": 10000,
-      "visited_states": 5000,
-      "time_budget_ms": null
-    },
-    "metrics": {
-      "expansions": 342,
-      "visited_states": 156,
-      "elapsed_ms": 12.456
-    },
-    "breached": {
-      "expansions": false,
-      "visited_states": false,
-      "time_budget": false,
-      "any": false
-    }
-  }
+```php
+$result = $service->findBestPaths($request);
+
+// Access paths
+$paths = $result->paths();           // PathResultSet object
+$hasPaths = $result->hasPaths();     // boolean
+
+// Access guard report
+$guards = $result->guardLimits();    // SearchGuardReport object
+
+// Iterate through paths
+foreach ($result->paths() as $path) {
+    echo "Path found: {$path->route()}\n";
+}
+
+// Check for guard breaches
+if ($guards->anyLimitReached()) {
+    echo "Search was limited by guards\n";
 }
 ```
 
-**Fields**:
-
-| Field    | Type                                    | Required | Description                          |
-|----------|-----------------------------------------|----------|--------------------------------------|
-| `paths`  | array<[PathResult](#pathresult)>        | Yes      | Found paths (may be empty)           |
-| `guards` | [SearchGuardReport](#searchguardreport) | Yes      | Search guard metrics                 |
+**Properties**:
+- **paths**: PathResultSet object (found conversion paths)
+- **guardLimits**: SearchGuardReport object (search performance metrics)
 
 **Notes**:
-- `paths` is always present, even if empty (represented as `[]`)
-- `paths` are ordered by the configured `PathOrderStrategy` (default: cost, then hops, then route signature)
-- The number of paths may be limited by `PathSearchConfig.resultLimit`
-- `guards` provides diagnostic information about search performance and limits
+- Paths are ordered by configured strategy (default: cost, then hops, then route signature)
+- Number of paths limited by `PathSearchConfig.resultLimit`
+- Guard report provides diagnostic information about search limits and performance
 
 **Version History**:
 - 1.0.0: Initial structure
@@ -442,72 +305,48 @@ An array of [PathLeg](#pathleg) objects:
 
 ### SearchGuardReport
 
-**Class**: `SomeWork\P2PPathFinder\Application\PathFinder\Result\SearchGuardReport`
+**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport`
 
 **Purpose**: Immutable snapshot describing how the search interacted with its guard rails.
 
-**JSON Structure**:
+**API Methods**:
 
-```json
-{
-  "limits": {
-    "expansions": 10000,
-    "visited_states": 5000,
-    "time_budget_ms": 1000
-  },
-  "metrics": {
-    "expansions": 342,
-    "visited_states": 156,
-    "elapsed_ms": 12.456
-  },
-  "breached": {
-    "expansions": false,
-    "visited_states": false,
-    "time_budget": false,
-    "any": false
-  }
-}
+```php
+$report = $outcome->guardLimits();
+
+// Check individual limits
+$expansionsReached = $report->expansionsReached();      // boolean
+$statesReached = $report->visitedStatesReached();       // boolean
+$timeBudgetReached = $report->timeBudgetReached();      // boolean
+$anyLimitReached = $report->anyLimitReached();          // boolean
+
+// Access metrics
+$expansions = $report->expansions();              // int
+$visitedStates = $report->visitedStates();        // int
+$elapsedMs = $report->elapsedMilliseconds();      // float
+
+// Access configured limits
+$maxExpansions = $report->expansionLimit();       // int
+$maxStates = $report->visitedStateLimit();        // int
+$timeBudgetMs = $report->timeBudgetLimit();       // int|null
 ```
 
-**Fields**:
+**Properties**:
+- **Limits**: Configured maximum values for search constraints
+- **Metrics**: Actual values recorded during search execution
+- **Breached Flags**: Boolean indicators for each limit type
 
-| Field      | Type   | Required | Description                      |
-|------------|--------|----------|----------------------------------|
-| `limits`   | object | Yes      | Configured search limits         |
-| `metrics`  | object | Yes      | Actual search metrics            |
-| `breached` | object | Yes      | Boolean flags for limit breaches |
-
-#### `limits` Object
-
-| Field            | Type | Required | Description                     |
-|------------------|------|----------|---------------------------------|
-| `expansions`     | int  | Yes      | Maximum allowed node expansions |
-| `visited_states` | int  | Yes      | Maximum allowed visited states  |
-| `time_budget_ms` | int  | null     | Yes                             | Time budget in milliseconds (null = unlimited) |
-
-#### `metrics` Object
-
-| Field            | Type  | Required | Description                              |
-|------------------|-------|----------|------------------------------------------|
-| `expansions`     | int   | Yes      | Actual number of node expansions         |
-| `visited_states` | int   | Yes      | Actual number of visited states          |
-| `elapsed_ms`     | float | Yes      | Actual elapsed time in milliseconds      |
-
-#### `breached` Object
-
-| Field            | Type | Required | Description                                   |
-|------------------|------|----------|-----------------------------------------------|
-| `expansions`     | bool | Yes      | True if expansion limit was reached           |
-| `visited_states` | bool | Yes      | True if visited states limit was reached      |
-| `time_budget`    | bool | Yes      | True if time budget was exceeded              |
-| `any`            | bool | Yes      | True if any limit was breached                |
+**Limit Types**:
+- **expansions**: Maximum allowed node expansions
+- **visited_states**: Maximum allowed visited states
+- **time_budget_ms**: Time budget in milliseconds (null = unlimited)
 
 **Notes**:
-- All metric values start at 0 for a fresh search
-- `elapsed_ms` is measured using high-resolution timers
-- `breached.any` is a convenience field: true if any individual breach flag is true
-- If `time_budget_ms` is `null`, `breached.time_budget` is always `false`
-- Limits are enforced during the search; if breached, the search terminates early
+- All metrics start at 0 for fresh searches
+- `elapsed_ms` measured using high-resolution timers
+- `anyLimitReached()` is convenience method for checking any breach
+- If time budget is null, `timeBudgetReached()` always returns false
+- Breached limits cause early search termination
 
 **Version History**:
 - 1.0.0: Initial structure
@@ -516,237 +355,92 @@ An array of [PathLeg](#pathleg) objects:
 
 ### PathResultSet
 
-**Class**: `SomeWork\P2PPathFinder\Application\PathFinder\Result\PathResultSet<TPath>`
+**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSet<TPath>`
 
 **Purpose**: Generic ordered collection of path results.
 
-**JSON Structure**:
+**API Methods**:
 
-An array of path objects (typically [PathResult](#pathresult)):
+```php
+$paths = $outcome->paths();  // PathResultSet object
 
-```json
-[
-  {
-    "totalSpent": {
-      "currency": "USD",
-      "amount": "100.00",
-      "scale": 2
-    },
-    "totalReceived": {
-      "currency": "EUR",
-      "amount": "92.50",
-      "scale": 2
-    },
-    "residualTolerance": "0.0000000000",
-    "feeBreakdown": {},
-    "legs": []
-  },
-  {
-    "totalSpent": {
-      "currency": "USD",
-      "amount": "100.00",
-      "scale": 2
-    },
-    "totalReceived": {
-      "currency": "EUR",
-      "amount": "91.80",
-      "scale": 2
-    },
-    "residualTolerance": "0.0123456789",
-    "feeBreakdown": {
-      "EUR": {
-        "currency": "EUR",
-        "amount": "0.70",
-        "scale": 2
-      }
-    },
-    "legs": []
-  }
-]
+// Collection operations
+$count = $paths->count();
+$isEmpty = $paths->isEmpty();
+$firstPath = $paths->first();
+
+// Iterate through paths
+foreach ($paths as $path) {
+    echo "Found path: {$path->route()}\n";
+}
+
+// Slice collection
+$top3Paths = $paths->slice(0, 3);
+
+// Convert to array (for debugging)
+$pathArray = $paths->toArray();
 ```
 
 **Structure**:
-- Array of path objects (type depends on generic parameter `TPath`)
-- Empty collection is represented as `[]`
-- Paths are ordered according to the configured `PathOrderStrategy`
+- Immutable ordered collection of path objects
+- Empty collection available via `PathResultSet::empty()`
+- Paths ordered by configured `PathOrderStrategy`
 
 **Notes**:
-- This is a generic type; the actual content type varies by usage
-- When used with `PathFinderService`, `TPath` is typically `PathResult`
-- The ordering is stable and deterministic given the same inputs and strategy
+- Generic type - content type varies by usage
+- Typically contains `PathResult` objects from search
+- Ordering is stable and deterministic
 
 ---
 
-## Example: Complete Search Response
+## Usage Examples
 
-Here's a complete example showing a typical `SearchOutcome` with paths and guard metrics:
+### Working with Search Results
 
-```json
-{
-  "paths": [
-    {
-      "totalSpent": {
-        "currency": "USD",
-        "amount": "100.00",
-        "scale": 2
-      },
-      "totalReceived": {
-        "currency": "EUR",
-        "amount": "93.12",
-        "scale": 2
-      },
-      "residualTolerance": "0.0000000000",
-      "feeBreakdown": {
-        "JPY": {
-          "currency": "JPY",
-          "amount": "750.00",
-          "scale": 2
-        },
-        "EUR": {
-          "currency": "EUR",
-          "amount": "0.47",
-          "scale": 2
-        }
-      },
-      "legs": [
-        {
-          "from": "USD",
-          "to": "JPY",
-          "spent": {
-            "currency": "USD",
-            "amount": "100.00",
-            "scale": 2
-          },
-          "received": {
-            "currency": "JPY",
-            "amount": "14250.00",
-            "scale": 2
-          },
-          "fees": {
-            "JPY": {
-              "currency": "JPY",
-              "amount": "750.00",
-              "scale": 2
-            }
-          }
-        },
-        {
-          "from": "JPY",
-          "to": "EUR",
-          "spent": {
-            "currency": "JPY",
-            "amount": "14250.00",
-            "scale": 2
-          },
-          "received": {
-            "currency": "EUR",
-            "amount": "93.59",
-            "scale": 2
-          },
-          "fees": {
-            "EUR": {
-              "currency": "EUR",
-              "amount": "0.47",
-              "scale": 2
-            }
-          }
-        }
-      ]
-    },
-    {
-      "totalSpent": {
-        "currency": "USD",
-        "amount": "100.00",
-        "scale": 2
-      },
-      "totalReceived": {
-        "currency": "EUR",
-        "amount": "91.54",
-        "scale": 2
-      },
-      "residualTolerance": "0.0000000000",
-      "feeBreakdown": {
-        "EUR": {
-          "currency": "EUR",
-          "amount": "0.46",
-          "scale": 2
-        }
-      },
-      "legs": [
-        {
-          "from": "USD",
-          "to": "EUR",
-          "spent": {
-            "currency": "USD",
-            "amount": "100.00",
-            "scale": 2
-          },
-          "received": {
-            "currency": "EUR",
-            "amount": "92.00",
-            "scale": 2
-          },
-          "fees": {
-            "EUR": {
-              "currency": "EUR",
-              "amount": "0.46",
-              "scale": 2
-            }
-          }
-        }
-      ]
+Here's how to work with a complete `SearchOutcome` containing paths and guard metrics:
+
+```php
+$outcome = $service->findBestPaths($request);
+
+// Access guard metrics
+$guards = $outcome->guardLimits();
+echo "Search took: {$guards->elapsedMilliseconds()}ms\n";
+echo "Expansions: {$guards->expansions()}\n";
+
+// Process found paths
+foreach ($outcome->paths() as $path) {
+    echo "Path: {$path->route()}\n";
+    echo "Spent: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()}\n";
+    echo "Received: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
+    echo "Tolerance remaining: {$path->residualTolerance()->percentage(2)}\n";
+
+    // Process fees
+    foreach ($path->feeBreakdown() as $currency => $fee) {
+        echo "Fee in $currency: {$fee->amount()}\n";
     }
-  ],
-  "guards": {
-    "limits": {
-      "expansions": 10000,
-      "visited_states": 5000,
-      "time_budget_ms": null
-    },
-    "metrics": {
-      "expansions": 127,
-      "visited_states": 43,
-      "elapsed_ms": 8.234
-    },
-    "breached": {
-      "expansions": false,
-      "visited_states": false,
-      "time_budget": false,
-      "any": false
+
+    // Process legs
+    foreach ($path->legs() as $leg) {
+        echo "  {$leg->from()} -> {$leg->to()}: ";
+        echo "spent {$leg->spent()->amount()}, received {$leg->received()->amount()}\n";
     }
-  }
+}
+
+// Check for guard breaches
+if ($guards->anyLimitReached()) {
+    echo "Warning: Search was limited by guard constraints\n";
 }
 ```
 
-This example shows:
+This example demonstrates:
 - Two paths found: one 2-hop path (USD -> JPY -> EUR) and one direct path (USD -> EUR)
 - Fees in multiple currencies (JPY and EUR)
 - Complete leg-by-leg breakdown for each path
 - Guard metrics showing the search completed well within limits
 
----
-
-## Usage in Production
-
-### Parsing JSON Responses
-
-All types can be serialized to JSON using `json_encode()`:
-
-```php
-$outcome = $service->findBestPaths($request);
-$json = json_encode($outcome, JSON_PRETTY_PRINT);
-```
-
 ### Type Safety
 
-The PHPDoc annotations on `jsonSerialize()` methods provide full type information for static analysis tools like PHPStan and Psalm. These types are enforced at the type-checking level and documented here for API consumers.
-
-### Backwards Compatibility
-
-This JSON contract is considered part of the public API. Changes follow semantic versioning:
-- **Patch releases** (1.0.x): Bug fixes only, no schema changes
-- **Minor releases** (1.x.0): New optional fields may be added
-- **Major releases** (x.0.0): Breaking schema changes allowed
+All APIs use strongly-typed domain objects with PHPDoc annotations. This provides full type information for static analysis tools like PHPStan and Psalm, ensuring type safety at development time.
 
 ---
 

@@ -5,11 +5,20 @@
          executionOrder="default"
          resolveDependencies="true">
   <testsuites>
-    <testsuite name="Application Module">
-      <directory>tests/Application</directory>
+    <testsuite name="Unit Tests">
+      <directory>tests/Unit</directory>
     </testsuite>
-    <testsuite name="Domain Module">
-      <directory>tests/Domain</directory>
+    <testsuite name="Integration Tests">
+      <directory>tests/Integration</directory>
+    </testsuite>
+    <testsuite name="Benchmarks Helpers Tests">
+      <directory>tests/Benchmarks</directory>
+    </testsuite>
+    <testsuite name="Tests Helpers Module">
+      <directory>tests/Helpers/Tests</directory>
+    </testsuite>
+    <testsuite name="Tests Fixtures Tests">
+      <directory>tests/Fixture/Tests</directory>
     </testsuite>
   </testsuites>
   <source>

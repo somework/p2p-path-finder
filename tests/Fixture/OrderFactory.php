@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Fixture;
 
-use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
+use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
+use SomeWork\P2PPathFinder\Domain\Order\Fee\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBounds;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
-use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 
 final class OrderFactory
 {

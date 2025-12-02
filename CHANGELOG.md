@@ -7,23 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- Nothing yet
-
 ### Changed
-- Nothing yet
+- **Major namespace refactoring**: Reorganized entire codebase for better structure and maintainability
+  - `Application/Graph/` → `Application/PathSearch/Model/Graph/`
+  - `Application/PathFinder/` → `Application/PathSearch/`
+  - `Domain/ValueObject/` → `Domain/Money/`, `Domain/Tolerance/`, `Domain/Order/`
+  - `Application/Service/` → `Application/PathSearch/Service/`
+  - Updated all imports and references across 78 source files and 173 test files
+- **Cleaned up domain models**: Removed serialization interfaces for cleaner, more focused domain objects
+  - Eliminated `JsonSerializable` implementations from core classes
+  - Removed serialization-specific traits and logic
+  - Updated examples to use direct object APIs
 
-### Deprecated
-- Nothing yet
+### Breaking Changes
+- **Namespace changes**: All public class namespaces have changed (breaking change for library consumers)
+- **Simplified APIs**: Classes now provide direct object access methods
 
-### Removed
-- Nothing yet
-
-### Fixed
-- Nothing yet
-
-### Security
-- Nothing yet
+### Migration Guide
+- Update all import statements to use new namespace paths
+- Use direct object API methods for accessing data
+- See updated documentation for new API usage patterns
 
 ## [0.1.0] - TBD
 
@@ -62,7 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `PathResult` with detailed path information
   - `PathLeg` for individual hop details
   - `SearchGuardReport` for diagnostics
-  - JSON serialization for all result types
+  - Object APIs for all result types
   
 - **Exception Hierarchy**:
   - `InvalidInput` for domain validation errors
@@ -75,7 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Getting Started Guide (step-by-step tutorial)
   - Troubleshooting Guide (common issues and solutions)
   - Architecture Guide (7 Mermaid diagrams, 943 lines)
-  - API Contracts (JSON serialization specification)
+  - API Contracts (object API specification)
   - API Stability Guide (public API guarantees)
   - Domain Invariants (value object constraints)
   - Decimal Strategy (arbitrary precision policy)

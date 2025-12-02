@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 require __DIR__.'/../vendor/autoload.php';
 
-use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
-use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
-use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
-use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
+use SomeWork\P2PPathFinder\Domain\Money\AssetPair;
+use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBook;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBounds;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
-use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
-use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 
 try {
     $orderBook = new OrderBook([
@@ -45,7 +45,7 @@ try {
         ->withSearchGuards(20000, 50000)
         ->build();
 
-    $service = new PathFinderService(new GraphBuilder());
+    $service = new PathSearchService(new GraphBuilder());
     $request = new PathSearchRequest($orderBook, $config, 'BTC');
     $result = $service->findBestPaths($request);
 
@@ -56,9 +56,6 @@ try {
             count($path->legs()),
         );
     }
-
-    $payload = $result->jsonSerialize();
-    assert(isset($payload['guards']));
 
     $report = $result->guardLimits();
     printf(

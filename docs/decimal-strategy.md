@@ -18,12 +18,12 @@ link back to the relevant section so that new invariants remain self-contained.
 
 | Component group                                                                                      | BigDecimal ownership plan                                                                                                                                                                                                              | Public interface plan                                                                                                                    |
 |------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
-| Domain value objects (`Money`, `ExchangeRate`, `DecimalTolerance`, `ToleranceWindow`, `OrderBounds`) | Store `BigDecimal` instances internally for amounts, rates, and tolerance ratios. Builders keep accepting numeric strings but immediately convert to `BigDecimal`.                                                                     | Getter and JSON helpers continue to emit normalized numeric strings so downstream integrations do not need to understand `BigDecimal`.   |
+| Domain value objects (`Money`, `ExchangeRate`, `DecimalTolerance`, `ToleranceWindow`, `OrderBounds`) | Store `BigDecimal` instances internally for amounts, rates, and tolerance ratios. Builders keep accepting numeric strings but immediately convert to `BigDecimal`.                                                                     | Getter methods emit normalized numeric strings so downstream integrations work with familiar string representations.   |
 | Order aggregates (`Order`, `OrderBook`, `OrderBounds`)                                               | Orders reuse the BigDecimal-backed value objects; no additional storage changes are required beyond adopting the upgraded value object APIs.                                                                                           | Public constructors remain string-first for backwards compatibility.                                                                     |
-| Graph primitives (`GraphEdge`, `EdgeCapacity`, `EdgeSegmentCollection`)                              | Consume BigDecimal-backed value objects and store BigDecimal copies for computed ratios (capacity-to-rate multipliers, per-leg ratios).                                                                                                | Debug/inspection helpers (`toArray()`, `jsonSerialize()`) convert BigDecimals to strings via the shared formatter.                       |
-| Search core (`PathFinder`, `SearchState`, `SearchStateRecord`, `CandidatePath`, `PathCost`)          | Cost, product, and ratio properties become `BigDecimal` fields to avoid repeated string parsing. Working precision constants (`SCALE`, `RATIO_EXTRA_SCALE`, `SUM_EXTRA_SCALE`) define the normalization boundary before serialization. | The queue ordering and result materialization layers still emit numeric strings so property-based tests and JSON payloads remain stable. |
+| Graph primitives (`GraphEdge`, `EdgeCapacity`, `EdgeSegmentCollection`)                              | Consume BigDecimal-backed value objects and store BigDecimal copies for computed ratios (capacity-to-rate multipliers, per-leg ratios).                                                                                                | Debug/inspection helpers (`toArray()`) convert BigDecimals to strings via the shared formatter.                       |
+| Search core (`PathFinder`, `SearchState`, `SearchStateRecord`, `CandidatePath`, `PathCost`)          | Cost, product, and ratio properties become `BigDecimal` fields to avoid repeated string parsing. Working precision constants (`SCALE`, `RATIO_EXTRA_SCALE`, `SUM_EXTRA_SCALE`) define the normalization boundary. | The queue ordering and result materialization layers emit numeric strings for consistent API behavior. |
 | Services (`PathFinderService`, `ToleranceEvaluator`, `LegMaterializer`)                              | Operate entirely on `BigDecimal` inputs produced by the upgraded value objects and search states. Reusable helpers (e.g. residual tolerance computation) accept/return `BigDecimal` instances to avoid repeated conversions.           | DTOs returned by services (guard reports, path results) keep exposing strings and `Money` aggregates for API callers.                    |
-| Serialization (`PathResult`, `PathLeg`, `MoneyMap`, `SerializesMoney`)                               | Receive BigDecimal-backed value objects and call a shared formatter before emitting arrays/JSON. `SerializesMoney` continues to centralize `Money` serialization while the new formatter handles tolerances and ratios.                | This isolates string conversion to the serialization boundary and ensures clients continue to consume normalized numeric strings.        |
+| API Layer (`PathResult`, `PathLeg`, `MoneyMap`)                                                       | Receive BigDecimal-backed value objects and format them as strings for API consumption.                                                                                                                                            | This ensures clients receive normalized numeric strings through the object API methods.        |
 
 ## Serialization boundaries and helper plan
 
@@ -36,13 +36,13 @@ link back to the relevant section so that new invariants remain self-contained.
   of flowing through a shared facade.
 * **Outbound formatting** – Public DTOs (`PathResult`, `PathLeg`, `MoneyMap`,
   `PathResultSet`, guard reports) convert their `BigDecimal` payloads to numeric strings at
-  the moment they serialize to arrays or JSON.
+  the moment they are accessed through the API.
 * **Helper utilities** – Introduce a `DecimalFormatter` with methods like
   `DecimalFormatter::toString(BigDecimal $value, int $scale, bool $trimTrailingZeros = false)`
   and `DecimalFormatter::percentage(BigDecimal $ratio, int $scale = 2)` so every outbound
   string honours the canonical policy. `SerializesMoney` will call into this formatter when
   emitting tolerance or ratio metadata alongside `Money` payloads.
-* **JSON encoders** – The `SerializesMoney` trait and DTOs such as `PathResult` retain their
+* **API consumers** – The DTOs such as `PathResult` provide formatted
   current role as serialization boundaries. They will invoke the formatter (rather than
   ad-hoc string helpers) to maintain consistent numeric-string representations when
   emitting tolerances, costs, guard counters, and per-leg breakdowns.
@@ -53,7 +53,7 @@ BrickDecimalMath has been removed now that each value object owns its `BigDecima
 normalization rules. Production code constructs decimals directly inside `Money`,
 `ExchangeRate`, tolerance windows, and the search states, eliminating the shared facade.
 Tests and benchmarks that need deterministic numeric strings rely on the 
-`SomeWork\P2PPathFinder\Tests\Support\DecimalMath` helper instead, keeping the
+`SomeWork\P2PPathFinder\Tests\Unit\Support\DecimalMath` helper instead, keeping the
 canonical rounding policy available without reintroducing a production dependency.【F:tests/Support/DecimalMath.php†L1-L120】
 
 ## Scale Application Examples
@@ -63,7 +63,7 @@ Understanding how scales work in practice is key to using the library correctly.
 ### Example 1: Fiat Currency (USD)
 
 ```php
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
 
 // USD typically uses 2 decimal places (cents)
 $amount = Money::fromString('USD', '123.45', 2);
@@ -78,7 +78,7 @@ echo $amount->scale();     // 2
 ### Example 2: Cryptocurrency (BTC)
 
 ```php
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
 
 // Bitcoin typically uses 8 decimal places (satoshis)
 $btc = Money::fromString('BTC', '0.12345678', 8);
@@ -93,8 +93,7 @@ echo $btc->scale();     // 8
 ### Example 3: Exchange Rates
 
 ```php
-use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;use SomeWork\P2PPathFinder\Domain\Money\Money;
 
 // EUR/USD rate with high precision
 $rate = ExchangeRate::fromString('EUR', 'USD', '1.085432', 6);
@@ -111,7 +110,7 @@ echo $dollars->scale();   // 2 (inherits USD scale)
 ### Example 4: Tolerance Windows
 
 ```php
-use SomeWork\P2PPathFinder\Domain\ValueObject\ToleranceWindow;
+use SomeWork\P2PPathFinder\Domain\Tolerance\ToleranceWindow;
 
 // Tolerance: 0% to 5% (5 decimal places for precision)
 $tolerance = ToleranceWindow::fromScalars('0.00000', '0.05000', 5);
@@ -298,8 +297,8 @@ public function testConversionRoundtrip(): void
 **Cause:** Fee is >= 100%, leaving zero or negative effective amount.
 
 **Example:**
+
 ```php
-use SomeWork\P2PPathFinder\Domain\Order\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\PercentageFeePolicy;
 
 // ❌ Wrong: 100% fee

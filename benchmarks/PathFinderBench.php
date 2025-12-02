@@ -6,22 +6,22 @@ namespace SomeWork\P2PPathFinder\Benchmarks;
 
 use PhpBench\Attributes\BeforeMethods;
 use PhpBench\Attributes\ParamProviders;
-use SomeWork\P2PPathFinder\Application\Config\PathSearchConfig;
-use SomeWork\P2PPathFinder\Application\Graph\Graph;
-use SomeWork\P2PPathFinder\Application\Graph\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\OrderBook\OrderBook;
-use SomeWork\P2PPathFinder\Application\PathFinder\PathFinder;
-use SomeWork\P2PPathFinder\Application\PathFinder\ValueObject\SpendConstraints;
-use SomeWork\P2PPathFinder\Application\Service\PathFinderService;
-use SomeWork\P2PPathFinder\Application\Service\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Engine\PathSearchEngine;
+use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\Graph;
+use SomeWork\P2PPathFinder\Application\PathSearch\Model\SpendConstraints;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
+use SomeWork\P2PPathFinder\Domain\Money\AssetPair;
+use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBook;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBounds;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\ValueObject\AssetPair;
-use SomeWork\P2PPathFinder\Domain\ValueObject\ExchangeRate;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
-use SomeWork\P2PPathFinder\Domain\ValueObject\OrderBounds;
 use SomeWork\P2PPathFinder\Tests\Fixture\BottleneckOrderBookFactory;
-use SomeWork\P2PPathFinder\Tests\Support\DecimalMath;
+use SomeWork\P2PPathFinder\Tests\Helpers\DecimalMath;
 
 use function array_fill;
 use function array_map;
@@ -34,7 +34,7 @@ use const STR_PAD_LEFT;
 #[BeforeMethods('setUp')]
 class PathFinderBench
 {
-    private PathFinderService $service;
+    private PathSearchService $service;
 
     private GraphBuilder $graphBuilder;
 
@@ -76,7 +76,7 @@ class PathFinderBench
     public function setUp(): void
     {
         $this->graphBuilder = new GraphBuilder();
-        $this->service = new PathFinderService($this->graphBuilder);
+        $this->service = new PathSearchService($this->graphBuilder);
         $this->baseOrders = $this->createBaseOrderSet();
         $this->bottleneckOrderBooks = [
             'create' => BottleneckOrderBookFactory::create(),
@@ -134,7 +134,7 @@ class PathFinderBench
             $params['spendDesired'],
         );
 
-        $pathFinder = new PathFinder(
+        $pathFinder = new PathSearchEngine(
             maxHops: $params['maxHops'],
             tolerance: $params['tolerance'],
             topK: $params['resultLimit'],

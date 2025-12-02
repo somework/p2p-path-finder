@@ -423,7 +423,7 @@ Include:
 - **PHP version**: `php -v`
 - **Minimal reproducible example**
 - **Expected vs actual behavior**
-- **Guard report**: `$outcome->guardLimits()->jsonSerialize()`
+- **Guard report**: `$outcome->guardLimits()->expansions()` and other methods
 - **Error messages**: Full exception message and stack trace
 
 **Example report**:

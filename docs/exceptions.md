@@ -166,7 +166,9 @@ try {
     http_response_code(503);
     return [
         'error' => 'Search limit exceeded',
-        'report' => $report->jsonSerialize(),
+        'expansions' => $report->expansions(),
+        'visited_states' => $report->visitedStates(),
+        'elapsed_ms' => $report->elapsedMilliseconds(),
     ];
 }
 ```
@@ -281,13 +283,30 @@ if ($outcome->guardLimits()->anyLimitReached()) {
 
 // Check for empty results
 if ($outcome->paths()->isEmpty()) {
-    return ['error' => 'No paths found', 'guards' => $outcome->guardLimits()->jsonSerialize()];
+    $report = $outcome->guardLimits();
+    return [
+        'error' => 'No paths found',
+        'expansions' => $report->expansions(),
+        'visited_states' => $report->visitedStates(),
+    ];
 }
 
 // Process results
+$paths = [];
+foreach ($outcome->paths() as $path) {
+    $paths[] = [
+        'total_spent' => $path->totalSpent()->amount(),
+        'total_received' => $path->totalReceived()->amount(),
+    ];
+}
+
+$report = $outcome->guardLimits();
 return [
-    'paths' => $outcome->paths()->jsonSerialize(),
-    'guards' => $outcome->guardLimits()->jsonSerialize(),
+    'paths' => $paths,
+    'guards' => [
+        'expansions' => $report->expansions(),
+        'visited_states' => $report->visitedStates(),
+    ],
 ];
 ```
 
@@ -353,18 +372,32 @@ function handlePathSearch(
         
         // Check for empty results
         if ($outcome->paths()->isEmpty()) {
+            $report = $outcome->guardLimits();
             return [
                 'success' => false,
                 'error' => 'No paths found',
-                'guards' => $outcome->guardLimits()->jsonSerialize(),
+                'expansions' => $report->expansions(),
+                'visited_states' => $report->visitedStates(),
             ];
         }
-        
+
         // Success
+        $paths = [];
+        foreach ($outcome->paths() as $path) {
+            $paths[] = [
+                'spent' => $path->totalSpent()->amount(),
+                'received' => $path->totalReceived()->amount(),
+            ];
+        }
+
+        $report = $outcome->guardLimits();
         return [
             'success' => true,
-            'paths' => $outcome->paths()->jsonSerialize(),
-            'guards' => $outcome->guardLimits()->jsonSerialize(),
+            'paths' => $paths,
+            'guards' => [
+                'expansions' => $report->expansions(),
+                'visited_states' => $report->visitedStates(),
+            ],
         ];
         
     } catch (InvalidInput $e) {
@@ -383,7 +416,8 @@ function handlePathSearch(
         return [
             'success' => false,
             'error' => 'Search limit exceeded',
-            'report' => $report->jsonSerialize(),
+            'expansions' => $report->expansions(),
+            'visited_states' => $report->visitedStates(),
             'http_status' => 503,
         ];
         
@@ -608,7 +642,7 @@ A: Empty results are NOT an error - check `$outcome->paths()->isEmpty()` and han
 
 - [Troubleshooting Guide](troubleshooting.md) - Common issues and solutions
 - [Getting Started Guide](getting-started.md) - Library basics
-- [API Contracts](api-contracts.md) - JSON serialization format
+- [API Contracts](api-contracts.md) - Object API specification
 - [Domain Invariants](domain-invariants.md) - Validation rules
 
 ---

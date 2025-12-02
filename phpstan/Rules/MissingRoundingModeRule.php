@@ -12,6 +12,7 @@ use PHPStan\Rules\RuleErrorBuilder;
 use PHPStan\Type\ObjectType;
 
 use function count;
+use Brick\Math\BigDecimal;
 
 /**
  * Detects toScale() calls without explicit RoundingMode parameter.
@@ -44,7 +45,7 @@ final class MissingRoundingModeRule implements Rule
 
         // Check if this is called on a BigDecimal type
         $callerType = $scope->getType($node->var);
-        $bigDecimalType = new ObjectType('Brick\\Math\\BigDecimal');
+        $bigDecimalType = new ObjectType(BigDecimal::class);
 
         if (!$bigDecimalType->isSuperTypeOf($callerType)->yes()) {
             return [];

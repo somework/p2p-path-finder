@@ -147,9 +147,7 @@ Optimize your order book **before** the search to reduce memory at the source. T
 Filter out orders that cannot possibly satisfy the requested spend amount:
 
 ```php
-use SomeWork\P2PPathFinder\Application\Filter\MinimumAmountFilter;
-use SomeWork\P2PPathFinder\Application\Filter\MaximumAmountFilter;
-use SomeWork\P2PPathFinder\Domain\ValueObject\Money;
+use SomeWork\P2PPathFinder\Application\Order\Filter\MaximumAmountFilter;use SomeWork\P2PPathFinder\Application\Order\Filter\MinimumAmountFilter;use SomeWork\P2PPathFinder\Domain\Money\Money;
 
 $spendAmount = Money::fromString('USD', '1000.00', 2);
 
@@ -174,7 +172,7 @@ $filtered = $orderBook->filter($minFilter, $maxFilter);
 Remove orders with rates outside the acceptable tolerance:
 
 ```php
-use SomeWork\P2PPathFinder\Application\Filter\ToleranceWindowFilter;
+use SomeWork\P2PPathFinder\Application\Order\Filter\ToleranceWindowFilter;
 
 $config = PathSearchConfig::builder()
     ->withSpendAmount($amount)
@@ -193,7 +191,7 @@ $filtered = $orderBook->filter($filter);
 Focus on relevant currency pairs for your search:
 
 ```php
-use SomeWork\P2PPathFinder\Application\Filter\CurrencyPairFilter;
+use SomeWork\P2PPathFinder\Application\Order\Filter\CurrencyPairFilter;
 
 // Only include orders involving USD, EUR, or BTC
 $filter = new CurrencyPairFilter(['USD', 'EUR', 'BTC']);
@@ -488,7 +486,7 @@ After deploying with your calculated limits, monitor these metrics:
 ```php
 $outcome = $service->findBestPaths($request);
 $report = $outcome->guardLimits();
-$metrics = $report->jsonSerialize()['metrics'];
+$metrics = $report->expansions(); // Access metrics directly
 
 // Calculate utilization percentages
 $visitedUtilization = $metrics['visited_states'] / $config->searchGuards()->maxVisitedStates();
@@ -657,7 +655,11 @@ For most production use cases:
 $outcome = $service->findBestPaths($request);
 $report = $outcome->guardLimits();
 
-$metrics = $report->jsonSerialize();
+$metrics = [
+    'expansions' => $report->expansions(),
+    'visited_states' => $report->visitedStates(),
+    'elapsed_ms' => $report->elapsedMilliseconds(),
+];
 // {
 //   "limits": {
 //     "expansions": 100000,
@@ -805,7 +807,12 @@ Track these metrics to understand memory behavior:
 $startMemory = memory_get_usage(true);
 $outcome = $service->findBestPaths($request);
 $peakMemory = memory_get_peak_usage(true);
-$metrics = $outcome->guardLimits()->jsonSerialize()['metrics'];
+$report = $outcome->guardLimits();
+$metrics = [
+    'expansions' => $report->expansions(),
+    'visited_states' => $report->visitedStates(),
+    'elapsed_ms' => $report->elapsedMilliseconds(),
+];
 
 $memoryUsed = ($peakMemory - $startMemory) / 1024 / 1024; // MB
 $memoryPerState = $metrics['visited_states'] > 0 

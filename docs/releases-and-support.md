@@ -34,13 +34,13 @@ MAJOR.MINOR.PATCH (e.g., 1.3.2)
 - Removing public API methods or classes
 - Changing method signatures or return types
 - Changing exception types
-- Significant JSON output structure changes
+- Significant API structure changes
 - Breaking behavioral changes
 
 **MINOR version** (1.2.x → 1.3.0):
 - Adding new public methods or classes
 - Adding optional parameters (with defaults)
-- Adding new JSON output fields
+- Adding new API methods
 - Performance improvements
 - New configuration options
 
@@ -66,8 +66,8 @@ class PathSearchConfig {
     // After:  public function __construct(Money $amount, int $hops)
 }
 
-// ❌ BC BREAK: Removing JSON fields
-$json = $money->jsonSerialize();
+// ❌ BC BREAK: Removing API methods
+$amount = $money->amount();
 // Before: ['currency' => 'USD', 'amount' => '100.00', 'scale' => 2]
 // After:  ['currency' => 'USD', 'amount' => '100.00']  // 'scale' removed
 ```
@@ -83,8 +83,8 @@ class PathFinderService {
 // ✅ OK: Adding optional parameters
 public static function builder(?string $preset = null): PathSearchConfigBuilder
 
-// ✅ OK: Adding new JSON fields
-$json = $money->jsonSerialize();
+// ✅ OK: Adding new API methods
+$amount = $money->amount();
 // Before: ['currency' => 'USD', 'amount' => '100.00']
 // After:  ['currency' => 'USD', 'amount' => '100.00', 'formatted' => '$100.00']
 
@@ -468,7 +468,7 @@ A: Bug fixes are PATCH releases even if they change behavior, because they resto
 **Q: How long are MAJOR versions supported?**  
 A: Active support for latest MINOR. Security fixes for 6 months after new MAJOR release.
 
-**Q: Can JSON output fields be removed?**  
+**Q: Can API methods be removed?**  
 A: No, removing fields is a BC break. Fields can be deprecated and removed in a MAJOR version.
 
 ---
