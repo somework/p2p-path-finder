@@ -44,7 +44,6 @@ final class MaterializedResultTest extends TestCase
         self::assertInstanceOf(PathResultSetEntry::class, $entry);
         self::assertSame($result, $entry->path());
         self::assertSame($orderKey, $entry->orderKey());
-        self::assertSame($result->jsonSerialize(), $materialized->jsonSerialize());
     }
 
     public function test_it_handles_zero_amounts(): void
@@ -170,7 +169,6 @@ final class MaterializedResultTest extends TestCase
             $materialized = new MaterializedResult($result, $orderKey);
 
             self::assertSame($tolerance, $materialized->result()->residualTolerance()->ratio());
-            self::assertSame($result->jsonSerialize(), $materialized->jsonSerialize());
         }
     }
 
@@ -348,13 +346,6 @@ final class MaterializedResultTest extends TestCase
         self::assertSame($entry1Path->totalReceived()->currency(), $entry2Path->totalReceived()->currency());
         self::assertSame($entry1OrderKey->cost()->value(), $entry2OrderKey->cost()->value());
         self::assertSame($entry1OrderKey->hops(), $entry2OrderKey->hops());
-
-        // Ensure jsonSerialize() returns consistent data
-        $json1 = $materialized->jsonSerialize();
-        $json2 = $materialized->jsonSerialize();
-
-        self::assertSame($json1, $json2);
-        self::assertSame($result->jsonSerialize(), $json1);
     }
 
     public function test_it_handles_extreme_cost_values(): void
@@ -410,34 +401,5 @@ final class MaterializedResultTest extends TestCase
         self::assertSame($result->totalReceived(), $entry->path()->totalReceived());
         self::assertSame($orderKey->cost(), $entry->orderKey()->cost());
         self::assertSame($orderKey->hops(), $entry->orderKey()->hops());
-    }
-
-    public function test_json_serialize_delegates_to_path_result(): void
-    {
-        $result = new PathResult(
-            Money::fromString('USD', '100.00', 2),
-            Money::fromString('EUR', '90.00', 2),
-            DecimalTolerance::fromNumericString('0.050000000000000000'),
-        );
-
-        $orderKey = new PathOrderKey(
-            new PathCost(DecimalFactory::decimal('1.111111111111111111')),
-            1,
-            RouteSignature::fromNodes(['USD', 'EUR']),
-            0,
-        );
-
-        $materialized = new MaterializedResult($result, $orderKey);
-
-        $jsonData = $materialized->jsonSerialize();
-        $resultJsonData = $result->jsonSerialize();
-
-        self::assertSame($resultJsonData, $jsonData);
-        self::assertIsArray($jsonData);
-        self::assertArrayHasKey('totalSpent', $jsonData);
-        self::assertArrayHasKey('totalReceived', $jsonData);
-        self::assertArrayHasKey('residualTolerance', $jsonData);
-        self::assertArrayHasKey('feeBreakdown', $jsonData);
-        self::assertArrayHasKey('legs', $jsonData);
     }
 }

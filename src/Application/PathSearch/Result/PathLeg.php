@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathSearch\Result;
 
-use JsonSerializable;
-use SomeWork\P2PPathFinder\Application\PathSearch\Support\SerializesMoney;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Money\MoneyMap;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
@@ -18,10 +16,8 @@ use function strtoupper;
  *
  * @api
  */
-final class PathLeg implements JsonSerializable
+final class PathLeg
 {
-    use SerializesMoney;
-
     private readonly string $fromAsset;
 
     private readonly string $toAsset;
@@ -86,26 +82,6 @@ final class PathLeg implements JsonSerializable
     public function feesAsArray(): array
     {
         return $this->fees->toArray();
-    }
-
-    /**
-     * @return array{
-     *     from: string,
-     *     to: string,
-     *     spent: array{currency: string, amount: numeric-string, scale: int},
-     *     received: array{currency: string, amount: numeric-string, scale: int},
-     *     fees: array<string, array{currency: string, amount: numeric-string, scale: int}>,
-     * }
-     */
-    public function jsonSerialize(): array
-    {
-        return [
-            'from' => $this->fromAsset,
-            'to' => $this->toAsset,
-            'spent' => self::serializeMoney($this->spent),
-            'received' => self::serializeMoney($this->received),
-            'fees' => $this->fees->jsonSerialize(),
-        ];
     }
 
     /**

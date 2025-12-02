@@ -31,24 +31,6 @@ final class MoneyMapTest extends TestCase
         self::assertNull($map->get('EUR'));
     }
 
-    public function test_json_serialization_preserves_normalized_strings(): void
-    {
-        $map = MoneyMap::fromList([
-            Money::fromString('usd', '0.500', 3),
-            Money::fromString('eur', '0.12345', 5),
-            Money::fromString('usd', '1.25', 2),
-            Money::fromString('eur', '0.87655', 5),
-        ]);
-
-        self::assertSame(
-            [
-                'EUR' => ['currency' => 'EUR', 'amount' => '1.00000', 'scale' => 5],
-                'USD' => ['currency' => 'USD', 'amount' => '1.750', 'scale' => 3],
-            ],
-            $map->jsonSerialize(),
-        );
-    }
-
     public function test_empty_creates_empty_map(): void
     {
         $map = MoneyMap::empty();
@@ -56,7 +38,6 @@ final class MoneyMapTest extends TestCase
         self::assertTrue($map->isEmpty());
         self::assertSame(0, $map->count());
         self::assertSame([], $map->toArray());
-        self::assertSame([], $map->jsonSerialize());
     }
 
     public function test_from_list_with_empty_iterable(): void
@@ -383,87 +364,6 @@ final class MoneyMapTest extends TestCase
         self::assertSame('75.00', $final->get('EUR')?->amount());  // 50 + 25
         self::assertSame('75.00', $final->get('GBP')?->amount());  // 75
         self::assertSame('1000', $final->get('JPY')?->amount());   // 1000
-    }
-
-    public function test_json_serialize_empty_map(): void
-    {
-        $map = MoneyMap::empty();
-
-        self::assertSame([], $map->jsonSerialize());
-    }
-
-    public function test_json_serialize_single_currency(): void
-    {
-        $map = MoneyMap::fromList([Money::fromString('USD', '123.45', 2)]);
-
-        $expected = [
-            'USD' => [
-                'currency' => 'USD',
-                'amount' => '123.45',
-                'scale' => 2,
-            ],
-        ];
-
-        self::assertSame($expected, $map->jsonSerialize());
-    }
-
-    public function test_json_serialize_multiple_currencies(): void
-    {
-        $map = MoneyMap::fromList([
-            Money::fromString('EUR', '100.50', 2),
-            Money::fromString('USD', '200.75', 2),
-            Money::fromString('GBP', '50.25', 2),
-        ]);
-
-        $serialized = $map->jsonSerialize();
-
-        self::assertCount(3, $serialized);
-        self::assertArrayHasKey('EUR', $serialized);
-        self::assertArrayHasKey('USD', $serialized);
-        self::assertArrayHasKey('GBP', $serialized);
-
-        // Check each currency serialization
-        self::assertSame([
-            'currency' => 'EUR',
-            'amount' => '100.50',
-            'scale' => 2,
-        ], $serialized['EUR']);
-
-        self::assertSame([
-            'currency' => 'USD',
-            'amount' => '200.75',
-            'scale' => 2,
-        ], $serialized['USD']);
-
-        self::assertSame([
-            'currency' => 'GBP',
-            'amount' => '50.25',
-            'scale' => 2,
-        ], $serialized['GBP']);
-    }
-
-    public function test_json_serialize_with_merging(): void
-    {
-        $map = MoneyMap::fromList([
-            Money::fromString('USD', '100.00', 2),
-            Money::fromString('USD', '50.00', 2), // Should merge to 150.00
-            Money::fromString('EUR', '75.00', 2),
-        ]);
-
-        $serialized = $map->jsonSerialize();
-
-        self::assertSame([
-            'EUR' => [
-                'currency' => 'EUR',
-                'amount' => '75.00',
-                'scale' => 2,
-            ],
-            'USD' => [
-                'currency' => 'USD',
-                'amount' => '150.00',
-                'scale' => 2,
-            ],
-        ], $serialized);
     }
 
     public function test_very_large_amounts(): void

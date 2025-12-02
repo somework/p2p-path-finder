@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph;
 
-use JsonSerializable;
-use SomeWork\P2PPathFinder\Application\PathSearch\Support\SerializesMoney;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
@@ -14,10 +12,8 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
  *
  * @internal
  */
-final class EdgeCapacity implements JsonSerializable
+final class EdgeCapacity
 {
-    use SerializesMoney;
-
     public function __construct(
         private readonly Money $min,
         private readonly Money $max,
@@ -39,16 +35,5 @@ final class EdgeCapacity implements JsonSerializable
     public function max(): Money
     {
         return $this->max;
-    }
-
-    /**
-     * @return array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}}
-     */
-    public function jsonSerialize(): array
-    {
-        return [
-            'min' => self::serializeMoney($this->min),
-            'max' => self::serializeMoney($this->max),
-        ];
     }
 }

@@ -7,8 +7,6 @@ namespace SomeWork\P2PPathFinder\Domain\Money;
 use ArrayIterator;
 use Countable;
 use IteratorAggregate;
-use JsonSerializable;
-use SomeWork\P2PPathFinder\Application\PathSearch\Support\SerializesMoney;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 use Traversable;
@@ -24,10 +22,8 @@ use function ksort;
  *
  * @api
  */
-final class MoneyMap implements Countable, IteratorAggregate, JsonSerializable
+final class MoneyMap implements Countable, IteratorAggregate
 {
-    use SerializesMoney;
-
     /**
      * @var array<string, Money>
      */
@@ -175,19 +171,5 @@ final class MoneyMap implements Countable, IteratorAggregate, JsonSerializable
         ksort($values);
 
         return new self($values);
-    }
-
-    /**
-     * @return array<string, array{currency: string, amount: numeric-string, scale: int}>
-     */
-    public function jsonSerialize(): array
-    {
-        $serialized = [];
-
-        foreach ($this->values as $currency => $money) {
-            $serialized[$currency] = self::serializeMoney($money);
-        }
-
-        return $serialized;
     }
 }

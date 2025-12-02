@@ -8,7 +8,6 @@ use ArrayIterator;
 use Closure;
 use Countable;
 use IteratorAggregate;
-use JsonSerializable;
 use LogicException;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use Traversable;
@@ -24,7 +23,7 @@ use function implode;
  *
  * @implements IteratorAggregate<int, GraphEdge>
  */
-final class GraphEdgeCollection implements Countable, IteratorAggregate, JsonSerializable
+final class GraphEdgeCollection implements Countable, IteratorAggregate
 {
     /**
      * @var list<GraphEdge>
@@ -155,20 +154,6 @@ final class GraphEdgeCollection implements Countable, IteratorAggregate, JsonSer
     public function toArray(): array
     {
         return $this->edges;
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    public function jsonSerialize(): array
-    {
-        $serialized = [];
-
-        foreach ($this->edges as $edge) {
-            $serialized[] = $edge->jsonSerialize();
-        }
-
-        return $serialized;
     }
 
     /**

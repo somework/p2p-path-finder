@@ -57,9 +57,6 @@ try {
         );
     }
 
-    $payload = $result->jsonSerialize();
-    assert(isset($payload['guards']));
-
     $report = $result->guardLimits();
     printf(
         "Explored %d/%d states across %d/%d expansions in %.3fms\n",

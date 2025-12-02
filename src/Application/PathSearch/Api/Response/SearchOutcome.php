@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathSearch\Api\Response;
 
-use JsonSerializable;
 use SomeWork\P2PPathFinder\Application\PathSearch\Config\SearchGuardConfig;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
@@ -23,7 +22,7 @@ use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
  *
  * @api
  */
-final class SearchOutcome implements JsonSerializable
+final class SearchOutcome
 {
     /**
      * @var PathResultSet<TPath>
@@ -111,23 +110,5 @@ final class SearchOutcome implements JsonSerializable
     public function guardLimits(): SearchGuardReport
     {
         return $this->guardLimits;
-    }
-
-    /**
-     * @return array{
-     *     paths: list<TPath>,
-     *     guards: array{
-     *         limits: array{expansions: int, visited_states: int, time_budget_ms: int|null},
-     *         metrics: array{expansions: int, visited_states: int, elapsed_ms: float},
-     *         breached: array{expansions: bool, visited_states: bool, time_budget: bool, any: bool}
-     *     }
-     * }
-     */
-    public function jsonSerialize(): array
-    {
-        return [
-            'paths' => $this->paths->jsonSerialize(),
-            'guards' => $this->guardLimits->jsonSerialize(),
-        ];
     }
 }

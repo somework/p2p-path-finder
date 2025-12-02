@@ -7,7 +7,6 @@ namespace SomeWork\P2PPathFinder\Application\PathSearch\Result;
 use ArrayIterator;
 use Countable;
 use IteratorAggregate;
-use JsonSerializable;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use Traversable;
 
@@ -23,7 +22,7 @@ use function count;
  *
  * @api
  */
-final class PathLegCollection implements Countable, IteratorAggregate, JsonSerializable
+final class PathLegCollection implements Countable, IteratorAggregate
 {
     /**
      * @var list<PathLeg>
@@ -104,26 +103,6 @@ final class PathLegCollection implements Countable, IteratorAggregate, JsonSeria
     public function isEmpty(): bool
     {
         return [] === $this->legs;
-    }
-
-    /**
-     * @return list<array{
-     *     from: string,
-     *     to: string,
-     *     spent: array{currency: string, amount: numeric-string, scale: int},
-     *     received: array{currency: string, amount: numeric-string, scale: int},
-     *     fees: array<string, array{currency: string, amount: numeric-string, scale: int}>,
-     * }>
-     */
-    public function jsonSerialize(): array
-    {
-        $serialized = [];
-
-        foreach ($this->legs as $leg) {
-            $serialized[] = $leg->jsonSerialize();
-        }
-
-        return $serialized;
     }
 
     /**

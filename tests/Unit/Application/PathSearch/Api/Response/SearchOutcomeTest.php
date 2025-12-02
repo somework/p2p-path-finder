@@ -55,37 +55,4 @@ final class SearchOutcomeTest extends TestCase
         self::assertSame($paths, $outcome->paths());
         self::assertSame($status, $outcome->guardLimits());
     }
-
-    public function test_json_serialize_returns_paths_and_guard_report_payload(): void
-    {
-        $orderKeys = [
-            new PathOrderKey(new PathCost(DecimalFactory::decimal('2')), 1, RouteSignature::fromNodes(['C']), 1),
-            new PathOrderKey(new PathCost(DecimalFactory::decimal('1')), 1, RouteSignature::fromNodes(['B']), 0),
-        ];
-
-        $paths = PathResultSet::fromPaths(
-            new CostHopsSignatureOrderingStrategy(18),
-            [
-                ['id' => 3],
-                ['id' => 2],
-            ],
-            static fn (array $path, int $index): PathOrderKey => $orderKeys[$index],
-        );
-        $status = SearchGuardReport::fromMetrics(
-            expansions: 5,
-            visitedStates: 7,
-            elapsedMilliseconds: 12.5,
-            expansionLimit: 10,
-            visitedStateLimit: 12,
-            timeBudgetLimit: 50,
-            expansionLimitReached: true,
-        );
-
-        $outcome = SearchOutcome::fromResultSet($paths, $status);
-
-        $payload = $outcome->jsonSerialize();
-
-        self::assertSame($paths->jsonSerialize(), $payload['paths']);
-        self::assertSame($status->jsonSerialize(), $payload['guards']);
-    }
 }

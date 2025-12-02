@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph;
 
 use IteratorAggregate;
-use JsonSerializable;
-use SomeWork\P2PPathFinder\Application\PathSearch\Support\SerializesMoney;
 use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
@@ -19,10 +17,8 @@ use Traversable;
  *
  * @implements IteratorAggregate<int, EdgeSegment>
  */
-final class GraphEdge implements IteratorAggregate, JsonSerializable
+final class GraphEdge implements IteratorAggregate
 {
-    use SerializesMoney;
-
     private readonly EdgeSegmentCollection $segments;
 
     /**
@@ -98,64 +94,5 @@ final class GraphEdge implements IteratorAggregate, JsonSerializable
     public function getIterator(): Traversable
     {
         return $this->segments->getIterator();
-    }
-
-    /**
-     * @return array{
-     *     from: string,
-     *     to: string,
-     *     orderSide: string,
-     *     order: array{
-     *         side: string,
-     *         assetPair: array{base: string, quote: string},
-     *         bounds: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-     *         effectiveRate: array{baseCurrency: string, quoteCurrency: string, value: string, scale: int},
-     *     },
-     *     rate: array{baseCurrency: string, quoteCurrency: string, value: string, scale: int},
-     *     baseCapacity: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-     *     quoteCapacity: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-     *     grossBaseCapacity: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-     *     segments: list<array{
-     *         isMandatory: bool,
-     *         base: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-     *         quote: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-     *         grossBase: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-     *     }>,
-     * }
-     */
-    public function jsonSerialize(): array
-    {
-        return [
-            'from' => $this->from,
-            'to' => $this->to,
-            'orderSide' => $this->orderSide->value,
-            'order' => [
-                'side' => $this->order->side()->value,
-                'assetPair' => [
-                    'base' => $this->order->assetPair()->base(),
-                    'quote' => $this->order->assetPair()->quote(),
-                ],
-                'bounds' => [
-                    'min' => self::serializeMoney($this->order->bounds()->min()),
-                    'max' => self::serializeMoney($this->order->bounds()->max()),
-                ],
-                'effectiveRate' => [
-                    'baseCurrency' => $this->order->effectiveRate()->baseCurrency(),
-                    'quoteCurrency' => $this->order->effectiveRate()->quoteCurrency(),
-                    'value' => $this->order->effectiveRate()->rate(),
-                    'scale' => $this->order->effectiveRate()->scale(),
-                ],
-            ],
-            'rate' => [
-                'baseCurrency' => $this->rate->baseCurrency(),
-                'quoteCurrency' => $this->rate->quoteCurrency(),
-                'value' => $this->rate->rate(),
-                'scale' => $this->rate->scale(),
-            ],
-            'baseCapacity' => $this->baseCapacity->jsonSerialize(),
-            'quoteCapacity' => $this->quoteCapacity->jsonSerialize(),
-            'grossBaseCapacity' => $this->grossBaseCapacity->jsonSerialize(),
-            'segments' => $this->segments->jsonSerialize(),
-        ];
     }
 }

@@ -104,8 +104,8 @@ final class GraphEdgeTest extends TestCase
         self::assertTrue($grossBaseCapacity->max()->equals($fixture['grossBaseCapacity']->max()));
 
         self::assertSame([
-            $fixture['segment']->jsonSerialize(),
-        ], $edge->segmentCollection()->jsonSerialize());
+            $fixture['segment'],
+        ], $edge->segmentCollection()->toArray());
     }
 
     public function test_segment_collection_exposes_edge_segments(): void

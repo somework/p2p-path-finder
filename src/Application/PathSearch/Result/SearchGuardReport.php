@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathSearch\Result;
 
-use JsonSerializable;
-
 /**
  * Immutable snapshot describing how the search interacted with its guard rails.
  *
  * @api
  */
-final class SearchGuardReport implements JsonSerializable
+final class SearchGuardReport
 {
     /**
      * @psalm-type SearchGuardReportJson = array{
@@ -177,34 +175,5 @@ final class SearchGuardReport implements JsonSerializable
     public function timeBudgetLimit(): ?int
     {
         return $this->timeBudgetLimit;
-    }
-
-    /**
-     * @return array{
-     *     limits: array{expansions: int, visited_states: int, time_budget_ms: int|null},
-     *     metrics: array{expansions: int, visited_states: int, elapsed_ms: float},
-     *     breached: array{expansions: bool, visited_states: bool, time_budget: bool, any: bool}
-     * }
-     */
-    public function jsonSerialize(): array
-    {
-        return [
-            'limits' => [
-                'expansions' => $this->expansionLimit,
-                'visited_states' => $this->visitedStateLimit,
-                'time_budget_ms' => $this->timeBudgetLimit,
-            ],
-            'metrics' => [
-                'expansions' => $this->expansions,
-                'visited_states' => $this->visitedStates,
-                'elapsed_ms' => $this->elapsedMilliseconds,
-            ],
-            'breached' => [
-                'expansions' => $this->expansionsReached,
-                'visited_states' => $this->visitedStatesReached,
-                'time_budget' => $this->timeBudgetReached,
-                'any' => $this->anyLimitReached(),
-            ],
-        ];
     }
 }

@@ -27,7 +27,6 @@ use SomeWork\P2PPathFinder\Tests\Fixture\CurrencyScenarioFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 use SomeWork\P2PPathFinder\Tests\Helpers\DecimalMath;
 
-use function array_column;
 use function array_key_last;
 use function array_reverse;
 use function array_slice;
@@ -1205,33 +1204,6 @@ final class PathSearchEngineIntegrationTest extends TestCase
         }
 
         self::assertSame($assetTrail, array_unique($assetTrail), 'Paths should not revisit identical assets.');
-    }
-
-    public function test_manual_edge_serializes_segment_flags(): void
-    {
-        $edgeData = self::manualEdge('AAA', 'BBB', '1.250');
-
-        $edgeData['segments'][] = [
-            'isMandatory' => true,
-            'base' => [
-                'min' => Money::fromString('AAA', '0.500', 3),
-                'max' => Money::fromString('AAA', '1.000', 3),
-            ],
-            'quote' => [
-                'min' => Money::fromString('BBB', '0.625', 3),
-                'max' => Money::fromString('BBB', '1.250', 3),
-            ],
-            'grossBase' => [
-                'min' => Money::fromString('AAA', '0.500', 3),
-                'max' => Money::fromString('AAA', '1.000', 3),
-            ],
-        ];
-
-        $edge = self::hydrateEdge($edgeData);
-        $serialized = $edge->jsonSerialize();
-
-        self::assertSame([false, true], array_column($serialized['segments'], 'isMandatory'));
-        self::assertCount(2, $serialized['segments']);
     }
 
     public function test_it_preserves_parallel_states_with_distinct_ranges(): void

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Unit\Application\PathSearch\Result;
 
-use JsonSerializable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\CostHopsSignatureOrderingStrategy;
@@ -46,17 +45,13 @@ final class PathResultSetTest extends TestCase
         self::assertSame(['preferred duplicate', 'unique'], $set->toArray());
     }
 
-    public function test_it_discards_duplicates_while_preserving_payload_order_and_json_output(): void
+    public function test_it_discards_duplicates_while_preserving_payload_order(): void
     {
-        $preferred = ['id' => 'preferred'];
-        $jsonSerializable = $this->createJsonSerializablePayload();
-        $arrayConvertible = $this->createArrayConvertiblePayload();
-
         $paths = [
-            ['id' => 'discarded'],
-            $preferred,
-            $jsonSerializable,
-            $arrayConvertible,
+            'discarded',
+            'preferred',
+            'unique1',
+            'unique2',
         ];
         $orderKeys = [
             new PathOrderKey(new PathCost(DecimalFactory::decimal('0.400000000000000000')), 3, RouteSignature::fromNodes(['SRC', 'A', 'DST']), 3),
@@ -67,41 +62,9 @@ final class PathResultSetTest extends TestCase
 
         $set = $this->createResultSet($paths, $orderKeys);
 
-        $expectedPayloads = [$preferred, $jsonSerializable, $arrayConvertible];
+        $expectedPayloads = ['preferred', 'unique1', 'unique2'];
 
         self::assertSame($expectedPayloads, $set->toArray());
-        self::assertSame(
-            [
-                $preferred,
-                ['type' => 'json'],
-                ['type' => 'array'],
-            ],
-            $set->jsonSerialize(),
-        );
-    }
-
-    public function test_json_serialization_delegates_to_entries(): void
-    {
-        $serializable = $this->createJsonSerializablePayload();
-        $arrayConvertible = $this->createArrayConvertiblePayload();
-
-        $paths = [$serializable, $arrayConvertible, ['type' => 'scalar']];
-        $orderKeys = [
-            new PathOrderKey(new PathCost(DecimalFactory::decimal('0.100000000000000000')), 1, RouteSignature::fromNodes(['SRC', 'A', 'DST']), 0),
-            new PathOrderKey(new PathCost(DecimalFactory::decimal('0.200000000000000000')), 1, RouteSignature::fromNodes(['SRC', 'B', 'DST']), 1),
-            new PathOrderKey(new PathCost(DecimalFactory::decimal('0.300000000000000000')), 1, RouteSignature::fromNodes(['SRC', 'C', 'DST']), 2),
-        ];
-
-        $set = $this->createResultSet($paths, $orderKeys);
-
-        self::assertSame(
-            [
-                ['type' => 'json'],
-                ['type' => 'array'],
-                ['type' => 'scalar'],
-            ],
-            $set->jsonSerialize(),
-        );
     }
 
     public function test_slice_returns_subset_preserving_order(): void
@@ -143,7 +106,6 @@ final class PathResultSetTest extends TestCase
         $this->assertNull($set->first());
         $this->assertSame([], $set->toArray());
         $this->assertSame([], iterator_to_array($set));
-        $this->assertSame([], $set->jsonSerialize());
     }
 
     public function test_empty_collection_slice_returns_empty(): void
@@ -320,43 +282,6 @@ final class PathResultSetTest extends TestCase
         $this->assertSame(['second_duplicate', 'different'], $set->toArray());
     }
 
-    public function test_json_serialization_handles_mixed_payload_types(): void
-    {
-        $jsonSerializable = $this->createJsonSerializablePayload();
-        $arrayConvertible = $this->createArrayConvertiblePayload();
-
-        $paths = [
-            $jsonSerializable,
-            $arrayConvertible,
-            ['key' => 'array_value'],
-            'scalar_string',
-            42,
-            null,
-        ];
-        $orderKeys = array_map(
-            static fn (int $index): PathOrderKey => new PathOrderKey(
-                new PathCost(DecimalFactory::decimal('0.100000000000000000')),
-                1,
-                RouteSignature::fromNodes(['SRC', (string) $index, 'DST']),
-                $index
-            ),
-            array_keys($paths)
-        );
-
-        $set = $this->createResultSet($paths, $orderKeys);
-
-        $expected = [
-            ['type' => 'json'],
-            ['type' => 'array'],
-            ['key' => 'array_value'],
-            'scalar_string',
-            42,
-            null,
-        ];
-
-        $this->assertSame($expected, $set->jsonSerialize());
-    }
-
     /**
      * @template TPath of mixed
      *
@@ -374,16 +299,6 @@ final class PathResultSetTest extends TestCase
             $paths,
             static fn (mixed $path, int $index): PathOrderKey => $orderKeys[$index],
         );
-    }
-
-    private function createJsonSerializablePayload(): JsonSerializable
-    {
-        return new class implements JsonSerializable {
-            public function jsonSerialize(): array
-            {
-                return ['type' => 'json'];
-            }
-        };
     }
 
     private function createArrayConvertiblePayload(): object

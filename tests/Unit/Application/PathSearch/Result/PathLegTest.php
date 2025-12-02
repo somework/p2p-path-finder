@@ -14,30 +14,6 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
 #[CoversClass(PathLeg::class)]
 final class PathLegTest extends TestCase
 {
-    public function test_json_serialization(): void
-    {
-        $leg = new PathLeg(
-            'usd',
-            'eur',
-            Money::fromString('USD', '50', 2),
-            Money::fromString('EUR', '45', 2),
-            MoneyMap::fromList([Money::fromString('USD', '0.50', 2)], true),
-        );
-
-        $this->assertSame(
-            [
-                'from' => 'USD',
-                'to' => 'EUR',
-                'spent' => ['currency' => 'USD', 'amount' => '50.00', 'scale' => 2],
-                'received' => ['currency' => 'EUR', 'amount' => '45.00', 'scale' => 2],
-                'fees' => [
-                    'USD' => ['currency' => 'USD', 'amount' => '0.50', 'scale' => 2],
-                ],
-            ],
-            $leg->jsonSerialize(),
-        );
-    }
-
     public function test_fee_normalization_merges_duplicates_and_discards_zero_values(): void
     {
         $leg = new PathLeg(
@@ -302,27 +278,6 @@ final class PathLegTest extends TestCase
         $this->assertArrayHasKey('USD', $feesArray);
         $this->assertArrayHasKey('EUR', $feesArray);
         $this->assertArrayHasKey('BTC', $feesArray);
-    }
-
-    public function test_json_serialization_with_different_scales(): void
-    {
-        $leg = new PathLeg(
-            'btc',
-            'eth',
-            Money::fromString('BTC', '0.5', 8),
-            Money::fromString('ETH', '15.123', 3),
-            MoneyMap::fromList([Money::fromString('USD', '5.75', 2)], true),
-        );
-
-        $serialized = $leg->jsonSerialize();
-
-        $this->assertSame('BTC', $serialized['from']);
-        $this->assertSame('ETH', $serialized['to']);
-        $this->assertSame('0.50000000', $serialized['spent']['amount']);
-        $this->assertSame(8, $serialized['spent']['scale']);
-        $this->assertSame('15.123', $serialized['received']['amount']);
-        $this->assertSame(3, $serialized['received']['scale']);
-        $this->assertArrayHasKey('USD', $serialized['fees']);
     }
 
     public function test_non_money_fee_entries_throw_exception(): void

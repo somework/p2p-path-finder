@@ -8,17 +8,13 @@ use ArrayIterator;
 use Countable;
 use InvalidArgumentException;
 use IteratorAggregate;
-use JsonSerializable;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathOrderStrategy;
 use Traversable;
 
-use function array_map;
 use function array_slice;
 use function count;
 use function get_debug_type;
-use function is_array;
-use function is_object;
 use function sprintf;
 use function usort;
 
@@ -33,7 +29,7 @@ use function usort;
  *
  * @implements IteratorAggregate<int, TPath>
  */
-final class PathResultSet implements IteratorAggregate, Countable, JsonSerializable
+final class PathResultSet implements IteratorAggregate, Countable
 {
     /**
      * @var list<TPath>
@@ -215,36 +211,5 @@ final class PathResultSet implements IteratorAggregate, Countable, JsonSerializa
     public function first(): mixed
     {
         return $this->paths[0] ?? null;
-    }
-
-    /**
-     * @return list<mixed>
-     */
-    public function jsonSerialize(): array
-    {
-        /** @var list<mixed> $serialized */
-        $serialized = array_map(
-            static function (mixed $path): mixed {
-                if ($path instanceof JsonSerializable) {
-                    return $path->jsonSerialize();
-                }
-
-                if (is_array($path)) {
-                    return $path;
-                }
-
-                // Fallback for objects with toArray method
-                /* @phpstan-ignore function.alreadyNarrowedType */
-                if (is_object($path) && method_exists($path, 'toArray')) {
-                    /* @phpstan-ignore method.notFound */
-                    return $path->toArray();
-                }
-
-                return $path;
-            },
-            $this->paths,
-        );
-
-        return $serialized;
     }
 }

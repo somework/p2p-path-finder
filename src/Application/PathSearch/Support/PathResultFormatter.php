@@ -20,48 +20,6 @@ use const PHP_EOL;
 final class PathResultFormatter
 {
     /**
-     * @return array{
-     *     totalSpent: array{currency: string, amount: numeric-string, scale: int},
-     *     totalReceived: array{currency: string, amount: numeric-string, scale: int},
-     *     residualTolerance: numeric-string,
-     *     feeBreakdown: array<string, array{currency: string, amount: numeric-string, scale: int}>,
-     *     legs: list<array{
-     *         from: string,
-     *         to: string,
-     *         spent: array{currency: string, amount: numeric-string, scale: int},
-     *         received: array{currency: string, amount: numeric-string, scale: int},
-     *         fees: array<string, array{currency: string, amount: numeric-string, scale: int}>,
-     *     }>,
-     * }
-     */
-    public function formatMachine(PathResult $result): array
-    {
-        return $result->jsonSerialize();
-    }
-
-    /**
-     * @param PathResultSet<PathResult> $results
-     *
-     * @return list<array{
-     *     totalSpent: array{currency: string, amount: numeric-string, scale: int},
-     *     totalReceived: array{currency: string, amount: numeric-string, scale: int},
-     *     residualTolerance: numeric-string,
-     *     feeBreakdown: array<string, array{currency: string, amount: numeric-string, scale: int}>,
-     *     legs: list<array{
-     *         from: string,
-     *         to: string,
-     *         spent: array{currency: string, amount: numeric-string, scale: int},
-     *         received: array{currency: string, amount: numeric-string, scale: int},
-     *         fees: array<string, array{currency: string, amount: numeric-string, scale: int}>,
-     *     }>,
-     * }>
-     */
-    public function formatMachineCollection(PathResultSet $results): array
-    {
-        return array_map(fn (PathResult $result): array => $this->formatMachine($result), $results->toArray());
-    }
-
-    /**
      * Produces a multi-line human readable summary of the conversion path.
      */
     public function formatHuman(PathResult $result): string

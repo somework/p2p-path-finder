@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathSearch\Result;
 
-use JsonSerializable;
-use SomeWork\P2PPathFinder\Application\PathSearch\Support\SerializesMoney;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Money\MoneyMap;
 use SomeWork\P2PPathFinder\Domain\Tolerance\DecimalTolerance;
@@ -22,10 +20,8 @@ use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
  *
  * @api
  */
-final class PathResult implements JsonSerializable
+final class PathResult
 {
-    use SerializesMoney;
-
     private readonly MoneyMap $feeBreakdown;
 
     private readonly PathLegCollection $legs;
@@ -119,32 +115,6 @@ final class PathResult implements JsonSerializable
             'residualTolerance' => $this->residualTolerance,
             'feeBreakdown' => $this->feeBreakdown,
             'legs' => $this->legs,
-        ];
-    }
-
-    /**
-     * @return array{
-     *     totalSpent: array{currency: string, amount: numeric-string, scale: int},
-     *     totalReceived: array{currency: string, amount: numeric-string, scale: int},
-     *     residualTolerance: numeric-string,
-     *     feeBreakdown: array<string, array{currency: string, amount: numeric-string, scale: int}>,
-     *     legs: list<array{
-     *         from: string,
-     *         to: string,
-     *         spent: array{currency: string, amount: numeric-string, scale: int},
-     *         received: array{currency: string, amount: numeric-string, scale: int},
-     *         fees: array<string, array{currency: string, amount: numeric-string, scale: int}>,
-     *     }>,
-     * }
-     */
-    public function jsonSerialize(): array
-    {
-        return [
-            'totalSpent' => self::serializeMoney($this->totalSpent),
-            'totalReceived' => self::serializeMoney($this->totalReceived),
-            'residualTolerance' => $this->residualTolerance->ratio(),
-            'feeBreakdown' => $this->feeBreakdown->jsonSerialize(),
-            'legs' => $this->legs->jsonSerialize(),
         ];
     }
 }

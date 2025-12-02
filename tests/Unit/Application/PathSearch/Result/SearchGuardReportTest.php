@@ -150,43 +150,6 @@ final class SearchGuardReportTest extends TestCase
         self::assertFalse($report->timeBudgetReached());
     }
 
-    public function test_json_serialization_exposes_counters_and_limits(): void
-    {
-        $report = SearchGuardReport::fromMetrics(
-            expansions: 4,
-            visitedStates: 7,
-            elapsedMilliseconds: 2.5,
-            expansionLimit: 10,
-            visitedStateLimit: 20,
-            timeBudgetLimit: 15,
-            timeBudgetReached: true,
-        );
-
-        $payload = $report->jsonSerialize();
-
-        self::assertSame(
-            [
-                'limits' => [
-                    'expansions' => 10,
-                    'visited_states' => 20,
-                    'time_budget_ms' => 15,
-                ],
-                'metrics' => [
-                    'expansions' => 4,
-                    'visited_states' => 7,
-                    'elapsed_ms' => 2.5,
-                ],
-                'breached' => [
-                    'expansions' => false,
-                    'visited_states' => false,
-                    'time_budget' => true,
-                    'any' => true,
-                ],
-            ],
-            $payload,
-        );
-    }
-
     public function test_from_metrics_clamps_negative_expansions_to_zero(): void
     {
         $report = SearchGuardReport::fromMetrics(
@@ -277,22 +240,5 @@ final class SearchGuardReportTest extends TestCase
         self::assertFalse($report->visitedStatesReached());
         self::assertFalse($report->timeBudgetReached());
         self::assertFalse($report->anyLimitReached());
-    }
-
-    public function test_json_serialization_with_null_time_budget(): void
-    {
-        $report = SearchGuardReport::fromMetrics(
-            expansions: 5,
-            visitedStates: 10,
-            elapsedMilliseconds: 3.5,
-            expansionLimit: 100,
-            visitedStateLimit: 200,
-            timeBudgetLimit: null,
-        );
-
-        $payload = $report->jsonSerialize();
-
-        self::assertNull($payload['limits']['time_budget_ms']);
-        self::assertFalse($payload['breached']['time_budget']);
     }
 }

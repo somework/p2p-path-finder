@@ -17,69 +17,6 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
 #[CoversClass(PathResult::class)]
 final class PathResultTest extends TestCase
 {
-    public function test_json_serialization(): void
-    {
-        $firstLeg = new PathLeg(
-            'usd',
-            'btc',
-            Money::fromString('USD', '60', 2),
-            Money::fromString('BTC', '0.002', 6),
-            MoneyMap::fromList([Money::fromString('USD', '0.30', 2)], true),
-        );
-
-        $secondLeg = new PathLeg(
-            'btc',
-            'eur',
-            Money::fromString('BTC', '0.002', 6),
-            Money::fromString('EUR', '55', 2),
-            MoneyMap::fromList([Money::fromString('EUR', '0.10', 2)], true),
-        );
-
-        $result = new PathResult(
-            Money::fromString('USD', '60', 2),
-            Money::fromString('EUR', '55', 2),
-            DecimalTolerance::fromNumericString('0.05'),
-            PathLegCollection::fromList([$firstLeg, $secondLeg]),
-            MoneyMap::fromAssociative([
-                'USD' => Money::fromString('USD', '0.30', 2),
-                'EUR' => Money::fromString('EUR', '0.10', 2),
-            ]),
-        );
-
-        $this->assertSame(
-            [
-                'totalSpent' => ['currency' => 'USD', 'amount' => '60.00', 'scale' => 2],
-                'totalReceived' => ['currency' => 'EUR', 'amount' => '55.00', 'scale' => 2],
-                'residualTolerance' => '0.050000000000000000',
-                'feeBreakdown' => [
-                    'EUR' => ['currency' => 'EUR', 'amount' => '0.10', 'scale' => 2],
-                    'USD' => ['currency' => 'USD', 'amount' => '0.30', 'scale' => 2],
-                ],
-                'legs' => [
-                    [
-                        'from' => 'USD',
-                        'to' => 'BTC',
-                        'spent' => ['currency' => 'USD', 'amount' => '60.00', 'scale' => 2],
-                        'received' => ['currency' => 'BTC', 'amount' => '0.002000', 'scale' => 6],
-                        'fees' => [
-                            'USD' => ['currency' => 'USD', 'amount' => '0.30', 'scale' => 2],
-                        ],
-                    ],
-                    [
-                        'from' => 'BTC',
-                        'to' => 'EUR',
-                        'spent' => ['currency' => 'BTC', 'amount' => '0.002000', 'scale' => 6],
-                        'received' => ['currency' => 'EUR', 'amount' => '55.00', 'scale' => 2],
-                        'fees' => [
-                            'EUR' => ['currency' => 'EUR', 'amount' => '0.10', 'scale' => 2],
-                        ],
-                    ],
-                ],
-            ],
-            $result->jsonSerialize(),
-        );
-    }
-
     public function test_residual_tolerance_cannot_be_negative(): void
     {
         $this->expectException(InvalidInput::class);
@@ -172,11 +109,9 @@ final class PathResultTest extends TestCase
         $this->assertSame(2, $eurFee->scale());
 
         $this->assertSame([
-            'feeBreakdown' => [
-                'EUR' => ['currency' => 'EUR', 'amount' => '1.00', 'scale' => 2],
-                'USD' => ['currency' => 'USD', 'amount' => '0.500', 'scale' => 3],
-            ],
-        ], array_intersect_key($result->jsonSerialize(), ['feeBreakdown' => true]));
+            'EUR' => $eurFee,
+            'USD' => $usdFee,
+        ], $result->feeBreakdownAsArray());
     }
 
     public function test_fee_breakdown_requires_money_instances(): void
@@ -201,13 +136,11 @@ final class PathResultTest extends TestCase
         self::assertSame('0.00', $result->residualTolerancePercentage());
         self::assertSame('0.0000', $result->residualTolerancePercentage(4));
 
-        $this->assertSame([
-            'totalSpent' => ['currency' => 'USD', 'amount' => '0.00', 'scale' => 2],
-            'totalReceived' => ['currency' => 'EUR', 'amount' => '0.00', 'scale' => 2],
-            'residualTolerance' => '0.000000000000000000',
-            'feeBreakdown' => [],
-            'legs' => [],
-        ], $result->jsonSerialize());
+        $this->assertSame('0.00', $result->totalSpent()->amount());
+        $this->assertSame('0.00', $result->totalReceived()->amount());
+        $this->assertSame('0.000000000000000000', $result->residualTolerance()->ratio());
+        $this->assertTrue($result->feeBreakdown()->isEmpty());
+        $this->assertTrue($result->legs()->isEmpty());
     }
 
     public function test_basic_construction_and_getters(): void
@@ -415,28 +348,5 @@ final class PathResultTest extends TestCase
         $this->assertSame('12.35', $result->residualTolerancePercentage(2));
         $this->assertSame('12.3457', $result->residualTolerancePercentage(4));
         $this->assertSame('12.34567891', $result->residualTolerancePercentage(8));
-    }
-
-    public function test_json_serialization_with_minimal_data(): void
-    {
-        $result = new PathResult(
-            Money::fromString('USD', '100', 2),
-            Money::fromString('EUR', '85', 2),
-            DecimalTolerance::fromNumericString('0.1')
-        );
-
-        $serialized = $result->jsonSerialize();
-
-        $this->assertSame('USD', $serialized['totalSpent']['currency']);
-        $this->assertSame('100.00', $serialized['totalSpent']['amount']);
-        $this->assertSame(2, $serialized['totalSpent']['scale']);
-
-        $this->assertSame('EUR', $serialized['totalReceived']['currency']);
-        $this->assertSame('85.00', $serialized['totalReceived']['amount']);
-        $this->assertSame(2, $serialized['totalReceived']['scale']);
-
-        $this->assertSame('0.100000000000000000', $serialized['residualTolerance']);
-        $this->assertSame([], $serialized['feeBreakdown']);
-        $this->assertSame([], $serialized['legs']);
     }
 }

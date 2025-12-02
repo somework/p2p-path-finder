@@ -7,7 +7,6 @@ namespace SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph;
 use ArrayIterator;
 use Countable;
 use IteratorAggregate;
-use JsonSerializable;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use Traversable;
@@ -24,7 +23,7 @@ use function sprintf;
  *
  * @implements IteratorAggregate<int, EdgeSegment>
  */
-final class EdgeSegmentCollection implements Countable, IteratorAggregate, JsonSerializable
+final class EdgeSegmentCollection implements Countable, IteratorAggregate
 {
     public const MEASURE_BASE = 'base';
     public const MEASURE_QUOTE = 'quote';
@@ -126,25 +125,6 @@ final class EdgeSegmentCollection implements Countable, IteratorAggregate, JsonS
         $this->assertSupportedMeasure($measure);
 
         return $this->capacityMetrics[$measure]['scale'];
-    }
-
-    /**
-     * @return list<array{
-     *     isMandatory: bool,
-     *     base: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-     *     quote: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-     *     grossBase: array{min: array{currency: string, amount: string, scale: int}, max: array{currency: string, amount: string, scale: int}},
-     * }>
-     */
-    public function jsonSerialize(): array
-    {
-        $serialized = [];
-
-        foreach ($this->segments as $segment) {
-            $serialized[] = $segment->jsonSerialize();
-        }
-
-        return $serialized;
     }
 
     /**

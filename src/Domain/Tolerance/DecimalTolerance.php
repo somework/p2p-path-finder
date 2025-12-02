@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Domain\Tolerance;
 
 use Brick\Math\BigDecimal;
-use JsonSerializable;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalHelperTrait;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
@@ -16,7 +15,7 @@ use function max;
  *
  * @api
  */
-final class DecimalTolerance implements JsonSerializable
+final class DecimalTolerance
 {
     use DecimalHelperTrait;
 
@@ -146,15 +145,5 @@ final class DecimalTolerance implements JsonSerializable
             ->multipliedBy(BigDecimal::of(self::PERCENT_MULTIPLIER));
 
         return self::decimalToString($product, $scale);
-    }
-
-    /**
-     * Returns the canonical numeric-string representation for JSON serialization.
-     *
-     * @return numeric-string The tolerance ratio (e.g., "0.050000000000000000" at scale 18)
-     */
-    public function jsonSerialize(): string
-    {
-        return $this->ratio();
     }
 }

@@ -513,10 +513,7 @@ final class BasicPathSearchServiceTest extends PathSearchServiceTestCase
         $paths = $resultSet->toArray();
         self::assertNotSame([], $paths);
 
-        self::assertSame(
-            $paths[0]->jsonSerialize(),
-            $first->jsonSerialize(),
-        );
+        self::assertSame($paths[0], $first);
     }
 
     /**

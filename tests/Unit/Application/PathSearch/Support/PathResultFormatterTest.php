@@ -44,17 +44,11 @@ final class PathResultFormatterTest extends TestCase
 
         $formatter = new PathResultFormatter();
 
-        $this->assertSame($result->jsonSerialize(), $formatter->formatMachine($result));
-
         $collection = PathResultSet::fromPaths(
             new CostHopsSignatureOrderingStrategy(18),
             [$result],
             static fn (PathResult $path, int $index): PathOrderKey => new PathOrderKey(new PathCost('0.1'), 1, RouteSignature::fromNodes(['USD', 'EUR']), $index),
         );
-
-        $this->assertSame([
-            $result->jsonSerialize(),
-        ], $formatter->formatMachineCollection($collection));
 
         $expectedHuman = 'Total spent: USD 100.00; total received: EUR 95.00; total fees: USD 1.50; residual tolerance: 2.50%.'.PHP_EOL
             .'Legs:'.PHP_EOL
@@ -84,8 +78,6 @@ final class PathResultFormatterTest extends TestCase
 
         $formatter = new PathResultFormatter();
 
-        $this->assertSame($result->jsonSerialize(), $formatter->formatMachine($result));
-
         $expectedHuman = 'Total spent: USD 100.00; total received: EUR 100.00; total fees: none; residual tolerance: 1.50%.'
             .PHP_EOL
             .'Legs:'
@@ -93,14 +85,6 @@ final class PathResultFormatterTest extends TestCase
             .'  1. USD -> EUR | Spent USD 100.00 | Received EUR 100.00 | Fees none';
 
         $this->assertSame($expectedHuman, $formatter->formatHuman($result));
-    }
-
-    public function test_format_machine_collection_with_empty_set(): void
-    {
-        $formatter = new PathResultFormatter();
-        $emptySet = PathResultSet::empty();
-
-        $this->assertSame([], $formatter->formatMachineCollection($emptySet));
     }
 
     public function test_format_human_collection_with_empty_array(): void

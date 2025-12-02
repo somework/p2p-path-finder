@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph;
 
 use IteratorAggregate;
-use JsonSerializable;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use Traversable;
 
@@ -16,7 +15,7 @@ use Traversable;
  *
  * @implements IteratorAggregate<int, GraphEdge>
  */
-final class GraphNode implements IteratorAggregate, JsonSerializable
+final class GraphNode implements IteratorAggregate
 {
     private readonly GraphEdgeCollection $edges;
 
@@ -50,16 +49,5 @@ final class GraphNode implements IteratorAggregate, JsonSerializable
     public function getIterator(): Traversable
     {
         return $this->edges->getIterator();
-    }
-
-    /**
-     * @return array{currency: string, edges: list<array<string, mixed>>}
-     */
-    public function jsonSerialize(): array
-    {
-        return [
-            'currency' => $this->currency,
-            'edges' => $this->edges->jsonSerialize(),
-        ];
     }
 }

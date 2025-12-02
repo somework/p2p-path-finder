@@ -7,7 +7,6 @@ namespace SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph;
 use ArrayIterator;
 use Countable;
 use IteratorAggregate;
-use JsonSerializable;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use Traversable;
 
@@ -21,7 +20,7 @@ use function sprintf;
  *
  * @implements IteratorAggregate<string, GraphNode>
  */
-final class GraphNodeCollection implements Countable, IteratorAggregate, JsonSerializable
+final class GraphNodeCollection implements Countable, IteratorAggregate
 {
     /**
      * @var array<string, GraphNode>
@@ -110,20 +109,6 @@ final class GraphNodeCollection implements Countable, IteratorAggregate, JsonSer
     public function toArray(): array
     {
         return $this->buildOrderedNodes();
-    }
-
-    /**
-     * @return array<string, array{currency: string, edges: list<array<string, mixed>>}>
-     */
-    public function jsonSerialize(): array
-    {
-        $serialized = [];
-
-        foreach ($this->buildOrderedNodes() as $currency => $node) {
-            $serialized[$currency] = $node->jsonSerialize();
-        }
-
-        return $serialized;
     }
 
     /**
