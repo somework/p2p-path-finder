@@ -131,6 +131,43 @@ final class PathSearchEngineIntegrationTest extends TestCase
         );
     }
 
+    public function test_best_path_accessor_exposes_leading_candidate_with_additional_sorted_routes(): void
+    {
+        $graph = (new GraphBuilder())->build(self::buildComprehensiveOrderBook());
+
+        $finder = new PathSearchEngine(maxHops: 3, tolerance: '0.995', topK: 3);
+        $outcome = $finder->findBestPaths($graph, 'RUB', 'IDR');
+
+        $paths = self::extractPaths($outcome);
+        self::assertGreaterThanOrEqual(2, count($paths), 'Expected multiple ranked routes.');
+
+        $best = $outcome->bestPath();
+
+        self::assertNotNull($best);
+        self::assertSame($paths[0], $best->toArray());
+
+        $expectedEdges = [
+            ['from' => 'RUB', 'to' => 'USD'],
+            ['from' => 'USD', 'to' => 'JPY'],
+            ['from' => 'JPY', 'to' => 'IDR'],
+        ];
+
+        foreach ($expectedEdges as $index => $edge) {
+            $pathEdge = $best->edges()->at($index);
+            self::assertSame($edge['from'], $pathEdge->from());
+            self::assertSame($edge['to'], $pathEdge->to());
+        }
+
+        $orderedAlternatives = $outcome->paths()->slice(1)->toArray();
+
+        self::assertNotSame([], $orderedAlternatives);
+
+        $secondBest = $orderedAlternatives[0];
+
+        self::assertLessThanOrEqual(0, DecimalMath::comp($best->cost(), $secondBest->cost(), self::SCALE));
+        self::assertGreaterThanOrEqual(0, DecimalMath::comp($best->product(), $secondBest->product(), self::SCALE));
+    }
+
     public function test_it_preserves_discovery_order_for_equal_cost_candidates(): void
     {
         $orders = [

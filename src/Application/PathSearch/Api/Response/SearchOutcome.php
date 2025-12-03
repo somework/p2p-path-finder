@@ -102,6 +102,18 @@ final class SearchOutcome
         return $this->paths;
     }
 
+    /**
+     * @return TPath|null
+     *
+     * @phpstan-return TPath|null
+     *
+     * @psalm-return TPath|null
+     */
+    public function bestPath(): mixed
+    {
+        return $this->paths->first();
+    }
+
     public function hasPaths(): bool
     {
         return !$this->paths->isEmpty();

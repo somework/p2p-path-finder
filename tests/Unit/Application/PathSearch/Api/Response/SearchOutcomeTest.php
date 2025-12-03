@@ -30,6 +30,7 @@ final class SearchOutcomeTest extends TestCase
 
         self::assertTrue($outcome->paths()->isEmpty());
         self::assertFalse($outcome->hasPaths());
+        self::assertNull($outcome->bestPath());
         self::assertSame($status, $outcome->guardLimits());
     }
 
@@ -53,6 +54,7 @@ final class SearchOutcomeTest extends TestCase
 
         self::assertTrue($outcome->hasPaths());
         self::assertSame($paths, $outcome->paths());
+        self::assertSame(['id' => 1], $outcome->bestPath());
         self::assertSame($status, $outcome->guardLimits());
     }
 }
