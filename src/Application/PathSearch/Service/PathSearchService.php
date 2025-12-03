@@ -43,7 +43,7 @@ use function trim;
  *
  * @api
  *
- * @psalm-type CandidateCallback = callable(CandidatePath):bool|null
+ * @psalm-type CandidateCallback = callable(CandidatePath):bool
  */
 final class PathSearchService
 {
@@ -116,7 +116,7 @@ final class PathSearchService
              * @param Graph                  $graph
              * @param CandidateCallback|null $callback
              *
-             * @phpstan-param null|callable(CandidatePath):bool|null $callback
+             * @phpstan-param null|callable(CandidatePath):bool $callback
              *
              * @psalm-param CandidateCallback|null $callback
              *

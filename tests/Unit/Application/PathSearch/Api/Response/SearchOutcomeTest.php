@@ -56,7 +56,7 @@ final class SearchOutcomeTest extends TestCase
                 $firstPath,
                 $secondPath,
             ],
-            static fn (Path $path, int $index): PathOrderKey => $orderKeys[$index],
+            static fn (Path $_path, int $index): PathOrderKey => $orderKeys[$index],
         );
         $status = SearchGuardReport::idle(25, 10);
         $outcome = SearchOutcome::fromResultSet($paths, $status);

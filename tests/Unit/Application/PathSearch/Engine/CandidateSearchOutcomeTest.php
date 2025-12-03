@@ -14,13 +14,10 @@ use SomeWork\P2PPathFinder\Application\PathSearch\Model\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
-use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalHelperTrait;
 use SomeWork\P2PPathFinder\Tests\Helpers\DecimalFactory;
 
 final class CandidateSearchOutcomeTest extends TestCase
 {
-    use DecimalHelperTrait;
-
     private const SCALE = 18;
 
     public function test_empty_factory_returns_result_without_paths(): void
@@ -57,7 +54,7 @@ final class CandidateSearchOutcomeTest extends TestCase
                 $firstPath,
                 $secondPath,
             ],
-            static fn (CandidatePath $path, int $index): PathOrderKey => $orderKeys[$index],
+            static fn (CandidatePath $_path, int $index): PathOrderKey => $orderKeys[$index],
         );
         $status = SearchGuardReport::idle(25, 10);
         $outcome = CandidateSearchOutcome::fromResultSet($paths, $status);

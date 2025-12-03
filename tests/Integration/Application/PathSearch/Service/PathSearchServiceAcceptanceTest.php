@@ -421,7 +421,7 @@ final class PathSearchServiceAcceptanceTest extends PathSearchServiceTestCase
         );
 
         return static function (PathSearchRequest $request) use ($normalized, $guardLimits): Closure {
-            return static function (Graph $graph, callable $callback) use ($normalized, $guardLimits): CandidateSearchOutcome {
+            return static function (Graph $_graph, callable $callback) use ($normalized, $guardLimits): CandidateSearchOutcome {
                 foreach ($normalized as $candidate) {
                     $callback($candidate);
                 }
