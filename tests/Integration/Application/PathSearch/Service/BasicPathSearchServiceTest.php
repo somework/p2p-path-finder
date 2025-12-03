@@ -6,19 +6,17 @@ namespace SomeWork\P2PPathFinder\Tests\Integration\Application\PathSearch\Servic
 
 use SomeWork\P2PPathFinder\Application\PathSearch\Api\Response\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
-use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResult;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\Path;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Order\OrderBook;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
-use function count;
-
 final class BasicPathSearchServiceTest extends PathSearchServiceTestCase
 {
     /**
-     * @return list<PathResult>
+     * @return list<Path>
      */
     private static function extractPaths(SearchOutcome $result): array
     {
@@ -56,18 +54,18 @@ final class BasicPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertTrue($result->residualTolerance()->isZero());
         self::assertSame('0.000000000000000000', $result->residualTolerance()->ratio());
 
-        $legs = $result->legs()->all();
-        self::assertCount(2, $legs);
+        $hops = $result->hops();
+        self::assertCount(2, $hops);
 
-        self::assertSame('EUR', $legs[0]->from());
-        self::assertSame('USD', $legs[0]->to());
-        self::assertSame('100.000', $legs[0]->spent()->amount());
-        self::assertSame('111.100', $legs[0]->received()->amount());
+        self::assertSame('EUR', $hops->at(0)->from());
+        self::assertSame('USD', $hops->at(0)->to());
+        self::assertSame('100.000', $hops->at(0)->spent()->amount());
+        self::assertSame('111.100', $hops->at(0)->received()->amount());
 
-        self::assertSame('USD', $legs[1]->from());
-        self::assertSame('JPY', $legs[1]->to());
-        self::assertSame('111.100', $legs[1]->spent()->amount());
-        self::assertSame('16665.000', $legs[1]->received()->amount());
+        self::assertSame('USD', $hops->at(1)->from());
+        self::assertSame('JPY', $hops->at(1)->to());
+        self::assertSame('111.100', $hops->at(1)->spent()->amount());
+        self::assertSame('16665.000', $hops->at(1)->received()->amount());
     }
 
     /**
@@ -136,17 +134,17 @@ final class BasicPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertSame('USD', $result->totalReceived()->currency());
         self::assertSame('150.000', $result->totalReceived()->amount());
 
-        $legs = $result->legs();
-        self::assertCount(2, $legs);
-        self::assertSame('EUR', $legs->at(0)->from());
-        self::assertSame('GBP', $legs->at(0)->to());
-        self::assertSame('100.000', $legs->at(0)->spent()->amount());
-        self::assertSame('125.000', $legs->at(0)->received()->amount());
+        $hops = $result->hops();
+        self::assertCount(2, $hops);
+        self::assertSame('EUR', $hops->at(0)->from());
+        self::assertSame('GBP', $hops->at(0)->to());
+        self::assertSame('100.000', $hops->at(0)->spent()->amount());
+        self::assertSame('125.000', $hops->at(0)->received()->amount());
 
-        self::assertSame('GBP', $legs->at(1)->from());
-        self::assertSame('USD', $legs->at(1)->to());
-        self::assertSame('125.000', $legs->at(1)->spent()->amount());
-        self::assertSame('150.000', $legs->at(1)->received()->amount());
+        self::assertSame('GBP', $hops->at(1)->from());
+        self::assertSame('USD', $hops->at(1)->to());
+        self::assertSame('125.000', $hops->at(1)->spent()->amount());
+        self::assertSame('150.000', $hops->at(1)->received()->amount());
     }
 
     /**
@@ -173,18 +171,18 @@ final class BasicPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertSame('USD', $result->totalReceived()->currency());
         self::assertSame('178.625', $result->totalReceived()->amount());
 
-        $legs = $result->legs();
-        self::assertCount(2, $legs);
+        $hops = $result->hops();
+        self::assertCount(2, $hops);
 
-        self::assertSame('EUR', $legs->at(0)->from());
-        self::assertSame('GBP', $legs->at(0)->to());
-        self::assertSame('100.000', $legs->at(0)->spent()->amount());
-        self::assertSame('142.900', $legs->at(0)->received()->amount());
+        self::assertSame('EUR', $hops->at(0)->from());
+        self::assertSame('GBP', $hops->at(0)->to());
+        self::assertSame('100.000', $hops->at(0)->spent()->amount());
+        self::assertSame('142.900', $hops->at(0)->received()->amount());
 
-        self::assertSame('GBP', $legs->at(1)->from());
-        self::assertSame('USD', $legs->at(1)->to());
-        self::assertSame('142.900', $legs->at(1)->spent()->amount());
-        self::assertSame('178.625', $legs->at(1)->received()->amount());
+        self::assertSame('GBP', $hops->at(1)->from());
+        self::assertSame('USD', $hops->at(1)->to());
+        self::assertSame('142.900', $hops->at(1)->spent()->amount());
+        self::assertSame('178.625', $hops->at(1)->received()->amount());
     }
 
     public function test_it_returns_multiple_paths_ordered_by_cost(): void
@@ -214,17 +212,17 @@ final class BasicPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertSame('USD', $second->totalReceived()->currency());
         self::assertTrue($first->totalReceived()->greaterThan($second->totalReceived()));
 
-        $firstLegs = $first->legs();
-        self::assertCount(1, $firstLegs);
-        self::assertSame('EUR', $firstLegs->at(0)->from());
-        self::assertSame('USD', $firstLegs->at(0)->to());
+        $firstHops = $first->hops();
+        self::assertCount(1, $firstHops);
+        self::assertSame('EUR', $firstHops->at(0)->from());
+        self::assertSame('USD', $firstHops->at(0)->to());
 
-        $secondLegs = $second->legs();
-        self::assertCount(2, $secondLegs);
-        self::assertSame('EUR', $secondLegs->at(0)->from());
-        self::assertSame('GBP', $secondLegs->at(0)->to());
-        self::assertSame('GBP', $secondLegs->at(1)->from());
-        self::assertSame('USD', $secondLegs->at(1)->to());
+        $secondHops = $second->hops();
+        self::assertCount(2, $secondHops);
+        self::assertSame('EUR', $secondHops->at(0)->from());
+        self::assertSame('GBP', $secondHops->at(0)->to());
+        self::assertSame('GBP', $secondHops->at(1)->from());
+        self::assertSame('USD', $secondHops->at(1)->to());
     }
 
     public function test_it_preserves_result_insertion_order_when_costs_are_identical(): void
@@ -252,8 +250,8 @@ final class BasicPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertSame('0.000000000000000000', $results[0]->residualTolerance()->ratio());
         self::assertTrue($results[1]->residualTolerance()->isZero());
         self::assertSame('0.000000000000000000', $results[1]->residualTolerance()->ratio());
-        self::assertCount(2, $results[0]->legs());
-        self::assertCount(1, $results[1]->legs());
+        self::assertCount(2, $results[0]->hops());
+        self::assertCount(1, $results[1]->hops());
     }
 
     public function test_it_enforces_minimum_hop_constraint_before_materialization(): void
@@ -300,15 +298,15 @@ final class BasicPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertSame('100.000', $best->totalSpent()->amount());
         self::assertSame('USD', $best->totalReceived()->currency());
 
-        $legs = $best->legs();
-        self::assertCount(2, $legs);
-        self::assertSame('EUR', $legs->at(0)->from());
-        self::assertSame('GBP', $legs->at(0)->to());
-        self::assertSame('GBP', $legs->at(1)->from());
-        self::assertSame('USD', $legs->at(1)->to());
+        $hops = $best->hops();
+        self::assertCount(2, $hops);
+        self::assertSame('EUR', $hops->at(0)->from());
+        self::assertSame('GBP', $hops->at(0)->to());
+        self::assertSame('GBP', $hops->at(1)->from());
+        self::assertSame('USD', $hops->at(1)->to());
 
         foreach ($results as $result) {
-            self::assertGreaterThanOrEqual(2, count($result->legs()));
+            self::assertGreaterThanOrEqual(2, $result->hops()->count());
         }
     }
 
@@ -489,7 +487,7 @@ final class BasicPathSearchServiceTest extends PathSearchServiceTestCase
     }
 
     /**
-     * @testdox Provides the leading result through PathResultSet::first()
+     * @testdox Provides the leading result through PathSet::first()
      */
     public function test_result_set_returns_first_materialized_result(): void
     {
@@ -517,7 +515,7 @@ final class BasicPathSearchServiceTest extends PathSearchServiceTestCase
     }
 
     /**
-     * @testdox PathResultSet::first() returns null when no candidates exist
+     * @testdox PathSet::first() returns null when no candidates exist
      */
     public function test_result_set_returns_null_when_no_paths_exist(): void
     {
@@ -563,11 +561,11 @@ final class BasicPathSearchServiceTest extends PathSearchServiceTestCase
         $top = $paths[0];
 
         self::assertSame($top->totalReceived()->amount(), $first->totalReceived()->amount());
-        $topFirstLeg = $top->legs()->at(0);
-        $firstFirstLeg = $first->legs()->at(0);
+        $topFirstHop = $top->hops()->at(0);
+        $firstFirstHop = $first->hops()->at(0);
 
-        self::assertSame($topFirstLeg->to(), $firstFirstLeg->to());
-        self::assertCount($top->legs()->count(), $first->legs());
+        self::assertSame($topFirstHop->to(), $firstFirstHop->to());
+        self::assertCount($top->hops()->count(), $first->hops());
     }
 
     private function scenarioEuroToUsdToJpyBridge(): OrderBook

@@ -367,11 +367,11 @@ try {
             echo "\nPath #{$num}:\n";
             echo "  Spent: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()}\n";
             echo "  Received: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
-            echo '  Hops: '.count($path->legsAsArray())."\n";
+            echo '  Hops: '.count($path->hopsAsArray())."\n";
 
-            foreach ($path->legsAsArray() as $legIdx => $leg) {
-                $legNum = $legIdx + 1;
-                echo "    Leg #{$legNum}: {$leg->from()} -> {$leg->to()}\n";
+            foreach ($path->hopsAsArray() as $hopIdx => $hop) {
+                $hopNum = $hopIdx + 1;
+                echo "    Hop #{$hopNum}: {$hop->from()} -> {$hop->to()}\n";
             }
         }
     } else {

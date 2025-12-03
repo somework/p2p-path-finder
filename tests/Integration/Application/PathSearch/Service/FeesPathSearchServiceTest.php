@@ -8,7 +8,7 @@ use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use SomeWork\P2PPathFinder\Application\PathSearch\Api\Response\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
-use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResult;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\Path;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathSearch\Service\LegMaterializer;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
@@ -21,7 +21,7 @@ use function sprintf;
 final class FeesPathSearchServiceTest extends PathSearchServiceTestCase
 {
     /**
-     * @return list<PathResult>
+     * @return list<Path>
      */
     private static function extractPaths(SearchOutcome $result): array
     {
@@ -52,7 +52,7 @@ final class FeesPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertNotSame([], $results);
         $result = $results[0];
 
-        $legs = $result->legs();
+        $legs = $result->hops();
         self::assertCount(2, $legs);
 
         self::assertSame('112.233', $legs->at(0)->received()->amount());
@@ -105,7 +105,7 @@ final class FeesPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertSame('BTC', $result->totalReceived()->currency());
         self::assertSame('0.900', $result->totalReceived()->amount());
 
-        $legs = $result->legs();
+        $legs = $result->hops();
         self::assertCount(1, $legs);
         $leg = $legs->at(0);
         self::assertSame('USD', $leg->from());
@@ -139,7 +139,7 @@ final class FeesPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertNotSame([], $results);
         $result = $results[0];
 
-        $legs = $result->legs();
+        $legs = $result->hops();
         self::assertCount(1, $legs);
 
         self::assertSame('EUR', $result->totalSpent()->currency());
@@ -182,7 +182,7 @@ final class FeesPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertSame('114.000', $result->totalReceived()->amount());
         self::assertSame('0.020000000000000000', $result->residualTolerance()->ratio());
 
-        $legs = $result->legs();
+        $legs = $result->hops();
         self::assertCount(1, $legs);
         $leg = $legs->at(0);
         self::assertSame('EUR', $leg->from());
@@ -224,7 +224,7 @@ final class FeesPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertTrue($result->residualTolerance()->isZero());
         self::assertSame('0.000000000000000000', $result->residualTolerance()->ratio());
 
-        $legs = $result->legs();
+        $legs = $result->hops();
         self::assertCount(2, $legs);
 
         self::assertSame('EUR', $legs->at(0)->from());
@@ -272,7 +272,7 @@ final class FeesPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertNotSame([], $results);
         $result = $results[0];
 
-        $legs = $result->legs();
+        $legs = $result->hops();
         self::assertCount(2, $legs);
         $firstLeg = $legs->at(0);
         $secondLeg = $legs->at(1);
@@ -315,7 +315,7 @@ final class FeesPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertSame('USD', $result->totalReceived()->currency());
         self::assertSame('118.800', $result->totalReceived()->amount());
 
-        $legs = $result->legs();
+        $legs = $result->hops();
         self::assertCount(1, $legs);
         self::assertSame('USD', $legs->at(0)->to());
         self::assertSame('118.800', $legs->at(0)->received()->amount());
@@ -342,7 +342,7 @@ final class FeesPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertNotSame([], $results);
         $result = $results[0];
 
-        $legs = $result->legs();
+        $legs = $result->hops();
         self::assertCount(1, $legs);
         $leg = $legs->at(0);
         self::assertSame('EUR', $leg->from());
@@ -391,7 +391,7 @@ final class FeesPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertNotSame([], $results);
         $result = $results[0];
 
-        $legs = $result->legs();
+        $legs = $result->hops();
         self::assertCount(2, $legs);
 
         $firstLeg = $legs->at(0);
@@ -468,7 +468,7 @@ final class FeesPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertSame('JPY', $result->totalReceived()->currency());
         self::assertSame('16632.000', $result->totalReceived()->amount());
 
-        $legs = $result->legs();
+        $legs = $result->hops();
         self::assertCount(2, $legs);
         self::assertSame('USD', $legs->at(0)->to());
         self::assertSame('118.800', $legs->at(0)->received()->amount());

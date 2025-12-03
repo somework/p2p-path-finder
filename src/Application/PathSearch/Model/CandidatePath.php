@@ -16,7 +16,7 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
  *
  * This class is used internally by PathSearchService and is not exposed to consumers.
  * The callback that receives CandidatePath instances is created inside PathSearchService
- * and never passed to consumer code. Consumers interact with PathResult instead.
+ * and never passed to consumer code. Consumers interact with Path instead.
  *
  * @internal This is an internal value object and may change without notice
  */

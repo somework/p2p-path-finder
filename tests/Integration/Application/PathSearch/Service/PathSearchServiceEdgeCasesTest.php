@@ -136,7 +136,7 @@ final class PathSearchServiceEdgeCasesTest extends PathSearchServiceTestCase
         self::assertTrue($result->hasPaths());
         $path = $result->paths()->first();
         self::assertNotNull($path);
-        self::assertCount(PathFinderEdgeCaseFixtures::LONG_CHAIN_SEGMENTS, $path->legs());
+        self::assertCount(PathFinderEdgeCaseFixtures::LONG_CHAIN_SEGMENTS, $path->hops());
         self::assertFalse($result->guardLimits()->anyLimitReached());
     }
 }

@@ -14,12 +14,12 @@ use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathOrderKey;
 final class MaterializedResult
 {
     public function __construct(
-        private readonly PathResult $result,
+        private readonly Path $result,
         private readonly PathOrderKey $orderKey,
     ) {
     }
 
-    public function result(): PathResult
+    public function result(): Path
     {
         return $this->result;
     }
@@ -30,7 +30,7 @@ final class MaterializedResult
     }
 
     /**
-     * @return PathResultSetEntry<PathResult>
+     * @return PathResultSetEntry<Path>
      */
     public function toEntry(): PathResultSetEntry
     {

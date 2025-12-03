@@ -65,7 +65,7 @@ final class LegMaterializerIntegrationTest extends TestCase
         self::assertSame('100.000', $materialized['totalSpent']->amount());
         self::assertSame('JPY', $materialized['totalReceived']->currency());
         self::assertSame('16665.000', $materialized['totalReceived']->amount());
-        self::assertCount(2, $materialized['legs']);
+        self::assertCount(2, $materialized['hops']);
         self::assertSame('100.000', $materialized['toleranceSpent']->amount());
     }
 
@@ -150,29 +150,29 @@ final class LegMaterializerIntegrationTest extends TestCase
         self::assertSame('2.041', $feeBreakdownMap['USD']->amount());
         self::assertSame('2.823', $feeBreakdownMap['EUR']->amount());
 
-        $legs = $materialized['legs'];
-        self::assertCount(2, $legs);
+        $hops = $materialized['hops'];
+        self::assertCount(2, $hops);
 
-        $firstLeg = $legs->at(0);
-        self::assertSame('USD', $firstLeg->from());
-        self::assertSame('AAA', $firstLeg->to());
-        self::assertSame('104.082', $firstLeg->spent()->amount());
-        self::assertSame('USD', $firstLeg->spent()->currency());
-        self::assertSame('96.939', $firstLeg->received()->amount());
-        self::assertSame('AAA', $firstLeg->received()->currency());
-        $firstFees = $firstLeg->fees();
+        $firstHop = $hops->at(0);
+        self::assertSame('USD', $firstHop->from());
+        self::assertSame('AAA', $firstHop->to());
+        self::assertSame('104.082', $firstHop->spent()->amount());
+        self::assertSame('USD', $firstHop->spent()->currency());
+        self::assertSame('96.939', $firstHop->received()->amount());
+        self::assertSame('AAA', $firstHop->received()->currency());
+        $firstFees = $firstHop->fees();
         self::assertCount(2, $firstFees);
         self::assertSame('5.102', $this->fee($firstFees, 'AAA')->amount());
         self::assertSame('2.041', $this->fee($firstFees, 'USD')->amount());
 
-        $secondLeg = $legs->at(1);
-        self::assertSame('AAA', $secondLeg->from());
-        self::assertSame('EUR', $secondLeg->to());
-        self::assertSame('96.939', $secondLeg->spent()->amount());
-        self::assertSame('AAA', $secondLeg->spent()->currency());
-        self::assertSame('185.409', $secondLeg->received()->amount());
-        self::assertSame('EUR', $secondLeg->received()->currency());
-        $secondFees = $secondLeg->fees();
+        $secondHop = $hops->at(1);
+        self::assertSame('AAA', $secondHop->from());
+        self::assertSame('EUR', $secondHop->to());
+        self::assertSame('96.939', $secondHop->spent()->amount());
+        self::assertSame('AAA', $secondHop->spent()->currency());
+        self::assertSame('185.409', $secondHop->received()->amount());
+        self::assertSame('EUR', $secondHop->received()->currency());
+        $secondFees = $secondHop->fees();
         self::assertCount(2, $secondFees);
         self::assertSame('2.823', $this->fee($secondFees, 'AAA')->amount());
         self::assertSame('2.823', $this->fee($secondFees, 'EUR')->amount());
@@ -491,12 +491,12 @@ final class LegMaterializerIntegrationTest extends TestCase
         self::assertNotNull($materialized);
         self::assertSame('USD', $materialized['totalSpent']->currency());
         self::assertSame($materialized['totalSpent']->amount(), $materialized['toleranceSpent']->amount());
-        $legs = $materialized['legs'];
-        self::assertCount(2, $legs);
-        self::assertSame('USD', $legs->at(0)->spent()->currency());
-        self::assertSame('EUR', $legs->at(0)->received()->currency());
-        self::assertSame('EUR', $legs->at(1)->spent()->currency());
-        self::assertSame('JPY', $legs->at(1)->received()->currency());
+        $hops = $materialized['hops'];
+        self::assertCount(2, $hops);
+        self::assertSame('USD', $hops->at(0)->spent()->currency());
+        self::assertSame('EUR', $hops->at(0)->received()->currency());
+        self::assertSame('EUR', $hops->at(1)->spent()->currency());
+        self::assertSame('JPY', $hops->at(1)->received()->currency());
     }
 
     public function test_reduce_budget_handles_currency_mismatch_and_zero_clamp(): void

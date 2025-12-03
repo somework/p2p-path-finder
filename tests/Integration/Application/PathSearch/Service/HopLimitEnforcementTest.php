@@ -87,7 +87,7 @@ final class HopLimitEnforcementTest extends TestCase
         self::assertNotEmpty($paths, 'Expected at least one path satisfying minHops requirement');
 
         foreach ($paths as $path) {
-            self::assertGreaterThanOrEqual(2, $path->legs()->count(), 'All paths should have at least minHops legs');
+            self::assertGreaterThanOrEqual(2, $path->hops()->count(), 'All paths should have at least minHops legs');
         }
     }
 
@@ -125,7 +125,7 @@ final class HopLimitEnforcementTest extends TestCase
         self::assertNotEmpty($paths, 'Expected to find 2-hop path');
 
         foreach ($paths as $path) {
-            self::assertSame(2, $path->legs()->count(), 'All paths should have exactly 2 hops');
+            self::assertSame(2, $path->hops()->count(), 'All paths should have exactly 2 hops');
         }
     }
 
@@ -218,7 +218,7 @@ final class HopLimitEnforcementTest extends TestCase
 
         // Should find the 3-hop path
         self::assertNotEmpty($paths, 'Should find path with exactly maxHops');
-        self::assertSame(3, $paths[0]->legs()->count(), 'Path should have exactly 3 hops');
+        self::assertSame(3, $paths[0]->hops()->count(), 'Path should have exactly 3 hops');
     }
 
     /**
@@ -246,7 +246,7 @@ final class HopLimitEnforcementTest extends TestCase
 
         // Should find the 2-hop path
         self::assertNotEmpty($paths, 'Should find path with exactly minHops');
-        self::assertSame(2, $paths[0]->legs()->count(), 'Path should have exactly 2 hops');
+        self::assertSame(2, $paths[0]->hops()->count(), 'Path should have exactly 2 hops');
     }
 
     /**
@@ -283,7 +283,7 @@ final class HopLimitEnforcementTest extends TestCase
         self::assertNotEmpty($paths, 'Should find 2-hop path');
 
         foreach ($paths as $path) {
-            self::assertSame(2, $path->legs()->count(), 'All returned paths should have exactly 2 hops');
+            self::assertSame(2, $path->hops()->count(), 'All returned paths should have exactly 2 hops');
         }
     }
 }
