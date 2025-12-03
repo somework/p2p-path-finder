@@ -107,7 +107,7 @@ Returns: self&lt;TOutcome&gt;
 ### empty
 `SearchOutcome::empty(SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport $guardLimits): self`
 
-Returns: self&lt;mixed&gt;
+Returns: self&lt;Path&gt;
 
 ### paths
 `SearchOutcome::paths(): SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSet`
@@ -115,7 +115,7 @@ Returns: self&lt;mixed&gt;
 Returns: PathResultSet&lt;TPath&gt;
 
 ### bestPath
-`SearchOutcome::bestPath(): mixed`
+`SearchOutcome::bestPath(): ?SomeWork\P2PPathFinder\Application\PathSearch\Result\Path`
 
 Returns: TPath|null
 

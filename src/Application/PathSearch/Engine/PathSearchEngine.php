@@ -6,7 +6,7 @@ namespace SomeWork\P2PPathFinder\Application\PathSearch\Engine;
 
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
-use SomeWork\P2PPathFinder\Application\PathSearch\Api\Response\SearchOutcome;
+use SomeWork\P2PPathFinder\Application\PathSearch\Engine\CandidateSearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Guard\SearchGuards;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\CostHopsSignatureOrderingStrategy;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathCost;
@@ -375,11 +375,7 @@ final class PathSearchEngine
      * @throws GuardLimitExceeded              when a configured guard limit is exceeded during search
      * @throws InvalidInput|PrecisionViolation when path construction or arithmetic operations fail
      *
-     * @return SearchOutcome<CandidatePath>
-     *
-     * @phpstan-return SearchOutcome<CandidatePath>
-     *
-     * @psalm-return SearchOutcome<CandidatePath>
+     * @return CandidateSearchOutcome
      */
     public function findBestPaths(
         Graph $graph,
@@ -387,13 +383,12 @@ final class PathSearchEngine
         string $target,
         ?SpendConstraints $spendConstraints = null,
         ?callable $acceptCandidate = null
-    ): SearchOutcome {
+    ): CandidateSearchOutcome {
         $source = strtoupper($source);
         $target = strtoupper($target);
 
         if (!$graph->hasNode($source) || !$graph->hasNode($target)) {
-            /** @var SearchOutcome<CandidatePath> $empty */
-            $empty = SearchOutcome::empty(SearchGuardReport::idle($this->maxVisitedStates, $this->maxExpansions, $this->timeBudgetMs));
+            $empty = CandidateSearchOutcome::empty(SearchGuardReport::idle($this->maxVisitedStates, $this->maxExpansions, $this->timeBudgetMs));
 
             return $empty;
         }
@@ -559,15 +554,14 @@ final class PathSearchEngine
         $guardLimits = $guards->finalize($visitedStates, $this->maxVisitedStates, $visitedGuardReached);
 
         if (0 === $results->count()) {
-            /** @var SearchOutcome<CandidatePath> $empty */
-            $empty = SearchOutcome::empty($guardLimits);
+            $empty = CandidateSearchOutcome::empty($guardLimits);
 
             return $empty;
         }
 
         $finalized = $this->finalizeResults($results);
 
-        return new SearchOutcome($finalized, $guardLimits);
+        return new CandidateSearchOutcome($finalized, $guardLimits);
     }
 
     private function stateSignature(?SpendRange $range, ?Money $desired): SearchStateSignature

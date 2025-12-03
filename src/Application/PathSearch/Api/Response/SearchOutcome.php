@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Application\PathSearch\Api\Response;
 
 use SomeWork\P2PPathFinder\Application\PathSearch\Config\SearchGuardConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\Path;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
 
@@ -16,11 +17,11 @@ use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
  * / {@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHopCollection})
  * alongside guard rail metrics.
  *
- * @template-covariant TPath of mixed
+ * @template-covariant TPath of Path
  *
- * @phpstan-template-covariant TPath of mixed
+ * @phpstan-template-covariant TPath of Path
  *
- * @psalm-template-covariant TPath as mixed
+ * @psalm-template-covariant TPath as Path
  *
  * @see PathResultSet For the paths collection
  * @see SearchGuardReport For guard metrics and limits
@@ -56,11 +57,11 @@ final class SearchOutcome
     }
 
     /**
-     * @template TOutcome of mixed
+     * @template TOutcome of Path
      *
-     * @phpstan-template TOutcome of mixed
+     * @phpstan-template TOutcome of Path
      *
-     * @psalm-template TOutcome as mixed
+     * @psalm-template TOutcome as Path
      *
      * @param PathResultSet<TOutcome> $paths
      *
@@ -80,18 +81,18 @@ final class SearchOutcome
     }
 
     /**
-     * @return self<mixed>
+     * @return self<Path>
      *
-     * @phpstan-return self<mixed>
+     * @phpstan-return self<Path>
      *
-     * @psalm-return self<mixed>
+     * @psalm-return self<Path>
      */
     public static function empty(SearchGuardReport $guardLimits): self
     {
-        /** @var PathResultSet<mixed> $emptyPaths */
+        /** @var PathResultSet<Path> $emptyPaths */
         $emptyPaths = PathResultSet::empty();
 
-        /** @var self<mixed> $empty */
+        /** @var self<Path> $empty */
         $empty = self::fromResultSet($emptyPaths, $guardLimits);
 
         return $empty;
@@ -116,7 +117,7 @@ final class SearchOutcome
      *
      * @psalm-return TPath|null
      */
-    public function bestPath(): mixed
+    public function bestPath(): ?Path
     {
         return $this->paths->first();
     }

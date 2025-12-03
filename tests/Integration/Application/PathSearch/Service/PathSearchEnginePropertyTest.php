@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Integration\Application\PathSearch\Service;
 
 use PHPUnit\Framework\TestCase;
-use SomeWork\P2PPathFinder\Application\PathSearch\Api\Response\SearchOutcome;
+use SomeWork\P2PPathFinder\Application\PathSearch\Engine\CandidateSearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\RouteSignature;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\PathSearchEngine;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\CandidatePath;
@@ -306,7 +306,7 @@ final class PathSearchEnginePropertyTest extends TestCase
     /**
      * @return list<array{cost: numeric-string, product: numeric-string, hops: int, edges: list<array{from: string, to: string, order: Order, rate: \SomeWork\P2PPathFinder\Domain\Money\ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}>, amountRange: array{min: \SomeWork\P2PPathFinder\Domain\Money\Money, max: \SomeWork\P2PPathFinder\Domain\Money\Money}|null, desiredAmount: \SomeWork\P2PPathFinder\Domain\Money\Money|null}>
      */
-    private static function extractPaths(SearchOutcome $outcome): array
+    private static function extractPaths(CandidateSearchOutcome $outcome): array
     {
         return array_map(
             static fn (CandidatePath $path): array => $path->toArray(),

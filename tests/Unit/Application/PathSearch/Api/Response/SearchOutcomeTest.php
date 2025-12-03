@@ -10,8 +10,14 @@ use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\CostHopsSignat
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathCost;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\RouteSignature;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\Path;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHop;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHopCollection;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
+use SomeWork\P2PPathFinder\Domain\Tolerance\DecimalTolerance;
+use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 use SomeWork\P2PPathFinder\Tests\Helpers\DecimalFactory;
 
 final class SearchOutcomeTest extends TestCase
@@ -41,20 +47,36 @@ final class SearchOutcomeTest extends TestCase
             new PathOrderKey(new PathCost(DecimalFactory::decimal('1')), 1, RouteSignature::fromNodes(['A']), 0),
         ];
 
+        $firstPath = $this->path('USD', 'EUR', '10', '9');
+        $secondPath = $this->path('EUR', 'GBP', '20', '15');
+
         $paths = PathResultSet::fromPaths(
             new CostHopsSignatureOrderingStrategy(18),
             [
-                ['id' => 2],
-                ['id' => 1],
+                $firstPath,
+                $secondPath,
             ],
-            static fn (array $path, int $index): PathOrderKey => $orderKeys[$index],
+            static fn (Path $path, int $index): PathOrderKey => $orderKeys[$index],
         );
         $status = SearchGuardReport::idle(25, 10);
         $outcome = SearchOutcome::fromResultSet($paths, $status);
 
         self::assertTrue($outcome->hasPaths());
         self::assertSame($paths, $outcome->paths());
-        self::assertSame(['id' => 1], $outcome->bestPath());
+        self::assertSame($secondPath, $outcome->bestPath());
         self::assertSame($status, $outcome->guardLimits());
+    }
+
+    private function path(string $from, string $to, string $spent, string $received): Path
+    {
+        $hop = new PathHop(
+            $from,
+            $to,
+            Money::fromString($from, $spent, 2),
+            Money::fromString($to, $received, 2),
+            OrderFactory::sell($from, $to),
+        );
+
+        return new Path(PathHopCollection::fromList([$hop]), DecimalTolerance::fromNumericString('0.1'));
     }
 }

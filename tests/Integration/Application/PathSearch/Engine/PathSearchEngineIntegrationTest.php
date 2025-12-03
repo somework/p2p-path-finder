@@ -6,7 +6,7 @@ namespace SomeWork\P2PPathFinder\Tests\Integration\Application\PathSearch\Engine
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use SomeWork\P2PPathFinder\Application\PathSearch\Api\Response\SearchOutcome;
+use SomeWork\P2PPathFinder\Application\PathSearch\Engine\CandidateSearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathSearch\Config\SearchGuardConfig;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\PathSearchEngine;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\CandidatePath;
@@ -54,7 +54,7 @@ final class PathSearchEngineIntegrationTest extends TestCase
      *     desiredAmount: Money|null,
      * }>
      */
-    private static function extractPaths(SearchOutcome $searchResult): array
+    private static function extractPaths(CandidateSearchOutcome $searchResult): array
     {
         return array_map(
             static fn (CandidatePath $path): array => $path->toArray(),

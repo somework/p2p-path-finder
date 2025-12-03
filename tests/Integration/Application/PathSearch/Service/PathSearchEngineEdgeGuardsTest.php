@@ -6,7 +6,7 @@ namespace SomeWork\P2PPathFinder\Tests\Integration\Application\PathSearch\Servic
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use SomeWork\P2PPathFinder\Application\PathSearch\Api\Response\SearchOutcome;
+use SomeWork\P2PPathFinder\Application\PathSearch\Engine\CandidateSearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\PathSearchEngine;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
@@ -72,7 +72,7 @@ final class PathSearchEngineEdgeGuardsTest extends TestCase
     /**
      * @return list<array{cost: numeric-string, product: numeric-string, hops: int, edges: list<array{from: string, to: string, order: Order, rate: ExchangeRate, orderSide: OrderSide, conversionRate: numeric-string}>, amountRange: array{min: Money, max: Money}|null, desiredAmount: Money|null}>
      */
-    private static function extractPaths(SearchOutcome $outcome): array
+    private static function extractPaths(CandidateSearchOutcome $outcome): array
     {
         return array_map(
             static fn (CandidatePath $path): array => $path->toArray(),
