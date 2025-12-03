@@ -42,6 +42,8 @@ use function trim;
  * @see docs/getting-started.md For complete usage examples
  *
  * @api
+ *
+ * @psalm-type CandidateCallback = callable(CandidatePath):bool|null
  */
 final class PathSearchService
 {
@@ -55,7 +57,7 @@ final class PathSearchService
     private readonly ToleranceEvaluator $toleranceEvaluator;
     private readonly PathOrderStrategy $orderingStrategy;
     /**
-     * @var Closure(PathSearchRequest): (Closure(Graph, (callable(CandidatePath): bool)): CandidateSearchOutcome)
+     * @var Closure(PathSearchRequest): (Closure(Graph, CandidateCallback|null): CandidateSearchOutcome)
      */
     private Closure $pathFinderFactory;
 
@@ -84,7 +86,7 @@ final class PathSearchService
      *
      * @internal This is for testing only and may change without notice
      *
-     * @param Closure(PathSearchRequest): (Closure(Graph, (callable(CandidatePath): bool)): CandidateSearchOutcome) $pathFinderFactory Factory that creates PathFinder runner instances
+     * @param Closure(PathSearchRequest): (Closure(Graph, CandidateCallback|null): CandidateSearchOutcome) $pathFinderFactory Factory that creates PathFinder runner instances
      *
      * @return self Service instance with injected factory (for testing only)
      */
@@ -95,7 +97,7 @@ final class PathSearchService
     ): self {
         $service = new self($graphBuilder, $orderingStrategy);
 
-        /** @var Closure(PathSearchRequest): (Closure(Graph, (callable(CandidatePath): bool)): CandidateSearchOutcome) $typedFactory */
+        /** @var Closure(PathSearchRequest): (Closure(Graph, (CandidateCallback|null)): CandidateSearchOutcome) $typedFactory */
         $typedFactory = $pathFinderFactory;
         $service->pathFinderFactory = $typedFactory;
 
@@ -103,7 +105,7 @@ final class PathSearchService
     }
 
     /**
-     * @return Closure(PathSearchRequest): (Closure(Graph, (callable(CandidatePath): bool)): CandidateSearchOutcome)
+     * @return Closure(PathSearchRequest): (Closure(Graph, CandidateCallback|null): CandidateSearchOutcome)
      */
     private static function createDefaultRunnerFactory(PathOrderStrategy $strategy): Closure
     {
@@ -111,14 +113,18 @@ final class PathSearchService
             $config = $request->config();
 
             /**
-             * @param Graph                        $graph
-             * @param callable(CandidatePath):bool $callback
+             * @param Graph                  $graph
+             * @param CandidateCallback|null $callback
+             *
+             * @phpstan-param null|callable(CandidatePath):bool|null $callback
+             *
+             * @psalm-param CandidateCallback|null $callback
              *
              * @return CandidateSearchOutcome
              */
             $runner = static function (
                 Graph $graph,
-                callable $callback,
+                ?callable $callback,
             ) use ($config, $strategy, $request): CandidateSearchOutcome {
                 $pathFinder = new PathSearchEngine(
                     $config->maximumHops(),
@@ -130,12 +136,15 @@ final class PathSearchService
                     $config->pathFinderTimeBudgetMs(),
                 );
 
+                /** @var CandidateCallback|null $typedCallback */
+                $typedCallback = $callback;
+
                 return $pathFinder->findBestPaths(
                     $graph,
                     $request->sourceAsset(),
                     $request->targetAsset(),
                     $request->spendConstraints(),
-                    $callback,
+                    $typedCallback,
                 );
             };
 

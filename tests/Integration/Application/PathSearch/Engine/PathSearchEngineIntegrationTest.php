@@ -6,8 +6,8 @@ namespace SomeWork\P2PPathFinder\Tests\Integration\Application\PathSearch\Engine
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use SomeWork\P2PPathFinder\Application\PathSearch\Engine\CandidateSearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathSearch\Config\SearchGuardConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Engine\CandidateSearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\PathSearchEngine;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\EdgeCapacity;

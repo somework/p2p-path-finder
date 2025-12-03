@@ -7,7 +7,6 @@ namespace SomeWork\P2PPathFinder\Tests\Integration\Application\PathSearch\Servic
 use Brick\Math\BigDecimal;
 use Closure;
 use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
-use SomeWork\P2PPathFinder\Application\PathSearch\Api\Response\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\CandidateSearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\CandidatePath;

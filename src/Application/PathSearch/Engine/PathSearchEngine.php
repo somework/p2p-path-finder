@@ -6,7 +6,6 @@ namespace SomeWork\P2PPathFinder\Application\PathSearch\Engine;
 
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
-use SomeWork\P2PPathFinder\Application\PathSearch\Engine\CandidateSearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Guard\SearchGuards;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\CostHopsSignatureOrderingStrategy;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathCost;
@@ -374,8 +373,6 @@ final class PathSearchEngine
      *
      * @throws GuardLimitExceeded              when a configured guard limit is exceeded during search
      * @throws InvalidInput|PrecisionViolation when path construction or arithmetic operations fail
-     *
-     * @return CandidateSearchOutcome
      */
     public function findBestPaths(
         Graph $graph,
