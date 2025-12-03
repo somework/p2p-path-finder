@@ -73,6 +73,9 @@ final class PathHop
         return $this->received;
     }
 
+    /**
+     * Returns the order associated with this hop.
+     */
     public function order(): Order
     {
         return $this->order;

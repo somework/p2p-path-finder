@@ -362,15 +362,15 @@ final class PathSearchServicePropertyTest extends TestCase
     private function routeSignatureFromHops(iterable $hops): string
     {
         $nodes = [];
-        $firstLeg = true;
+        $firstHop = true;
 
-        foreach ($hops as $leg) {
-            if ($firstLeg) {
-                $nodes[] = $leg->from();
-                $firstLeg = false;
+        foreach ($hops as $hop) {
+            if ($firstHop) {
+                $nodes[] = $hop->from();
+                $firstHop = false;
             }
 
-            $nodes[] = $leg->to();
+            $nodes[] = $hop->to();
         }
 
         if ([] === $nodes) {

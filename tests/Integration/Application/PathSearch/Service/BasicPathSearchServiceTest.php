@@ -56,18 +56,18 @@ final class BasicPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertTrue($result->residualTolerance()->isZero());
         self::assertSame('0.000000000000000000', $result->residualTolerance()->ratio());
 
-        $legs = $result->hops()->all();
-        self::assertCount(2, $legs);
+        $hops = $result->hops()->all();
+        self::assertCount(2, $hops);
 
-        self::assertSame('EUR', $legs[0]->from());
-        self::assertSame('USD', $legs[0]->to());
-        self::assertSame('100.000', $legs[0]->spent()->amount());
-        self::assertSame('111.100', $legs[0]->received()->amount());
+        self::assertSame('EUR', $hops[0]->from());
+        self::assertSame('USD', $hops[0]->to());
+        self::assertSame('100.000', $hops[0]->spent()->amount());
+        self::assertSame('111.100', $hops[0]->received()->amount());
 
-        self::assertSame('USD', $legs[1]->from());
-        self::assertSame('JPY', $legs[1]->to());
-        self::assertSame('111.100', $legs[1]->spent()->amount());
-        self::assertSame('16665.000', $legs[1]->received()->amount());
+        self::assertSame('USD', $hops[1]->from());
+        self::assertSame('JPY', $hops[1]->to());
+        self::assertSame('111.100', $hops[1]->spent()->amount());
+        self::assertSame('16665.000', $hops[1]->received()->amount());
     }
 
     /**

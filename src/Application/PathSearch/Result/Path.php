@@ -31,12 +31,10 @@ final class Path
             throw new InvalidInput('Path must contain at least one hop.');
         }
 
+        /** @var PathHop $firstHop */
         $firstHop = $hops->first();
+        /** @var PathHop $lastHop */
         $lastHop = $hops->last();
-
-        if (null === $firstHop || null === $lastHop) {
-            throw new InvalidInput('Path must contain at least one hop.');
-        }
 
         $this->totalSpent = $firstHop->spent();
         $this->totalReceived = $lastHop->received();

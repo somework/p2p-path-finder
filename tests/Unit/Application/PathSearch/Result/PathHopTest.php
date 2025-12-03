@@ -67,6 +67,20 @@ final class PathHopTest extends TestCase
         );
     }
 
+    public function test_received_currency_must_match_to_asset(): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Path hop received currency must match the to asset.');
+
+        new PathHop(
+            'usd',
+            'btc',
+            Money::fromString('USD', '10', 2),
+            Money::fromString('EUR', '0.001', 6),
+            OrderFactory::sell('USD', 'BTC'),
+        );
+    }
+
     public function test_assets_cannot_be_empty(): void
     {
         $this->expectException(InvalidInput::class);
@@ -75,6 +89,20 @@ final class PathHopTest extends TestCase
         new PathHop(
             ' ',
             'btc',
+            Money::fromString('USD', '10', 2),
+            Money::fromString('BTC', '0.001', 6),
+            OrderFactory::sell('USD', 'BTC'),
+        );
+    }
+
+    public function test_to_asset_cannot_be_empty(): void
+    {
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Path hop to asset cannot be empty.');
+
+        new PathHop(
+            'usd',
+            ' ',
             Money::fromString('USD', '10', 2),
             Money::fromString('BTC', '0.001', 6),
             OrderFactory::sell('USD', 'BTC'),
