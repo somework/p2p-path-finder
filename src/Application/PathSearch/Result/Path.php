@@ -11,46 +11,56 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 /**
- * Aggregated representation of a discovered conversion path.
- *
- * @see PathLeg For individual hop details
- * @see PathLegCollection For the legs collection
- * @see MoneyMap For fee breakdown aggregation
- * @see docs/api-contracts.md#pathresult For JSON structure specification
+ * Aggregated representation of a discovered conversion path derived from hops.
  *
  * @api
  */
-final class PathResult
+final class Path
 {
+    private readonly Money $totalSpent;
+
+    private readonly Money $totalReceived;
+
     private readonly MoneyMap $feeBreakdown;
 
-    private readonly PathLegCollection $legs;
-
-    /**
-     * @throws InvalidInput|PrecisionViolation when fee entries are invalid or cannot be merged deterministically
-     */
     public function __construct(
-        private readonly Money $totalSpent,
-        private readonly Money $totalReceived,
+        private readonly PathHopCollection $hops,
         private readonly DecimalTolerance $residualTolerance,
-        ?PathLegCollection $legs = null,
-        ?MoneyMap $feeBreakdown = null,
     ) {
-        $this->legs = $legs ?? PathLegCollection::empty();
-        $this->feeBreakdown = $feeBreakdown ?? MoneyMap::empty();
+        if ($hops->isEmpty()) {
+            throw new InvalidInput('Path must contain at least one hop.');
+        }
+
+        $firstHop = $hops->first();
+        $lastHop = $hops->last();
+
+        if (null === $firstHop || null === $lastHop) {
+            throw new InvalidInput('Path must contain at least one hop.');
+        }
+
+        $this->totalSpent = $firstHop->spent();
+        $this->totalReceived = $lastHop->received();
+        $this->feeBreakdown = $this->aggregateFees($hops);
+    }
+
+    public function hops(): PathHopCollection
+    {
+        return $this->hops;
     }
 
     /**
-     * Returns the total amount of source asset spent across the entire path.
+     * @return list<PathHop>
      */
+    public function hopsAsArray(): array
+    {
+        return $this->hops->all();
+    }
+
     public function totalSpent(): Money
     {
         return $this->totalSpent;
     }
 
-    /**
-     * Returns the total amount of destination asset received across the path.
-     */
     public function totalReceived(): Money
     {
         return $this->totalReceived;
@@ -85,26 +95,13 @@ final class PathResult
         return $this->residualTolerance->percentage($scale);
     }
 
-    public function legs(): PathLegCollection
-    {
-        return $this->legs;
-    }
-
-    /**
-     * @return list<PathLeg>
-     */
-    public function legsAsArray(): array
-    {
-        return $this->legs->all();
-    }
-
     /**
      * @return array{
      *     totalSpent: Money,
      *     totalReceived: Money,
      *     residualTolerance: DecimalTolerance,
      *     feeBreakdown: MoneyMap,
-     *     legs: PathLegCollection,
+     *     hops: PathHopCollection,
      * }
      */
     public function toArray(): array
@@ -114,7 +111,21 @@ final class PathResult
             'totalReceived' => $this->totalReceived,
             'residualTolerance' => $this->residualTolerance,
             'feeBreakdown' => $this->feeBreakdown,
-            'legs' => $this->legs,
+            'hops' => $this->hops,
         ];
+    }
+
+    /**
+     * @throws PrecisionViolation when the fee breakdown cannot be merged deterministically
+     */
+    private function aggregateFees(PathHopCollection $hops): MoneyMap
+    {
+        $aggregate = MoneyMap::empty();
+
+        foreach ($hops as $hop) {
+            $aggregate = $aggregate->merge($hop->fees());
+        }
+
+        return $aggregate;
     }
 }

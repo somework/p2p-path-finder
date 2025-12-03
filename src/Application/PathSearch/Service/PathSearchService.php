@@ -18,7 +18,7 @@ use SomeWork\P2PPathFinder\Application\PathSearch\Model\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\PathEdgeSequence;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\MaterializedResult;
-use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResult;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\Path;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSetEntry;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
@@ -159,11 +159,11 @@ final class PathSearchService
      * @throws InvalidInput       when the requested target asset identifier is empty
      * @throws PrecisionViolation when arbitrary precision operations required for cost ordering cannot be performed
      *
-     * @return SearchOutcome<PathResult>
+     * @return SearchOutcome<Path>
      *
-     * @phpstan-return SearchOutcome<PathResult>
+     * @phpstan-return SearchOutcome<Path>
      *
-     * @psalm-return SearchOutcome<PathResult>
+     * @psalm-return SearchOutcome<Path>
      *
      * @example
      * ```php
@@ -201,7 +201,7 @@ final class PathSearchService
 
         $orders = $this->orderSpendAnalyzer->filterOrders($orderBook, $config);
         if ([] === $orders) {
-            /** @var SearchOutcome<PathResult> $empty */
+            /** @var SearchOutcome<Path> $empty */
             $empty = SearchOutcome::empty(SearchGuardReport::idle(
                 $config->pathFinderMaxVisitedStates(),
                 $config->pathFinderMaxExpansions(),
@@ -213,7 +213,7 @@ final class PathSearchService
 
         $graph = $this->graphBuilder->build($orders);
         if (!$graph->hasNode($sourceCurrency) || !$graph->hasNode($targetCurrency)) {
-            /** @var SearchOutcome<PathResult> $empty */
+            /** @var SearchOutcome<Path> $empty */
             $empty = SearchOutcome::empty(SearchGuardReport::idle(
                 $config->pathFinderMaxVisitedStates(),
                 $config->pathFinderMaxExpansions(),
@@ -276,13 +276,7 @@ final class PathSearchService
                 }
 
                 $routeSignature = $this->routeSignature($edges);
-                $result = new PathResult(
-                    $materialized['totalSpent'],
-                    $materialized['totalReceived'],
-                    $residual,
-                    $materialized['legs'],
-                    $materialized['feeBreakdown'],
-                );
+                $result = new Path($materialized['hops'], $residual);
 
                 $orderKey = new PathOrderKey(
                     new PathCost($candidate->costDecimal()),
@@ -303,25 +297,25 @@ final class PathSearchService
         $this->assertGuardLimits($config, $guardLimits);
 
         if ([] === $materializedResults) {
-            /** @var SearchOutcome<PathResult> $empty */
+            /** @var SearchOutcome<Path> $empty */
             $empty = SearchOutcome::empty($guardLimits);
 
             return $empty;
         }
 
-        /** @var array<PathResultSetEntry<PathResult>> $resultEntries */
+        /** @var array<PathResultSetEntry<Path>> $resultEntries */
         $resultEntries = [];
         foreach ($materializedResults as $entry) {
-            /** @var PathResultSetEntry<PathResult> $resultEntry */
+            /** @var PathResultSetEntry<Path> $resultEntry */
             $resultEntry = $entry->toEntry();
 
             $resultEntries[] = $resultEntry;
         }
 
-        /** @var PathResultSet<PathResult> $resultSet */
+        /** @var PathResultSet<Path> $resultSet */
         $resultSet = PathResultSet::fromEntries($this->orderingStrategy, $resultEntries);
 
-        /** @var SearchOutcome<PathResult> $outcome */
+        /** @var SearchOutcome<Path> $outcome */
         $outcome = new SearchOutcome($resultSet, $guardLimits);
 
         return $outcome;

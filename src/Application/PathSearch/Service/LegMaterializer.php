@@ -7,8 +7,8 @@ namespace SomeWork\P2PPathFinder\Application\PathSearch\Service;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\PathEdgeSequence;
-use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathLeg;
-use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathLegCollection;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHop;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHopCollection;
 use SomeWork\P2PPathFinder\Application\PathSearch\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Money\MoneyMap;
@@ -22,7 +22,7 @@ use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 use function max;
 
 /**
- * Resolves concrete path legs from abstract graph edges.
+ * Resolves concrete path hops from abstract graph edges.
  *
  * @internal
  */
@@ -58,7 +58,7 @@ final class LegMaterializer
      *     totalSpent: Money,
      *     totalReceived: Money,
      *     toleranceSpent: Money,
-     *     legs: PathLegCollection,
+     *     hops: PathHopCollection,
      *     feeBreakdown: MoneyMap,
      * }|null
      */
@@ -94,7 +94,7 @@ final class LegMaterializer
             return null;
         }
 
-        $legs = [];
+        $hops = [];
         $current = $initialSeed['net'];
         $currentCurrency = $current->currency();
         $feeBreakdown = MoneyMap::empty();
@@ -177,7 +177,7 @@ final class LegMaterializer
                 $toleranceSpent = $toleranceSpent->add($spent, $grossSpentScale);
             }
 
-            $legs[] = new PathLeg($from, $to, $spent, $received, $legFees);
+            $hops[] = new PathHop($from, $to, $spent, $received, $order, $legFees);
             $current = $received;
             $currentCurrency = $current->currency();
         }
@@ -191,7 +191,7 @@ final class LegMaterializer
             'totalSpent' => $grossSpent,
             'totalReceived' => $current,
             'toleranceSpent' => $toleranceSpent,
-            'legs' => PathLegCollection::fromList($legs),
+            'hops' => PathHopCollection::fromList($hops),
             'feeBreakdown' => $feeBreakdown,
         ];
     }

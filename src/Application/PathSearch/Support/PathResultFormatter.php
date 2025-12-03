@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathSearch\Support;
 
-use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResult;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\Path;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Money\MoneyMap;
@@ -15,14 +15,14 @@ use function sprintf;
 use const PHP_EOL;
 
 /**
- * Provides machine and human friendly representations of {@see PathResult} instances.
+ * Provides machine and human friendly representations of {@see Path} instances.
  */
 final class PathResultFormatter
 {
     /**
      * Produces a multi-line human readable summary of the conversion path.
      */
-    public function formatHuman(PathResult $result): string
+    public function formatHuman(Path $result): string
     {
         $lines = [];
         $lines[] = sprintf(
@@ -33,16 +33,16 @@ final class PathResultFormatter
             $result->residualTolerancePercentage(2),
         );
 
-        $lines[] = 'Legs:';
-        foreach ($result->legs() as $index => $leg) {
+        $lines[] = 'Hops:';
+        foreach ($result->hops() as $index => $hop) {
             $lines[] = sprintf(
                 '  %d. %s -> %s | Spent %s | Received %s | Fees %s',
                 $index + 1,
-                $leg->from(),
-                $leg->to(),
-                $this->formatMoney($leg->spent()),
-                $this->formatMoney($leg->received()),
-                $this->formatFeeSummary($leg->fees()),
+                $hop->from(),
+                $hop->to(),
+                $this->formatMoney($hop->spent()),
+                $this->formatMoney($hop->received()),
+                $this->formatFeeSummary($hop->fees()),
             );
         }
 
@@ -50,7 +50,7 @@ final class PathResultFormatter
     }
 
     /**
-     * @param PathResultSet<PathResult>|list<PathResult> $results
+     * @param PathResultSet<Path>|list<Path> $results
      */
     public function formatHumanCollection(array|PathResultSet $results): string
     {

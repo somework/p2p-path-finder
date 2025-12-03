@@ -65,7 +65,7 @@ final class LegMaterializerIntegrationTest extends TestCase
         self::assertSame('100.000', $materialized['totalSpent']->amount());
         self::assertSame('JPY', $materialized['totalReceived']->currency());
         self::assertSame('16665.000', $materialized['totalReceived']->amount());
-        self::assertCount(2, $materialized['legs']);
+        self::assertCount(2, $materialized['hops']);
         self::assertSame('100.000', $materialized['toleranceSpent']->amount());
     }
 
@@ -150,7 +150,7 @@ final class LegMaterializerIntegrationTest extends TestCase
         self::assertSame('2.041', $feeBreakdownMap['USD']->amount());
         self::assertSame('2.823', $feeBreakdownMap['EUR']->amount());
 
-        $legs = $materialized['legs'];
+        $legs = $materialized['hops'];
         self::assertCount(2, $legs);
 
         $firstLeg = $legs->at(0);
@@ -491,7 +491,7 @@ final class LegMaterializerIntegrationTest extends TestCase
         self::assertNotNull($materialized);
         self::assertSame('USD', $materialized['totalSpent']->currency());
         self::assertSame($materialized['totalSpent']->amount(), $materialized['toleranceSpent']->amount());
-        $legs = $materialized['legs'];
+        $legs = $materialized['hops'];
         self::assertCount(2, $legs);
         self::assertSame('USD', $legs->at(0)->spent()->currency());
         self::assertSame('EUR', $legs->at(0)->received()->currency());

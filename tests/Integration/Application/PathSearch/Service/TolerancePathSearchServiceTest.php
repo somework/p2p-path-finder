@@ -10,7 +10,7 @@ use ReflectionProperty;
 use SomeWork\P2PPathFinder\Application\PathSearch\Api\Response\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\PathSearchEngine;
-use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResult;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\Path;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Order\Fee\FeePolicy;
@@ -22,7 +22,7 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
 final class TolerancePathSearchServiceTest extends PathSearchServiceTestCase
 {
     /**
-     * @return list<PathResult>
+     * @return list<Path>
      */
     private static function extractPaths(SearchOutcome $result): array
     {
@@ -61,7 +61,7 @@ final class TolerancePathSearchServiceTest extends PathSearchServiceTestCase
         self::assertTrue($result->residualTolerance()->isLessThanOrEqual($config->maximumTolerance(), 18));
         self::assertSame('0.020000000000000000', $result->residualTolerance()->ratio());
 
-        $legs = $result->legs();
+        $legs = $result->hops();
         self::assertCount(1, $legs);
         $leg = $legs->at(0);
         self::assertSame('EUR', $leg->from());
@@ -88,7 +88,7 @@ final class TolerancePathSearchServiceTest extends PathSearchServiceTestCase
         self::assertNotSame([], $results);
         $result = $results[0];
 
-        $legs = $result->legs();
+        $legs = $result->hops();
         self::assertCount(1, $legs);
         $leg = $legs->at(0);
 

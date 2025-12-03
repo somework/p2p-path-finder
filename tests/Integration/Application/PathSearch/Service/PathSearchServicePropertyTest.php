@@ -14,9 +14,9 @@ use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathOrderStrategy;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\RouteSignature;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\GraphEdge;
-use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathLeg;
-use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathLegCollection;
-use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResult;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHop;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHopCollection;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\Path;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
@@ -25,6 +25,7 @@ use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Order\OrderBook;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\Tolerance\DecimalTolerance;
+use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 use SomeWork\P2PPathFinder\Tests\Helpers\Generator\PathFinderScenarioGenerator;
 use SomeWork\P2PPathFinder\Tests\Helpers\InfectionIterationLimiter;
 
@@ -195,24 +196,9 @@ final class PathSearchServicePropertyTest extends TestCase
         };
 
         $paths = [
-            new PathResult(
-                Money::fromString('SRC', '1.0', 1),
-                Money::fromString('DST', '1.0', 1),
-                DecimalTolerance::zero(),
-                $this->buildLegCollection(['SRC', 'ALP', 'DST']),
-            ),
-            new PathResult(
-                Money::fromString('SRC', '1.0', 1),
-                Money::fromString('DST', '1.0', 1),
-                DecimalTolerance::zero(),
-                $this->buildLegCollection(['SRC', 'BET', 'DST']),
-            ),
-            new PathResult(
-                Money::fromString('SRC', '1.0', 1),
-                Money::fromString('DST', '1.0', 1),
-                DecimalTolerance::zero(),
-                $this->buildLegCollection(['SRC', 'CHI', 'DST']),
-            ),
+            new Path($this->buildHopCollection(['SRC', 'ALP', 'DST']), DecimalTolerance::zero()),
+            new Path($this->buildHopCollection(['SRC', 'BET', 'DST']), DecimalTolerance::zero()),
+            new Path($this->buildHopCollection(['SRC', 'CHI', 'DST']), DecimalTolerance::zero()),
         ];
         $orderKeys = [
             new PathOrderKey(new PathCost('0.100000000000000000'), 2, RouteSignature::fromNodes(['SRC', 'ALP', 'DST']), 0),
@@ -223,13 +209,13 @@ final class PathSearchServicePropertyTest extends TestCase
         $resultSet = PathResultSet::fromPaths(
             $strategy,
             $paths,
-            static fn (PathResult $result, int $index): PathOrderKey => $orderKeys[$index],
+            static fn (Path $result, int $index): PathOrderKey => $orderKeys[$index],
         );
 
         self::assertSame(
             ['SRC->CHI->DST', 'SRC->BET->DST', 'SRC->ALP->DST'],
             array_map(
-                fn (PathResult $result): string => $this->routeSignatureFromLegs($result->legs()),
+                fn (Path $result): string => $this->routeSignatureFromHops($result->hops()),
                 $resultSet->toArray(),
             ),
         );
@@ -297,38 +283,39 @@ final class PathSearchServicePropertyTest extends TestCase
     }
 
     /**
-     * @return callable(PathResult): string
+     * @return callable(Path): string
      */
     private function encodeResult(): callable
     {
-        return static fn (PathResult $result): string => serialize($result->jsonSerialize());
+        return static fn (Path $result): string => serialize($result->toArray());
     }
 
     /**
      * @param list<string> $nodes
      */
-    private function buildLegCollection(array $nodes): PathLegCollection
+    private function buildHopCollection(array $nodes): PathHopCollection
     {
-        $legs = [];
+        $hops = [];
         $lastIndex = count($nodes) - 1;
 
         for ($index = 0; $index < $lastIndex; ++$index) {
             $from = $nodes[$index];
             $to = $nodes[$index + 1];
 
-            $legs[] = new PathLeg(
+            $hops[] = new PathHop(
                 $from,
                 $to,
                 Money::fromString($from, '1.0', 1),
                 Money::fromString($to, '1.0', 1),
+                OrderFactory::sell($from, $to, '1.0', '1.0', '1.0', 1, 1),
             );
         }
 
-        return PathLegCollection::fromList($legs);
+        return PathHopCollection::fromList($hops);
     }
 
     /**
-     * @param list<PathResult> $results
+     * @param list<Path> $results
      *
      * @return list<array{cost: string, hops: int, signature: string, order: int}>
      */
@@ -346,7 +333,7 @@ final class PathSearchServicePropertyTest extends TestCase
     /**
      * @return array{cost: string, hops: int, signature: string, order: int}
      */
-    private function sortKeyForResult(PathResult $result, int $order): array
+    private function sortKeyForResult(Path $result, int $order): array
     {
         $spent = $result->totalSpent()->withScale(18);
         $received = $result->totalReceived()->withScale(18);
@@ -363,21 +350,21 @@ final class PathSearchServicePropertyTest extends TestCase
 
         return [
             'cost' => $cost,
-            'hops' => count($result->legs()),
-            'signature' => $this->routeSignatureFromLegs($result->legs()),
+            'hops' => count($result->hops()),
+            'signature' => $this->routeSignatureFromHops($result->hops()),
             'order' => $order,
         ];
     }
 
     /**
-     * @param iterable<PathLeg> $legs
+     * @param iterable<PathHop> $hops
      */
-    private function routeSignatureFromLegs(iterable $legs): string
+    private function routeSignatureFromHops(iterable $hops): string
     {
         $nodes = [];
         $firstLeg = true;
 
-        foreach ($legs as $leg) {
+        foreach ($hops as $leg) {
             if ($firstLeg) {
                 $nodes[] = $leg->from();
                 $firstLeg = false;

@@ -6,17 +6,18 @@ namespace SomeWork\P2PPathFinder\Application\PathSearch\Result;
 
 use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Money\MoneyMap;
+use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 use function sprintf;
 use function strtoupper;
 
 /**
- * Describes a single conversion leg in a path finder result.
+ * Describes a single conversion hop in a path finder result.
  *
  * @api
  */
-final class PathLeg
+final class PathHop
 {
     private readonly string $fromAsset;
 
@@ -29,6 +30,7 @@ final class PathLeg
         string $toAsset,
         private readonly Money $spent,
         private readonly Money $received,
+        private readonly Order $order,
         ?MoneyMap $fees = null,
     ) {
         $this->fromAsset = self::normalizeAsset($fromAsset, 'from');
@@ -40,7 +42,7 @@ final class PathLeg
     }
 
     /**
-     * Returns the asset symbol of the leg's source.
+     * Returns the asset symbol of the hop's source.
      */
     public function from(): string
     {
@@ -48,7 +50,7 @@ final class PathLeg
     }
 
     /**
-     * Returns the asset symbol of the leg's destination.
+     * Returns the asset symbol of the hop's destination.
      */
     public function to(): string
     {
@@ -56,7 +58,7 @@ final class PathLeg
     }
 
     /**
-     * Returns the amount of source asset spent in this leg.
+     * Returns the amount of source asset spent in this hop.
      */
     public function spent(): Money
     {
@@ -64,11 +66,16 @@ final class PathLeg
     }
 
     /**
-     * Returns the amount of destination asset received in this leg.
+     * Returns the amount of destination asset received in this hop.
      */
     public function received(): Money
     {
         return $this->received;
+    }
+
+    public function order(): Order
+    {
+        return $this->order;
     }
 
     public function fees(): MoneyMap
@@ -91,6 +98,7 @@ final class PathLeg
      *     spent: Money,
      *     received: Money,
      *     fees: MoneyMap,
+     *     order: Order,
      * }
      */
     public function toArray(): array
@@ -101,6 +109,7 @@ final class PathLeg
             'spent' => $this->spent,
             'received' => $this->received,
             'fees' => $this->fees,
+            'order' => $this->order,
         ];
     }
 
@@ -109,7 +118,7 @@ final class PathLeg
         $normalized = strtoupper(trim($asset));
 
         if ('' === $normalized) {
-            throw new InvalidInput(sprintf('Path leg %s asset cannot be empty.', $field));
+            throw new InvalidInput(sprintf('Path hop %s asset cannot be empty.', $field));
         }
 
         return $normalized;
@@ -122,7 +131,7 @@ final class PathLeg
         string $assetField,
     ): void {
         if ($money->currency() !== $asset) {
-            throw new InvalidInput(sprintf('Path leg %s currency must match the %s asset.', $moneyField, $assetField));
+            throw new InvalidInput(sprintf('Path hop %s currency must match the %s asset.', $moneyField, $assetField));
         }
     }
 }
