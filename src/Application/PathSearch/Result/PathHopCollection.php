@@ -8,6 +8,7 @@ use ArrayIterator;
 use Countable;
 use IteratorAggregate;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SplFixedArray;
 use Traversable;
 
 use function array_diff_key;
@@ -25,21 +26,24 @@ use function count;
 final class PathHopCollection implements Countable, IteratorAggregate
 {
     /**
-     * @var list<PathHop>
+     * @var SplFixedArray<PathHop>
      */
-    private array $hops;
+    private SplFixedArray $hops;
 
     /**
-     * @param list<PathHop> $hops
+     * @param SplFixedArray<PathHop> $hops
      */
-    private function __construct(array $hops)
+    private function __construct(SplFixedArray $hops)
     {
         $this->hops = $hops;
     }
 
     public static function empty(): self
     {
-        return new self([]);
+        /** @var SplFixedArray<PathHop> $empty */
+        $empty = new SplFixedArray(0);
+
+        return new self($empty);
     }
 
     /**
@@ -50,7 +54,10 @@ final class PathHopCollection implements Countable, IteratorAggregate
     public static function fromList(array $hops): self
     {
         if ([] === $hops) {
-            return new self([]);
+            /** @var SplFixedArray<PathHop> $empty */
+            $empty = new SplFixedArray(0);
+
+            return new self($empty);
         }
 
         if (!array_is_list($hops)) {
@@ -68,12 +75,12 @@ final class PathHopCollection implements Countable, IteratorAggregate
             $normalized[] = $hop;
         }
 
-        return new self(self::sortContiguously($normalized));
+        return new self(self::toFixedArray(self::sortContiguously($normalized)));
     }
 
     public function count(): int
     {
-        return count($this->hops);
+        return $this->hops->count();
     }
 
     /**
@@ -81,7 +88,10 @@ final class PathHopCollection implements Countable, IteratorAggregate
      */
     public function getIterator(): Traversable
     {
-        return new ArrayIterator($this->hops);
+        /** @var list<PathHop> $hops */
+        $hops = $this->hops->toArray();
+
+        return new ArrayIterator($hops);
     }
 
     /**
@@ -89,7 +99,10 @@ final class PathHopCollection implements Countable, IteratorAggregate
      */
     public function all(): array
     {
-        return $this->hops;
+        /** @var list<PathHop> $hops */
+        $hops = $this->hops->toArray();
+
+        return $hops;
     }
 
     /**
@@ -102,7 +115,7 @@ final class PathHopCollection implements Countable, IteratorAggregate
 
     public function isEmpty(): bool
     {
-        return [] === $this->hops;
+        return 0 === $this->hops->count();
     }
 
     /**
@@ -110,16 +123,24 @@ final class PathHopCollection implements Countable, IteratorAggregate
      */
     public function at(int $index): PathHop
     {
-        if (!isset($this->hops[$index])) {
+        $count = $this->hops->count();
+        if (0 > $index || $index >= $count) {
             throw new InvalidInput('Path hop index must reference an existing position.');
         }
 
-        return $this->hops[$index];
+        /** @var PathHop $hop */
+        $hop = $this->hops[$index];
+
+        return $hop;
     }
 
     public function first(): ?PathHop
     {
-        return $this->hops[0] ?? null;
+        if ($this->isEmpty()) {
+            return null;
+        }
+
+        return $this->hops[0];
     }
 
     public function last(): ?PathHop
@@ -128,12 +149,12 @@ final class PathHopCollection implements Countable, IteratorAggregate
             return null;
         }
 
-        $lastIndex = array_key_last($this->hops);
-        if (null === $lastIndex) {
-            return null;
-        }
+        $lastIndex = $this->hops->count() - 1;
 
-        return $this->hops[$lastIndex];
+        /** @var PathHop $hop */
+        $hop = $this->hops[$lastIndex];
+
+        return $hop;
     }
 
     /**
@@ -197,5 +218,22 @@ final class PathHopCollection implements Countable, IteratorAggregate
         }
 
         return $sorted;
+    }
+
+    /**
+     * @param list<PathHop> $hops
+     *
+     * @return SplFixedArray<PathHop>
+     */
+    private static function toFixedArray(array $hops): SplFixedArray
+    {
+        /** @var SplFixedArray<PathHop> $fixed */
+        $fixed = new SplFixedArray(count($hops));
+
+        foreach ($hops as $index => $hop) {
+            $fixed[$index] = $hop;
+        }
+
+        return $fixed;
     }
 }
