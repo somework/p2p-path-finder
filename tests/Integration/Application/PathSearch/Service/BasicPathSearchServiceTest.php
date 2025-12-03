@@ -13,8 +13,6 @@ use SomeWork\P2PPathFinder\Domain\Order\OrderBook;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
-use function count;
-
 final class BasicPathSearchServiceTest extends PathSearchServiceTestCase
 {
     /**
@@ -56,18 +54,18 @@ final class BasicPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertTrue($result->residualTolerance()->isZero());
         self::assertSame('0.000000000000000000', $result->residualTolerance()->ratio());
 
-        $hops = $result->hops()->all();
+        $hops = $result->hops();
         self::assertCount(2, $hops);
 
-        self::assertSame('EUR', $hops[0]->from());
-        self::assertSame('USD', $hops[0]->to());
-        self::assertSame('100.000', $hops[0]->spent()->amount());
-        self::assertSame('111.100', $hops[0]->received()->amount());
+        self::assertSame('EUR', $hops->at(0)->from());
+        self::assertSame('USD', $hops->at(0)->to());
+        self::assertSame('100.000', $hops->at(0)->spent()->amount());
+        self::assertSame('111.100', $hops->at(0)->received()->amount());
 
-        self::assertSame('USD', $hops[1]->from());
-        self::assertSame('JPY', $hops[1]->to());
-        self::assertSame('111.100', $hops[1]->spent()->amount());
-        self::assertSame('16665.000', $hops[1]->received()->amount());
+        self::assertSame('USD', $hops->at(1)->from());
+        self::assertSame('JPY', $hops->at(1)->to());
+        self::assertSame('111.100', $hops->at(1)->spent()->amount());
+        self::assertSame('16665.000', $hops->at(1)->received()->amount());
     }
 
     /**
@@ -308,7 +306,7 @@ final class BasicPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertSame('USD', $hops->at(1)->to());
 
         foreach ($results as $result) {
-            self::assertGreaterThanOrEqual(2, count($result->hops()));
+            self::assertGreaterThanOrEqual(2, $result->hops()->count());
         }
     }
 
