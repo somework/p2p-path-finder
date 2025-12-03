@@ -134,6 +134,8 @@ if ($outcome->paths()->isEmpty()) {
 $bestPath = $outcome->paths()->first();
 
 // Build a human-friendly route using hopsAsArray()
+// Use hopsAsArray() when you need a plain list (e.g., for serialization or string building).
+// Use hops() when you want lazy, collection-style iteration without materializing an array.
 $route = [];
 foreach ($bestPath->hopsAsArray() as $index => $hop) {
     if (0 === $index) {
@@ -173,7 +175,9 @@ Best path found!
   Fees: []
   Hops: 1
   Hop: USD -> BTC
-    Order asset pair: BTC / USD
+    Order pair: BTC/USD
+    Spent: 1000.00 USD
+    Received: 0.03333333 BTC
 ```
 
 ---

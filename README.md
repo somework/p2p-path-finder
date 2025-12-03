@@ -76,7 +76,6 @@ foreach ($outcome->paths() as $path) {
 
     foreach ($path->hops() as $hop) {
         echo "Hop: {$hop->from()} -> {$hop->to()}\n";
-        echo "  Order pair: {$hop->order()->assetPair()->base()}/{$hop->order()->assetPair()->quote()}\n";
         echo "  Spent: {$hop->spent()->amount()} {$hop->spent()->currency()}\n";
         echo "  Received: {$hop->received()->amount()} {$hop->received()->currency()}\n";
     }
