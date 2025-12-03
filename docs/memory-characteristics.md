@@ -12,7 +12,7 @@ Based on benchmark profiling with PHP 8.3:
 - **Per-graph-edge memory:** ~2-3 KB (graph representation with segments and capacity bounds)
 - **Per-search-state memory:** ~0.8-1.2 KB (visited state tracking in registry)
 - **Registry overhead:** ~1 KB per 10 unique visited states
-- **Result materialization:** ~3-5 KB per path leg
+- **Result materialization:** ~3-5 KB per hop (`PathHop` snapshots plus `Path` references)
 
 ### Baseline Memory Usage
 
@@ -72,8 +72,8 @@ Where D = hop depth, S = states per hop
 Where K = resultLimit, H = average hops per path
 
 - **Result limit impact:** Minimal (default K = 1-10)
-- **Per-path overhead:** ~3-5 KB × hop count
-- **Example:** 10 results × 3 hops × 4 KB ≈ 120 KB
+- **Per-path overhead:** ~1 KB base `Path` + (3-5 KB × hop count for `PathHop` entries)
+- **Example:** 10 results × (1 KB + 3 hops × 4 KB) ≈ 130 KB (hop storage dominates)
 
 ## Practical Limits and Recommendations
 
