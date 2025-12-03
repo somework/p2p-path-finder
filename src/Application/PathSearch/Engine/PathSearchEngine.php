@@ -343,16 +343,16 @@ final class PathSearchEngine
      *
      * The search performs a best-first traversal with dominance pruning, cycle prevention, tolerance-based pruning, and configurable guards (expansion/time/visited-state limits). When provided, the `$acceptCandidate` callback is invoked for each completed candidate path before it is recorded; the search continues regardless of the callback's boolean result. Results are returned as a deterministic top-K CandidatePath set together with a SearchGuardReport describing any guard limits reached.
      *
-     * @param Graph                             $graph            The trading graph to search.
-     * @param string                            $source           Source currency code (case-insensitive).
-     * @param string                            $target           Target currency code (case-insensitive).
-     * @param SpendConstraints|null             $spendConstraints Optional spend constraints (range and desired amount) to enforce and propagate along edges.
+     * @param Graph                             $graph            the trading graph to search
+     * @param string                            $source           source currency code (case-insensitive)
+     * @param string                            $target           target currency code (case-insensitive)
+     * @param SpendConstraints|null             $spendConstraints optional spend constraints (range and desired amount) to enforce and propagate along edges
      * @param callable(CandidatePath):bool|null $acceptCandidate  Optional callback invoked for each candidate that reaches the target; return `true` to accept the candidate into results, `false` to reject it. If `null`, all candidates are accepted. Exceptions thrown by the callback propagate to the caller.
      *
-     * @return CandidateSearchOutcome The outcome containing the ordered set of candidate paths (up to the configured top-K) and a SearchGuardReport describing guard usage and limits.
+     * @throws GuardLimitExceeded              when a configured search guard limit (expansions, time, or visited states) is exceeded during the search
+     * @throws InvalidInput|PrecisionViolation when path construction or decimal arithmetic fails due to invalid inputs or precision issues
      *
-     * @throws GuardLimitExceeded              When a configured search guard limit (expansions, time, or visited states) is exceeded during the search.
-     * @throws InvalidInput|PrecisionViolation When path construction or decimal arithmetic fails due to invalid inputs or precision issues.
+     * @return CandidateSearchOutcome the outcome containing the ordered set of candidate paths (up to the configured top-K) and a SearchGuardReport describing guard usage and limits
      */
     public function findBestPaths(
         Graph $graph,
@@ -548,9 +548,10 @@ final class PathSearchEngine
      * to a consistent scale so equivalent states compare equal. If `$range` is null the signature's range component
      * is the literal string `'null'`; otherwise the range component encodes currency, minimum, maximum and scale.
      *
-     * @param SpendRange|null $range The spend range for the state, or null when no range constraint exists.
-     * @param Money|null $desired The desired amount for the state, or null when not applicable; this value is normalized to the same scale used for the range.
-     * @return SearchStateSignature A composed signature representing the normalized `range` and `desired` components of the search state.
+     * @param SpendRange|null $range   the spend range for the state, or null when no range constraint exists
+     * @param Money|null      $desired the desired amount for the state, or null when not applicable; this value is normalized to the same scale used for the range
+     *
+     * @return SearchStateSignature a composed signature representing the normalized `range` and `desired` components of the search state
      */
     private function stateSignature(?SpendRange $range, ?Money $desired): SearchStateSignature
     {

@@ -82,9 +82,11 @@ final class PathSearchService
      *
      * This method is internal and intended solely to inject a test-specific PathFinder factory; it is not part of the public API and may change without notice.
      *
-     * @internal For testing only.
-     * @param Closure(PathSearchRequest): (Closure(Graph, CandidateCallback|null): CandidateSearchOutcome) $pathFinderFactory Factory that, given a PathSearchRequest, returns a runner closure accepting a Graph and an optional candidate callback and producing a CandidateSearchOutcome.
-     * @return self Service instance with the provided path finder factory injected (testing use only).
+     * @internal for testing only
+     *
+     * @param Closure(PathSearchRequest): (Closure(Graph, CandidateCallback|null): CandidateSearchOutcome) $pathFinderFactory factory that, given a PathSearchRequest, returns a runner closure accepting a Graph and an optional candidate callback and producing a CandidateSearchOutcome
+     *
+     * @return self service instance with the provided path finder factory injected (testing use only)
      */
     public static function withRunnerFactory(
         GraphBuilder $graphBuilder,
@@ -107,7 +109,8 @@ final class PathSearchService
      * The runner closure executes a configured PathSearchEngine on a provided Graph,
      * optionally invoking a candidate callback, and returns a CandidateSearchOutcome.
      *
-     * @param PathOrderStrategy $strategy Strategy used to order and score candidate paths.
+     * @param PathOrderStrategy $strategy strategy used to order and score candidate paths
+     *
      * @return Closure(PathSearchRequest): (Closure(Graph, CandidateCallback|null): CandidateSearchOutcome)
      */
     private static function createDefaultRunnerFactory(PathOrderStrategy $strategy): Closure
