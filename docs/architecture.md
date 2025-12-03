@@ -34,11 +34,11 @@ The library follows a three-layer architecture with strict dependency rules.
 
 ### Layer Overview
 
-| Layer           | Responsibility                               | Example Components                                 |
-|-----------------|----------------------------------------------|----------------------------------------------------|
-| **Domain**      | Business entities, value objects, invariants | `Money`, `Order`, `ExchangeRate`, `FeePolicy`      |
-| **Application** | Use cases, algorithms, orchestration         | `PathFinder`, `GraphBuilder`, `SearchGuards`       |
-| **Public API**  | Entry points, request/response DTOs          | `PathFinderService`, `SearchOutcome`, `PathResult` |
+| Layer           | Responsibility                               | Example Components                                        |
+|-----------------|----------------------------------------------|-----------------------------------------------------------|
+| **Domain**      | Business entities, value objects, invariants | `Money`, `Order`, `ExchangeRate`, `FeePolicy`             |
+| **Application** | Use cases, algorithms, orchestration         | `PathFinder`, `GraphBuilder`, `SearchGuards`              |
+| **Public API**  | Entry points, request/response DTOs          | `PathFinderService`, `SearchOutcome`, `Path`, `PathHop`   |
 
 ### Dependency Rule
 
@@ -138,14 +138,25 @@ $config = PathSearchConfig::builder()
 **Results**:
 ```php
 foreach ($outcome->paths() as $path) {
-    $path->route();              // "USD->EUR->BTC"
-    $path->totalSpent();         // Money object
-    $path->totalReceived();      // Money object  
-    $path->legs();               // PathLegCollection
+    $path->totalSpent();           // Derived from first hop's spent amount
+    $path->totalReceived();        // Derived from last hop's received amount
+    $path->residualTolerance();    // Remaining tolerance headroom
+    $path->feeBreakdown();         // Aggregated MoneyMap across hops
+
+    foreach ($path->hops() as $hop) {
+        $hop->from();              // Asset symbol
+        $hop->to();                // Asset symbol
+        $hop->order();             // Original Order driving this hop
+        $hop->fees();              // MoneyMap for hop-level fees
+    }
 }
 
 $outcome->guardLimits()->anyLimitReached();  // Check guard status
 ```
+
+**Hop-centric model**: Each `Path` is derived from an ordered `PathHopCollection`. Totals (`totalSpent()`, `totalReceived()`),
+aggregated fees (`feeBreakdown()`), and remaining tolerance (`residualTolerance()`) are computed from the hop data, while each
+hop retains its originating `Order` for reconciliation.
 
 ---
 
@@ -173,7 +184,7 @@ $outcome->guardLimits()->anyLimitReached();  // Check guard status
       - Calculate next state
       - Check if dominated (registry)
       - Enqueue if not dominated
-3. Materialize top-K candidates to PathResult DTOs
+3. Materialize top-K candidates to `Path` results with ordered hops
 4. Return SearchOutcome with results + guard report
 ```
 

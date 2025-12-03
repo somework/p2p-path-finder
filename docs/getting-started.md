@@ -133,9 +133,11 @@ if ($outcome->paths()->isEmpty()) {
 /** @var SomeWork\P2PPathFinder\Application\PathSearch\Result\Path $bestPath */
 $bestPath = $outcome->paths()->first();
 
-// Derive a human-friendly route using the hops
+// Build a human-friendly route using hopsAsArray()
+// Use hopsAsArray() when you need a plain list (e.g., for serialization or string building).
+// Use hops() when you want lazy, collection-style iteration without materializing an array.
 $route = [];
-foreach ($bestPath->hops() as $index => $hop) {
+foreach ($bestPath->hopsAsArray() as $index => $hop) {
     if (0 === $index) {
         $route[] = $hop->from();
     }
@@ -144,12 +146,22 @@ foreach ($bestPath->hops() as $index => $hop) {
 }
 $routeString = implode('->', $route);
 
-// Display totals and hop count
+// Display totals, tolerance headroom, and fees derived from hops
 echo "Best path found!\n";
 echo "  Route: {$routeString}\n";
 echo "  Spend: {$bestPath->totalSpent()->amount()} {$bestPath->totalSpent()->currency()}\n";
 echo "  Receive: {$bestPath->totalReceived()->amount()} {$bestPath->totalReceived()->currency()}\n";
+echo "  Residual tolerance: {$bestPath->residualTolerance()->percentage()}%\n";
+echo "  Fees: " . json_encode($bestPath->feeBreakdownAsArray()) . "\n";
 echo "  Hops: {$bestPath->hops()->count()}\n";
+
+// Inspect hop-level Orders and amounts
+foreach ($bestPath->hops() as $hop) {
+    echo "  Hop: {$hop->from()} -> {$hop->to()}\n";
+    echo "    Order pair: {$hop->order()->assetPair()->base()}/{$hop->order()->assetPair()->quote()}\n";
+    echo "    Spent: {$hop->spent()->amount()} {$hop->spent()->currency()}\n";
+    echo "    Received: {$hop->received()->amount()} {$hop->received()->currency()}\n";
+}
 ```
 
 **Expected output**:
@@ -159,7 +171,13 @@ Best path found!
   Route: USD->BTC
   Spend: 1000.00 USD
   Receive: 0.03333333 BTC
+  Residual tolerance: 5.00%
+  Fees: []
   Hops: 1
+  Hop: USD -> BTC
+    Order pair: BTC/USD
+    Spent: 1000.00 USD
+    Received: 0.03333333 BTC
 ```
 
 ---
@@ -335,8 +353,18 @@ $config = PathSearchConfig::builder()
 
 // Iterate through all paths
 foreach ($outcome->paths() as $path) {
-    echo "Path: {$path->route()}\n";
-    echo "  Cost: {$path->cost()}\n";
+    $route = [];
+    foreach ($path->hopsAsArray() as $index => $hop) {
+        if (0 === $index) {
+            $route[] = $hop->from();
+        }
+
+        $route[] = $hop->to();
+    }
+
+    echo "Path: " . implode(' -> ', $route) . "\n";
+    echo "  Spend: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()}\n";
+    echo "  Receive: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
 }
 ```
 
@@ -510,17 +538,28 @@ echo "Found {$outcome->paths()->count()} path(s):\n\n";
 
 foreach ($outcome->paths() as $i => $path) {
     echo "Path " . ($i + 1) . ":\n";
-    echo "  Route: {$path->route()}\n";
+    $route = [];
+    foreach ($path->hopsAsArray() as $index => $hop) {
+        if (0 === $index) {
+            $route[] = $hop->from();
+        }
+
+        $route[] = $hop->to();
+    }
+
+    echo "  Route: " . implode(' -> ', $route) . "\n";
     echo "  Spend: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()}\n";
     echo "  Receive: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
-    echo "  Cost: {$path->cost()}\n";
-    echo "  Hops: {$path->hops()}\n";
-    
-    echo "  Legs:\n";
-    foreach ($path->legs() as $leg) {
-        echo "    {$leg->from()} -> {$leg->to()}: ";
-        echo "Spend {$leg->spent()->amount()}, ";
-        echo "Receive {$leg->received()->amount()}\n";
+    echo "  Residual tolerance: {$path->residualTolerance()->percentage()}%\n";
+    echo "  Fees: " . json_encode($path->feeBreakdownAsArray()) . "\n";
+    echo "  Hops: {$path->hops()->count()}\n";
+
+    echo "  Hops detail:\n";
+    foreach ($path->hops() as $hop) {
+        echo "    {$hop->from()} -> {$hop->to()}: ";
+        echo "Spend {$hop->spent()->amount()} {$hop->spent()->currency()}, ";
+        echo "Receive {$hop->received()->amount()} {$hop->received()->currency()} ";
+        echo "via {$hop->order()->assetPair()->base()}/{$hop->order()->assetPair()->quote()}\n";
     }
     echo "\n";
 }

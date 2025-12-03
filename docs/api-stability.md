@@ -72,8 +72,8 @@ This document defines the public API surface that remains stable across minor an
 |                      | `SearchGuardConfig`       | Guard limit configuration            |
 | **Results**          | `SearchOutcome`           | Search results + guard report        |
 |                      | `PathResultSet`           | Immutable collection of paths        |
-|                      | `PathResult`              | Single path with legs and fees       |
-|                      | `PathLeg`                 | Single conversion hop                |
+|                      | `Path`                    | Hop-centric path with derived totals |
+|                      | `PathHop`                 | Single conversion hop with `Order`   |
 |                      | `SearchGuardReport`       | Guard metrics and breach status      |
 | **Order Management** | `OrderBook`               | Order collection with filtering      |
 | **Domain**           | `Money`                   | Monetary amount with currency        |
@@ -119,9 +119,14 @@ $outcome = $service->findBestPaths($request);
 
 // Access results
 foreach ($outcome->paths() as $path) {
-    echo $path->route();
     echo $path->totalSpent()->amount();
     echo $path->totalReceived()->amount();
+    echo $path->residualTolerance()->percentage();
+
+    foreach ($path->hops() as $hop) {
+        echo $hop->from() . ' -> ' . $hop->to();
+        echo $hop->order()->assetPair()->base();
+    }
 }
 
 // Check guard limits
@@ -448,7 +453,7 @@ This allows MINOR and PATCH updates (1.0.0 → 1.9.9) but prevents MAJOR updates
 - `PathFinderService`
 - `PathSearchConfig` / `PathSearchConfigBuilder`
 - `PathSearchRequest`
-- `SearchOutcome` / `PathResult` / `PathLeg`
+- `SearchOutcome` / `PathResultSet` / `Path` / `PathHop`
 - All domain classes (`Money`, `ExchangeRate`, `Order`, etc.)
 - All exceptions (`InvalidInput`, `GuardLimitExceeded`, etc.)
 - Extension interfaces (`OrderFilterInterface`, `PathOrderStrategy`, `FeePolicy`)
