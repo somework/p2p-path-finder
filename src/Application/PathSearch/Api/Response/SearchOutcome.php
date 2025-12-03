@@ -9,6 +9,13 @@ use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
 
 /**
+ * Immutable response DTO describing the outcome of a path search.
+ *
+ * Carries discovered {@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\Path}
+ * instances built from hop-centric DTOs ({@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHop}
+ * / {@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHopCollection})
+ * alongside guard rail metrics.
+ *
  * @template-covariant TPath of mixed
  *
  * @phpstan-template-covariant TPath of mixed

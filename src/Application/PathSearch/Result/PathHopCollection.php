@@ -19,6 +19,9 @@ use function count;
 /**
  * Immutable ordered collection of {@see PathHop} instances.
  *
+ * Enforces contiguity and uniqueness so routes can be consumed safely by
+ * {@see Path} aggregations and downstream formatters.
+ *
  * @implements IteratorAggregate<int, PathHop>
  *
  * @api

@@ -15,6 +15,10 @@ use function strtoupper;
 /**
  * Describes a single conversion hop in a path finder result.
  *
+ * Each hop preserves the originating {@see Order}, normalized assets, hop-level
+ * fees, and the spent/received amounts so you can trace fills without
+ * re-computing conversions when traversing a {@see Path}.
+ *
  * @api
  */
 final class PathHop
