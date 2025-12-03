@@ -27,7 +27,10 @@ final class CandidateSearchOutcome
     private readonly SearchGuardReport $guardLimits;
 
     /**
-     * @param PathResultSet<CandidatePath> $paths
+     * Create a CandidateSearchOutcome containing candidate paths and the search guard report.
+     *
+     * @param PathResultSet<CandidatePath> $paths The set of candidate paths produced by the search engine.
+     * @param SearchGuardReport $guardLimits The search guard report describing applied limits/guidance.
      */
     public function __construct(PathResultSet $paths, SearchGuardReport $guardLimits)
     {
@@ -36,13 +39,23 @@ final class CandidateSearchOutcome
     }
 
     /**
-     * @param PathResultSet<CandidatePath> $paths
+     * Create a CandidateSearchOutcome from an existing set of candidate paths and a guard limits report.
+     *
+     * @param PathResultSet<CandidatePath> $paths The PathResultSet of CandidatePath items to include in the outcome.
+     * @param SearchGuardReport $guardLimits The SearchGuardReport describing guard limits observed during the search.
+     * @return self A new CandidateSearchOutcome containing the provided paths and guard limits.
      */
     public static function fromResultSet(PathResultSet $paths, SearchGuardReport $guardLimits): self
     {
         return new self($paths, $guardLimits);
     }
 
+    /**
+     * Create a CandidateSearchOutcome containing no candidate paths and the provided guard limits.
+     *
+     * @param SearchGuardReport $guardLimits Guard limits report to attach to the empty outcome.
+     * @return self An instance whose paths set is empty and whose guardLimits is the provided report.
+     */
     public static function empty(SearchGuardReport $guardLimits): self
     {
         /** @var PathResultSet<CandidatePath> $emptyPaths */
@@ -52,23 +65,40 @@ final class CandidateSearchOutcome
     }
 
     /**
-     * @return PathResultSet<CandidatePath>
+     * The set of candidate paths produced by the engine search.
+     *
+     * @return PathResultSet<CandidatePath> The candidate path results.
      */
     public function paths(): PathResultSet
     {
         return $this->paths;
     }
 
+    /**
+     * Get the first candidate path from the stored result set.
+     *
+     * @return CandidatePath|null The first CandidatePath in the result set, or `null` if the set is empty.
+     */
     public function bestPath(): ?CandidatePath
     {
         return $this->paths->first();
     }
 
+    /**
+     * Indicates whether any candidate paths are present in the result set.
+     *
+     * @return bool `true` if the result set contains at least one CandidatePath, `false` otherwise.
+     */
     public function hasPaths(): bool
     {
         return !$this->paths->isEmpty();
     }
 
+    /**
+     * Retrieve the guard limits report produced during the search.
+     *
+     * @return SearchGuardReport The search guard's limits and guidance report.
+     */
     public function guardLimits(): SearchGuardReport
     {
         return $this->guardLimits;

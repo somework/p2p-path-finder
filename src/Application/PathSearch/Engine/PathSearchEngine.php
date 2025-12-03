@@ -339,40 +339,20 @@ final class PathSearchEngine
     }
 
     /**
-     * Searches for the best paths from source to target with optional acceptance filtering.
+     * Finds optimal candidate trading paths from a source currency to a target currency subject to optional spend constraints and an acceptance filter.
      *
-     * @param Graph                             $graph            The trading graph to search
-     * @param string                            $source           Source currency code
-     * @param string                            $target           Target currency code
-     * @param SpendConstraints|null             $spendConstraints Optional spend amount constraints
-     * @param callable(CandidatePath):bool|null $acceptCandidate  Optional callback to filter candidate paths
+     * The search performs a best-first traversal with dominance pruning, cycle prevention, tolerance-based pruning, and configurable guards (expansion/time/visited-state limits). When provided, the `$acceptCandidate` callback is invoked for each completed candidate path before it is recorded; the search continues regardless of the callback's boolean result. Results are returned as a deterministic top-K CandidatePath set together with a SearchGuardReport describing any guard limits reached.
      *
-     * ## Acceptance Callback Contract
+     * @param Graph                             $graph            The trading graph to search.
+     * @param string                            $source           Source currency code (case-insensitive).
+     * @param string                            $target           Target currency code (case-insensitive).
+     * @param SpendConstraints|null             $spendConstraints Optional spend constraints (range and desired amount) to enforce and propagate along edges.
+     * @param callable(CandidatePath):bool|null $acceptCandidate  Optional callback invoked for each candidate that reaches the target; return `true` to accept the candidate into results, `false` to reject it. If `null`, all candidates are accepted. Exceptions thrown by the callback propagate to the caller.
      *
-     * The callback is invoked when a path reaches the target node, **before** it's added to results.
+     * @return CandidateSearchOutcome The outcome containing the ordered set of candidate paths (up to the configured top-K) and a SearchGuardReport describing guard usage and limits.
      *
-     * **Signature**: `callable(CandidatePath):bool`
-     *
-     * **Return values**:
-     * - `true`: Accept path (add to results)
-     * - `false`: Reject path (continue search for alternatives)
-     * - `null` callback: Accept all paths (default behavior)
-     *
-     * **Guarantees when callback is invoked**:
-     * - Candidate has valid structure (cost, product, hops, edges, range)
-     * - Path reaches target node
-     * - Path hops ≤ maxHops
-     *
-     * **Timing**: Called AFTER path construction, BEFORE result recording, BEFORE tolerance pruning update
-     *
-     * **Error handling**: Callback exceptions propagate to caller (no exception wrapper)
-     *
-     * **Side effects**: Callback may have side effects but must NOT modify graph or candidate
-     *
-     * **Search continuation**: Search always continues after callback, regardless of return value
-     *
-     * @throws GuardLimitExceeded              when a configured guard limit is exceeded during search
-     * @throws InvalidInput|PrecisionViolation when path construction or arithmetic operations fail
+     * @throws GuardLimitExceeded              When a configured search guard limit (expansions, time, or visited states) is exceeded during the search.
+     * @throws InvalidInput|PrecisionViolation When path construction or decimal arithmetic fails due to invalid inputs or precision issues.
      */
     public function findBestPaths(
         Graph $graph,
@@ -561,6 +541,17 @@ final class PathSearchEngine
         return new CandidateSearchOutcome($finalized, $guardLimits);
     }
 
+    /**
+     * Create a deterministic signature for a search state from an optional spend range and optional desired amount.
+     *
+     * The signature encodes a canonical representation of the spend range and the desired money value, normalized
+     * to a consistent scale so equivalent states compare equal. If `$range` is null the signature's range component
+     * is the literal string `'null'`; otherwise the range component encodes currency, minimum, maximum and scale.
+     *
+     * @param SpendRange|null $range The spend range for the state, or null when no range constraint exists.
+     * @param Money|null $desired The desired amount for the state, or null when not applicable; this value is normalized to the same scale used for the range.
+     * @return SearchStateSignature A composed signature representing the normalized `range` and `desired` components of the search state.
+     */
     private function stateSignature(?SpendRange $range, ?Money $desired): SearchStateSignature
     {
         if (null === $range) {
