@@ -116,7 +116,7 @@ if ($tolerance->isGreaterThanOrEqual('0.03')) {
 - `"1.000000000000000000"` - 100% tolerance (maximum)
 
 **Usage in API**:
-- Used in `PathResult.residualTolerance` field
+- Used in `Path.residualTolerance` field
 - Represents remaining tolerance after accounting for a path
 - Always between 0.0 (no tolerance left) and 1.0 (full tolerance remaining)
 
@@ -124,77 +124,76 @@ if ($tolerance->isGreaterThanOrEqual('0.03')) {
 
 ## Path Results
 
-### PathResult
+### Path
 
-**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResult`
+**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\Path`
 
-**Purpose**: Aggregated representation of a discovered conversion path.
+**Purpose**: Aggregated representation of a discovered conversion path derived from hops.
 
 **API Methods**:
 
 ```php
+// Access hops
+$hops = $path->hops();            // PathHopCollection object
+$hopArray = $path->hopsAsArray(); // list<PathHop>
+
 // Access totals
 $totalSpent = $path->totalSpent();        // Money object
 $totalReceived = $path->totalReceived();  // Money object
 
 // Access tolerance
-$tolerance = $path->residualTolerance();  // DecimalTolerance object
-$ratio = $tolerance->ratio();             // "0.0123456789"
-$percentage = $tolerance->percentage(2);  // "1.23"
+$tolerance = $path->residualTolerance();          // DecimalTolerance object
+$percentage = $path->residualTolerancePercentage(2); // "1.23"
 
 // Access fees
 $feeBreakdown = $path->feeBreakdown();    // MoneyMap object
 $allFees = $path->feeBreakdownAsArray();  // array<string, Money>
-
-// Access legs
-$legs = $path->legs();                    // PathLegCollection object
-$legArray = $path->legsAsArray();         // array of PathLeg objects
 
 // Convenience method (returns array of key properties)
 $summary = $path->toArray();              // For debugging/internal use
 ```
 
 **Properties**:
-- **totalSpent**: Money object (source asset amount)
-- **totalReceived**: Money object (destination asset amount)
+- **hops**: PathHopCollection object (individual conversion steps)
+- **totalSpent**: Money object derived from the first hop's `spent()` amount
+- **totalReceived**: Money object derived from the last hop's `received()` amount
 - **residualTolerance**: DecimalTolerance object (remaining acceptable slippage)
-- **feeBreakdown**: MoneyMap object (total fees by currency)
-- **legs**: PathLegCollection object (individual conversion steps)
+- **feeBreakdown**: MoneyMap object that merges fees across all hops by currency
 
 **Notes**:
-- All amounts use arbitrary precision arithmetic
-- Fee breakdown aggregates fees across all legs by currency
-- Legs represent the conversion path sequence
-- Empty legs possible for direct conversions
-
-**Version History**:
-- 1.0.0: Initial structure
+- Paths are always built from at least one hop
+- `feeBreakdown` aggregates hop fees deterministically by currency
+- `hopsAsArray()` preserves hop ordering for serialization-friendly scenarios
+- Derived totals stay in sync with the hop collection supplied at construction
 
 ---
 
-### PathLeg
+### PathHop
 
-**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\PathLeg`
+**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHop`
 
-**Purpose**: Describes a single conversion leg in a path.
+**Purpose**: Describes a single conversion hop in a path and the order that produced it.
 
 **API Methods**:
 
 ```php
 // Asset information
-$from = $leg->from();     // "USD"
-$to = $leg->to();         // "GBP"
+$from = $hop->from();     // "USD"
+$to = $hop->to();         // "GBP"
 
 // Monetary amounts
-$spent = $leg->spent();       // Money object (USD 100.00)
-$received = $leg->received(); // Money object (GBP 79.60)
+$spent = $hop->spent();       // Money object (USD 100.00)
+$received = $hop->received(); // Money object (GBP 79.60)
 
 // Fees
-$fees = $leg->fees();             // MoneyMap object
-$feeArray = $leg->feesAsArray();  // array<string, Money>
+$fees = $hop->fees();             // MoneyMap object
+$feeArray = $hop->feesAsArray();  // array<string, Money>
+
+// Associated order (the same instance you supplied to the order book)
+$order = $hop->order();
 
 // Convenience method
-$summary = $leg->toArray();        // For debugging/internal use
+$summary = $hop->toArray();       // For debugging/internal use
 ```
 
 **Properties**:
@@ -202,7 +201,8 @@ $summary = $leg->toArray();        // For debugging/internal use
 - **to**: Destination asset symbol (uppercase)
 - **spent**: Money object (amount spent)
 - **received**: Money object (amount received, after fees)
-- **fees**: MoneyMap object (fees charged for this leg)
+- **fees**: MoneyMap object (fees charged for this hop)
+- **order**: Domain `Order` instance used to fill the hop
 
 **Constraints**:
 - `spent.currency` always equals `from`
@@ -212,49 +212,46 @@ $summary = $leg->toArray();        // For debugging/internal use
 
 **Notes**:
 - The `received` amount reflects fees already deducted
-- Fees may be charged in source or destination currency
-- Multi-currency fees supported
-
-**Version History**:
-- 1.0.0: Initial structure
+- Fees may be charged in source or destination currency; multi-currency fees are supported
+- Use `order()` to access your upstream order metadata (IDs, venue references, etc.). Because the exact identifier shape is application-specific, attach IDs to your `Order` instances or map them externally (for example, via `spl_object_id($hop->order())`).
 
 ---
 
-### PathLegCollection
+### PathHopCollection
 
-**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\PathLegCollection`
+**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHopCollection`
 
-**Purpose**: Ordered collection of path legs representing a conversion path.
+**Purpose**: Ordered collection of path hops representing a conversion path.
 
 **API Methods**:
 
 ```php
-$collection = PathLegCollection::fromList([$leg1, $leg2]);
+$collection = PathHopCollection::fromList([$hop1, $hop2]);
 
-// Access legs
+// Access hops
 $count = $collection->count();
-$firstLeg = $collection->first();
-$specificLeg = $collection->at(0);  // Zero-indexed
+$firstHop = $collection->first();
+$specificHop = $collection->at(0);  // Zero-indexed
 
 // Iterate
-foreach ($collection as $leg) {
-    echo "Convert {$leg->from()} to {$leg->to()}\n";
+foreach ($collection as $hop) {
+    echo "Convert {$hop->from()} to {$hop->to()}\n";
 }
 
 // Get as array
-$legsArray = $collection->all();    // array of PathLeg objects
+$hopArray = $collection->all();      // list of PathHop objects
 $simpleArray = $collection->toArray(); // For debugging
 ```
 
 **Structure**:
-- Immutable ordered collection of PathLeg objects
-- Legs are ordered by path sequence
-- Empty collection available via `PathLegCollection::empty()`
+- Immutable ordered collection of PathHop objects
+- Hops are ordered by path sequence
+- Empty collection available via `PathHopCollection::empty()`
 
 **Notes**:
-- First leg's `from` is the path's source asset
-- Last leg's `to` is the path's destination asset
-- Each leg's `to` matches next leg's `from` (if any)
+- First hop's `from` is the path's source asset
+- Last hop's `to` is the path's destination asset
+- Each hop's `to` matches the next hop's `from` (if any)
 
 ---
 
@@ -274,13 +271,14 @@ $result = $service->findBestPaths($request);
 // Access paths
 $paths = $result->paths();           // PathResultSet object
 $hasPaths = $result->hasPaths();     // boolean
+$bestPath = $result->bestPath();     // Path|null
 
 // Access guard report
 $guards = $result->guardLimits();    // SearchGuardReport object
 
 // Iterate through paths
 foreach ($result->paths() as $path) {
-    echo "Path found: {$path->route()}\n";
+    echo "Path has {$path->hops()->count()} hops\n";
 }
 
 // Check for guard breaches
@@ -371,7 +369,7 @@ $firstPath = $paths->first();
 
 // Iterate through paths
 foreach ($paths as $path) {
-    echo "Found path: {$path->route()}\n";
+    echo "Found path with {$path->hops()->count()} hops\n";
 }
 
 // Slice collection
@@ -388,7 +386,7 @@ $pathArray = $paths->toArray();
 
 **Notes**:
 - Generic type - content type varies by usage
-- Typically contains `PathResult` objects from search
+- Typically contains `Path` objects from search
 - Ordering is stable and deterministic
 
 ---
@@ -407,22 +405,27 @@ $guards = $outcome->guardLimits();
 echo "Search took: {$guards->elapsedMilliseconds()}ms\n";
 echo "Expansions: {$guards->expansions()}\n";
 
+echo "Paths: {$outcome->paths()->count()}\n";
+
 // Process found paths
 foreach ($outcome->paths() as $path) {
-    echo "Path: {$path->route()}\n";
     echo "Spent: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()}\n";
     echo "Received: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
     echo "Tolerance remaining: {$path->residualTolerance()->percentage(2)}\n";
 
-    // Process fees
+    // Process aggregated fees
     foreach ($path->feeBreakdown() as $currency => $fee) {
         echo "Fee in $currency: {$fee->amount()}\n";
     }
 
-    // Process legs
-    foreach ($path->legs() as $leg) {
-        echo "  {$leg->from()} -> {$leg->to()}: ";
-        echo "spent {$leg->spent()->amount()}, received {$leg->received()->amount()}\n";
+    // Process hops and related orders
+    foreach ($path->hops() as $hop) {
+        echo "  {$hop->from()} -> {$hop->to()}: ";
+        echo "spent {$hop->spent()->amount()}, received {$hop->received()->amount()}\n";
+
+        // Order reference: use your own identifiers on the supplied order instances
+        $order = $hop->order();
+        echo "  Filled order across {$order->assetPair()->base()} / {$order->assetPair()->quote()}\n";
     }
 }
 
@@ -433,10 +436,10 @@ if ($guards->anyLimitReached()) {
 ```
 
 This example demonstrates:
-- Two paths found: one 2-hop path (USD -> JPY -> EUR) and one direct path (USD -> EUR)
-- Fees in multiple currencies (JPY and EUR)
-- Complete leg-by-leg breakdown for each path
-- Guard metrics showing the search completed well within limits
+- Paths composed of ordered hops with deterministic totals
+- Fees in multiple currencies aggregated at the path level
+- Hop-by-hop access to the originating orders for downstream reconciliation
+- Guard metrics showing the search completed within limits
 
 ### Type Safety
 
@@ -452,6 +455,5 @@ All APIs use strongly-typed domain objects with PHPDoc annotations. This provide
 
 ---
 
-**Document Version**: 1.0.0  
-**Last Updated**: November 2024
-
+**Document Version**: 1.1.0
+**Last Updated**: April 2025

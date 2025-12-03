@@ -117,6 +117,10 @@ USD → EUR → BTC        (2 hops)
 USD → USDT → ETH → BTC (3 hops)
 ```
 
+### Path-Level Transparency
+
+Search results return `Path` objects backed by ordered hop collections. Each hop exposes the originating `Order`, hop-specific fees, and the amounts spent/received so you can reconcile fills, read custom order IDs, and aggregate totals without re-computing them yourself.
+
 ### Guard Rails and Performance
 
 Configure guard limits to balance thoroughness with performance:
