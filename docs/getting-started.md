@@ -130,14 +130,26 @@ if ($outcome->paths()->isEmpty()) {
 }
 
 // Get the best path
+/** @var SomeWork\P2PPathFinder\Application\PathSearch\Result\Path $bestPath */
 $bestPath = $outcome->paths()->first();
 
+// Derive a human-friendly route using the hops
+$route = [];
+foreach ($bestPath->hops() as $index => $hop) {
+    if (0 === $index) {
+        $route[] = $hop->from();
+    }
+
+    $route[] = $hop->to();
+}
+$routeString = implode('->', $route);
+
+// Display totals and hop count
 echo "Best path found!\n";
-echo "  Route: {$bestPath->route()}\n";
+echo "  Route: {$routeString}\n";
 echo "  Spend: {$bestPath->totalSpent()->amount()} {$bestPath->totalSpent()->currency()}\n";
 echo "  Receive: {$bestPath->totalReceived()->amount()} {$bestPath->totalReceived()->currency()}\n";
-echo "  Cost: {$bestPath->cost()}\n";
-echo "  Hops: {$bestPath->hops()}\n";
+echo "  Hops: {$bestPath->hops()->count()}\n";
 ```
 
 **Expected output**:
@@ -147,7 +159,6 @@ Best path found!
   Route: USD->BTC
   Spend: 1000.00 USD
   Receive: 0.03333333 BTC
-  Cost: 1.000000000000000000
   Hops: 1
 ```
 
@@ -157,29 +168,34 @@ Best path found!
 
 ### Path Structure
 
-A **`PathResult`** contains:
+A **`Path`** contains:
 
-- **`route()`**: String representation of the path (e.g., "USD->BTC" or "USD->EUR->BTC")
-- **`totalSpent()`**: Total amount spent (Money object)
-- **`totalReceived()`**: Total amount received (Money object)
-- **`cost()`**: Normalized cost metric (lower is better)
-- **`hops()`**: Number of hops in the path
-- **`legs()`**: Individual legs of the path (PathLegCollection)
+- **`hops()`**: Ordered collection of hop objects (`PathHopCollection`)
+- **`hopsAsArray()`**: List-friendly representation of hops for serialization
+- **`totalSpent()`**: Derived from the first hop's `spent()` amount (Money object)
+- **`totalReceived()`**: Derived from the last hop's `received()` amount (Money object)
+- **`residualTolerance()`**: Remaining tolerance after applying the path (DecimalTolerance)
+- **`feeBreakdown()`**: Aggregated fees across all hops (MoneyMap)
 
-### Path Legs
+### Path Hops
 
-Each **leg** represents one hop in the path:
+Each **hop** represents one conversion step and exposes the associated order:
 
 ```php
-foreach ($bestPath->legs() as $leg) {
-    echo "Leg: {$leg->from()} -> {$leg->to()}\n";
-    echo "  Spent: {$leg->spent()->amount()} {$leg->spent()->currency()}\n";
-    echo "  Received: {$leg->received()->amount()} {$leg->received()->currency()}\n";
-    echo "  Fees: \n";
-    
-    foreach ($leg->fees() as $currency => $fee) {
-        echo "    {$fee->amount()} {$currency}\n";
+foreach ($bestPath->hops() as $hop) {
+    echo "Hop: {$hop->from()} -> {$hop->to()}\n";
+    echo "  Spent: {$hop->spent()->amount()} {$hop->spent()->currency()}\n";
+    echo "  Received: {$hop->received()->amount()} {$hop->received()->currency()}\n";
+
+    // Fees for this hop
+    foreach ($hop->fees() as $currency => $fee) {
+        echo "    Fee: {$fee->amount()} {$currency}\n";
     }
+
+    // Access the originating order for reconciliation or ID lookup
+    $order = $hop->order();
+    echo "  Order asset pair: {$order->assetPair()->base()} / {$order->assetPair()->quote()}\n";
+    // If your Order implementation carries custom IDs, read them here or map via spl_object_id($order)
 }
 ```
 

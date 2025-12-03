@@ -108,6 +108,11 @@ Returns: self&lt;mixed&gt;
 
 Returns: PathResultSet&lt;TPath&gt;
 
+### bestPath
+`SearchOutcome::bestPath(): mixed`
+
+Returns: TPath|null
+
 ### hasPaths
 `SearchOutcome::hasPaths(): bool`
 
@@ -545,44 +550,98 @@ Returns: array{min: Money, max: Money}
 ### desired
 `SpendConstraints::desired(): ?SomeWork\P2PPathFinder\Domain\Money\Money`
 
-## SomeWork\P2PPathFinder\Application\PathSearch\Result\PathLeg
-Describes a single conversion leg in a path finder result.
+## SomeWork\P2PPathFinder\Application\PathSearch\Result\Path
+Aggregated representation of a discovered conversion path derived from hops.
 
 ### Public methods
 
 ### __construct
-`PathLeg::__construct(string $fromAsset, string $toAsset, SomeWork\P2PPathFinder\Domain\Money\Money $spent, SomeWork\P2PPathFinder\Domain\Money\Money $received, ?SomeWork\P2PPathFinder\Domain\Money\MoneyMap $fees = null)`
+`Path::__construct(SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHopCollection $hops, SomeWork\P2PPathFinder\Domain\Tolerance\DecimalTolerance $residualTolerance)`
+
+### hops
+`Path::hops(): SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHopCollection`
+
+### hopsAsArray
+`Path::hopsAsArray(): array`
+
+Returns: list&lt;PathHop&gt;
+
+### totalSpent
+`Path::totalSpent(): SomeWork\P2PPathFinder\Domain\Money\Money`
+
+### totalReceived
+`Path::totalReceived(): SomeWork\P2PPathFinder\Domain\Money\Money`
+
+### feeBreakdown
+`Path::feeBreakdown(): SomeWork\P2PPathFinder\Domain\Money\MoneyMap`
+
+### feeBreakdownAsArray
+`Path::feeBreakdownAsArray(): array`
+
+Returns: array&lt;string, Money&gt;
+
+### residualTolerance
+`Path::residualTolerance(): SomeWork\P2PPathFinder\Domain\Tolerance\DecimalTolerance`
+
+Returns the remaining tolerance after accounting for the chosen path.
+
+### residualTolerancePercentage
+`Path::residualTolerancePercentage(int $scale = 2): string`
+
+### toArray
+`Path::toArray(): array`
+
+Returns: array{
+totalSpent: Money,
+totalReceived: Money,
+residualTolerance: DecimalTolerance,
+feeBreakdown: MoneyMap,
+hops: PathHopCollection,
+}
+
+## SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHop
+Describes a single conversion hop in a path finder result.
+
+### Public methods
+
+### __construct
+`PathHop::__construct(string $fromAsset, string $toAsset, SomeWork\P2PPathFinder\Domain\Money\Money $spent, SomeWork\P2PPathFinder\Domain\Money\Money $received, SomeWork\P2PPathFinder\Domain\Order\Order $order, ?SomeWork\P2PPathFinder\Domain\Money\MoneyMap $fees = null)`
 
 ### from
-`PathLeg::from(): string`
+`PathHop::from(): string`
 
-Returns the asset symbol of the leg's source.
+Returns the asset symbol of the hop's source.
 
 ### to
-`PathLeg::to(): string`
+`PathHop::to(): string`
 
-Returns the asset symbol of the leg's destination.
+Returns the asset symbol of the hop's destination.
 
 ### spent
-`PathLeg::spent(): SomeWork\P2PPathFinder\Domain\Money\Money`
+`PathHop::spent(): SomeWork\P2PPathFinder\Domain\Money\Money`
 
-Returns the amount of source asset spent in this leg.
+Returns the amount of source asset spent in this hop.
 
 ### received
-`PathLeg::received(): SomeWork\P2PPathFinder\Domain\Money\Money`
+`PathHop::received(): SomeWork\P2PPathFinder\Domain\Money\Money`
 
-Returns the amount of destination asset received in this leg.
+Returns the amount of destination asset received in this hop.
+
+### order
+`PathHop::order(): SomeWork\P2PPathFinder\Domain\Order\Order`
+
+Returns the order associated with this hop.
 
 ### fees
-`PathLeg::fees(): SomeWork\P2PPathFinder\Domain\Money\MoneyMap`
+`PathHop::fees(): SomeWork\P2PPathFinder\Domain\Money\MoneyMap`
 
 ### feesAsArray
-`PathLeg::feesAsArray(): array`
+`PathHop::feesAsArray(): array`
 
 Returns: array&lt;string, Money&gt;
 
 ### toArray
-`PathLeg::toArray(): array`
+`PathHop::toArray(): array`
 
 Returns: array{
 from: string,
@@ -590,100 +649,51 @@ to: string,
 spent: Money,
 received: Money,
 fees: MoneyMap,
+order: Order,
 }
 
-## SomeWork\P2PPathFinder\Application\PathSearch\Result\PathLegCollection
-Immutable ordered collection of {@see PathLeg} instances.
+## SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHopCollection
+Immutable ordered collection of {@see PathHop} instances.
 
 ### Public methods
 
 ### empty
-`PathLegCollection::empty(): self`
+`PathHopCollection::empty(): self`
 
 ### fromList
-`PathLegCollection::fromList(array $legs): self`
+`PathHopCollection::fromList(array $hops): self`
 
-Parameter $legs: array&lt;array-key, PathLeg&gt;
+Parameter $hops: array&lt;array-key, PathHop&gt;
 
 ### count
-`PathLegCollection::count(): int`
+`PathHopCollection::count(): int`
 
 ### getIterator
-`PathLegCollection::getIterator(): Traversable`
+`PathHopCollection::getIterator(): Traversable`
 
-Returns: Traversable&lt;int, PathLeg&gt;
+Returns: Traversable&lt;int, PathHop&gt;
 
 ### all
-`PathLegCollection::all(): array`
+`PathHopCollection::all(): array`
 
-Returns: list&lt;PathLeg&gt;
+Returns: list&lt;PathHop&gt;
 
 ### toArray
-`PathLegCollection::toArray(): array`
+`PathHopCollection::toArray(): array`
 
-Returns: list&lt;PathLeg&gt;
+Returns: list&lt;PathHop&gt;
 
 ### isEmpty
-`PathLegCollection::isEmpty(): bool`
+`PathHopCollection::isEmpty(): bool`
 
 ### at
-`PathLegCollection::at(int $index): SomeWork\P2PPathFinder\Application\PathSearch\Result\PathLeg`
+`PathHopCollection::at(int $index): SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHop`
 
 ### first
-`PathLegCollection::first(): ?SomeWork\P2PPathFinder\Application\PathSearch\Result\PathLeg`
+`PathHopCollection::first(): ?SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHop`
 
-## SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResult
-Aggregated representation of a discovered conversion path.
-
-### Public methods
-
-### __construct
-`PathResult::__construct(SomeWork\P2PPathFinder\Domain\Money\Money $totalSpent, SomeWork\P2PPathFinder\Domain\Money\Money $totalReceived, SomeWork\P2PPathFinder\Domain\Tolerance\DecimalTolerance $residualTolerance, ?SomeWork\P2PPathFinder\Application\PathSearch\Result\PathLegCollection $legs = null, ?SomeWork\P2PPathFinder\Domain\Money\MoneyMap $feeBreakdown = null)`
-
-### totalSpent
-`PathResult::totalSpent(): SomeWork\P2PPathFinder\Domain\Money\Money`
-
-Returns the total amount of source asset spent across the entire path.
-
-### totalReceived
-`PathResult::totalReceived(): SomeWork\P2PPathFinder\Domain\Money\Money`
-
-Returns the total amount of destination asset received across the path.
-
-### feeBreakdown
-`PathResult::feeBreakdown(): SomeWork\P2PPathFinder\Domain\Money\MoneyMap`
-
-### feeBreakdownAsArray
-`PathResult::feeBreakdownAsArray(): array`
-
-Returns: array&lt;string, Money&gt;
-
-### residualTolerance
-`PathResult::residualTolerance(): SomeWork\P2PPathFinder\Domain\Tolerance\DecimalTolerance`
-
-Returns the remaining tolerance after accounting for the chosen path.
-
-### residualTolerancePercentage
-`PathResult::residualTolerancePercentage(int $scale = 2): string`
-
-### legs
-`PathResult::legs(): SomeWork\P2PPathFinder\Application\PathSearch\Result\PathLegCollection`
-
-### legsAsArray
-`PathResult::legsAsArray(): array`
-
-Returns: list&lt;PathLeg&gt;
-
-### toArray
-`PathResult::toArray(): array`
-
-Returns: array{
-totalSpent: Money,
-totalReceived: Money,
-residualTolerance: DecimalTolerance,
-feeBreakdown: MoneyMap,
-legs: PathLegCollection,
-}
+### last
+`PathHopCollection::last(): ?SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHop`
 
 ## SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSet
 Immutable collection of ordered path results.
@@ -809,7 +819,7 @@ configured protections.
 
 
 
-Returns: SearchOutcome&lt;PathResult&gt;
+Returns: SearchOutcome&lt;Path&gt;
 
 
 
@@ -831,19 +841,19 @@ echo "Search was limited by guard rails\n";
 ```
 
 ## SomeWork\P2PPathFinder\Application\PathSearch\Support\PathResultFormatter
-Provides machine and human friendly representations of {@see PathResult} instances.
+Provides machine and human friendly representations of {@see Path} instances.
 
 ### Public methods
 
 ### formatHuman
-`PathResultFormatter::formatHuman(SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResult $result): string`
+`PathResultFormatter::formatHuman(SomeWork\P2PPathFinder\Application\PathSearch\Result\Path $result): string`
 
 Produces a multi-line human readable summary of the conversion path.
 
 ### formatHumanCollection
 `PathResultFormatter::formatHumanCollection(SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSet|array $results): string`
 
-Parameter $results: PathResultSet&lt;PathResult&gt;|list&lt;PathResult&gt;
+Parameter $results: PathResultSet&lt;Path&gt;|list&lt;Path&gt;
 
 ## SomeWork\P2PPathFinder\Domain\Money\AssetPair
 Value object describing a directed asset pair (base -> quote).
