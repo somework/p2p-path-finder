@@ -70,9 +70,16 @@ $outcome = $service->findBestPaths($request);
 
 // 4. Use the results
 foreach ($outcome->paths() as $path) {
-    echo "Route: {$path->route()}\n";
     echo "Spend: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()}\n";
     echo "Receive: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
+    echo "Residual tolerance: {$path->residualTolerance()->percentage()}%\n";
+
+    foreach ($path->hops() as $hop) {
+        echo "Hop: {$hop->from()} -> {$hop->to()}\n";
+        echo "  Order pair: {$hop->order()->assetPair()->base()}/{$hop->order()->assetPair()->quote()}\n";
+        echo "  Spent: {$hop->spent()->amount()} {$hop->spent()->currency()}\n";
+        echo "  Received: {$hop->received()->amount()} {$hop->received()->currency()}\n";
+    }
 }
 ```
 
@@ -119,7 +126,7 @@ USD → USDT → ETH → BTC (3 hops)
 
 ### Path-Level Transparency
 
-Search results return `Path` objects backed by ordered hop collections. Each hop exposes the originating `Order`, hop-specific fees, and the amounts spent/received so you can reconcile fills, read custom order IDs, and aggregate totals without re-computing them yourself.
+Search results return `Path` objects backed by ordered `PathHop` collections. Totals (`totalSpent()`, `totalReceived()`), fee breakdowns, and residual tolerance are derived from the hop data, while each hop exposes its originating `Order`, hop-level fees, and the spent/received amounts so you can reconcile fills or attach custom IDs without re-computing anything.
 
 ### Guard Rails and Performance
 
