@@ -424,18 +424,17 @@ function demonstrateFeePolicy(string $name, FeePolicy $feePolicy): void
 
     $position = 1;
     foreach ($pathResultSet as $path) {
-        $legs = $path->legs();
-        $legArray = iterator_to_array($legs);
+        $hopArray = $path->hopsAsArray();
 
-        if (empty($legArray)) {
+        if (empty($hopArray)) {
             continue;
         }
 
         // Build route signature
-        $firstLeg = $legArray[0];
-        $signature = $firstLeg->from();
-        foreach ($legArray as $leg) {
-            $signature .= ' -> '.$leg->to();
+        $firstHop = $hopArray[0];
+        $signature = $firstHop->from();
+        foreach ($hopArray as $hop) {
+            $signature .= ' -> '.$hop->to();
         }
 
         // Calculate total fees
@@ -448,7 +447,7 @@ function demonstrateFeePolicy(string $name, FeePolicy $feePolicy): void
         }
 
         echo "  [{$position}] Route: {$signature}\n";
-        echo '      - Hops: '.count($legArray)."\n";
+        echo '      - Hops: '.count($hopArray)."\n";
         echo "      - Spent: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()}\n";
         echo "      - Received: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
         echo '      - Total Fees: '.(empty($feeStrings) ? 'None' : implode(', ', $feeStrings))."\n";

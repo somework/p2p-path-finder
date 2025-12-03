@@ -128,7 +128,12 @@ final class PathHopCollection implements Countable, IteratorAggregate
             return null;
         }
 
-        return $this->hops[count($this->hops) - 1];
+        $lastIndex = array_key_last($this->hops);
+        if (null === $lastIndex) {
+            return null;
+        }
+
+        return $this->hops[$lastIndex];
     }
 
     /**

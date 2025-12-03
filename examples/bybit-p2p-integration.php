@@ -467,18 +467,18 @@ try {
             echo "  Path #{$num}:\n";
             echo "    Spend: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()}\n";
             echo "    Receive: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
-            echo '    Hops: '.count($path->legs())."\n";
+            $hops = $path->hopsAsArray();
+            echo '    Hops: '.count($hops)."\n";
             echo "    Residual tolerance: {$path->residualTolerancePercentage()}%\n";
 
             echo '    Route: ';
             $route = [];
-            foreach ($path->legs() as $leg) {
-                $route[] = $leg->from();
+            foreach ($hops as $hop) {
+                $route[] = $hop->from();
             }
-            // Add the final destination
-            $legs = iterator_to_array($path->legs());
-            if (count($legs) > 0) {
-                $route[] = $legs[count($legs) - 1]->to();
+
+            if (count($hops) > 0) {
+                $route[] = $hops[count($hops) - 1]->to();
             }
             echo implode(' → ', $route)."\n";
 
@@ -551,13 +551,14 @@ try {
 
         foreach ($outcome3->paths() as $idx => $path) {
             $num = $idx + 1;
-            echo "  Path #{$num} (".count($path->legs())." hops):\n";
+            $hops = $path->hopsAsArray();
+            echo "  Path #{$num} (".count($hops)." hops):\n";
 
-            foreach ($path->legs() as $legIdx => $leg) {
-                $legNum = $legIdx + 1;
-                echo "    Hop {$legNum}: {$leg->from()} → {$leg->to()}\n";
-                echo "      Spend: {$leg->spent()->amount()} {$leg->spent()->currency()}\n";
-                echo "      Receive: {$leg->received()->amount()} {$leg->received()->currency()}\n";
+            foreach ($hops as $hopIdx => $hop) {
+                $hopNum = $hopIdx + 1;
+                echo "    Hop {$hopNum}: {$hop->from()} → {$hop->to()}\n";
+                echo "      Spend: {$hop->spent()->amount()} {$hop->spent()->currency()}\n";
+                echo "      Receive: {$hop->received()->amount()} {$hop->received()->currency()}\n";
             }
 
             echo "    Final: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()} → ";
@@ -649,7 +650,7 @@ try {
                 echo "   Best Path:\n";
                 echo "     Input: {$bestPath->totalSpent()->amount()} {$bestPath->totalSpent()->currency()}\n";
                 echo "     Output: {$bestPath->totalReceived()->amount()} {$bestPath->totalReceived()->currency()}\n";
-                echo '     Hops: '.count($bestPath->legs())."\n";
+                echo '     Hops: '.count($bestPath->hops())."\n";
                 echo "     Tolerance: {$bestPath->residualTolerancePercentage()}%\n";
             } else {
                 echo "   ✗ No paths found\n";

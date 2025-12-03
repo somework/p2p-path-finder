@@ -53,7 +53,7 @@ try {
         printf(
             "Found path with residual tolerance %s%% and %d segments\n",
             $path->residualTolerancePercentage(),
-            count($path->legs()),
+            count($path->hops()),
         );
     }
 

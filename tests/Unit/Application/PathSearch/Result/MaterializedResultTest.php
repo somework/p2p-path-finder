@@ -19,6 +19,8 @@ use SomeWork\P2PPathFinder\Domain\Tolerance\DecimalTolerance;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 use SomeWork\P2PPathFinder\Tests\Helpers\DecimalFactory;
 
+use function strlen;
+
 #[CoversClass(MaterializedResult::class)]
 final class MaterializedResultTest extends TestCase
 {

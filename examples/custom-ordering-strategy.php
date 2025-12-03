@@ -398,19 +398,19 @@ function demonstrateStrategy(string $name, PathOrderStrategy $strategy): void
 
     $position = 1;
     foreach ($pathResultSet as $path) {
-        $legs = $path->legs();
-        $hopCount = count($legs);
+        $hops = $path->hops();
+        $hopCount = count($hops);
 
         if (0 === $hopCount) {
             continue;
         }
 
-        // Build signature from legs
-        $legArray = iterator_to_array($legs);
-        $firstLeg = $legArray[0];
-        $fullSignature = $firstLeg->from();
-        foreach ($legArray as $leg) {
-            $fullSignature .= ' -> '.$leg->to();
+        // Build signature from hops
+        $hopArray = $hops->all();
+        $firstHop = $hopArray[0];
+        $fullSignature = $firstHop->from();
+        foreach ($hopArray as $hop) {
+            $fullSignature .= ' -> '.$hop->to();
         }
 
         $totalSpent = $path->totalSpent();
@@ -495,13 +495,13 @@ try {
         $signatures = [];
         $pathResultSet = $resultSet->paths();
         foreach ($pathResultSet as $path) {
-            $legs = $path->legs();
-            if (count($legs) > 0) {
-                $legArray = iterator_to_array($legs);
-                $firstLeg = $legArray[0];
-                $signature = $firstLeg->from();
-                foreach ($legArray as $leg) {
-                    $signature .= ' -> '.$leg->to();
+            $hops = $path->hops();
+            if (count($hops) > 0) {
+                $hopArray = $hops->all();
+                $firstHop = $hopArray[0];
+                $signature = $firstHop->from();
+                foreach ($hopArray as $hop) {
+                    $signature .= ' -> '.$hop->to();
                 }
                 $signatures[] = $signature;
             }
