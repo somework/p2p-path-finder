@@ -13,6 +13,10 @@ use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 /**
  * Aggregated representation of a discovered conversion path derived from hops.
  *
+ * Encapsulates a contiguous {@see PathHopCollection} so callers can inspect
+ * individual {@see PathHop} steps alongside aggregate amounts, fees, and
+ * residual tolerance derived from the hop sequence.
+ *
  * @api
  */
 final class Path

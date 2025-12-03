@@ -81,6 +81,12 @@ Immutable request DTO carrying the dependencies required to run a path search.
 `PathSearchRequest::spendConstraints(): SomeWork\P2PPathFinder\Application\PathSearch\Model\SpendConstraints`
 
 ## SomeWork\P2PPathFinder\Application\PathSearch\Api\Response\SearchOutcome
+Immutable response DTO describing the outcome of a path search.
+
+Carries discovered {@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\Path}
+instances built from hop-centric DTOs ({@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHop}
+/ {@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHopCollection})
+alongside guard rail metrics.
 
 ### Public methods
 
@@ -553,6 +559,10 @@ Returns: array{min: Money, max: Money}
 ## SomeWork\P2PPathFinder\Application\PathSearch\Result\Path
 Aggregated representation of a discovered conversion path derived from hops.
 
+Encapsulates a contiguous {@see PathHopCollection} so callers can inspect
+individual {@see PathHop} steps alongside aggregate amounts, fees, and
+residual tolerance derived from the hop sequence.
+
 ### Public methods
 
 ### __construct
@@ -601,6 +611,10 @@ hops: PathHopCollection,
 
 ## SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHop
 Describes a single conversion hop in a path finder result.
+
+Each hop preserves the originating {@see Order}, normalized assets, hop-level
+fees, and the spent/received amounts so you can trace fills without
+re-computing conversions when traversing a {@see Path}.
 
 ### Public methods
 
@@ -654,6 +668,9 @@ order: Order,
 
 ## SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHopCollection
 Immutable ordered collection of {@see PathHop} instances.
+
+Enforces contiguity and uniqueness so routes can be consumed safely by
+{@see Path} aggregations and downstream formatters.
 
 ### Public methods
 
