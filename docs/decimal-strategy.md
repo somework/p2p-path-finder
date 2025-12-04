@@ -16,14 +16,16 @@ link back to the relevant section so that new invariants remain self-contained.
 
 ## BigDecimal ownership matrix
 
+*Glossary:* "order-carrying hops" are `PathHop` entries that record their hop-order metadata (the sequence/position index inside a `PathHopCollection`) so downstream consumers can reproduce the exact traversal order when materializing or serializing paths.
+
 | Component group                                                                                      | BigDecimal ownership plan                                                                                                                                                                                                              | Public interface plan                                                                                                                    |
 |------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
 | Domain value objects (`Money`, `ExchangeRate`, `DecimalTolerance`, `ToleranceWindow`, `OrderBounds`) | Store `BigDecimal` instances internally for amounts, rates, and tolerance ratios. Builders keep accepting numeric strings but immediately convert to `BigDecimal`.                                                                     | Getter methods emit normalized numeric strings so downstream integrations work with familiar string representations.   |
 | Order aggregates (`Order`, `OrderBook`, `OrderBounds`)                                               | Orders reuse the BigDecimal-backed value objects; no additional storage changes are required beyond adopting the upgraded value object APIs.                                                                                           | Public constructors remain string-first for backwards compatibility.                                                                     |
 | Graph primitives (`GraphEdge`, `EdgeCapacity`, `EdgeSegmentCollection`)                              | Consume BigDecimal-backed value objects and store BigDecimal copies for computed ratios (capacity-to-rate multipliers, per-hop ratios).                                                                                                | Debug/inspection helpers (`toArray()`) convert BigDecimals to strings via the shared formatter.                       |
 | Search core (`PathFinder`, `SearchState`, `SearchStateRecord`, `CandidatePath`, `PathCost`)          | Cost, product, and ratio properties become `BigDecimal` fields to avoid repeated string parsing. Working precision constants (`SCALE`, `RATIO_EXTRA_SCALE`, `SUM_EXTRA_SCALE`) define the normalization boundary. | The queue ordering and result materialization layers emit numeric strings for consistent API behavior. |
-| Services (`PathFinderService`, `ToleranceEvaluator`, hop materialization for `PathHopCollection`)    | Operate entirely on `BigDecimal` inputs produced by the upgraded value objects and search states. Reusable helpers (e.g. residual tolerance computation) accept/return `BigDecimal` instances to avoid repeated conversions while building order-carrying hops. | DTOs returned by services (guard reports, hop-based path results) keep exposing strings and `Money` aggregates for API callers.         |
-| API Layer (`Path`, `PathHop`, `PathHopCollection`, `MoneyMap`)                                        | Receive BigDecimal-backed value objects and format them as strings for API consumption. `Path` aggregates hop collections to expose totals/residual tolerance while preserving hop-level inspection. | This ensures clients receive normalized numeric strings through the hop-centric object API methods.                  |
+| Services (`PathFinderService`, `ToleranceEvaluator`, hop materialization for `PathHopCollection`)    | Operate entirely on `BigDecimal` inputs produced by the upgraded value objects and search states. Reusable helpers (e.g. residual tolerance computation) accept/return `BigDecimal` instances to avoid repeated conversions while building order-carrying hops that embed their sequence index. | DTOs returned by services (guard reports, hop-based path results) keep exposing strings and `Money` aggregates for API callers.         |
+| API Layer (`Path`, `PathHop`, `PathHopCollection`, `MoneyMap`)                                        | Receive BigDecimal-backed value objects and format them as strings for API consumption. `Path` aggregates hop collections to expose totals/residual tolerance while preserving hop-level inspection. | This ensures clients receive normalized numeric strings through the hop-based object API methods and that order-carrying hops keep their position metadata intact.                  |
 
 ## Serialization boundaries and helper plan
 
@@ -36,16 +38,16 @@ link back to the relevant section so that new invariants remain self-contained.
   of flowing through a shared facade.
 * **Outbound formatting** – Public DTOs (`Path`, `PathHop`, `PathHopCollection`,
   `MoneyMap`, `PathResultSet`, guard reports) convert their `BigDecimal` payloads to numeric strings at
-  the moment they are accessed through the API, ensuring hop-based paths (with order-carrying hops) are formatted consistently.
+  the moment they are accessed through the API, ensuring hop-based paths (all hops are order-carrying to preserve sequence metadata) are formatted consistently.
 * **Helper utilities** – Introduce a `DecimalFormatter` with methods like
   `DecimalFormatter::toString(BigDecimal $value, int $scale, bool $trimTrailingZeros = false)`
   and `DecimalFormatter::percentage(BigDecimal $ratio, int $scale = 2)` so every outbound
   string honours the canonical policy. `SerializesMoney` will call into this formatter when
   emitting tolerance or ratio metadata alongside `Money` payloads.
 * **API consumers** – DTOs such as `Path`, `PathHop`, and `PathHopCollection` continue their
-  current role as serialization boundaries for hop-centric paths. They will invoke the formatter (rather than
+  current role as serialization boundaries for hop-based paths. They will invoke the formatter (rather than
   ad-hoc string helpers) to maintain consistent numeric-string representations when
-  emitting tolerances, costs, guard counters, per-hop breakdowns, and the hop order metadata each `PathHop` carries.
+  emitting tolerances, costs, guard counters, per-hop breakdowns, and the hop order metadata (the sequence/position index) each `PathHop` carries.
 
 ## BrickDecimalMath retirement
 
