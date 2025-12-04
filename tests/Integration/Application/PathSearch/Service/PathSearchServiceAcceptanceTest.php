@@ -7,8 +7,8 @@ namespace SomeWork\P2PPathFinder\Tests\Integration\Application\PathSearch\Servic
 use Brick\Math\BigDecimal;
 use Closure;
 use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
-use SomeWork\P2PPathFinder\Application\PathSearch\Api\Response\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Engine\CandidateSearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\CandidatePath;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\GraphEdge;
@@ -390,7 +390,7 @@ final class PathSearchServiceAcceptanceTest extends PathSearchServiceTestCase
      *     desiredAmount: mixed,
      * }> $candidates
      *
-     * @return Closure(PathSearchRequest):(Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath>)
+     * @return Closure(PathSearchRequest):(Closure(Graph, callable(CandidatePath):bool):CandidateSearchOutcome)
      */
     private function pathFinderFactoryForCandidates(array $candidates, ?SearchGuardReport $guardLimits = null): Closure
     {
@@ -421,12 +421,12 @@ final class PathSearchServiceAcceptanceTest extends PathSearchServiceTestCase
         );
 
         return static function (PathSearchRequest $request) use ($normalized, $guardLimits): Closure {
-            return static function (Graph $graph, callable $callback) use ($normalized, $guardLimits): SearchOutcome {
+            return static function (Graph $_graph, callable $callback) use ($normalized, $guardLimits): CandidateSearchOutcome {
                 foreach ($normalized as $candidate) {
                     $callback($candidate);
                 }
 
-                return new SearchOutcome(PathResultSet::empty(), $guardLimits ?? SearchGuardReport::none());
+                return new CandidateSearchOutcome(PathResultSet::empty(), $guardLimits ?? SearchGuardReport::none());
             };
         };
     }

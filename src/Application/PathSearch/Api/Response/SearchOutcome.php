@@ -5,22 +5,23 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Application\PathSearch\Api\Response;
 
 use SomeWork\P2PPathFinder\Application\PathSearch\Config\SearchGuardConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\Path;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
 
 /**
  * Immutable response DTO describing the outcome of a path search.
  *
- * Carries discovered {@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\Path}
+ * Carries discovered {@see Path}
  * instances built from hop-centric DTOs ({@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHop}
  * / {@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHopCollection})
  * alongside guard rail metrics.
  *
- * @template-covariant TPath of mixed
+ * @template-covariant TPath of Path
  *
- * @phpstan-template-covariant TPath of mixed
+ * @phpstan-template-covariant TPath of Path
  *
- * @psalm-template-covariant TPath as mixed
+ * @psalm-template-covariant TPath as Path
  *
  * @see PathResultSet For the paths collection
  * @see SearchGuardReport For guard metrics and limits
@@ -43,7 +44,10 @@ final class SearchOutcome
     private readonly SearchGuardReport $guardLimits;
 
     /**
-     * @param PathResultSet<TPath> $paths
+     * Create a new SearchOutcome containing discovered paths and their guard-rail metrics.
+     *
+     * @param PathResultSet<TPath> $paths       the collection of discovered Path instances
+     * @param SearchGuardReport    $guardLimits the guard-rail report describing limits and metrics observed during search
      *
      * @phpstan-param PathResultSet<TPath> $paths
      *
@@ -56,19 +60,22 @@ final class SearchOutcome
     }
 
     /**
-     * @template TOutcome of mixed
+     * Create a SearchOutcome from an existing set of discovered paths and its guard report.
      *
-     * @phpstan-template TOutcome of mixed
+     * @template TOutcome of Path
      *
-     * @psalm-template TOutcome as mixed
+     * @phpstan-template TOutcome of Path
      *
-     * @param PathResultSet<TOutcome> $paths
+     * @psalm-template TOutcome as Path
+     *
+     * @param PathResultSet<TOutcome> $paths       discovered Path instances to include in the outcome
+     * @param SearchGuardReport       $guardLimits guard metrics and limits produced during the search
      *
      * @phpstan-param PathResultSet<TOutcome> $paths
      *
      * @psalm-param PathResultSet<TOutcome> $paths
      *
-     * @return self<TOutcome>
+     * @return self<TOutcome> a SearchOutcome containing the provided paths and guard report
      *
      * @phpstan-return self<TOutcome>
      *
@@ -80,18 +87,22 @@ final class SearchOutcome
     }
 
     /**
-     * @return self<mixed>
+     * Create a SearchOutcome with no paths while retaining the provided guard report.
      *
-     * @phpstan-return self<mixed>
+     * @param SearchGuardReport $guardLimits guard-rail metrics and limits to include in the outcome
      *
-     * @psalm-return self<mixed>
+     * @return self<Path> a SearchOutcome containing an empty PathResultSet and the given guard limits
+     *
+     * @phpstan-return self<Path>
+     *
+     * @psalm-return self<Path>
      */
     public static function empty(SearchGuardReport $guardLimits): self
     {
-        /** @var PathResultSet<mixed> $emptyPaths */
+        /** @var PathResultSet<Path> $emptyPaths */
         $emptyPaths = PathResultSet::empty();
 
-        /** @var self<mixed> $empty */
+        /** @var self<Path> $empty */
         $empty = self::fromResultSet($emptyPaths, $guardLimits);
 
         return $empty;
@@ -110,13 +121,15 @@ final class SearchOutcome
     }
 
     /**
-     * @return TPath|null
+     * Get the best (first) path from the result set.
+     *
+     * @return TPath|null the first path from the result set, or `null` if none exist
      *
      * @phpstan-return TPath|null
      *
      * @psalm-return TPath|null
      */
-    public function bestPath(): mixed
+    public function bestPath(): ?Path
     {
         return $this->paths->first();
     }

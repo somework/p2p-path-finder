@@ -110,6 +110,7 @@ See [Domain Invariants](domain-invariants.md) for complete specifications.
 - `SearchState` - Immutable frontier state representation
 - `SearchStateRegistry` - Tracks visited states, dominance filtering
 - `SearchGuards` - Enforces resource limits (expansions, states, time)
+- `CandidateSearchOutcome` - Internal DTO for engine-to-service layer communication
 
 **Key Algorithm Features**:
 - Priority queue for cost-based exploration
@@ -184,9 +185,31 @@ hop retains its originating `Order` for reconciliation.
       - Calculate next state
       - Check if dominated (registry)
       - Enqueue if not dominated
-3. Materialize top-K candidates to `Path` results with ordered hops
-4. Return SearchOutcome with results + guard report
+3. Return CandidateSearchOutcome with candidate paths + guard report
+4. Service layer materializes candidates to full `Path` objects
+5. Return SearchOutcome with materialized results + guard report
 ```
+
+### Engine-to-Service Layer Communication
+
+The search algorithm operates at two levels of abstraction to maintain clean separation of concerns:
+
+**Engine Layer** (`@internal`):
+- Works with `CandidatePath` objects containing raw search data (cost, product, hops, edge sequence)
+- Returns `CandidateSearchOutcome` - lightweight DTO for internal communication
+- Focus: Pure algorithmic search without domain object materialization
+
+**Service Layer** (Public API):
+- Consumes `CandidateSearchOutcome` from engine
+- Materializes `CandidatePath` objects into full `Path` objects with `PathHopCollection`
+- Applies domain rules (fee calculation, tolerance validation, order reconciliation)
+- Returns `SearchOutcome` - public API DTO with complete domain objects
+
+**Benefits of this separation**:
+- Engine remains focused on algorithmic efficiency (no domain object overhead)
+- Service layer handles complex domain logic (fees, materialization, validation)
+- Clear contract between layers enables independent testing and evolution
+- Internal `CandidateSearchOutcome` can change without breaking public API
 
 ### Key Optimizations
 
@@ -444,6 +467,7 @@ $config = PathSearchConfig::builder()
 
 **Avoid depending on**:
 - `Application\PathSearch\*` (except public API namespaces) - Search algorithm internals
+- `CandidateSearchOutcome` - Internal DTO for engine-to-service communication
 - Classes marked `@internal`
 
 **Why**: Internal APIs may change in MINOR versions for performance or implementation improvements.

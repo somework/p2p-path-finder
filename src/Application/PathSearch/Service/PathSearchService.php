@@ -8,6 +8,7 @@ use Closure;
 use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
 use SomeWork\P2PPathFinder\Application\PathSearch\Api\Response\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Engine\CandidateSearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\CostHopsSignatureOrderingStrategy;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathCost;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathOrderKey;
@@ -41,6 +42,8 @@ use function trim;
  * @see docs/getting-started.md For complete usage examples
  *
  * @api
+ *
+ * @psalm-type CandidateCallback = callable(CandidatePath):bool
  */
 final class PathSearchService
 {
@@ -54,7 +57,7 @@ final class PathSearchService
     private readonly ToleranceEvaluator $toleranceEvaluator;
     private readonly PathOrderStrategy $orderingStrategy;
     /**
-     * @var Closure(PathSearchRequest): (Closure(Graph, (callable(CandidatePath): bool)): SearchOutcome<CandidatePath>)
+     * @var Closure(PathSearchRequest): (Closure(Graph, CandidateCallback|null): CandidateSearchOutcome)
      */
     private Closure $pathFinderFactory;
 
@@ -75,17 +78,15 @@ final class PathSearchService
     }
 
     /**
-     * Factory hook for testing. NOT PART OF PUBLIC API.
+     * Create a PathSearchService instance configured with a custom path finder factory for testing.
      *
-     * This method exists solely to enable dependency injection of mock PathFinder
-     * implementations during testing. Production code should NEVER use this method.
-     * Use the standard constructor instead.
+     * This method is internal and intended solely to inject a test-specific PathFinder factory; it is not part of the public API and may change without notice.
      *
-     * @internal This is for testing only and may change without notice
+     * @internal for testing only
      *
-     * @param Closure(PathSearchRequest): (Closure(Graph, (callable(CandidatePath): bool)): SearchOutcome<CandidatePath>) $pathFinderFactory Factory that creates PathFinder runner instances
+     * @param Closure(PathSearchRequest): (Closure(Graph, CandidateCallback|null): CandidateSearchOutcome) $pathFinderFactory factory that, given a PathSearchRequest, returns a runner closure accepting a Graph and an optional candidate callback and producing a CandidateSearchOutcome
      *
-     * @return self Service instance with injected factory (for testing only)
+     * @return self service instance with the provided path finder factory injected (testing use only)
      */
     public static function withRunnerFactory(
         GraphBuilder $graphBuilder,
@@ -94,7 +95,7 @@ final class PathSearchService
     ): self {
         $service = new self($graphBuilder, $orderingStrategy);
 
-        /** @var Closure(PathSearchRequest): (Closure(Graph, (callable(CandidatePath): bool)): SearchOutcome<CandidatePath>) $typedFactory */
+        /** @var Closure(PathSearchRequest): (Closure(Graph, (CandidateCallback|null)): CandidateSearchOutcome) $typedFactory */
         $typedFactory = $pathFinderFactory;
         $service->pathFinderFactory = $typedFactory;
 
@@ -102,7 +103,15 @@ final class PathSearchService
     }
 
     /**
-     * @return Closure(PathSearchRequest): (Closure(Graph, (callable(CandidatePath): bool)): SearchOutcome<CandidatePath>)
+     * Create a factory that, given a PathSearchRequest, produces a path-finder runner.
+     *
+     * The returned factory closure accepts a PathSearchRequest and returns a runner closure.
+     * The runner closure executes a configured PathSearchEngine on a provided Graph,
+     * optionally invoking a candidate callback, and returns a CandidateSearchOutcome.
+     *
+     * @param PathOrderStrategy $strategy strategy used to order and score candidate paths
+     *
+     * @return Closure(PathSearchRequest): (Closure(Graph, CandidateCallback|null): CandidateSearchOutcome)
      */
     private static function createDefaultRunnerFactory(PathOrderStrategy $strategy): Closure
     {
@@ -110,15 +119,19 @@ final class PathSearchService
             $config = $request->config();
 
             /**
-             * @param Graph                        $graph
-             * @param callable(CandidatePath):bool $callback
+             * @param Graph                  $graph
+             * @param CandidateCallback|null $callback
              *
-             * @return SearchOutcome<CandidatePath>
+             * @phpstan-param null|callable(CandidatePath):bool $callback
+             *
+             * @psalm-param CandidateCallback|null $callback
+             *
+             * @return CandidateSearchOutcome
              */
             $runner = static function (
                 Graph $graph,
-                callable $callback,
-            ) use ($config, $strategy, $request): SearchOutcome {
+                ?callable $callback,
+            ) use ($config, $strategy, $request): CandidateSearchOutcome {
                 $pathFinder = new PathSearchEngine(
                     $config->maximumHops(),
                     $config->pathFinderTolerance(),
@@ -129,15 +142,15 @@ final class PathSearchService
                     $config->pathFinderTimeBudgetMs(),
                 );
 
-                /** @var callable(CandidatePath):bool $callback */
-                $callback = $callback;
+                /** @var CandidateCallback|null $typedCallback */
+                $typedCallback = $callback;
 
                 return $pathFinder->findBestPaths(
                     $graph,
                     $request->sourceAsset(),
                     $request->targetAsset(),
                     $request->spendConstraints(),
-                    $callback,
+                    $typedCallback,
                 );
             };
 
@@ -224,7 +237,7 @@ final class PathSearchService
         }
 
         $runnerFactory = $this->pathFinderFactory;
-        /** @var Closure(Graph, callable(CandidatePath):bool):SearchOutcome<CandidatePath> $runner */
+        /** @var Closure(Graph, callable(CandidatePath):bool):CandidateSearchOutcome $runner */
         $runner = $runnerFactory($request);
 
         /**
