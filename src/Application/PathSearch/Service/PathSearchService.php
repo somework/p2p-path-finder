@@ -192,9 +192,27 @@ final class PathSearchService
      * $outcome = $service->findBestPaths($request);
      *
      * // Process results
-     * foreach ($outcome->paths() as $path) {
-     *     echo "Route: {$path->route()}\n";
-     *     echo "Receive: {$path->totalReceived()->amount()} BTC\n";
+     * $bestPath = $outcome->bestPath();
+     * if (null !== $bestPath) {
+     *     echo "Best path spends {$bestPath->totalSpent()->amount()} {$bestPath->totalSpent()->currency()}\n";
+     *     echo "Best path receives {$bestPath->totalReceived()->amount()} {$bestPath->totalReceived()->currency()}\n";
+     *
+     *     foreach ($bestPath->hops() as $index => $hop) {
+     *         $order = $hop->order();
+     *         $pair = $order->assetPair();
+     *
+     *         printf(
+     *             "Hop %d (%s order %s/%s): spend %s %s to receive %s %s\n",
+     *             $index + 1,
+     *             $order->side()->value,
+     *             $pair->base(),
+     *             $pair->quote(),
+     *             $hop->spent()->amount(),
+     *             $hop->spent()->currency(),
+     *             $hop->received()->amount(),
+     *             $hop->received()->currency(),
+     *         );
+     *     }
      * }
      *
      * // Check guard limits
