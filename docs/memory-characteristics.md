@@ -12,7 +12,7 @@ Based on benchmark profiling with PHP 8.3:
 - **Per-graph-edge memory:** ~2-3 KB (graph representation with segments and capacity bounds)
 - **Per-search-state memory:** ~0.8-1.2 KB (visited state tracking in registry)
 - **Registry overhead:** ~1 KB per 10 unique visited states
-- **Result materialization:** ~3-5 KB per hop (`PathHop` snapshots plus `Path` references)
+- **Result materialization:** ~3-5 KB per hop (`PathHop` snapshots plus `Path` header built by `LegMaterializer`)
 
 ### Baseline Memory Usage
 
@@ -72,7 +72,7 @@ Where D = hop depth, S = states per hop
 Where K = resultLimit, H = average hops per path
 
 - **Result limit impact:** Minimal (default K = 1-10)
-- **Per-path overhead:** ~1 KB base `Path` + (3-5 KB × hop count for `PathHop` entries)
+- **Per-path overhead:** ~1 KB `Path` header managed by `LegMaterializer` + (3-5 KB × hop count for serialized `PathHop` entries)
 - **Example:** 10 results × (1 KB + 3 hops × 4 KB) ≈ 130 KB (hop storage dominates)
 
 ## Practical Limits and Recommendations
@@ -863,9 +863,9 @@ Based on profiling with PHP 8.3:
 - Optimization: Memoized ExchangeRate instances shared across orders
 
 **Result materialization** (`LegMaterializer`):
-- Allocation pattern: Stack-allocated candidate DTOs, lazy finalization
-- Memory share: ~5-10% of peak
-- Optimization: Buffers reused across expansions, allocations deferred until tolerance passes
+- Allocation pattern: Stack-allocated candidate DTOs that materialize `Path` headers and `PathHop` collections
+- Memory share: ~5-10% of peak, scaling primarily with hop count per path rather than resultLimit
+- Optimization: Buffers reused across expansions, allocations deferred until tolerance passes so most `PathHop` snapshots only materialize for viable paths
 
 ### Memory Growth Patterns
 
