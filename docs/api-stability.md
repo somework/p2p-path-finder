@@ -196,8 +196,8 @@ Classes and namespaces marked `@internal` or in these packages:
 - Not intended for direct consumer use
 
 **Example Internal Classes** (may change without notice):
-- `GraphBuilder` - Implementation detail (use `PathFinderService` instead)
-- `PathFinder` - Search algorithm (use `PathFinderService` instead)
+- `GraphBuilder` - Implementation detail (use `PathSearchService` instead)
+- `PathFinder` - Search algorithm (use `PathSearchService` instead)
 - `SearchState` - Internal state representation
 - `EdgeSegment` - Graph representation detail
 
@@ -450,7 +450,7 @@ This allows MINOR and PATCH updates (1.0.0 → 1.9.9) but prevents MAJOR updates
 ### Quick Reference
 
 **✅ Safe to use** (public API):
-- `PathFinderService`
+- `PathSearchService`
 - `PathSearchConfig` / `PathSearchConfigBuilder`
 - `PathSearchRequest`
 - `SearchOutcome` / `PathResultSet` / `Path` / `PathHop`

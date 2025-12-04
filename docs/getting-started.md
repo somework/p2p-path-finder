@@ -97,9 +97,11 @@ $config = PathSearchConfig::builder()
 ### Step 3: Run the Search
 
 ```php
-use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
 
-// Create the path finder service
+// Create the path search service
 $graphBuilder = new GraphBuilder();
 $pathFinderService = new PathSearchService($graphBuilder);
 
@@ -116,7 +118,7 @@ $outcome = $pathFinderService->findBestPaths($request);
 
 **What's happening here?**
 
-- We create a **`PathFinderService`** with a `GraphBuilder`
+- We create a **`PathSearchService`** with a `GraphBuilder`
 - We create a **`PathSearchRequest`** specifying the order book, configuration, and target currency (BTC)
 - We call **`findBestPaths()`** to search for optimal paths
 

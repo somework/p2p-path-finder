@@ -38,7 +38,7 @@ The library follows a three-layer architecture with strict dependency rules.
 |-----------------|----------------------------------------------|-----------------------------------------------------------|
 | **Domain**      | Business entities, value objects, invariants | `Money`, `Order`, `ExchangeRate`, `FeePolicy`             |
 | **Application** | Use cases, algorithms, orchestration         | `PathFinder`, `GraphBuilder`, `SearchGuards`              |
-| **Public API**  | Entry points, request/response DTOs          | `PathFinderService`, `SearchOutcome`, `Path`, `PathHop`   |
+| **Public API**  | Entry points, request/response DTOs          | `PathSearchService`, `SearchOutcome`, `Path`, `PathHop`   |
 
 ### Dependency Rule
 
@@ -53,7 +53,7 @@ The library follows a three-layer architecture with strict dependency rules.
 ```
 User Code
     ↓
-PathFinderService (Public API)
+PathSearchService (Public API)
     ↓
 ┌────────────────────────────────┐
 │ 1. GraphBuilder                │ → Builds graph from OrderBook
@@ -94,7 +94,7 @@ See [Domain Invariants](domain-invariants.md) for complete specifications.
 ### Application Layer
 
 **Service Layer**:
-- `PathFinderService` - Main facade coordinating search
+- `PathSearchService` - Main facade coordinating search
 - `PathSearchRequest` - Request DTO with order book + config
 - `LegMaterializer` - Converts search results to domain DTOs
 - `ToleranceEvaluator` - Validates path tolerance compliance
@@ -122,7 +122,10 @@ See [Domain Invariants](domain-invariants.md) for complete specifications.
 
 **Entry Point**:
 ```php
-$service = new PathFinderService(new GraphBuilder());
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
+
+$service = new PathSearchService(new GraphBuilder());
 $outcome = $service->findBestPaths($request);
 ```
 
@@ -278,11 +281,11 @@ final readonly class Money
 **Used for**: Simplify complex subsystem
 
 ```php
-class PathFinderService  // Facade
+class PathSearchService  // Facade
 {
     public function findBestPaths(PathSearchRequest $request): SearchOutcome
     {
-        // Coordinates GraphBuilder, PathFinder, LegMaterializer
+        // Coordinates GraphBuilder, PathFinder, LegMaterializer, ToleranceEvaluator
     }
 }
 ```
@@ -359,7 +362,7 @@ class MinimizeHopsStrategy implements PathOrderStrategy
 }
 
 // Use strategy
-$service = new PathFinderService($graphBuilder, new MinimizeHopsStrategy());
+$service = new PathSearchService($graphBuilder, new MinimizeHopsStrategy());
 ```
 
 **Use cases**:
