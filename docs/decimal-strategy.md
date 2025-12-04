@@ -95,7 +95,8 @@ echo $btc->scale();     // 8
 ### Example 3: Exchange Rates
 
 ```php
-use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;use SomeWork\P2PPathFinder\Domain\Money\Money;
+use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
 
 // EUR/USD rate with high precision
 $rate = ExchangeRate::fromString('EUR', 'USD', '1.085432', 6);
