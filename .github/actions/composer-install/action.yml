@@ -1,0 +1,32 @@
+name: Composer install with cache
+description: Set up PHP with Composer and install dependencies using cache
+inputs:
+    php-version:
+        description: PHP version to install
+        required: true
+    coverage:
+        description: Code coverage driver to enable (none, xdebug, pcov)
+        required: false
+        default: none
+    ini_values:
+        description: Custom PHP ini values to set
+        required: false
+        default: ''
+
+runs:
+    using: composite
+    steps:
+        -   name: Setup PHP
+            uses: shivammathur/setup-php@v2
+            with:
+                php-version: ${{ inputs.php-version }}
+                coverage: ${{ inputs.coverage }}
+                tools: composer
+                extensions: bcmath
+                ini-values: ${{ inputs.ini_values }}
+
+        -   name: Install dependencies
+            uses: ramsey/composer-install@v3
+            with:
+                composer-options: --prefer-dist --no-interaction --no-progress
+                custom-cache-suffix: ${{ hashFiles('composer.json') }}
