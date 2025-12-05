@@ -1,125 +1,42 @@
 name: Examples
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "**" ]
-    types: [opened, synchronize, reopened, ready_for_review]
-  workflow_dispatch:
+    push:
+        branches: [ "main" ]
+    pull_request:
+        branches: [ "**" ]
+        types: [ opened, synchronize, reopened, ready_for_review ]
+    workflow_dispatch:
 
 jobs:
-  validate-examples:
-    name: Validate Examples (PHP ${{ matrix.php-version }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        php-version: ['8.2', '8.3']
+    validate-examples:
+        name: Validate Examples (PHP ${{ matrix.php-version }})
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                php-version: [ '8.2', '8.3' ]
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
+        steps:
+            -   name: Checkout repository
+                uses: actions/checkout@v6
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: ${{ matrix.php-version }}
-          extensions: bcmath
-          ini-values: memory_limit=-1
+            -   name: Install dependencies
+                uses: ./.github/actions/composer-install
+                with:
+                    php-version: ${{ matrix.php-version }}
+                    ini_values: 'memory_limit=-1'
 
-      - name: Install dependencies
-        uses: ramsey/composer-install@v3
-        with:
-          composer-options: --prefer-dist --no-interaction --no-progress
-          custom-cache-suffix: ${{ hashFiles('composer.json') }}
+            -   name: Validate example syntax
+                run: |
+                    echo "Validating PHP syntax for all examples..."
+                    for example in examples/*.php; do
+                      echo "Checking $example..."
+                      php -l "$example"
+                    done
 
-      - name: Validate example syntax
-        run: |
-          echo "Validating PHP syntax for all examples..."
-          for example in examples/*.php; do
-            echo "Checking $example..."
-            php -l "$example"
-          done
-
-      - name: Run custom-order-filter.php
-        run: |
-          echo "=== Running custom-order-filter.php ==="
-          timeout 30s php examples/custom-order-filter.php
-          echo "✓ custom-order-filter.php completed successfully"
-
-      - name: Run custom-ordering-strategy.php
-        run: |
-          echo "=== Running custom-ordering-strategy.php ==="
-          timeout 30s php examples/custom-ordering-strategy.php
-          echo "✓ custom-ordering-strategy.php completed successfully"
-
-      - name: Run custom-fee-policy.php
-        run: |
-          echo "=== Running custom-fee-policy.php ==="
-          timeout 30s php examples/custom-fee-policy.php
-          echo "✓ custom-fee-policy.php completed successfully"
-
-      - name: Run error-handling.php
-        run: |
-          echo "=== Running error-handling.php ==="
-          timeout 30s php examples/error-handling.php
-          echo "✓ error-handling.php completed successfully"
-
-      - name: Run performance-optimization.php
-        run: |
-          echo "=== Running performance-optimization.php ==="
-          timeout 60s php examples/performance-optimization.php
-          echo "✓ performance-optimization.php completed successfully"
-
-      - name: Run guarded-search-example.php
-        run: |
-          echo "=== Running guarded-search-example.php ==="
-          timeout 30s php examples/guarded-search-example.php
-          echo "✓ guarded-search-example.php completed successfully"
-
-      - name: Summary
-        if: success()
-        run: |
-          echo ""
-          echo "════════════════════════════════════════════════════════"
-          echo "✓ All examples validated successfully!"
-          echo "════════════════════════════════════════════════════════"
-          echo ""
-          echo "Examples tested:"
-          echo "  • custom-order-filter.php"
-          echo "  • custom-ordering-strategy.php"
-          echo "  • custom-fee-policy.php"
-          echo "  • error-handling.php"
-          echo "  • performance-optimization.php"
-          echo "  • guarded-search-example.php"
-          echo ""
-          echo "All examples are working correctly with PHP ${{ matrix.php-version }}"
-
-  composer-examples:
-    name: Test Composer Examples Script (PHP 8.3)
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.3'
-          extensions: bcmath
-          ini-values: memory_limit=-1
-
-      - name: Install dependencies
-        uses: ramsey/composer-install@v3
-        with:
-          composer-options: --prefer-dist --no-interaction --no-progress
-          custom-cache-suffix: ${{ hashFiles('composer.json') }}
-
-      - name: Run composer examples
-        run: |
-          echo "Testing composer examples script..."
-          timeout 180s composer examples
-          echo "✓ All examples ran successfully via composer"
-
+            -   name: Run composer examples
+                run: |
+                    echo "Testing composer examples script..."
+                    timeout 180s composer examples
+                    echo "✓ All examples ran successfully via composer"

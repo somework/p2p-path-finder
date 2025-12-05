@@ -29,18 +29,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.3'
-          extensions: bcmath
-          ini-values: memory_limit=-1
-
-      - name: Install dependencies
-        uses: ramsey/composer-install@v3
-        with:
-          composer-options: --prefer-dist --no-interaction --no-progress
-          custom-cache-suffix: ${{ hashFiles('composer.json') }}
+      -   name: Install dependencies
+          uses: ./.github/actions/composer-install
+          with:
+            php-version: '8.3'
+            ini_values: 'memory_limit=-1'
 
       - name: Verify custom rules are loaded
         run: |
