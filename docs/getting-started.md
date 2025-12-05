@@ -468,7 +468,7 @@ $filteredBook = new OrderBook(iterator_to_array($filteredOrders));
 
 // Search on filtered book
 $request = new PathSearchRequest($filteredBook, $config, 'BTC');
-$outcome = $pathFinderService->findBestPaths($request);
+$outcome = $pathSearchService->findBestPaths($request);
 ```
 
 ---
@@ -523,10 +523,10 @@ $config = PathSearchConfig::builder()
 
 // 3. Run search
 $graphBuilder = new GraphBuilder();
-$pathFinderService = new PathSearchService($graphBuilder);
+$pathSearchService = new PathSearchService($graphBuilder);
 
 $request = new PathSearchRequest($orderBook, $config, 'BTC');
-$outcome = $pathFinderService->findBestPaths($request);
+$outcome = $pathSearchService->findBestPaths($request);
 
 // 4. Display results
 echo "=== Path Search Results ===\n\n";
