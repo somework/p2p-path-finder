@@ -63,13 +63,18 @@ namespace SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering;
  * - **Hybrid**: Balance cost and hops using weighted scoring.
  * - **Route-aware**: Prefer certain currencies or exchanges in the path.
  *
- * ## Usage with PathFinderService
+ * ## Usage with PathSearchService
  *
- * Pass your custom strategy to the `PathFinderService` constructor:
+ * Pass your custom strategy to the `PathSearchService` constructor:
  *
  * ```php
+ * use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\MinimizeHopsStrategy;
+ * use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+ * use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
+ *
+ * $graphBuilder = new GraphBuilder();
  * $customStrategy = new MinimizeHopsStrategy(costScale: 6);
- * $service = new PathFinderService($graphBuilder, $customStrategy);
+ * $service = new PathSearchService($graphBuilder, $customStrategy);
  * ```
  *
  * @api
