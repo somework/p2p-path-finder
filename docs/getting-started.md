@@ -103,7 +103,7 @@ use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
 
 // Create the path search service
 $graphBuilder = new GraphBuilder();
-$pathFinderService = new PathSearchService($graphBuilder);
+$pathSearchService = new PathSearchService($graphBuilder);
 
 // Create the search request
 $request = new PathSearchRequest(
@@ -113,7 +113,7 @@ $request = new PathSearchRequest(
 );
 
 // Find the best paths
-$outcome = $pathFinderService->findBestPaths($request);
+$outcome = $pathSearchService->findBestPaths($request);
 ```
 
 **What's happening here?**
