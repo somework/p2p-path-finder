@@ -97,11 +97,13 @@ $config = PathSearchConfig::builder()
 ### Step 3: Run the Search
 
 ```php
-use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
 
-// Create the path finder service
+// Create the path search service
 $graphBuilder = new GraphBuilder();
-$pathFinderService = new PathSearchService($graphBuilder);
+$pathSearchService = new PathSearchService($graphBuilder);
 
 // Create the search request
 $request = new PathSearchRequest(
@@ -111,12 +113,12 @@ $request = new PathSearchRequest(
 );
 
 // Find the best paths
-$outcome = $pathFinderService->findBestPaths($request);
+$outcome = $pathSearchService->findBestPaths($request);
 ```
 
 **What's happening here?**
 
-- We create a **`PathFinderService`** with a `GraphBuilder`
+- We create a **`PathSearchService`** with a `GraphBuilder`
 - We create a **`PathSearchRequest`** specifying the order book, configuration, and target currency (BTC)
 - We call **`findBestPaths()`** to search for optimal paths
 
@@ -466,7 +468,7 @@ $filteredBook = new OrderBook(iterator_to_array($filteredOrders));
 
 // Search on filtered book
 $request = new PathSearchRequest($filteredBook, $config, 'BTC');
-$outcome = $pathFinderService->findBestPaths($request);
+$outcome = $pathSearchService->findBestPaths($request);
 ```
 
 ---
@@ -521,10 +523,10 @@ $config = PathSearchConfig::builder()
 
 // 3. Run search
 $graphBuilder = new GraphBuilder();
-$pathFinderService = new PathSearchService($graphBuilder);
+$pathSearchService = new PathSearchService($graphBuilder);
 
 $request = new PathSearchRequest($orderBook, $config, 'BTC');
-$outcome = $pathFinderService->findBestPaths($request);
+$outcome = $pathSearchService->findBestPaths($request);
 
 // 4. Display results
 echo "=== Path Search Results ===\n\n";

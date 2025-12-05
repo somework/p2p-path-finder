@@ -56,7 +56,7 @@ MAJOR.MINOR.PATCH (e.g., 1.3.2)
 
 ```php
 // ❌ BC BREAK: Removing public methods
-class PathFinderService {
+class PathSearchService {
     // public function findPath(...): ?PathResult  // Removed
 }
 
@@ -76,7 +76,7 @@ $amount = $money->amount();
 
 ```php
 // ✅ OK: Adding new public methods
-class PathFinderService {
+class PathSearchService {
     public function findAllPaths(): Generator  // New method
 }
 

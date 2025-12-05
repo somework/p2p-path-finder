@@ -356,9 +356,11 @@ use SomeWork\P2PPathFinder\Exception\ExceptionInterface;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
 
 function handlePathSearch(
-    PathFinderService $service,
+    PathSearchService $service,
     PathSearchRequest $request
 ): array {
     try {
