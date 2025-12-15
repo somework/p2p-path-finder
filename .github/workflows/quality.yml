@@ -117,7 +117,7 @@ jobs:
             -   name: Generate API documentation
                 run: composer phpdoc
             -   name: Upload PHPDoc artefact
-                uses: actions/upload-artifact@v5
+                uses: actions/upload-artifact@v6
                 with:
                     name: phpdoc-md
                     path: docs/api
@@ -135,7 +135,7 @@ jobs:
                       --iterations=1 \
                       --revs=1 | tee build/phpbench/p2p_aggregate.txt
             -   name: Upload PhpBench artefact
-                uses: actions/upload-artifact@v5
+                uses: actions/upload-artifact@v6
                 with:
                     name: phpbench-baseline
                     path: build/phpbench
@@ -156,7 +156,7 @@ jobs:
                     mkdir -p build/profiling
                     find .xdebug -type f -name 'cachegrind.out.*' -exec cp {} build/profiling/ \;
             -   name: Upload profiling artefact
-                uses: actions/upload-artifact@v5
+                uses: actions/upload-artifact@v6
                 with:
                     name: hotspot-profiles
                     path: build/profiling
