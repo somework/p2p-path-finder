@@ -1,0 +1,58 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation (not needed in container)
+*.md
+docs/
+CHANGELOG.md
+LICENSE
+SECURITY.md
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
+UPGRADING.md
+AGENT.md
+
+# IDE
+.idea/
+.vscode/
+.cursor/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# PHPUnit
+.phpunit.cache/
+.phpunit.result.cache
+.phpunit.result.cache
+
+# PHP CS Fixer
+.php_cs.cache
+.php-cs-fixer.cache
+
+# Xdebug
+.xdebug/
+
+# Build/Cache/Generated files
+var/
+coverage/
+coverage-report/
+.phpbench/
+build/
+
+# Infection
+infection.log
+
+# Vendor (will be installed in container)
+vendor/
+
+# Docker files
+Dockerfile
+docker-compose.yml
+.dockerignore
