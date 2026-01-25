@@ -4,167 +4,105 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathSearch\Service;
 
-use Closure;
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
 use SomeWork\P2PPathFinder\Application\PathSearch\Api\Response\SearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
-use SomeWork\P2PPathFinder\Application\PathSearch\Engine\CandidateSearchOutcome;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\CostHopsSignatureOrderingStrategy;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathCost;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathOrderStrategy;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\RouteSignature;
-use SomeWork\P2PPathFinder\Application\PathSearch\Engine\PathSearchEngine;
-use SomeWork\P2PPathFinder\Application\PathSearch\Model\CandidatePath;
-use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\Graph;
-use SomeWork\P2PPathFinder\Application\PathSearch\Model\PathEdgeSequence;
-use SomeWork\P2PPathFinder\Application\PathSearch\Result\MaterializedResult;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionPlan;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\Path;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSetEntry;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
-use SomeWork\P2PPathFinder\Application\PathSearch\Support\OrderFillEvaluator;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalHelperTrait;
 use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 use function sprintf;
-use function strtoupper;
-use function trim;
+use function trigger_error;
+
+use const E_USER_DEPRECATED;
 
 /**
  * High level facade orchestrating order filtering, graph building and path search.
  *
+ * @deprecated since 2.0. Use ExecutionPlanService::findBestPlans() instead.
+ *             This service only returns linear paths. For split/merge execution
+ *             plans, use ExecutionPlanService.
+ * @see ExecutionPlanService
  * @see PathSearchRequest For request structure
  * @see PathSearchConfig For configuration options
  * @see SearchOutcome For result structure
  * @see docs/getting-started.md For complete usage examples
  *
  * @api
- *
- * @psalm-type CandidateCallback = callable(CandidatePath):bool
  */
 final class PathSearchService
 {
-    /**
-     * @see DecimalHelperTrait::CANONICAL_SCALE
-     */
-    private const COST_SCALE = 18;
+    use DecimalHelperTrait;
 
-    private readonly OrderSpendAnalyzer $orderSpendAnalyzer;
-    private readonly LegMaterializer $legMaterializer;
-    private readonly ToleranceEvaluator $toleranceEvaluator;
-    private readonly PathOrderStrategy $orderingStrategy;
     /**
-     * @var Closure(PathSearchRequest): (Closure(Graph, CandidateCallback|null): CandidateSearchOutcome)
+     * Scale for cost calculations, matches trait's canonical scale.
      */
-    private Closure $pathFinderFactory;
+    private const COST_SCALE = self::CANONICAL_SCALE;
+
+    private readonly ExecutionPlanService $executionPlanService;
+    private readonly PathOrderStrategy $orderingStrategy;
 
     /**
      * @api
      */
     public function __construct(
-        private readonly GraphBuilder $graphBuilder,
+        GraphBuilder $graphBuilder,
         ?PathOrderStrategy $orderingStrategy = null,
     ) {
         $strategy = $orderingStrategy ?? new CostHopsSignatureOrderingStrategy(self::COST_SCALE);
-        $fillEvaluator = new OrderFillEvaluator();
-        $this->legMaterializer = new LegMaterializer($fillEvaluator);
-        $this->orderSpendAnalyzer = new OrderSpendAnalyzer($fillEvaluator, $this->legMaterializer);
-        $this->toleranceEvaluator = new ToleranceEvaluator();
         $this->orderingStrategy = $strategy;
-        $this->pathFinderFactory = self::createDefaultRunnerFactory($strategy);
+        $this->executionPlanService = new ExecutionPlanService($graphBuilder, $strategy);
     }
 
     /**
-     * Create a PathSearchService instance configured with a custom path finder factory for testing.
+     * Convert an ExecutionPlan to a Path if the plan is linear.
      *
-     * This method is internal and intended solely to inject a test-specific PathFinder factory; it is not part of the public API and may change without notice.
+     * This helper method assists in migrating from PathSearchService to ExecutionPlanService
+     * by providing a way to convert execution plans back to the legacy Path format.
      *
-     * @internal for testing only
-     *
-     * @param Closure(PathSearchRequest): (Closure(Graph, CandidateCallback|null): CandidateSearchOutcome) $pathFinderFactory factory that, given a PathSearchRequest, returns a runner closure accepting a Graph and an optional candidate callback and producing a CandidateSearchOutcome
-     *
-     * @return self service instance with the provided path finder factory injected (testing use only)
+     * @throws InvalidInput if the plan contains splits/merges (non-linear) or is empty
      */
-    public static function withRunnerFactory(
-        GraphBuilder $graphBuilder,
-        ?PathOrderStrategy $orderingStrategy,
-        Closure $pathFinderFactory,
-    ): self {
-        $service = new self($graphBuilder, $orderingStrategy);
-
-        /** @var Closure(PathSearchRequest): (Closure(Graph, (CandidateCallback|null)): CandidateSearchOutcome) $typedFactory */
-        $typedFactory = $pathFinderFactory;
-        $service->pathFinderFactory = $typedFactory;
-
-        return $service;
-    }
-
-    /**
-     * Create a factory that, given a PathSearchRequest, produces a path-finder runner.
-     *
-     * The returned factory closure accepts a PathSearchRequest and returns a runner closure.
-     * The runner closure executes a configured PathSearchEngine on a provided Graph,
-     * optionally invoking a candidate callback, and returns a CandidateSearchOutcome.
-     *
-     * @param PathOrderStrategy $strategy strategy used to order and score candidate paths
-     *
-     * @return Closure(PathSearchRequest): (Closure(Graph, CandidateCallback|null): CandidateSearchOutcome)
-     */
-    private static function createDefaultRunnerFactory(PathOrderStrategy $strategy): Closure
+    public static function planToPath(ExecutionPlan $plan): Path
     {
-        return static function (PathSearchRequest $request) use ($strategy): Closure {
-            $config = $request->config();
+        if (!$plan->isLinear()) {
+            throw InvalidInput::forNonLinearPlan();
+        }
 
-            /**
-             * @param Graph                  $graph
-             * @param CandidateCallback|null $callback
-             *
-             * @phpstan-param null|callable(CandidatePath):bool $callback
-             *
-             * @psalm-param CandidateCallback|null $callback
-             *
-             * @return CandidateSearchOutcome
-             */
-            $runner = static function (
-                Graph $graph,
-                ?callable $callback,
-            ) use ($config, $strategy, $request): CandidateSearchOutcome {
-                $pathFinder = new PathSearchEngine(
-                    $config->maximumHops(),
-                    $config->pathFinderTolerance(),
-                    $config->resultLimit(),
-                    $config->pathFinderMaxExpansions(),
-                    $config->pathFinderMaxVisitedStates(),
-                    $strategy,
-                    $config->pathFinderTimeBudgetMs(),
-                );
+        $path = $plan->asLinearPath();
 
-                /** @var CandidateCallback|null $typedCallback */
-                $typedCallback = $callback;
+        if (null === $path) {
+            throw InvalidInput::forEmptyPlan();
+        }
 
-                return $pathFinder->findBestPaths(
-                    $graph,
-                    $request->sourceAsset(),
-                    $request->targetAsset(),
-                    $request->spendConstraints(),
-                    $typedCallback,
-                );
-            };
-
-            return $runner;
-        };
+        return $path;
     }
 
     /**
      * Searches for the best conversion paths from the configured spend asset to the target asset.
      *
+     * This method delegates to {@see ExecutionPlanService::findBestPlans()} and filters
+     * results to return only linear paths that can be represented as {@see Path} objects.
+     *
      * Guard limit breaches are reported through the returned {@see SearchOutcome::guardLimits()}
      * metadata. Inspect the {@see SearchGuardReport} via helpers like
      * {@see SearchGuardReport::anyLimitReached()} to determine whether the search exhausted its
      * configured protections.
+     *
+     * @deprecated since 2.0. Use ExecutionPlanService::findBestPlans() instead.
      *
      * @api
      *
@@ -223,128 +161,60 @@ final class PathSearchService
      */
     public function findBestPaths(PathSearchRequest $request): SearchOutcome
     {
-        $config = $request->config();
-        $targetAsset = $request->targetAsset();
-        $orderBook = $request->orderBook();
-        $sourceCurrency = strtoupper(trim($request->sourceAsset()));
-        $targetCurrency = $targetAsset;
-        $requestedSpend = $request->spendAmount();
-
-        $orders = $this->orderSpendAnalyzer->filterOrders($orderBook, $config);
-        if ([] === $orders) {
-            /** @var SearchOutcome<Path> $empty */
-            $empty = SearchOutcome::empty(SearchGuardReport::idle(
-                $config->pathFinderMaxVisitedStates(),
-                $config->pathFinderMaxExpansions(),
-                $config->pathFinderTimeBudgetMs(),
-            ));
-
-            return $empty;
-        }
-
-        $graph = $this->graphBuilder->build($orders);
-        if (!$graph->hasNode($sourceCurrency) || !$graph->hasNode($targetCurrency)) {
-            /** @var SearchOutcome<Path> $empty */
-            $empty = SearchOutcome::empty(SearchGuardReport::idle(
-                $config->pathFinderMaxVisitedStates(),
-                $config->pathFinderMaxExpansions(),
-                $config->pathFinderTimeBudgetMs(),
-            ));
-
-            return $empty;
-        }
-
-        $runnerFactory = $this->pathFinderFactory;
-        /** @var Closure(Graph, callable(CandidatePath):bool):CandidateSearchOutcome $runner */
-        $runner = $runnerFactory($request);
-
-        /**
-         * @var list<MaterializedResult> $materializedResults
-         */
-        $materializedResults = [];
-        $resultOrder = 0;
-        $searchResult = $runner(
-            $graph,
-            function (CandidatePath $candidate) use (&$materializedResults, &$resultOrder, $request, $requestedSpend, $sourceCurrency, $targetCurrency, $config) {
-                if ($candidate->hops() < $request->minimumHops() || $candidate->hops() > $request->maximumHops()) {
-                    return false;
-                }
-
-                $edges = $candidate->edges();
-                if ($edges->isEmpty()) {
-                    return false;
-                }
-
-                $firstEdge = $edges->first();
-                if (null === $firstEdge || $firstEdge->from() !== $sourceCurrency) {
-                    return false;
-                }
-
-                $initialSeed = $this->orderSpendAnalyzer->determineInitialSpendAmount($config, $firstEdge);
-                if (null === $initialSeed) {
-                    return false;
-                }
-
-                $materialized = $this->legMaterializer->materialize(
-                    $edges,
-                    $requestedSpend,
-                    $initialSeed,
-                    $targetCurrency,
-                );
-
-                if (null === $materialized) {
-                    return false;
-                }
-
-                $residual = $this->toleranceEvaluator->evaluate(
-                    $config,
-                    $requestedSpend,
-                    $materialized['toleranceSpent'],
-                );
-
-                if (null === $residual) {
-                    return false;
-                }
-
-                $routeSignature = $this->routeSignature($edges);
-                $result = new Path($materialized['hops'], $residual);
-
-                $orderKey = new PathOrderKey(
-                    new PathCost($candidate->costDecimal()),
-                    $candidate->hops(),
-                    $routeSignature,
-                    $resultOrder,
-                );
-
-                $materializedResults[] = new MaterializedResult($result, $orderKey);
-
-                ++$resultOrder;
-
-                return true;
-            }
+        @trigger_error(
+            'PathSearchService::findBestPaths() is deprecated since 2.0, '
+            .'use ExecutionPlanService::findBestPlans() instead.',
+            E_USER_DEPRECATED,
         );
 
-        $guardLimits = $searchResult->guardLimits();
-        $this->assertGuardLimits($config, $guardLimits);
+        // Delegate to ExecutionPlanService
+        $planOutcome = $this->executionPlanService->findBestPlans($request);
+        $guardLimits = $planOutcome->guardLimits();
 
-        if ([] === $materializedResults) {
+        // Get hop constraints from request
+        $minimumHops = $request->minimumHops();
+        $maximumHops = $request->maximumHops();
+
+        // Filter to linear paths only and convert ExecutionPlan to Path
+        /** @var list<PathResultSetEntry<Path>> $linearPathEntries */
+        $linearPathEntries = [];
+
+        $resultIndex = 0;
+        foreach ($planOutcome->paths() as $plan) {
+            if (!$plan->isLinear()) {
+                continue;
+            }
+
+            $path = $plan->asLinearPath();
+            if (null === $path) {
+                continue;
+            }
+
+            // Enforce hop constraints (ExecutionPlanService doesn't filter by these)
+            $hopCount = $path->hops()->count();
+            if ($hopCount < $minimumHops || $hopCount > $maximumHops) {
+                continue;
+            }
+
+            // Create ordering key for the path
+            $orderKey = $this->createOrderKey($path, $resultIndex);
+
+            /** @var PathResultSetEntry<Path> $entry */
+            $entry = new PathResultSetEntry($path, $orderKey);
+
+            $linearPathEntries[] = $entry;
+            ++$resultIndex;
+        }
+
+        if ([] === $linearPathEntries) {
             /** @var SearchOutcome<Path> $empty */
             $empty = SearchOutcome::empty($guardLimits);
 
             return $empty;
         }
 
-        /** @var array<PathResultSetEntry<Path>> $resultEntries */
-        $resultEntries = [];
-        foreach ($materializedResults as $entry) {
-            /** @var PathResultSetEntry<Path> $resultEntry */
-            $resultEntry = $entry->toEntry();
-
-            $resultEntries[] = $resultEntry;
-        }
-
         /** @var PathResultSet<Path> $resultSet */
-        $resultSet = PathResultSet::fromEntries($this->orderingStrategy, $resultEntries);
+        $resultSet = PathResultSet::fromEntries($this->orderingStrategy, $linearPathEntries);
 
         /** @var SearchOutcome<Path> $outcome */
         $outcome = new SearchOutcome($resultSet, $guardLimits);
@@ -352,52 +222,63 @@ final class PathSearchService
         return $outcome;
     }
 
-    private function assertGuardLimits(PathSearchConfig $config, SearchGuardReport $guardLimits): void
+    /**
+     * Creates an order key for sorting/deduplication of results.
+     */
+    private function createOrderKey(Path $path, int $resultIndex): PathOrderKey
     {
-        if (!$config->throwOnGuardLimit() || !$guardLimits->anyLimitReached()) {
-            return;
-        }
+        // Calculate cost ratio (spent / received)
+        $cost = $this->calculateCostRatio($path->totalSpent(), $path->totalReceived());
 
-        throw new GuardLimitExceeded($this->formatGuardLimitMessage($config, $guardLimits));
+        // Build route signature from hops
+        $routeSignature = $this->buildRouteSignature($path);
+
+        return new PathOrderKey(
+            new PathCost($cost),
+            $path->hops()->count(),
+            $routeSignature,
+            $resultIndex,
+        );
     }
 
-    private function formatGuardLimitMessage(PathSearchConfig $config, SearchGuardReport $guardLimits): string
+    /**
+     * Calculates the cost ratio for ordering results.
+     * Lower cost = better (spend less to receive more).
+     */
+    private function calculateCostRatio(Money $spent, Money $received): BigDecimal
     {
-        $breaches = [];
+        if ($received->isZero()) {
+            return BigDecimal::of('999999999999999999');
+        }
 
-        if ($guardLimits->expansionsReached()) {
-            $breaches[] = sprintf(
-                'expansions %d/%d',
-                $guardLimits->expansions(),
-                $guardLimits->expansionLimit(),
+        return self::scaleDecimal(
+            $spent->decimal()->dividedBy($received->decimal(), self::COST_SCALE, RoundingMode::HALF_UP),
+            self::COST_SCALE
+        );
+    }
+
+    /**
+     * Builds a route signature from path hops for deterministic ordering.
+     */
+    private function buildRouteSignature(Path $path): RouteSignature
+    {
+        $hops = $path->hops()->all();
+        if ([] === $hops) {
+            return RouteSignature::fromNodes([]);
+        }
+
+        // Build node sequence from hops
+        $nodes = [];
+        foreach ($hops as $hop) {
+            $nodes[] = sprintf(
+                '%s_%s_%s_%d',
+                $hop->spent()->currency(),
+                $hop->received()->currency(),
+                $hop->order()->side()->value,
+                spl_object_id($hop->order()),
             );
         }
 
-        if ($guardLimits->visitedStatesReached()) {
-            $breaches[] = sprintf(
-                'visited states %d/%d',
-                $guardLimits->visitedStates(),
-                $guardLimits->visitedStateLimit(),
-            );
-        }
-
-        if ($guardLimits->timeBudgetReached()) {
-            $elapsed = sprintf('%.3fms', $guardLimits->elapsedMilliseconds());
-            $limit = $guardLimits->timeBudgetLimit();
-            $breaches[] = null === $limit
-                ? sprintf('elapsed %s (unbounded)', $elapsed)
-                : sprintf('elapsed %s/%dms', $elapsed, $limit);
-        }
-
-        if ([] === $breaches) {
-            return 'Search guard limit exceeded.';
-        }
-
-        return 'Search guard limit exceeded: '.implode(' and ', $breaches).'.';
-    }
-
-    private function routeSignature(PathEdgeSequence $edges): RouteSignature
-    {
-        return RouteSignature::fromPathEdgeSequence($edges);
+        return RouteSignature::fromNodes($nodes);
     }
 }

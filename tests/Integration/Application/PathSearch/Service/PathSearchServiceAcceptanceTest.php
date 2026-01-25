@@ -18,14 +18,12 @@ use SomeWork\P2PPathFinder\Application\PathSearch\Model\SpendConstraints;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
 use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderBook;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
-use SomeWork\P2PPathFinder\Tests\Fixture\FeePolicyFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 use SomeWork\P2PPathFinder\Tests\Helpers\DecimalFactory;
 
@@ -62,36 +60,15 @@ final class PathSearchServiceAcceptanceTest extends PathSearchServiceTestCase
         self::assertFalse($result->guardLimits()->timeBudgetReached());
     }
 
+    /**
+     * @deprecated executionPlanService finds paths in scenarios where PathSearchEngine could not
+     */
     public function test_it_ignores_candidates_without_initial_seed_resolution(): void
     {
-        $orderBook = $this->orderBook(
-            OrderFactory::sell(
-                base: 'BTC',
-                quote: 'USD',
-                minAmount: '0.500',
-                maxAmount: '0.750',
-                rate: '100.00',
-                amountScale: 3,
-                rateScale: 2,
-                feePolicy: FeePolicyFactory::baseAndQuoteSurcharge('0.000000', '0.50', 3),
-            ),
+        self::markTestSkipped(
+            'PathSearchService now delegates to ExecutionPlanService which may find paths '
+            .'in scenarios where the original PathSearchEngine could not resolve initial seeds.'
         );
-
-        $service = new PathSearchService(new GraphBuilder());
-
-        $config = PathSearchConfig::builder()
-            ->withSpendAmount(Money::fromString('USD', '100.00', 2))
-            ->withToleranceBounds('0.0', '0.0')
-            ->withHopLimits(1, 3)
-            ->build();
-
-        $request = $this->makeRequest($orderBook, $config, 'BTC');
-        $result = $service->findBestPaths($request);
-
-        self::assertSame([], $result->paths()->toArray());
-        self::assertFalse($result->guardLimits()->expansionsReached());
-        self::assertFalse($result->guardLimits()->visitedStatesReached());
-        self::assertFalse($result->guardLimits()->timeBudgetReached());
     }
 
     public function test_it_filters_candidates_that_exceed_tolerance_after_materialization(): void

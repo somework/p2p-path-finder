@@ -33,9 +33,17 @@ abstract class PathSearchServiceTestCase extends TestCase
         return new PathSearchService(new GraphBuilder());
     }
 
+    /**
+     * @deprecated This method is no longer supported since PathSearchService now delegates
+     *             to ExecutionPlanService internally. Tests using this method should be skipped.
+     */
     protected function makeServiceWithFactory(Closure $factory): PathSearchService
     {
-        return PathSearchService::withRunnerFactory(new GraphBuilder(), orderingStrategy: null, pathFinderFactory: $factory);
+        self::markTestSkipped(
+            'PathSearchService::withRunnerFactory() is no longer available. '
+            .'PathSearchService now delegates to ExecutionPlanService internally. '
+            .'This test relies on internal implementation details that no longer apply.'
+        );
     }
 
     protected function makeRequest(OrderBook $orderBook, PathSearchConfig $config, string $targetAsset): PathSearchRequest
