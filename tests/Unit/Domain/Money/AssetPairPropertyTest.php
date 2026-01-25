@@ -167,7 +167,7 @@ final class AssetPairPropertyTest extends TestCase
                 return 'AB'.$chars[$idx];
             })($this->randomizer),
             // Empty string
-            fn () => '',
+            static fn () => '',
         ];
 
         for ($i = 0; $i < $limit; ++$i) {
@@ -326,15 +326,15 @@ final class AssetPairPropertyTest extends TestCase
                 fn () => $validCurrency.$this->randomizer->getInt(0, 9),
                 fn () => $this->randomizer->getInt(0, 9).$validCurrency,
                 // Add special characters
-                fn () => $validCurrency.'!',
-                fn () => $validCurrency.'@',
-                fn () => $validCurrency.'#',
+                static fn () => $validCurrency.'!',
+                static fn () => $validCurrency.'@',
+                static fn () => $validCurrency.'#',
                 // Add spaces
-                fn () => $validCurrency.' ',
+                static fn () => $validCurrency.' ',
                 // Add dashes
-                fn () => $validCurrency.'-',
+                static fn () => $validCurrency.'-',
                 // Add underscores
-                fn () => $validCurrency.'_',
+                static fn () => $validCurrency.'_',
             ];
 
             $generator = $invalidGenerators[$this->randomizer->getInt(0, count($invalidGenerators) - 1)];
