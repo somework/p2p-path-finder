@@ -26,7 +26,7 @@ use PHPUnit\Framework\TestCase;
  * - test_it_throws_guard_limit_exception_when_configured
  * - test_guard_limited_chain_resolves_when_limits_relaxed
  *
- * @see \SomeWork\P2PPathFinder\Tests\Integration\Application\PathSearch\Service\ExecutionPlanServiceTest
+ * @see ExecutionPlanServiceTest
  */
 final class PathSearchServiceEdgeCasesTest extends TestCase
 {

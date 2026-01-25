@@ -319,7 +319,7 @@ final class ExecutionPlanBenchTest extends TestCase
 
             $ordersPerHop = max(1, intdiv($orderCount, $hops));
             for ($j = 0; $j < $ordersPerHop; ++$j) {
-                $rate = '1.0' . str_pad((string) (($i * 10 + $j) % 1000), 3, '0', STR_PAD_LEFT);
+                $rate = '1.0'.str_pad((string) (($i * 10 + $j) % 1000), 3, '0', STR_PAD_LEFT);
                 $orders[] = new Order(
                     OrderSide::SELL,
                     AssetPair::fromString($nextCurrency, $currentCurrency),
@@ -344,7 +344,7 @@ final class ExecutionPlanBenchTest extends TestCase
         $ordersPerPath = max(1, intdiv($orderCount, $pathsPerLayer * $layers));
 
         for ($layer = 0; $layer < $layers; ++$layer) {
-            $srcCurrencies = $layer === 0
+            $srcCurrencies = 0 === $layer
                 ? ['SRC']
                 : $this->generateLayerCurrencies($counter - $pathsPerLayer, $pathsPerLayer);
 
@@ -355,7 +355,7 @@ final class ExecutionPlanBenchTest extends TestCase
             foreach ($srcCurrencies as $src) {
                 foreach ($dstCurrencies as $dstCurrency) {
                     for ($i = 0; $i < $ordersPerPath; ++$i) {
-                        $rate = '1.0' . str_pad((string) (($counter + $i) % 1000), 3, '0', STR_PAD_LEFT);
+                        $rate = '1.0'.str_pad((string) (($counter + $i) % 1000), 3, '0', STR_PAD_LEFT);
                         $orders[] = new Order(
                             OrderSide::SELL,
                             AssetPair::fromString($dstCurrency, $src),
@@ -382,7 +382,7 @@ final class ExecutionPlanBenchTest extends TestCase
         $midToDstCount = $orderCount - $srcToMidCount;
 
         for ($i = 0; $i < $srcToMidCount; ++$i) {
-            $rate = '1.0' . str_pad((string) ($i % 1000), 3, '0', STR_PAD_LEFT);
+            $rate = '1.0'.str_pad((string) ($i % 1000), 3, '0', STR_PAD_LEFT);
             $orders[] = new Order(
                 OrderSide::SELL,
                 AssetPair::fromString('MID', 'SRC'),
@@ -395,7 +395,7 @@ final class ExecutionPlanBenchTest extends TestCase
         }
 
         for ($i = 0; $i < $midToDstCount; ++$i) {
-            $rate = '1.0' . str_pad((string) (($i + 500) % 1000), 3, '0', STR_PAD_LEFT);
+            $rate = '1.0'.str_pad((string) (($i + 500) % 1000), 3, '0', STR_PAD_LEFT);
             $orders[] = new Order(
                 OrderSide::SELL,
                 AssetPair::fromString('DST', 'MID'),
@@ -477,7 +477,7 @@ final class ExecutionPlanBenchTest extends TestCase
             $candidate = '';
 
             do {
-                $candidate = $alphabet[$value % $base] . $candidate;
+                $candidate = $alphabet[$value % $base].$candidate;
                 $value = intdiv($value, $base);
             } while ($value > 0);
 

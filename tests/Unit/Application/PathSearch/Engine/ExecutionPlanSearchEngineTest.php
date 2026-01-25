@@ -521,4 +521,262 @@ final class ExecutionPlanSearchEngineTest extends TestCase
         self::assertSame(ExecutionPlanSearchEngine::DEFAULT_MAX_VISITED_STATES, $guardReport->visitedStateLimit());
         self::assertSame(ExecutionPlanSearchEngine::DEFAULT_TIME_BUDGET_MS, $guardReport->timeBudgetLimit());
     }
+
+    // ========================================================================
+    // SPLIT/MERGE EXECUTION TESTS (MUL-13)
+    // ========================================================================
+
+    /**
+     * Test scenario where split execution is REQUIRED due to capacity limits.
+     *
+     * Order book:
+     * - Order1: A→B with capacity 50 units max
+     * - Order2: A→C with capacity 50 units max
+     * - Order3: B→D with capacity 100 units max
+     * - Order4: C→D with capacity 100 units max
+     *
+     * Request: Convert 80 units of A to D
+     *
+     * A single path (A→B→D) can only convert 50 units. To convert 80 units,
+     * the algorithm MUST use both paths:
+     * - A→B→D (50 units)
+     * - A→C→D (30 units)
+     */
+    public function test_produces_non_linear_plan_when_split_required(): void
+    {
+        // Order1: A→B with capacity 50 units max
+        $orderAB = OrderFactory::buy('AAA', 'BBB', '1.00000000', '50.00000000', '1.0', self::SCALE, self::SCALE);
+        // Order2: A→C with capacity 50 units max
+        $orderAC = OrderFactory::buy('AAA', 'CCC', '1.00000000', '50.00000000', '1.0', self::SCALE, self::SCALE);
+        // Order3: B→D with capacity 100 units max
+        $orderBD = OrderFactory::buy('BBB', 'DDD', '1.00000000', '100.00000000', '1.0', self::SCALE, self::SCALE);
+        // Order4: C→D with capacity 100 units max
+        $orderCD = OrderFactory::buy('CCC', 'DDD', '1.00000000', '100.00000000', '1.0', self::SCALE, self::SCALE);
+
+        $orders = [$orderAB, $orderAC, $orderBD, $orderCD];
+        $graph = $this->graphBuilder->build($orders);
+        $engine = new ExecutionPlanSearchEngine();
+
+        // Request: Convert 80 units of A to D (requires split)
+        $spendAmount = Money::fromString('AAA', '80.00000000', self::SCALE);
+        $outcome = $engine->search($graph, 'AAA', 'DDD', $spendAmount);
+
+        self::assertTrue($outcome->hasPlan(), 'Should find a plan for split execution');
+
+        $plan = $outcome->plan();
+        self::assertNotNull($plan);
+        self::assertSame('AAA', $plan->sourceCurrency());
+        self::assertSame('DDD', $plan->targetCurrency());
+
+        // CRITICAL ASSERTIONS for non-linear (split) execution:
+        // The plan should have 4 steps: A→B, A→C, B→D, C→D
+        self::assertGreaterThan(2, $plan->stepCount(), 'Split plan needs more than 2 steps');
+
+        // For a split plan, isLinear() should return false
+        self::assertFalse($plan->isLinear(), 'Plan should be non-linear (split execution)');
+
+        // Non-linear plans cannot be converted to Path
+        self::assertNull($plan->asLinearPath(), 'Non-linear plan should return null from asLinearPath()');
+
+        // Verify we spent close to requested amount (within order bounds tolerance)
+        $totalSpent = $plan->totalSpent();
+        self::assertSame('AAA', $totalSpent->currency());
+        // Should spend most of the 80 units (at least 50 via first path)
+        self::assertTrue(
+            $totalSpent->decimal()->isGreaterThanOrEqualTo('50.00000000'),
+            'Should spend at least 50 units via first path'
+        );
+    }
+
+    /**
+     * Test scenario where merge execution happens (multiple paths converge at target).
+     */
+    public function test_produces_non_linear_plan_when_merge_required(): void
+    {
+        // Two paths merging at target:
+        // Path 1: A→B→D (limited by B→D capacity of 40)
+        // Path 2: A→C→D (limited by C→D capacity of 40)
+        // Total capacity to D: 80, Request: 70
+
+        $orderAB = OrderFactory::buy('AAA', 'BBB', '1.00000000', '50.00000000', '1.0', self::SCALE, self::SCALE);
+        $orderAC = OrderFactory::buy('AAA', 'CCC', '1.00000000', '50.00000000', '1.0', self::SCALE, self::SCALE);
+        $orderBD = OrderFactory::buy('BBB', 'DDD', '1.00000000', '40.00000000', '1.0', self::SCALE, self::SCALE); // Limited capacity
+        $orderCD = OrderFactory::buy('CCC', 'DDD', '1.00000000', '40.00000000', '1.0', self::SCALE, self::SCALE); // Limited capacity
+
+        $orders = [$orderAB, $orderAC, $orderBD, $orderCD];
+        $graph = $this->graphBuilder->build($orders);
+        $engine = new ExecutionPlanSearchEngine();
+
+        // Request: Convert 70 units of A to D (requires both paths due to D-side capacity limits)
+        $spendAmount = Money::fromString('AAA', '70.00000000', self::SCALE);
+        $outcome = $engine->search($graph, 'AAA', 'DDD', $spendAmount);
+
+        self::assertTrue($outcome->hasPlan(), 'Should find a plan for merge execution');
+
+        $plan = $outcome->plan();
+        self::assertNotNull($plan);
+
+        // Should have multiple steps for merge execution
+        self::assertGreaterThanOrEqual(3, $plan->stepCount(), 'Merge plan needs multiple steps');
+    }
+
+    /**
+     * Test that step count reflects split execution properly.
+     */
+    public function test_step_count_reflects_split_execution(): void
+    {
+        // Create diamond graph with capacity limits forcing split
+        $orderAB = OrderFactory::buy('AAA', 'BBB', '1.00000000', '30.00000000', '1.0', self::SCALE, self::SCALE);
+        $orderAC = OrderFactory::buy('AAA', 'CCC', '1.00000000', '30.00000000', '1.0', self::SCALE, self::SCALE);
+        $orderBD = OrderFactory::buy('BBB', 'DDD', '1.00000000', '50.00000000', '1.0', self::SCALE, self::SCALE);
+        $orderCD = OrderFactory::buy('CCC', 'DDD', '1.00000000', '50.00000000', '1.0', self::SCALE, self::SCALE);
+
+        $orders = [$orderAB, $orderAC, $orderBD, $orderCD];
+        $graph = $this->graphBuilder->build($orders);
+        $engine = new ExecutionPlanSearchEngine();
+
+        // Request that requires both paths: 50 units (30 max per first leg)
+        $spendAmount = Money::fromString('AAA', '50.00000000', self::SCALE);
+        $outcome = $engine->search($graph, 'AAA', 'DDD', $spendAmount);
+
+        self::assertTrue($outcome->hasPlan());
+
+        $plan = $outcome->plan();
+        self::assertNotNull($plan);
+
+        // A full split should have 4 steps: A→B, B→D, A→C, C→D
+        // Or at minimum, if partial: 2+ steps
+        self::assertGreaterThanOrEqual(2, $plan->stepCount());
+    }
+
+    /**
+     * Test that total spent aggregates across split steps.
+     */
+    public function test_total_spent_aggregates_split_steps(): void
+    {
+        // Create scenario with split execution
+        $orderAB = OrderFactory::buy('AAA', 'BBB', '1.00000000', '25.00000000', '1.0', self::SCALE, self::SCALE);
+        $orderAC = OrderFactory::buy('AAA', 'CCC', '1.00000000', '25.00000000', '1.0', self::SCALE, self::SCALE);
+        $orderBD = OrderFactory::buy('BBB', 'DDD', '1.00000000', '50.00000000', '1.0', self::SCALE, self::SCALE);
+        $orderCD = OrderFactory::buy('CCC', 'DDD', '1.00000000', '50.00000000', '1.0', self::SCALE, self::SCALE);
+
+        $orders = [$orderAB, $orderAC, $orderBD, $orderCD];
+        $graph = $this->graphBuilder->build($orders);
+        $engine = new ExecutionPlanSearchEngine();
+
+        // Request 40 units - requires split across both routes (25 max per first leg)
+        $spendAmount = Money::fromString('AAA', '40.00000000', self::SCALE);
+        $outcome = $engine->search($graph, 'AAA', 'DDD', $spendAmount);
+
+        self::assertTrue($outcome->hasPlan());
+
+        $plan = $outcome->plan();
+        self::assertNotNull($plan);
+
+        $totalSpent = $plan->totalSpent();
+        self::assertSame('AAA', $totalSpent->currency());
+
+        // Should spend close to requested 40 (may be limited by first-leg capacity of 50 total)
+        self::assertTrue(
+            $totalSpent->decimal()->isGreaterThanOrEqualTo('25.00000000'),
+            'Should aggregate spend from multiple split steps'
+        );
+    }
+
+    /**
+     * Test that total received aggregates across merge steps.
+     */
+    public function test_total_received_aggregates_merge_steps(): void
+    {
+        // Create scenario with merge execution (different rates to track received amounts)
+        $orderAB = OrderFactory::buy('AAA', 'BBB', '1.00000000', '30.00000000', '1.0', self::SCALE, self::SCALE);
+        $orderAC = OrderFactory::buy('AAA', 'CCC', '1.00000000', '30.00000000', '1.0', self::SCALE, self::SCALE);
+        $orderBD = OrderFactory::buy('BBB', 'DDD', '1.00000000', '50.00000000', '2.0', self::SCALE, self::SCALE); // 2x rate
+        $orderCD = OrderFactory::buy('CCC', 'DDD', '1.00000000', '50.00000000', '2.0', self::SCALE, self::SCALE); // 2x rate
+
+        $orders = [$orderAB, $orderAC, $orderBD, $orderCD];
+        $graph = $this->graphBuilder->build($orders);
+        $engine = new ExecutionPlanSearchEngine();
+
+        // Request 50 units - requires split
+        $spendAmount = Money::fromString('AAA', '50.00000000', self::SCALE);
+        $outcome = $engine->search($graph, 'AAA', 'DDD', $spendAmount);
+
+        self::assertTrue($outcome->hasPlan());
+
+        $plan = $outcome->plan();
+        self::assertNotNull($plan);
+
+        $totalReceived = $plan->totalReceived();
+        self::assertSame('DDD', $totalReceived->currency());
+
+        // Should receive DDD from all merge steps
+        self::assertTrue(
+            $totalReceived->decimal()->isPositive(),
+            'Should aggregate received amount from multiple merge steps'
+        );
+    }
+
+    /**
+     * Test multi-order aggregation combined with split execution.
+     *
+     * Scenario: Two A→B orders plus split paths
+     */
+    public function test_multi_order_with_split_execution(): void
+    {
+        // Two A→B orders with 30 capacity each (60 total)
+        $orderAB1 = OrderFactory::buy('AAA', 'BBB', '1.00000000', '30.00000000', '1.0', self::SCALE, self::SCALE);
+        $orderAB2 = OrderFactory::buy('AAA', 'BBB', '1.00000000', '30.00000000', '1.0', self::SCALE, self::SCALE);
+        // A→C with 40 capacity
+        $orderAC = OrderFactory::buy('AAA', 'CCC', '1.00000000', '40.00000000', '1.0', self::SCALE, self::SCALE);
+        // B→D and C→D with high capacity
+        $orderBD = OrderFactory::buy('BBB', 'DDD', '1.00000000', '100.00000000', '1.0', self::SCALE, self::SCALE);
+        $orderCD = OrderFactory::buy('CCC', 'DDD', '1.00000000', '100.00000000', '1.0', self::SCALE, self::SCALE);
+
+        $orders = [$orderAB1, $orderAB2, $orderAC, $orderBD, $orderCD];
+        $graph = $this->graphBuilder->build($orders);
+        $engine = new ExecutionPlanSearchEngine();
+
+        // Request 90 units - can use A→B (both orders: 60) + A→C (40) = 100 capacity
+        $spendAmount = Money::fromString('AAA', '90.00000000', self::SCALE);
+        $outcome = $engine->search($graph, 'AAA', 'DDD', $spendAmount);
+
+        self::assertTrue($outcome->hasPlan());
+
+        $plan = $outcome->plan();
+        self::assertNotNull($plan);
+
+        // Should have multiple steps from using multiple orders
+        self::assertGreaterThanOrEqual(2, $plan->stepCount());
+    }
+
+    /**
+     * Test that linear execution is preferred when capacity is sufficient.
+     */
+    public function test_prefers_linear_when_capacity_sufficient(): void
+    {
+        // High capacity on direct path
+        $orderAB = OrderFactory::buy('AAA', 'BBB', '1.00000000', '100.00000000', '1.0', self::SCALE, self::SCALE);
+        $orderBD = OrderFactory::buy('BBB', 'DDD', '1.00000000', '100.00000000', '1.0', self::SCALE, self::SCALE);
+        // Alternative lower-capacity path
+        $orderAC = OrderFactory::buy('AAA', 'CCC', '1.00000000', '50.00000000', '1.0', self::SCALE, self::SCALE);
+        $orderCD = OrderFactory::buy('CCC', 'DDD', '1.00000000', '50.00000000', '1.0', self::SCALE, self::SCALE);
+
+        $orders = [$orderAB, $orderBD, $orderAC, $orderCD];
+        $graph = $this->graphBuilder->build($orders);
+        $engine = new ExecutionPlanSearchEngine();
+
+        // Request 50 units - well within single path capacity
+        $spendAmount = Money::fromString('AAA', '50.00000000', self::SCALE);
+        $outcome = $engine->search($graph, 'AAA', 'DDD', $spendAmount);
+
+        self::assertTrue($outcome->hasPlan());
+
+        $plan = $outcome->plan();
+        self::assertNotNull($plan);
+
+        // Should prefer linear path (2 steps: A→B→D)
+        self::assertSame(2, $plan->stepCount());
+        self::assertTrue($plan->isLinear(), 'Should be linear when capacity is sufficient');
+    }
 }

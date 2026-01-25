@@ -19,7 +19,6 @@ use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Order\Fee\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\Fee\FeePolicy;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
-use SomeWork\P2PPathFinder\Domain\Order\OrderBook;
 use SomeWork\P2PPathFinder\Domain\Order\OrderBounds;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 

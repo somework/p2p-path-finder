@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Integration\Application\PathSearch\Service;
 
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
@@ -24,6 +23,8 @@ use SomeWork\P2PPathFinder\Domain\Order\OrderBook;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
+
+use const E_USER_DEPRECATED;
 
 /**
  * Backward compatibility tests verifying ExecutionPlanService produces equivalent
@@ -310,14 +311,20 @@ final class BackwardCompatibilityTest extends TestCase
     /**
      * @testdox PathSearchService::planToPath() throws for non-linear plans
      *
-     * NOTE: This test documents the API contract for non-linear plan handling.
-     * The current ExecutionPlanSearchEngine implementation only produces linear paths.
-     * When split/merge execution is implemented in future versions, this test will
-     * become active and verify that planToPath() correctly rejects non-linear plans.
-     *
      * API Contract: planToPath() MUST throw InvalidInput for non-linear ExecutionPlan.
      * This ensures callers using the legacy Path API receive clear errors when
      * attempting to convert incompatible plan topologies.
+     *
+     * This test uses a capacity-limited order book that REQUIRES split execution:
+     * - Order1: AAA→BBB with capacity 50 units max
+     * - Order2: AAA→CCC with capacity 50 units max
+     * - Order3: BBB→DDD with capacity 100 units max
+     * - Order4: CCC→DDD with capacity 100 units max
+     *
+     * Request: Convert 80 units of AAA to DDD
+     *
+     * A single path (A→B→D) can only convert 50 units. To convert 80 units,
+     * the algorithm MUST use both paths, producing a non-linear plan.
      *
      * @see ExecutionPlan::isLinear() for linearity check
      * @see ExecutionPlan::asLinearPath() for conversion that returns null for non-linear
@@ -325,49 +332,66 @@ final class BackwardCompatibilityTest extends TestCase
     #[TestDox('PathSearchService::planToPath() throws for non-linear plans')]
     public function test_plan_to_path_throws_for_non_linear(): void
     {
-        // NOTE (MUL-12): This test is intentionally skipped because current implementation
-        // only produces linear plans. The test structure documents the API contract:
-        // - planToPath() MUST throw InvalidInput with "non-linear" message for non-linear plans
-        // - This will be testable when split/merge execution produces non-linear topologies
-        //
-        // The API contract exists and is implemented - it just can't be exercised with
-        // the current search algorithm. When ExecutionPlanSearchEngine is enhanced to
-        // produce split/merge plans, this skip condition will be removed.
+        // Create capacity-limited order book that requires split execution
+        $orderBook = $this->createSplitRequiredOrderBook();
 
-        $orderBook = $this->orderBook(
-            OrderFactory::sell('USDT', 'RUB', '100.00', '1000.00', '100.00', 2, 2),
-        );
-
+        // Tolerance '0.50', '0.50' means:
+        // - minSpend = 80 × (1 - 0.50) = 40 (allows orders with capacity 50 to participate)
+        // - maxSpend = 80 × (1 + 0.50) = 120
+        // This ensures orders with 50 capacity are not filtered out during order filtering.
         $config = PathSearchConfig::builder()
-            ->withSpendAmount(Money::fromString('RUB', '50000.00', 2))
-            ->withToleranceBounds('0.0', '0.25')
-            ->withHopLimits(1, 3)
+            ->withSpendAmount(Money::fromString('AAA', '80.00000000', 8))
+            ->withToleranceBounds('0.50', '0.50')
+            ->withHopLimits(1, 4)
             ->build();
 
-        $request = new PathSearchRequest($orderBook, $config, 'USDT');
+        $request = new PathSearchRequest($orderBook, $config, 'DDD');
 
         $planOutcome = $this->executionPlanService->findBestPlans($request);
 
-        if ($planOutcome->hasPaths()) {
-            /** @var ExecutionPlan $plan */
-            $plan = $planOutcome->bestPath();
-            if ($plan->isLinear()) {
-                // Expected: current implementation only produces linear plans.
-                // This skip will be removed when split/merge execution is implemented.
-                self::markTestSkipped(
-                    'Current ExecutionPlanSearchEngine only produces linear plans. '
-                    .'This test documents the API contract and will become active when '
-                    .'split/merge execution is implemented. See ExecutionPlan::isLinear().'
-                );
-            }
+        self::assertTrue($planOutcome->hasPaths(), 'Should find a plan for split execution');
 
-            // If we ever get here with a non-linear plan, verify the exception:
-            $this->expectException(InvalidInput::class);
-            $this->expectExceptionMessage('non-linear');
-            PathSearchService::planToPath($plan);
-        } else {
-            self::markTestSkipped('No plan found to test with');
-        }
+        /** @var ExecutionPlan $plan */
+        $plan = $planOutcome->bestPath();
+
+        // Verify plan is non-linear (split execution occurred)
+        self::assertFalse($plan->isLinear(), 'Plan should be non-linear due to split execution');
+
+        // Verify asLinearPath() returns null for non-linear plans
+        self::assertNull($plan->asLinearPath(), 'Non-linear plan should return null from asLinearPath()');
+
+        // Now verify that planToPath() throws InvalidInput for non-linear plans
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('non-linear');
+        PathSearchService::planToPath($plan);
+    }
+
+    /**
+     * Creates an order book that REQUIRES split execution due to capacity limits.
+     *
+     * Order topology:
+     *      AAA
+     *     /   \
+     *   BBB   CCC   (max 50 each from AAA)
+     *     \   /
+     *      DDD     (100 capacity from both)
+     *
+     * To convert 80 units from AAA to DDD, both paths must be used:
+     * - AAA→BBB→DDD (50 units)
+     * - AAA→CCC→DDD (30 units)
+     */
+    private function createSplitRequiredOrderBook(): OrderBook
+    {
+        return $this->orderBook(
+            // Order1: AAA→BBB with capacity 50 units max
+            OrderFactory::buy('AAA', 'BBB', '1.00000000', '50.00000000', '1.0', 8, 8),
+            // Order2: AAA→CCC with capacity 50 units max
+            OrderFactory::buy('AAA', 'CCC', '1.00000000', '50.00000000', '1.0', 8, 8),
+            // Order3: BBB→DDD with capacity 100 units max
+            OrderFactory::buy('BBB', 'DDD', '1.00000000', '100.00000000', '1.0', 8, 8),
+            // Order4: CCC→DDD with capacity 100 units max
+            OrderFactory::buy('CCC', 'DDD', '1.00000000', '100.00000000', '1.0', 8, 8),
+        );
     }
 
     // ============================================================================
@@ -873,7 +897,7 @@ final class BackwardCompatibilityTest extends TestCase
 
     private function orderBook(Order ...$orders): OrderBook
     {
-        return new OrderBook(\array_values($orders));
+        return new OrderBook(array_values($orders));
     }
 
     /**

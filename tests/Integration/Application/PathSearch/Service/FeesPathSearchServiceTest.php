@@ -15,6 +15,7 @@ use PHPUnit\Framework\TestCase;
  * Fee handling is now tested at multiple levels:
  *
  * 1. **Unit Level** - LegMaterializerTest tests the fee materialization logic directly
+ *
  *    @see \SomeWork\P2PPathFinder\Tests\Unit\Application\PathSearch\Service\LegMaterializerTest
  *
  * 2. **Integration Level** - ExecutionPlanServiceTest::test_fee_aggregation verifies

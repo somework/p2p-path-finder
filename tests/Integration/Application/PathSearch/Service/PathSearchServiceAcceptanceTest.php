@@ -7,6 +7,7 @@ namespace SomeWork\P2PPathFinder\Tests\Integration\Application\PathSearch\Servic
 use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Order\OrderBook;
+use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
 // NOTE: Many imports were removed as part of MUL-12 cleanup - they were only
