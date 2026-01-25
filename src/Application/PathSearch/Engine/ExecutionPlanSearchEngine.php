@@ -1,0 +1,643 @@
+<?php
+
+declare(strict_types=1);
+
+namespace SomeWork\P2PPathFinder\Application\PathSearch\Engine;
+
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
+use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Guard\SearchGuards;
+use SomeWork\P2PPathFinder\Application\PathSearch\Engine\State\PortfolioState;
+use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\Graph;
+use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\GraphEdge;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionPlan;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionStep;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionStepCollection;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
+use SomeWork\P2PPathFinder\Domain\Money\MoneyMap;
+use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
+use SomeWork\P2PPathFinder\Domain\Tolerance\DecimalTolerance;
+use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalHelperTrait;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
+
+use function array_key_exists;
+use function array_keys;
+use function array_reverse;
+use function strtoupper;
+
+/**
+ * Execution plan search engine implementing successive shortest augmenting paths algorithm.
+ *
+ * ## Algorithm Overview
+ *
+ * This engine finds optimal execution plans for converting an amount from a source currency
+ * to a target currency by finding successive shortest augmenting paths:
+ *
+ * 1. Initialize portfolio with source currency balance
+ * 2. While target balance < requested amount AND within budget:
+ *    a. Find cheapest augmenting path from any currency with balance to target
+ *    b. Calculate bottleneck (minimum flow along path)
+ *    c. Execute flow along path, updating portfolio state
+ * 3. Return execution plan with all steps
+ *
+ * ## Supported Path Types
+ *
+ * - **Linear paths**: A → B → C → D (single chain)
+ * - **Multi-order same direction**: Multiple orders A → B combined
+ * - **Split routes**: A → B → D and A → C → D (parallel paths merging)
+ * - **Complex combinations**: Any combination of the above
+ *
+ * ## Key Features
+ *
+ * - Uses {@see PortfolioState} for multi-currency balance tracking
+ * - Prevents backtracking (cannot return to fully spent currency)
+ * - Each order used only once
+ * - Deterministic results via consistent ordering
+ * - Guard limits (expansions, time, visited states)
+ *
+ * @internal
+ */
+final class ExecutionPlanSearchEngine
+{
+    use DecimalHelperTrait;
+
+    private const SCALE = self::CANONICAL_SCALE;
+
+    public const DEFAULT_MAX_EXPANSIONS = 10000;
+
+    public const DEFAULT_MAX_VISITED_STATES = 50000;
+
+    public const DEFAULT_TIME_BUDGET_MS = 5000;
+
+    public function __construct(
+        private readonly int $maxExpansions = self::DEFAULT_MAX_EXPANSIONS,
+        private readonly ?int $timeBudgetMs = self::DEFAULT_TIME_BUDGET_MS,
+        private readonly int $maxVisitedStates = self::DEFAULT_MAX_VISITED_STATES,
+    ) {
+        if ($maxExpansions < 1) {
+            throw new InvalidInput('Maximum expansions must be at least one.');
+        }
+
+        if ($maxVisitedStates < 1) {
+            throw new InvalidInput('Maximum visited states must be at least one.');
+        }
+
+        if (null !== $timeBudgetMs && $timeBudgetMs < 1) {
+            throw new InvalidInput('Time budget must be at least one millisecond.');
+        }
+    }
+
+    /**
+     * Searches for an optimal execution plan to convert source currency to target currency.
+     *
+     * @param Graph  $graph          The trading graph to search
+     * @param string $sourceCurrency Source currency code
+     * @param string $targetCurrency Target currency code
+     * @param Money  $spendAmount    Amount to spend in source currency
+     *
+     * @return ExecutionPlanSearchOutcome The search outcome containing plan and guard report
+     */
+    public function search(
+        Graph $graph,
+        string $sourceCurrency,
+        string $targetCurrency,
+        Money $spendAmount,
+    ): ExecutionPlanSearchOutcome {
+        $sourceCurrency = strtoupper($sourceCurrency);
+        $targetCurrency = strtoupper($targetCurrency);
+
+        // Validate currencies exist in graph
+        if (!$graph->hasNode($sourceCurrency) || !$graph->hasNode($targetCurrency)) {
+            return ExecutionPlanSearchOutcome::empty(
+                SearchGuardReport::idle($this->maxVisitedStates, $this->maxExpansions, $this->timeBudgetMs)
+            );
+        }
+
+        // Same currency - no conversion needed
+        if ($sourceCurrency === $targetCurrency) {
+            return ExecutionPlanSearchOutcome::empty(
+                SearchGuardReport::idle($this->maxVisitedStates, $this->maxExpansions, $this->timeBudgetMs)
+            );
+        }
+
+        // Validate spend amount matches source currency
+        if ($spendAmount->currency() !== $sourceCurrency) {
+            throw new InvalidInput('Spend amount currency must match source currency.');
+        }
+
+        if ($spendAmount->isZero()) {
+            return ExecutionPlanSearchOutcome::empty(
+                SearchGuardReport::idle($this->maxVisitedStates, $this->maxExpansions, $this->timeBudgetMs)
+            );
+        }
+
+        return $this->executeSearch($graph, $sourceCurrency, $targetCurrency, $spendAmount);
+    }
+
+    private function executeSearch(
+        Graph $graph,
+        string $sourceCurrency,
+        string $targetCurrency,
+        Money $spendAmount,
+    ): ExecutionPlanSearchOutcome {
+        $portfolio = PortfolioState::initial($spendAmount);
+        $guards = new SearchGuards($this->maxExpansions, $this->timeBudgetMs);
+        $visitedStates = 1;
+        $visitedGuardReached = false;
+
+        /** @var list<ExecutionStep> $steps */
+        $steps = [];
+        $sequenceNumber = 1;
+
+        // Main loop: find augmenting paths until no more balance to convert
+        while ($this->hasRemainingBalance($portfolio, $targetCurrency)) {
+            if (!$guards->canExpand()) {
+                break;
+            }
+
+            if ($visitedStates >= $this->maxVisitedStates) {
+                $visitedGuardReached = true;
+                break;
+            }
+
+            $guards->recordExpansion();
+            ++$visitedStates;
+
+            // Find cheapest augmenting path from any currency with balance to target
+            $pathResult = $this->findAugmentingPath($portfolio, $graph, $targetCurrency);
+
+            if (null === $pathResult) {
+                // No more paths available
+                break;
+            }
+
+            /** @var list<GraphEdge> $path */
+            $path = $pathResult['path'];
+            /** @var string $startCurrency */
+            $startCurrency = $pathResult['startCurrency'];
+
+            // Calculate bottleneck (maximum flow we can push through this path)
+            $bottleneck = $this->calculateBottleneck($path, $portfolio, $startCurrency);
+
+            if ($bottleneck->isZero()) {
+                // No flow possible on this path - mark orders as used and try another
+                foreach ($path as $edge) {
+                    $portfolio = $portfolio->markOrderUsed($edge->order());
+                }
+                continue;
+            }
+
+            // Execute flow along path
+            $flowResult = $this->executeFlow($path, $portfolio, $bottleneck, $startCurrency, $sequenceNumber);
+            $portfolio = $flowResult['portfolio'];
+            /** @var list<ExecutionStep> $newSteps */
+            $newSteps = $flowResult['steps'];
+            $sequenceNumber = $flowResult['sequenceNumber'];
+
+            foreach ($newSteps as $step) {
+                $steps[] = $step;
+            }
+        }
+
+        $guardReport = $guards->finalize($visitedStates, $this->maxVisitedStates, $visitedGuardReached);
+
+        if ([] === $steps) {
+            return ExecutionPlanSearchOutcome::empty($guardReport);
+        }
+
+        $stepCollection = ExecutionStepCollection::fromList($steps);
+        $tolerance = DecimalTolerance::fromNumericString('0', self::SCALE);
+        $plan = ExecutionPlan::fromSteps($stepCollection, $sourceCurrency, $targetCurrency, $tolerance);
+
+        // Check if we achieved full conversion: source currency balance should be zero
+        // and we should have received something in target currency
+        $sourceBalance = $portfolio->balance($sourceCurrency);
+        $targetBalance = $portfolio->balance($targetCurrency);
+        $isComplete = $sourceBalance->isZero() && !$targetBalance->isZero();
+
+        if ($isComplete) {
+            return ExecutionPlanSearchOutcome::complete($plan, $guardReport);
+        }
+
+        return ExecutionPlanSearchOutcome::partial($plan, $guardReport);
+    }
+
+    /**
+     * Checks if there is remaining balance to convert (not yet at target).
+     *
+     * Returns true if any non-target currency still has positive balance,
+     * indicating more conversion work can potentially be done.
+     */
+    private function hasRemainingBalance(PortfolioState $portfolio, string $targetCurrency): bool
+    {
+        $nonZeroBalances = $portfolio->nonZeroBalances();
+
+        foreach ($nonZeroBalances as $currency => $balance) {
+            if ($currency !== $targetCurrency) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Finds the cheapest augmenting path from any currency with balance to the target.
+     *
+     * Uses Dijkstra's algorithm starting from all currencies with positive balance.
+     *
+     * @return array{path: list<GraphEdge>, startCurrency: string, cost: BigDecimal}|null
+     */
+    private function findAugmentingPath(
+        PortfolioState $portfolio,
+        Graph $graph,
+        string $target,
+    ): ?array {
+        $nonZeroBalances = $portfolio->nonZeroBalances();
+
+        if ([] === $nonZeroBalances) {
+            return null;
+        }
+
+        // Remove target from starting currencies (we're done if all balance is in target)
+        unset($nonZeroBalances[$target]);
+
+        if ([] === $nonZeroBalances) {
+            return null;
+        }
+
+        // Dijkstra from all currencies with balance
+        /** @var array<string, BigDecimal> $dist */
+        $dist = [];
+
+        /** @var array<string, array{edge: GraphEdge, prev: string}|null> $prev */
+        $prev = [];
+
+        /** @var array<string, string> $startCurrencyMap */
+        $startCurrencyMap = [];
+
+        // Priority queue: [cost, currency, insertOrder]
+        /** @var \SplPriorityQueue<array{0: int, 1: int}, string> $queue */
+        $queue = new \SplPriorityQueue();
+        $queue->setExtractFlags(\SplPriorityQueue::EXTR_BOTH);
+
+        $insertOrder = 0;
+
+        // Initialize distances from all source currencies
+        foreach (array_keys($nonZeroBalances) as $currency) {
+            $dist[$currency] = BigDecimal::one();
+            $prev[$currency] = null;
+            $startCurrencyMap[$currency] = $currency;
+
+            // Priority is negative cost (SplPriorityQueue is max-heap)
+            // Use array [-cost_major, -insertOrder] for tie-breaking
+            $queue->insert($currency, [-1, -$insertOrder++]);
+        }
+
+        $bestPath = null;
+        $bestCost = null;
+        $bestStartCurrency = null;
+
+        /** @var array<string, bool> $visited */
+        $visited = [];
+
+        while (!$queue->isEmpty()) {
+            /** @var array{priority: array{0: int, 1: int}, data: string} $extracted */
+            $extracted = $queue->extract();
+            $current = $extracted['data'];
+
+            // Skip if already visited (stale entry)
+            if (isset($visited[$current])) {
+                continue;
+            }
+            $visited[$current] = true;
+
+            $currentCost = $dist[$current] ?? null;
+            if (null === $currentCost) {
+                continue;
+            }
+
+            // Found target - reconstruct path
+            if ($current === $target) {
+                if (null === $bestCost || $currentCost->isLessThan($bestCost)) {
+                    $path = $this->reconstructPath($prev, $current);
+                    if ([] !== $path) {
+                        $bestPath = $path;
+                        $bestCost = $currentCost;
+                        $bestStartCurrency = $startCurrencyMap[$current] ?? null;
+                    }
+                }
+                // Continue to find potentially better paths
+                continue;
+            }
+
+            $node = $graph->node($current);
+            if (null === $node) {
+                continue;
+            }
+
+            foreach ($node->edges() as $edge) {
+                $nextCurrency = $edge->to();
+
+                // Skip if order already used
+                if ($portfolio->hasUsedOrder($edge->order())) {
+                    continue;
+                }
+
+                // Skip if cannot receive into this currency (backtracking prevention)
+                if (!$portfolio->canReceiveInto($nextCurrency)) {
+                    continue;
+                }
+
+                // Skip if already visited (Dijkstra optimization)
+                if (isset($visited[$nextCurrency])) {
+                    continue;
+                }
+
+                // Calculate edge cost (inverse of conversion rate)
+                $edgeCost = $this->calculateEdgeCost($edge);
+                if (null === $edgeCost || $edgeCost->isLessThanOrEqualTo(BigDecimal::zero())) {
+                    continue;
+                }
+
+                $newCost = self::scaleDecimal(
+                    $currentCost->dividedBy($edgeCost, self::SCALE, RoundingMode::HALF_UP),
+                    self::SCALE
+                );
+
+                $existingCost = $dist[$nextCurrency] ?? null;
+                if (null === $existingCost || $newCost->isLessThan($existingCost)) {
+                    $dist[$nextCurrency] = $newCost;
+                    $prev[$nextCurrency] = ['edge' => $edge, 'prev' => $current];
+                    $startCurrencyMap[$nextCurrency] = $startCurrencyMap[$current] ?? $current;
+
+                    // Insert with negative cost for min-heap behavior
+                    // Use floor to avoid rounding issues
+                    $costForPriority = $newCost->multipliedBy(BigDecimal::of(1000000))
+                        ->toScale(0, RoundingMode::FLOOR);
+                    $costInt = (int) $costForPriority->toInt();
+                    $queue->insert($nextCurrency, [-$costInt, -$insertOrder++]);
+                }
+            }
+        }
+
+        if (null === $bestPath || null === $bestStartCurrency || null === $bestCost) {
+            return null;
+        }
+
+        return [
+            'path' => $bestPath,
+            'startCurrency' => $bestStartCurrency,
+            'cost' => $bestCost,
+        ];
+    }
+
+    /**
+     * Reconstructs the path from predecessors.
+     *
+     * @param array<string, array{edge: GraphEdge, prev: string}|null> $prev
+     *
+     * @return list<GraphEdge>
+     */
+    private function reconstructPath(array $prev, string $target): array
+    {
+        $path = [];
+        $current = $target;
+
+        while (array_key_exists($current, $prev)) {
+            $entry = $prev[$current];
+            if (null === $entry) {
+                break;
+            }
+
+            $path[] = $entry['edge'];
+            $current = $entry['prev'];
+        }
+
+        return array_reverse($path);
+    }
+
+    /**
+     * Calculates the effective conversion rate for an edge.
+     *
+     * Returns quote/base ratio representing how much quote currency
+     * is received per unit of base currency spent.
+     */
+    private function calculateEdgeCost(GraphEdge $edge): ?BigDecimal
+    {
+        $baseCapacity = OrderSide::BUY === $edge->orderSide()
+            ? $edge->grossBaseCapacity()
+            : $edge->baseCapacity();
+
+        $baseMax = $baseCapacity->max()->decimal();
+        if ($baseMax->isZero()) {
+            return null;
+        }
+
+        $quoteCapacity = $edge->quoteCapacity();
+        $quoteMax = $quoteCapacity->max()->decimal();
+
+        return $quoteMax->dividedBy($baseMax, self::SCALE, RoundingMode::HALF_UP);
+    }
+
+    /**
+     * Calculates the bottleneck (maximum flow) for a path.
+     *
+     * The bottleneck is the maximum amount that can be pushed through all edges
+     * in the path, limited by:
+     * - Available balance at start
+     * - Each edge's order bounds (min/max)
+     *
+     * @param list<GraphEdge> $path
+     */
+    private function calculateBottleneck(array $path, PortfolioState $portfolio, string $startCurrency): Money
+    {
+        if ([] === $path) {
+            return Money::zero($startCurrency, self::SCALE);
+        }
+
+        $balance = $portfolio->balance($startCurrency);
+
+        // Start with minimum of balance and first edge's max capacity
+        $firstEdge = $path[0];
+        $firstBounds = $firstEdge->order()->bounds();
+
+        $scale = max($balance->scale(), $firstBounds->max()->scale());
+        $balance = $balance->withScale($scale);
+        $firstMax = $firstBounds->max()->withScale($scale);
+
+        $bottleneck = $balance->greaterThan($firstMax) ? $firstMax : $balance;
+
+        if ($bottleneck->isZero()) {
+            return Money::zero($startCurrency, self::SCALE);
+        }
+
+        // Propagate through path to find actual bottleneck
+        $currentAmount = $bottleneck;
+
+        foreach ($path as $edge) {
+            $order = $edge->order();
+            $bounds = $order->bounds();
+
+            $edgeScale = max($currentAmount->scale(), $bounds->max()->scale());
+            $currentAmount = $currentAmount->withScale($edgeScale);
+            $edgeMax = $bounds->max()->withScale($edgeScale);
+            $edgeMin = $bounds->min()->withScale($edgeScale);
+
+            // If current amount exceeds edge max, reduce bottleneck proportionally
+            if ($currentAmount->greaterThan($edgeMax)) {
+                if (!$currentAmount->isZero()) {
+                    $ratio = $edgeMax->divide($currentAmount->amount(), $edgeScale);
+                    $bottleneck = $bottleneck->multiply($ratio->amount(), $bottleneck->scale());
+                }
+                $currentAmount = $edgeMax;
+            }
+
+            // If current amount is below edge minimum, path is not viable
+            if ($currentAmount->lessThan($edgeMin)) {
+                return Money::zero($startCurrency, self::SCALE);
+            }
+
+            if ($currentAmount->isZero()) {
+                return Money::zero($startCurrency, self::SCALE);
+            }
+
+            // Calculate received amount for next edge
+            $spendAmount = Money::fromString(
+                $order->assetPair()->base(),
+                $currentAmount->amount(),
+                $currentAmount->scale()
+            );
+
+            $received = $order->calculateEffectiveQuoteAmount($spendAmount);
+            $currentAmount = $received;
+        }
+
+        return $bottleneck;
+    }
+
+    /**
+     * Executes flow along a path, creating execution steps.
+     *
+     * @param list<GraphEdge> $path
+     *
+     * @return array{portfolio: PortfolioState, steps: list<ExecutionStep>, sequenceNumber: int}
+     */
+    private function executeFlow(
+        array $path,
+        PortfolioState $portfolio,
+        Money $bottleneck,
+        string $startCurrency,
+        int $sequenceNumber,
+    ): array {
+        /** @var list<ExecutionStep> $steps */
+        $steps = [];
+        $currentAmount = $bottleneck;
+
+        foreach ($path as $edge) {
+            $order = $edge->order();
+            $baseCurrency = $order->assetPair()->base();
+
+            // Convert current amount to base currency for order execution
+            $spendAmount = Money::fromString($baseCurrency, $currentAmount->amount(), $currentAmount->scale());
+
+            // Clamp to order bounds
+            $bounds = $order->bounds();
+            $boundsScale = max($spendAmount->scale(), $bounds->max()->scale());
+            $spendAmount = $spendAmount->withScale($boundsScale);
+            $boundsMax = $bounds->max()->withScale($boundsScale);
+            $boundsMin = $bounds->min()->withScale($boundsScale);
+
+            if ($spendAmount->greaterThan($boundsMax)) {
+                $spendAmount = $boundsMax;
+            }
+
+            if ($spendAmount->lessThan($boundsMin)) {
+                // Use minimum if below
+                $spendAmount = $boundsMin;
+            }
+
+            // Calculate received amount
+            $received = $order->calculateEffectiveQuoteAmount($spendAmount);
+
+            // Calculate fees
+            $fees = $this->calculateFees($order, $spendAmount, $received);
+
+            // Create step with proper from/to based on edge direction
+            $step = new ExecutionStep(
+                $edge->from(),
+                $edge->to(),
+                Money::fromString($edge->from(), $spendAmount->amount(), $spendAmount->scale()),
+                Money::fromString($edge->to(), $received->amount(), $received->scale()),
+                $order,
+                $fees,
+                $sequenceNumber++,
+            );
+
+            $steps[] = $step;
+
+            // Calculate cost for portfolio update
+            $cost = $this->calculateStepCost($spendAmount, $received);
+
+            // Update portfolio
+            $portfolio = $portfolio->executeOrder($order, $spendAmount, $cost);
+
+            // Set up for next edge
+            $currentAmount = $received;
+        }
+
+        return [
+            'portfolio' => $portfolio,
+            'steps' => $steps,
+            'sequenceNumber' => $sequenceNumber,
+        ];
+    }
+
+    /**
+     * Calculates fees for an order execution.
+     */
+    private function calculateFees(Order $order, Money $spent, Money $received): MoneyMap
+    {
+        $feePolicy = $order->feePolicy();
+        if (null === $feePolicy) {
+            return MoneyMap::empty();
+        }
+
+        $quoteAmount = $order->calculateQuoteAmount($spent);
+        $feeBreakdown = $feePolicy->calculate($order->side(), $spent, $quoteAmount);
+
+        $fees = [];
+        $baseFee = $feeBreakdown->baseFee();
+        $quoteFee = $feeBreakdown->quoteFee();
+
+        if (null !== $baseFee && !$baseFee->isZero()) {
+            $fees[] = $baseFee;
+        }
+
+        if (null !== $quoteFee && !$quoteFee->isZero()) {
+            $fees[] = $quoteFee;
+        }
+
+        return MoneyMap::fromList($fees);
+    }
+
+    /**
+     * Calculates the cost ratio for a step (spent / received).
+     *
+     * Lower cost is better. Returns a very high cost for zero-received (infeasible) steps.
+     */
+    private function calculateStepCost(Money $spent, Money $received): BigDecimal
+    {
+        if ($received->isZero()) {
+            // Infeasible step - return maximum cost to discourage this path
+            return BigDecimal::of('999999999999');
+        }
+
+        return self::scaleDecimal(
+            $spent->decimal()->dividedBy($received->decimal(), self::SCALE, RoundingMode::HALF_UP),
+            self::SCALE
+        );
+    }
+}
