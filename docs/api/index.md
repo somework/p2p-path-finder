@@ -83,7 +83,7 @@ Immutable request DTO carrying the dependencies required to run a path search.
 ## SomeWork\P2PPathFinder\Application\PathSearch\Api\Response\SearchOutcome
 Immutable response DTO describing the outcome of a path search.
 
-Carries discovered {@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\Path}
+Carries discovered {@see Path}
 instances built from hop-centric DTOs ({@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHop}
 / {@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHopCollection})
 alongside guard rail metrics.
@@ -93,21 +93,34 @@ alongside guard rail metrics.
 ### __construct
 `SearchOutcome::__construct(SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSet $paths, SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport $guardLimits)`
 
-Parameter $paths: PathResultSet&lt;TPath&gt;
+Create a new SearchOutcome containing discovered paths and their guard-rail metrics.
+
+Parameter $paths: PathResultSet&lt;TPath&gt; — the collection of discovered Path instances
+Parameter $guardLimits: SearchGuardReport — the guard-rail report describing limits and metrics observed during search
 
 ### fromResultSet
 `SearchOutcome::fromResultSet(SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSet $paths, SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport $guardLimits): self`
 
-Parameter $paths: PathResultSet&lt;TOutcome&gt;
+Create a SearchOutcome from an existing set of discovered paths and its guard report.
 
 
 
-Returns: self&lt;TOutcome&gt;
+
+Parameter $paths: PathResultSet&lt;TOutcome&gt; — discovered Path instances to include in the outcome
+Parameter $guardLimits: SearchGuardReport — guard metrics and limits produced during the search
+
+
+
+Returns: self&lt;TOutcome&gt; a SearchOutcome containing the provided paths and guard report
 
 ### empty
 `SearchOutcome::empty(SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport $guardLimits): self`
 
-Returns: self&lt;Path&gt;
+Create a SearchOutcome with no paths while retaining the provided guard report.
+
+Parameter $guardLimits: SearchGuardReport — guard-rail metrics and limits to include in the outcome
+
+Returns: self&lt;Path&gt; a SearchOutcome containing an empty PathResultSet and the given guard limits
 
 ### paths
 `SearchOutcome::paths(): SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSet`
@@ -117,7 +130,9 @@ Returns: PathResultSet&lt;TPath&gt;
 ### bestPath
 `SearchOutcome::bestPath(): ?SomeWork\P2PPathFinder\Application\PathSearch\Result\Path`
 
-Returns: TPath|null
+Get the best (first) path from the result set.
+
+Returns: TPath|null the first path from the result set, or `null` if none exist
 
 ### hasPaths
 `SearchOutcome::hasPaths(): bool`
@@ -461,6 +476,11 @@ an appropriate scale to avoid floating-point issues.
 Pass your custom strategy to the `PathSearchService` constructor:
 
 ```php
+use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\MinimizeHopsStrategy;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
+
+$graphBuilder = new GraphBuilder();
 $customStrategy = new MinimizeHopsStrategy(costScale: 6);
 $service = new PathSearchService($graphBuilder, $customStrategy);
 ```
@@ -819,6 +839,10 @@ Parameter $orders: iterable&lt;Order&gt;
 ## SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService
 High level facade orchestrating order filtering, graph building and path search.
 
+
+
+psalm-type CandidateCallback = callable(CandidatePath):bool
+
 ### Public methods
 
 ### __construct
@@ -846,9 +870,27 @@ $request = new PathSearchRequest($orderBook, $config, 'BTC');
 $outcome = $service->findBestPaths($request);
 
 // Process results
-foreach ($outcome->paths() as $path) {
-echo "Route: {$path->route()}\n";
-echo "Receive: {$path->totalReceived()->amount()} BTC\n";
+$bestPath = $outcome->bestPath();
+if (null !== $bestPath) {
+echo "Best path spends {$bestPath->totalSpent()->amount()} {$bestPath->totalSpent()->currency()}\n";
+echo "Best path receives {$bestPath->totalReceived()->amount()} {$bestPath->totalReceived()->currency()}\n";
+
+foreach ($bestPath->hops() as $index => $hop) {
+$order = $hop->order();
+$pair = $order->assetPair();
+
+printf(
+"Hop %d (%s order %s/%s): spend %s %s to receive %s %s\n",
+$index + 1,
+$order->side()->value,
+$pair->base(),
+$pair->quote(),
+$hop->spent()->amount(),
+$hop->spent()->currency(),
+$hop->received()->amount(),
+$hop->received()->currency(),
+);
+}
 }
 
 // Check guard limits

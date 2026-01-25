@@ -1,0 +1,23 @@
+services:
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: p2p-path-finder:latest
+    container_name: p2p-path-finder
+    volumes:
+      - .:/var/www/html/p2p-path-finder
+      - vendor:/var/www/html/p2p-path-finder/vendor
+    working_dir: /var/www/html/p2p-path-finder
+    environment:
+      - PHP_MEMORY_LIMIT=-1
+    command: tail -f /dev/null  # Keep container running
+    networks:
+      - p2p-network
+
+volumes:
+  vendor:
+
+networks:
+  p2p-network:
+    driver: bridge
