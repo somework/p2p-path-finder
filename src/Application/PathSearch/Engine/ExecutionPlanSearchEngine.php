@@ -8,6 +8,7 @@ use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Guard\SearchGuards;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\State\PortfolioState;
+use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\EdgeCapacity;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionPlan;
@@ -448,7 +449,7 @@ final class ExecutionPlanSearchEngine
      * The bottleneck is the maximum amount that can be pushed through all edges
      * in the path, limited by:
      * - Available balance at start
-     * - Each edge's order bounds (min/max)
+     * - Each edge's capacity (based on order side)
      *
      * @param list<GraphEdge> $path
      */
@@ -461,12 +462,15 @@ final class ExecutionPlanSearchEngine
         $balance = $portfolio->balance($startCurrency);
 
         // Start with minimum of balance and first edge's max capacity
+        // Use the correct capacity based on order side:
+        // - BUY order: taker spends base → use grossBaseCapacity
+        // - SELL order: taker spends quote → use quoteCapacity
         $firstEdge = $path[0];
-        $firstBounds = $firstEdge->order()->bounds();
+        $firstCapacity = $this->getSpendCapacity($firstEdge);
 
-        $scale = max($balance->scale(), $firstBounds->max()->scale());
+        $scale = max($balance->scale(), $firstCapacity->max()->scale());
         $balance = $balance->withScale($scale);
-        $firstMax = $firstBounds->max()->withScale($scale);
+        $firstMax = $firstCapacity->max()->withScale($scale);
 
         $bottleneck = $balance->greaterThan($firstMax) ? $firstMax : $balance;
 
@@ -478,13 +482,12 @@ final class ExecutionPlanSearchEngine
         $currentAmount = $bottleneck;
 
         foreach ($path as $edge) {
-            $order = $edge->order();
-            $bounds = $order->bounds();
+            $capacity = $this->getSpendCapacity($edge);
 
-            $edgeScale = max($currentAmount->scale(), $bounds->max()->scale());
+            $edgeScale = max($currentAmount->scale(), $capacity->max()->scale());
             $currentAmount = $currentAmount->withScale($edgeScale);
-            $edgeMax = $bounds->max()->withScale($edgeScale);
-            $edgeMin = $bounds->min()->withScale($edgeScale);
+            $edgeMax = $capacity->max()->withScale($edgeScale);
+            $edgeMin = $capacity->min()->withScale($edgeScale);
 
             // If current amount exceeds edge max, reduce bottleneck proportionally
             if ($currentAmount->greaterThan($edgeMax)) {
@@ -504,18 +507,77 @@ final class ExecutionPlanSearchEngine
                 return Money::zero($startCurrency, self::SCALE);
             }
 
-            // Calculate received amount for next edge
-            $spendAmount = Money::fromString(
-                $order->assetPair()->base(),
-                $currentAmount->amount(),
-                $currentAmount->scale()
-            );
-
-            $received = $order->calculateEffectiveQuoteAmount($spendAmount);
+            // Calculate received amount for next edge based on order side
+            $received = $this->calculateReceivedAmount($edge, $currentAmount);
             $currentAmount = $received;
         }
 
         return $bottleneck;
+    }
+
+    /**
+     * Gets the spend capacity for an edge based on order side.
+     *
+     * - BUY order: taker spends base → use grossBaseCapacity
+     * - SELL order: taker spends quote → use quoteCapacity
+     */
+    private function getSpendCapacity(GraphEdge $edge): EdgeCapacity
+    {
+        return OrderSide::BUY === $edge->orderSide()
+            ? $edge->grossBaseCapacity()
+            : $edge->quoteCapacity();
+    }
+
+    /**
+     * Calculates the received amount for an edge based on order side.
+     */
+    private function calculateReceivedAmount(GraphEdge $edge, Money $spendAmount): Money
+    {
+        $order = $edge->order();
+
+        if (OrderSide::BUY === $edge->orderSide()) {
+            // BUY order: spend base, receive quote
+            $baseAmount = Money::fromString(
+                $order->assetPair()->base(),
+                $spendAmount->amount(),
+                $spendAmount->scale()
+            );
+
+            return $order->calculateEffectiveQuoteAmount($baseAmount);
+        }
+
+        // SELL order: spend quote, receive base
+        // Convert quote amount to base amount using inverted rate
+        $rate = $order->effectiveRate();
+        $invertedRate = $rate->invert();
+
+        // Create quote money and convert to base
+        $quoteAmount = Money::fromString(
+            $order->assetPair()->quote(),
+            $spendAmount->amount(),
+            $spendAmount->scale()
+        );
+
+        $baseAmount = $invertedRate->convert($quoteAmount, self::SCALE);
+
+        // Apply fee deduction if present (fees are subtracted from received amount)
+        $feePolicy = $order->feePolicy();
+        if (null !== $feePolicy) {
+            // For SELL orders, we need to check if there's a base fee that should be deducted
+            // from the received base amount
+            $quoteForFee = $rate->convert(
+                Money::fromString($order->assetPair()->base(), $baseAmount->amount(), $baseAmount->scale()),
+                self::SCALE
+            );
+            $feeBreakdown = $feePolicy->calculate($order->side(), $baseAmount, $quoteForFee);
+            $baseFee = $feeBreakdown->baseFee();
+
+            if (null !== $baseFee && !$baseFee->isZero()) {
+                $baseAmount = $baseAmount->subtract($baseFee);
+            }
+        }
+
+        return $baseAmount;
     }
 
     /**
@@ -538,17 +600,20 @@ final class ExecutionPlanSearchEngine
 
         foreach ($path as $edge) {
             $order = $edge->order();
-            $baseCurrency = $order->assetPair()->base();
+            $isBuy = OrderSide::BUY === $edge->orderSide();
 
-            // Convert current amount to base currency for order execution
-            $spendAmount = Money::fromString($baseCurrency, $currentAmount->amount(), $currentAmount->scale());
+            // Get the correct spend currency based on order side
+            $spendCurrency = $isBuy ? $order->assetPair()->base() : $order->assetPair()->quote();
 
-            // Clamp to order bounds
-            $bounds = $order->bounds();
-            $boundsScale = max($spendAmount->scale(), $bounds->max()->scale());
+            // Convert current amount to spend currency for order execution
+            $spendAmount = Money::fromString($spendCurrency, $currentAmount->amount(), $currentAmount->scale());
+
+            // Clamp to capacity bounds (use correct capacity based on order side)
+            $capacity = $this->getSpendCapacity($edge);
+            $boundsScale = max($spendAmount->scale(), $capacity->max()->scale());
             $spendAmount = $spendAmount->withScale($boundsScale);
-            $boundsMax = $bounds->max()->withScale($boundsScale);
-            $boundsMin = $bounds->min()->withScale($boundsScale);
+            $boundsMax = $capacity->max()->withScale($boundsScale);
+            $boundsMin = $capacity->min()->withScale($boundsScale);
 
             if ($spendAmount->greaterThan($boundsMax)) {
                 $spendAmount = $boundsMax;
@@ -559,11 +624,11 @@ final class ExecutionPlanSearchEngine
                 $spendAmount = $boundsMin;
             }
 
-            // Calculate received amount
-            $received = $order->calculateEffectiveQuoteAmount($spendAmount);
+            // Calculate received amount based on order side
+            $received = $this->calculateReceivedAmount($edge, $spendAmount);
 
             // Calculate fees
-            $fees = $this->calculateFees($order, $spendAmount, $received);
+            $fees = $this->calculateFeesForEdge($edge, $spendAmount, $received);
 
             // Create step with proper from/to based on edge direction
             $step = new ExecutionStep(
@@ -581,8 +646,10 @@ final class ExecutionPlanSearchEngine
             // Calculate cost for portfolio update
             $cost = $this->calculateStepCost($spendAmount, $received);
 
-            // Update portfolio
-            $portfolio = $portfolio->executeOrder($order, $spendAmount, $cost);
+            // Update portfolio using order-side-aware method
+            $stepSpend = Money::fromString($edge->from(), $spendAmount->amount(), $spendAmount->scale());
+            $stepReceived = Money::fromString($edge->to(), $received->amount(), $received->scale());
+            $portfolio = $portfolio->executeOrderWithSide($order, $edge->orderSide(), $stepSpend, $stepReceived, $cost);
 
             // Set up for next edge
             $currentAmount = $received;
@@ -596,17 +663,46 @@ final class ExecutionPlanSearchEngine
     }
 
     /**
-     * Calculates fees for an order execution.
+     * Calculates fees for an edge execution.
+     *
+     * Handles both BUY and SELL orders by determining the correct base/quote amounts.
      */
-    private function calculateFees(Order $order, Money $spent, Money $received): MoneyMap
+    private function calculateFeesForEdge(GraphEdge $edge, Money $spendAmount, Money $receivedAmount): MoneyMap
     {
+        $order = $edge->order();
         $feePolicy = $order->feePolicy();
         if (null === $feePolicy) {
             return MoneyMap::empty();
         }
 
-        $quoteAmount = $order->calculateQuoteAmount($spent);
-        $feeBreakdown = $feePolicy->calculate($order->side(), $spent, $quoteAmount);
+        // Determine base and quote amounts based on order side
+        if (OrderSide::BUY === $edge->orderSide()) {
+            // BUY: spend base, receive quote
+            $baseAmount = Money::fromString(
+                $order->assetPair()->base(),
+                $spendAmount->amount(),
+                $spendAmount->scale()
+            );
+            $quoteAmount = Money::fromString(
+                $order->assetPair()->quote(),
+                $receivedAmount->amount(),
+                $receivedAmount->scale()
+            );
+        } else {
+            // SELL: spend quote, receive base
+            $baseAmount = Money::fromString(
+                $order->assetPair()->base(),
+                $receivedAmount->amount(),
+                $receivedAmount->scale()
+            );
+            $quoteAmount = Money::fromString(
+                $order->assetPair()->quote(),
+                $spendAmount->amount(),
+                $spendAmount->scale()
+            );
+        }
+
+        $feeBreakdown = $feePolicy->calculate($order->side(), $baseAmount, $quoteAmount);
 
         $fees = [];
         $baseFee = $feeBreakdown->baseFee();

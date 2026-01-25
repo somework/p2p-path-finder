@@ -15,6 +15,8 @@ use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
+use function in_array;
+
 #[CoversClass(ExecutionPlanSearchEngine::class)]
 #[CoversClass(ExecutionPlanSearchOutcome::class)]
 final class ExecutionPlanSearchEngineTest extends TestCase

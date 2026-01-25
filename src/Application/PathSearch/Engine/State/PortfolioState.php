@@ -8,6 +8,7 @@ use Brick\Math\BigDecimal;
 use InvalidArgumentException;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 
 use function array_filter;
 use function array_keys;
@@ -168,6 +169,61 @@ final class PortfolioState
     }
 
     /**
+     * Checks if the given order can be executed with the specified spend amount,
+     * taking order side into account.
+     *
+     * For BUY orders: source = base, target = quote (taker spends base)
+     * For SELL orders: source = quote, target = base (taker spends quote)
+     *
+     * Validates:
+     * - Sufficient balance in source currency
+     * - Order not already used
+     * - Target currency is receivable (not visited unless has balance)
+     */
+    public function canExecuteOrderWithSide(Order $order, OrderSide $side, Money $spendAmount): bool
+    {
+        [$sourceCurrency, $targetCurrency] = $this->resolveOrderDirection($order, $side);
+
+        // Check sufficient balance
+        if (!$this->hasBalance($sourceCurrency)) {
+            return false;
+        }
+
+        $currentBalance = $this->balance($sourceCurrency);
+        if ($currentBalance->lessThan($spendAmount)) {
+            return false;
+        }
+
+        // Check order not already used
+        if ($this->hasUsedOrder($order)) {
+            return false;
+        }
+
+        // Check target currency is receivable
+        if (!$this->canReceiveInto($targetCurrency)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Resolves the source and target currencies based on order side.
+     *
+     * @return array{0: string, 1: string} [sourceCurrency, targetCurrency]
+     */
+    private function resolveOrderDirection(Order $order, OrderSide $side): array
+    {
+        if (OrderSide::BUY === $side) {
+            // BUY: taker spends base, receives quote
+            return [$order->assetPair()->base(), $order->assetPair()->quote()];
+        }
+
+        // SELL: taker spends quote, receives base
+        return [$order->assetPair()->quote(), $order->assetPair()->base()];
+    }
+
+    /**
      * Executes an order, returning a new portfolio state with updated balances.
      *
      * Operations:
@@ -195,6 +251,79 @@ final class PortfolioState
 
         // Calculate received amount using order's effective rate
         $receivedAmount = $order->calculateEffectiveQuoteAmount($spendAmount);
+
+        // Update balances
+        $newBalances = $this->balances;
+
+        // Deduct from source
+        $newSourceBalance = $this->balance($sourceCurrency)->subtract($spendAmount);
+        if ($newSourceBalance->isZero()) {
+            unset($newBalances[$sourceCurrency]);
+        } else {
+            $newBalances[$sourceCurrency] = $newSourceBalance;
+        }
+
+        // Add to target
+        if (isset($newBalances[$targetCurrency])) {
+            $newBalances[$targetCurrency] = $newBalances[$targetCurrency]->add($receivedAmount);
+        } else {
+            $newBalances[$targetCurrency] = $receivedAmount;
+        }
+
+        // Mark source as visited if balance depleted
+        $newVisited = $this->visited;
+        if ($newSourceBalance->isZero()) {
+            $newVisited[$sourceCurrency] = true;
+        }
+
+        // Mark order as used
+        $newUsedOrders = $this->usedOrders;
+        $newUsedOrders[self::orderFingerprint($order)] = true;
+
+        // Update total cost
+        $newTotalCost = $this->totalCost->plus($cost);
+
+        return new self($newBalances, $newVisited, $newUsedOrders, $newTotalCost);
+    }
+
+    /**
+     * Executes an order with explicit order side, returning a new portfolio state.
+     *
+     * This method handles both BUY and SELL orders correctly:
+     * - BUY: taker spends base, receives quote
+     * - SELL: taker spends quote, receives base
+     *
+     * Operations:
+     * 1. Deducts spendAmount from source currency
+     * 2. Adds receivedAmount to target currency
+     * 3. Marks order as used
+     * 4. If source balance becomes zero, marks currency as visited
+     * 5. Adds order cost to total cost
+     *
+     * @throws InvalidArgumentException when the order cannot be executed
+     */
+    public function executeOrderWithSide(
+        Order $order,
+        OrderSide $side,
+        Money $spendAmount,
+        Money $receivedAmount,
+        BigDecimal $cost,
+    ): self {
+        if (!$this->canExecuteOrderWithSide($order, $side, $spendAmount)) {
+            throw new InvalidArgumentException('Cannot execute order: insufficient balance, order already used, or target currency not receivable.');
+        }
+
+        [$sourceCurrency, $targetCurrency] = $this->resolveOrderDirection($order, $side);
+
+        // Validate spend amount currency matches source currency
+        if ($spendAmount->currency() !== $sourceCurrency) {
+            throw new InvalidArgumentException(sprintf('Spend amount currency "%s" must match source currency "%s".', $spendAmount->currency(), $sourceCurrency));
+        }
+
+        // Validate received amount currency matches target currency
+        if ($receivedAmount->currency() !== $targetCurrency) {
+            throw new InvalidArgumentException(sprintf('Received amount currency "%s" must match target currency "%s".', $receivedAmount->currency(), $targetCurrency));
+        }
 
         // Update balances
         $newBalances = $this->balances;

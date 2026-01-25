@@ -28,7 +28,7 @@ use function trim;
  *
  * @api
  */
-final class ExecutionPlan
+final class ExecutionPlan implements SearchResultInterface
 {
     public function __construct(
         private readonly ExecutionStepCollection $steps,

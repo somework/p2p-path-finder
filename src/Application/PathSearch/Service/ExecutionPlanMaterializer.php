@@ -42,10 +42,10 @@ final class ExecutionPlanMaterializer
     /**
      * Materializes raw order fills into a complete ExecutionPlan.
      *
-     * @param list<array{order: Order, spend: Money, sequence: int}> $orderFills raw fills from search engine
+     * @param list<array{order: Order, spend: Money, sequence: int}> $orderFills     raw fills from search engine
      * @param string                                                 $sourceCurrency the starting currency of the path
      * @param string                                                 $targetCurrency the destination currency of the path
-     * @param DecimalTolerance                                       $tolerance residual tolerance for the plan
+     * @param DecimalTolerance                                       $tolerance      residual tolerance for the plan
      *
      * @throws \SomeWork\P2PPathFinder\Exception\InvalidInput when steps don't match source/target currencies
      *
@@ -86,8 +86,8 @@ final class ExecutionPlanMaterializer
     /**
      * Processes a single order fill into an ExecutionStep.
      *
-     * @param Order $order the order being filled
-     * @param Money $spend the amount being spent
+     * @param Order $order    the order being filled
+     * @param Money $spend    the amount being spent
      * @param int   $sequence the execution sequence number
      *
      * @return ExecutionStep|null null if the fill cannot be processed
