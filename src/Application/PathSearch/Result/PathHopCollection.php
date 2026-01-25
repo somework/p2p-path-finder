@@ -171,6 +171,11 @@ final class PathHopCollection implements Countable, IteratorAggregate
             return $hops;
         }
 
+        // Handle single transfer hop (self-loop where from === to)
+        if (1 === count($hops) && $hops[0]->from() === $hops[0]->to()) {
+            return $hops;
+        }
+
         /** @var array<string, PathHop> $byOrigin */
         $byOrigin = [];
         /** @var array<string, true> $destinations */
@@ -185,7 +190,11 @@ final class PathHopCollection implements Countable, IteratorAggregate
             }
 
             $byOrigin[$from] = $hop;
-            $destinations[$to] = true;
+            // For transfer hops (from === to), don't add to destinations
+            // as they don't block the origin from being a start candidate
+            if ($from !== $to) {
+                $destinations[$to] = true;
+            }
         }
 
         $startCandidates = array_diff_key($byOrigin, $destinations);
@@ -207,7 +216,9 @@ final class PathHopCollection implements Countable, IteratorAggregate
             unset($byOrigin[$currentAsset]);
 
             $destination = $hop->to();
-            if (isset($visitedDestinations[$destination])) {
+            // For transfer hops (from === to), allow the same destination
+            // as it represents staying on the same asset
+            if ($hop->from() !== $destination && isset($visitedDestinations[$destination])) {
                 throw new InvalidInput('Path hops must form a contiguous route.');
             }
 

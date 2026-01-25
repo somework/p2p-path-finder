@@ -194,10 +194,40 @@ final class AssetPairPropertyTest extends TestCase
     }
 
     /**
-     * Property: Base and quote currencies must be distinct (after normalization).
-     * Same currencies should always throw InvalidInput.
+     * Property: Same currencies create valid transfer pairs.
+     * Identical currencies are allowed for cross-exchange transfer orders.
      */
-    public function test_identical_currencies_always_throw(): void
+    public function test_identical_currencies_create_transfer_pairs(): void
+    {
+        $limit = $this->iterationLimit(25, 5, 'P2P_ASSET_PAIR_PROPERTY_ITERATIONS');
+
+        for ($i = 0; $i < $limit; ++$i) {
+            $currency = $this->randomCurrencyCode();
+
+            // Try various case combinations of same currency
+            $caseVariants = [
+                [strtoupper($currency), strtolower($currency)],
+                [strtolower($currency), strtoupper($currency)],
+                [$this->mixedCase($currency), strtoupper($currency)],
+                [strtoupper($currency), $currency],
+            ];
+
+            foreach ($caseVariants as [$base, $quote]) {
+                $pair = AssetPair::fromString($base, $quote);
+
+                // Should create a valid transfer pair
+                self::assertTrue($pair->isTransfer());
+                self::assertSame(strtoupper($currency), $pair->base());
+                self::assertSame(strtoupper($currency), $pair->quote());
+            }
+        }
+    }
+
+    /**
+     * Property: Conversion factory rejects identical currencies.
+     * Use conversion() factory when distinct currencies are required.
+     */
+    public function test_conversion_factory_rejects_identical_currencies(): void
     {
         $limit = $this->iterationLimit(25, 5, 'P2P_ASSET_PAIR_PROPERTY_ITERATIONS');
 
@@ -214,8 +244,8 @@ final class AssetPairPropertyTest extends TestCase
 
             foreach ($caseVariants as [$base, $quote]) {
                 try {
-                    AssetPair::fromString($base, $quote);
-                    self::fail('Expected InvalidInput for identical currencies: '.$base.' = '.$quote);
+                    AssetPair::conversion($base, $quote);
+                    self::fail('Expected InvalidInput for identical currencies in conversion: '.$base.' = '.$quote);
                 } catch (InvalidInput $e) {
                     self::assertStringContainsString('distinct assets', $e->getMessage());
                 }
@@ -391,9 +421,9 @@ final class AssetPairPropertyTest extends TestCase
     }
 
     /**
-     * Property: Base and quote currencies are always properly ordered and distinct after creation.
+     * Property: Conversion pairs have distinct base and quote currencies after creation.
      */
-    public function test_base_and_quote_are_always_distinct_and_normalized(): void
+    public function test_conversion_pairs_have_distinct_normalized_currencies(): void
     {
         $limit = $this->iterationLimit(25, 5, 'P2P_ASSET_PAIR_PROPERTY_ITERATIONS');
 
@@ -403,8 +433,9 @@ final class AssetPairPropertyTest extends TestCase
 
             $pair = AssetPair::fromString($base, $quote);
 
-            // Base and quote should always be different
+            // Base and quote should be different for conversion pairs
             self::assertNotSame($pair->base(), $pair->quote());
+            self::assertFalse($pair->isTransfer());
 
             // Both should be uppercase
             self::assertMatchesRegularExpression('/^[A-Z]{3,12}$/', $pair->base());
@@ -413,6 +444,28 @@ final class AssetPairPropertyTest extends TestCase
             // Should match the normalized versions of inputs
             self::assertSame(strtoupper($base), $pair->base());
             self::assertSame(strtoupper($quote), $pair->quote());
+        }
+    }
+
+    /**
+     * Property: Transfer pairs have identical base and quote currencies after creation.
+     */
+    public function test_transfer_pairs_have_identical_normalized_currencies(): void
+    {
+        $limit = $this->iterationLimit(25, 5, 'P2P_ASSET_PAIR_PROPERTY_ITERATIONS');
+
+        for ($i = 0; $i < $limit; ++$i) {
+            $currency = $this->randomCurrencyCode();
+
+            $pair = AssetPair::transfer($currency);
+
+            // Base and quote should be identical for transfer pairs
+            self::assertSame($pair->base(), $pair->quote());
+            self::assertTrue($pair->isTransfer());
+
+            // Should be uppercase
+            self::assertMatchesRegularExpression('/^[A-Z]{3,12}$/', $pair->base());
+            self::assertSame(strtoupper($currency), $pair->base());
         }
     }
 

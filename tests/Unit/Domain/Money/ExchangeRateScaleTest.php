@@ -261,12 +261,23 @@ final class ExchangeRateScaleTest extends TestCase
         ExchangeRate::fromString('BTC', 'USD', '-65000.00', 2);
     }
 
-    public function test_exchange_rate_rejects_same_currency(): void
+    public function test_exchange_rate_allows_same_currency_for_transfers(): void
+    {
+        // fromString now allows same currencies for transfer orders
+        $rate = ExchangeRate::fromString('USD', 'USD', '1.00', 2);
+
+        self::assertSame('USD', $rate->baseCurrency());
+        self::assertSame('USD', $rate->quoteCurrency());
+        self::assertTrue($rate->isTransfer());
+    }
+
+    public function test_exchange_rate_conversion_factory_rejects_same_currency(): void
     {
         $this->expectException(InvalidInput::class);
-        $this->expectExceptionMessage('Exchange rate requires distinct currencies.');
+        $this->expectExceptionMessage('distinct currencies');
 
-        ExchangeRate::fromString('USD', 'USD', '1.00', 2);
+        // conversion() factory enforces distinct currencies
+        ExchangeRate::conversion('USD', 'USD', '1.00', 2);
     }
 
     public function test_convert_rejects_wrong_base_currency(): void

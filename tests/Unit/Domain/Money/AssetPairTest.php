@@ -23,12 +23,22 @@ final class AssetPairTest extends TestCase
     }
 
     #[Test]
-    public function it_rejects_identical_assets(): void
+    public function it_allows_identical_assets_for_transfers(): void
+    {
+        $pair = AssetPair::fromString('btc', 'BTC');
+
+        self::assertSame('BTC', $pair->base());
+        self::assertSame('BTC', $pair->quote());
+        self::assertTrue($pair->isTransfer());
+    }
+
+    #[Test]
+    public function it_rejects_identical_assets_in_conversion_factory(): void
     {
         $this->expectException(InvalidInput::class);
-        $this->expectExceptionMessage('Asset pair requires distinct assets.');
+        $this->expectExceptionMessage('Conversion pair requires distinct assets.');
 
-        AssetPair::fromString('btc', 'BTC');
+        AssetPair::conversion('btc', 'BTC');
     }
 
     #[Test]
@@ -101,12 +111,22 @@ final class AssetPairTest extends TestCase
     }
 
     #[Test]
-    public function it_rejects_same_currencies_regardless_of_case(): void
+    public function it_allows_same_currencies_regardless_of_case_for_transfers(): void
+    {
+        $pair = AssetPair::fromString('usd', 'USD');
+
+        self::assertSame('USD', $pair->base());
+        self::assertSame('USD', $pair->quote());
+        self::assertTrue($pair->isTransfer());
+    }
+
+    #[Test]
+    public function it_rejects_same_currencies_regardless_of_case_in_conversion_factory(): void
     {
         $this->expectException(InvalidInput::class);
-        $this->expectExceptionMessage('Asset pair requires distinct assets.');
+        $this->expectExceptionMessage('Conversion pair requires distinct assets.');
 
-        AssetPair::fromString('usd', 'USD');
+        AssetPair::conversion('usd', 'USD');
     }
 
     #[Test]
@@ -285,10 +305,10 @@ final class AssetPairTest extends TestCase
     }
 
     #[Test]
-    public function it_validates_error_messages_for_identical_assets(): void
+    public function it_validates_error_messages_for_identical_assets_in_conversion(): void
     {
         try {
-            AssetPair::fromString('USD', 'usd');
+            AssetPair::conversion('USD', 'usd');
             self::fail('Expected InvalidInput for identical assets');
         } catch (InvalidInput $e) {
             self::assertStringContainsString('distinct assets', $e->getMessage());
@@ -323,5 +343,80 @@ final class AssetPairTest extends TestCase
             self::assertSame($currency, $pair->base());
             self::assertSame($otherCurrency, $pair->quote());
         }
+    }
+
+    // ==================== Transfer Order Tests ====================
+
+    #[Test]
+    public function it_creates_transfer_pair_from_single_currency(): void
+    {
+        $pair = AssetPair::transfer('USDT');
+
+        self::assertSame('USDT', $pair->base());
+        self::assertSame('USDT', $pair->quote());
+        self::assertTrue($pair->isTransfer());
+    }
+
+    #[Test]
+    public function it_normalizes_transfer_currency_to_uppercase(): void
+    {
+        $pair = AssetPair::transfer('usdt');
+
+        self::assertSame('USDT', $pair->base());
+        self::assertSame('USDT', $pair->quote());
+    }
+
+    #[Test]
+    public function it_rejects_invalid_transfer_currency(): void
+    {
+        $this->expectException(InvalidInput::class);
+
+        AssetPair::transfer('US1');
+    }
+
+    #[Test]
+    public function it_returns_false_for_is_transfer_on_conversion_pair(): void
+    {
+        $pair = AssetPair::fromString('BTC', 'USD');
+
+        self::assertFalse($pair->isTransfer());
+    }
+
+    #[Test]
+    public function it_supports_common_stablecoin_transfers(): void
+    {
+        $stablecoins = ['USDT', 'USDC', 'BUSD', 'DAI'];
+
+        foreach ($stablecoins as $coin) {
+            $pair = AssetPair::transfer($coin);
+
+            self::assertTrue($pair->isTransfer());
+            self::assertSame($coin, $pair->base());
+            self::assertSame($coin, $pair->quote());
+        }
+    }
+
+    #[Test]
+    public function it_supports_crypto_transfers(): void
+    {
+        $cryptos = ['BTC', 'ETH', 'XRP', 'LTC'];
+
+        foreach ($cryptos as $crypto) {
+            $pair = AssetPair::transfer($crypto);
+
+            self::assertTrue($pair->isTransfer());
+            self::assertSame($crypto, $pair->base());
+            self::assertSame($crypto, $pair->quote());
+        }
+    }
+
+    #[Test]
+    public function it_distinguishes_transfer_from_conversion(): void
+    {
+        $transfer = AssetPair::transfer('USDT');
+        $conversion = AssetPair::conversion('USDT', 'BTC');
+
+        self::assertTrue($transfer->isTransfer());
+        self::assertFalse($conversion->isTransfer());
     }
 }

@@ -27,17 +27,19 @@ use function sprintf;
  * - Multiple orders: Multiple orders for same direction can fill capacity (two A→B orders)
  * - Merge execution: Routes MERGE at target currency (B→D and C→D converge)
  * - Backtracking prevention: Once all funds leave a currency, cannot receive back into it (A→B→A forbidden)
+ * - Transfer orders: Same-currency transfers (A→A) represent cross-exchange movements and don't trigger backtracking
  *
  * ## Invariants
  *
  * - **Non-negative balances**: All balances must be >= 0
- * - **Visited marking**: A currency is marked visited when its balance becomes zero after spending
+ * - **Visited marking**: A currency is marked visited when its balance becomes zero after spending (conversion only)
  * - **No backtracking**: Cannot receive funds into a visited currency (unless already has balance)
+ * - **Transfer exception**: Transfer orders (A→A) don't mark currency as visited since we're not leaving it
  * - **Order uniqueness**: Each order can only be used once per portfolio state
  * - **Immutability**: All operations return new instances
  *
  * @invariant forall currency: balance(currency) >= 0
- * @invariant visited(currency) implies balance was depleted through spending
+ * @invariant visited(currency) implies balance was depleted through spending (conversion orders only)
  * @invariant canReceiveInto(currency) == !hasVisited(currency) || hasBalance(currency)
  * @invariant executeOrder returns new instance (immutable)
  *
@@ -139,6 +141,7 @@ final class PortfolioState
      * - Sufficient balance in source currency
      * - Order not already used
      * - Target currency is receivable (not visited unless has balance)
+     * - Transfer orders: Skip backtracking check since source === target
      */
     public function canExecuteOrder(Order $order, Money $spendAmount): bool
     {
@@ -160,7 +163,12 @@ final class PortfolioState
             return false;
         }
 
-        // Check target currency is receivable
+        // Transfer orders (A→A) skip backtracking check since we're not leaving the currency
+        if ($order->isTransfer()) {
+            return true;
+        }
+
+        // Check target currency is receivable (non-transfer orders only)
         if (!$this->canReceiveInto($targetCurrency)) {
             return false;
         }
@@ -179,6 +187,7 @@ final class PortfolioState
      * - Sufficient balance in source currency
      * - Order not already used
      * - Target currency is receivable (not visited unless has balance)
+     * - Transfer orders: Skip backtracking check since source === target
      */
     public function canExecuteOrderWithSide(Order $order, OrderSide $side, Money $spendAmount): bool
     {
@@ -199,7 +208,12 @@ final class PortfolioState
             return false;
         }
 
-        // Check target currency is receivable
+        // Transfer orders (A→A) skip backtracking check since we're not leaving the currency
+        if ($order->isTransfer()) {
+            return true;
+        }
+
+        // Check target currency is receivable (non-transfer orders only)
         if (!$this->canReceiveInto($targetCurrency)) {
             return false;
         }
@@ -230,8 +244,11 @@ final class PortfolioState
      * 1. Deducts spendAmount from source currency
      * 2. Adds received amount to target currency
      * 3. Marks order as used
-     * 4. If source balance becomes zero, marks currency as visited
+     * 4. If source balance becomes zero and NOT a transfer, marks currency as visited
      * 5. Adds order cost to total cost
+     *
+     * Transfer orders (A→A) don't mark the currency as visited since we're
+     * not leaving it - we're just moving funds between exchanges.
      *
      * @throws InvalidArgumentException when the order cannot be executed
      */
@@ -243,6 +260,7 @@ final class PortfolioState
 
         $sourceCurrency = $order->assetPair()->base();
         $targetCurrency = $order->assetPair()->quote();
+        $isTransfer = $order->isTransfer();
 
         // Validate spend amount currency matches order base currency
         if ($spendAmount->currency() !== $sourceCurrency) {
@@ -255,25 +273,41 @@ final class PortfolioState
         // Update balances
         $newBalances = $this->balances;
 
-        // Deduct from source
-        $newSourceBalance = $this->balance($sourceCurrency)->subtract($spendAmount);
-        if ($newSourceBalance->isZero()) {
-            unset($newBalances[$sourceCurrency]);
+        // For transfers, we subtract spend and add received to the same currency
+        if ($isTransfer) {
+            // Calculate net change: received - spend (typically negative due to fees)
+            $currentBalance = $this->balance($sourceCurrency);
+            $newBalance = $currentBalance->subtract($spendAmount)->add($receivedAmount);
+
+            if ($newBalance->isZero()) {
+                unset($newBalances[$sourceCurrency]);
+            } else {
+                $newBalances[$sourceCurrency] = $newBalance;
+            }
         } else {
-            $newBalances[$sourceCurrency] = $newSourceBalance;
+            // Deduct from source
+            $newSourceBalance = $this->balance($sourceCurrency)->subtract($spendAmount);
+            if ($newSourceBalance->isZero()) {
+                unset($newBalances[$sourceCurrency]);
+            } else {
+                $newBalances[$sourceCurrency] = $newSourceBalance;
+            }
+
+            // Add to target
+            if (isset($newBalances[$targetCurrency])) {
+                $newBalances[$targetCurrency] = $newBalances[$targetCurrency]->add($receivedAmount);
+            } else {
+                $newBalances[$targetCurrency] = $receivedAmount;
+            }
         }
 
-        // Add to target
-        if (isset($newBalances[$targetCurrency])) {
-            $newBalances[$targetCurrency] = $newBalances[$targetCurrency]->add($receivedAmount);
-        } else {
-            $newBalances[$targetCurrency] = $receivedAmount;
-        }
-
-        // Mark source as visited if balance depleted
+        // Mark source as visited if balance depleted (conversion orders only, not transfers)
         $newVisited = $this->visited;
-        if ($newSourceBalance->isZero()) {
-            $newVisited[$sourceCurrency] = true;
+        if (!$isTransfer) {
+            $newSourceBalance = $newBalances[$sourceCurrency] ?? null;
+            if (null === $newSourceBalance || $newSourceBalance->isZero()) {
+                $newVisited[$sourceCurrency] = true;
+            }
         }
 
         // Mark order as used
@@ -297,8 +331,11 @@ final class PortfolioState
      * 1. Deducts spendAmount from source currency
      * 2. Adds receivedAmount to target currency
      * 3. Marks order as used
-     * 4. If source balance becomes zero, marks currency as visited
+     * 4. If source balance becomes zero and NOT a transfer, marks currency as visited
      * 5. Adds order cost to total cost
+     *
+     * Transfer orders (A→A) don't mark the currency as visited since we're
+     * not leaving it - we're just moving funds between exchanges.
      *
      * @throws InvalidArgumentException when the order cannot be executed
      */
@@ -314,6 +351,7 @@ final class PortfolioState
         }
 
         [$sourceCurrency, $targetCurrency] = $this->resolveOrderDirection($order, $side);
+        $isTransfer = $order->isTransfer();
 
         // Validate spend amount currency matches source currency
         if ($spendAmount->currency() !== $sourceCurrency) {
@@ -328,25 +366,40 @@ final class PortfolioState
         // Update balances
         $newBalances = $this->balances;
 
-        // Deduct from source
-        $newSourceBalance = $this->balance($sourceCurrency)->subtract($spendAmount);
-        if ($newSourceBalance->isZero()) {
-            unset($newBalances[$sourceCurrency]);
+        // For transfers, source === target, so we calculate net change
+        if ($isTransfer) {
+            $currentBalance = $this->balance($sourceCurrency);
+            $newBalance = $currentBalance->subtract($spendAmount)->add($receivedAmount);
+
+            if ($newBalance->isZero()) {
+                unset($newBalances[$sourceCurrency]);
+            } else {
+                $newBalances[$sourceCurrency] = $newBalance;
+            }
         } else {
-            $newBalances[$sourceCurrency] = $newSourceBalance;
+            // Deduct from source
+            $newSourceBalance = $this->balance($sourceCurrency)->subtract($spendAmount);
+            if ($newSourceBalance->isZero()) {
+                unset($newBalances[$sourceCurrency]);
+            } else {
+                $newBalances[$sourceCurrency] = $newSourceBalance;
+            }
+
+            // Add to target
+            if (isset($newBalances[$targetCurrency])) {
+                $newBalances[$targetCurrency] = $newBalances[$targetCurrency]->add($receivedAmount);
+            } else {
+                $newBalances[$targetCurrency] = $receivedAmount;
+            }
         }
 
-        // Add to target
-        if (isset($newBalances[$targetCurrency])) {
-            $newBalances[$targetCurrency] = $newBalances[$targetCurrency]->add($receivedAmount);
-        } else {
-            $newBalances[$targetCurrency] = $receivedAmount;
-        }
-
-        // Mark source as visited if balance depleted
+        // Mark source as visited if balance depleted (conversion orders only, not transfers)
         $newVisited = $this->visited;
-        if ($newSourceBalance->isZero()) {
-            $newVisited[$sourceCurrency] = true;
+        if (!$isTransfer) {
+            $newSourceBalance = $newBalances[$sourceCurrency] ?? null;
+            if (null === $newSourceBalance || $newSourceBalance->isZero()) {
+                $newVisited[$sourceCurrency] = true;
+            }
         }
 
         // Mark order as used

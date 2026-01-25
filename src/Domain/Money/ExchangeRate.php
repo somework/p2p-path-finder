@@ -19,13 +19,12 @@ use function strtoupper;
  *
  * ## Invariants
  *
- * - **Distinct currencies**: Base and quote currencies must be distinct (case-insensitive)
  * - **Positive rate**: Exchange rate must be strictly positive (> 0)
  * - **Valid currencies**: Both currencies must match /^[A-Z]{3,12}$/
  * - **Scale bounds**: Scale must be 0 <= scale <= 50
  * - **Rate inversion**: invert() returns rate with swapped currencies and inverted value
+ * - **Transfer rates**: Same currency rates are allowed for transfer orders (must be 1:1)
  *
- * @invariant baseCurrency != quoteCurrency (case-insensitive)
  * @invariant rate > 0
  * @invariant scale >= 0 && scale <= 50
  * @invariant baseCurrency matches /^[A-Z]{3,12}$/
@@ -67,10 +66,6 @@ final class ExchangeRate
         Money::fromString($baseCurrency, '0', $scale); // Validates the currency format.
         Money::fromString($quoteCurrency, '0', $scale);
 
-        if (0 === strcasecmp($baseCurrency, $quoteCurrency)) {
-            throw new InvalidInput('Exchange rate requires distinct currencies.');
-        }
-
         $normalizedRate = self::scaleDecimal(self::decimalFromString($rate), $scale);
 
         if ($normalizedRate->compareTo(BigDecimal::zero()) <= 0) {
@@ -78,6 +73,49 @@ final class ExchangeRate
         }
 
         return new self(strtoupper($baseCurrency), strtoupper($quoteCurrency), $normalizedRate, $scale);
+    }
+
+    /**
+     * Creates an exchange rate for conversion between distinct currencies.
+     *
+     * @param non-empty-string $baseCurrency
+     * @param non-empty-string $quoteCurrency
+     * @param numeric-string   $rate
+     *
+     * @throws InvalidInput when currencies are the same or rate is invalid
+     */
+    public static function conversion(string $baseCurrency, string $quoteCurrency, string $rate, int $scale = 8): self
+    {
+        if (0 === strcasecmp($baseCurrency, $quoteCurrency)) {
+            throw new InvalidInput('Conversion rate requires distinct currencies.');
+        }
+
+        return self::fromString($baseCurrency, $quoteCurrency, $rate, $scale);
+    }
+
+    /**
+     * Creates a 1:1 exchange rate for same-currency transfers.
+     *
+     * Transfer rates represent cross-exchange movements where the currency
+     * doesn't change but network/withdrawal fees may apply.
+     *
+     * @param non-empty-string $currency
+     *
+     * @throws InvalidInput when the currency is invalid
+     */
+    public static function transfer(string $currency, int $scale = 8): self
+    {
+        Money::fromString($currency, '0', $scale);
+
+        return new self(strtoupper($currency), strtoupper($currency), BigDecimal::one(), $scale);
+    }
+
+    /**
+     * Returns whether this is a same-currency transfer rate.
+     */
+    public function isTransfer(): bool
+    {
+        return $this->baseCurrency === $this->quoteCurrency;
     }
 
     /**
@@ -100,6 +138,9 @@ final class ExchangeRate
 
     /**
      * Returns the inverted exchange rate (quote becomes base and vice versa).
+     *
+     * For transfer rates (same currency), returns a new instance with the same rate
+     * since inverting 1:1 yields 1:1.
      *
      * @throws InvalidInput when arbitrary precision operations are unavailable
      */

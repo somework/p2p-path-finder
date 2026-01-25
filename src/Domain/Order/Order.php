@@ -92,6 +92,18 @@ final class Order
     }
 
     /**
+     * Returns whether this order represents a same-currency transfer.
+     *
+     * Transfer orders have identical base and quote currencies in their asset pair
+     * and represent cross-exchange movements rather than currency conversions.
+     * The exchange rate should be 1:1 and any fees represent network/withdrawal costs.
+     */
+    public function isTransfer(): bool
+    {
+        return $this->assetPair->isTransfer();
+    }
+
+    /**
      * Validates that the provided amount can be used to partially fill the order.
      *
      * @throws InvalidInput|PrecisionViolation when the amount currency is invalid or outside the allowed bounds

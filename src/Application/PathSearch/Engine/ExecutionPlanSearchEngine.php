@@ -116,13 +116,6 @@ final class ExecutionPlanSearchEngine
             );
         }
 
-        // Same currency - no conversion needed
-        if ($sourceCurrency === $targetCurrency) {
-            return ExecutionPlanSearchOutcome::empty(
-                SearchGuardReport::idle($this->maxVisitedStates, $this->maxExpansions, $this->timeBudgetMs)
-            );
-        }
-
         // Validate spend amount matches source currency
         if ($spendAmount->currency() !== $sourceCurrency) {
             throw new InvalidInput('Spend amount currency must match source currency.');
@@ -132,6 +125,11 @@ final class ExecutionPlanSearchEngine
             return ExecutionPlanSearchOutcome::empty(
                 SearchGuardReport::idle($this->maxVisitedStates, $this->maxExpansions, $this->timeBudgetMs)
             );
+        }
+
+        // Same currency - check for transfer orders (cross-exchange movements)
+        if ($sourceCurrency === $targetCurrency) {
+            return $this->executeTransferSearch($graph, $sourceCurrency, $spendAmount);
         }
 
         return $this->executeSearch($graph, $sourceCurrency, $targetCurrency, $spendAmount);
@@ -217,6 +215,129 @@ final class ExecutionPlanSearchEngine
         $sourceBalance = $portfolio->balance($sourceCurrency);
         $targetBalance = $portfolio->balance($targetCurrency);
         $isComplete = $sourceBalance->isZero() && !$targetBalance->isZero();
+
+        if ($isComplete) {
+            return ExecutionPlanSearchOutcome::complete($plan, $guardReport);
+        }
+
+        return ExecutionPlanSearchOutcome::partial($plan, $guardReport);
+    }
+
+    /**
+     * Executes a transfer search for same-currency movements.
+     *
+     * Transfer orders represent cross-exchange movements of the same currency,
+     * where the rate is 1:1 but fees may apply.
+     */
+    private function executeTransferSearch(
+        Graph $graph,
+        string $currency,
+        Money $spendAmount,
+    ): ExecutionPlanSearchOutcome {
+        $portfolio = PortfolioState::initial($spendAmount);
+        $guards = new SearchGuards($this->maxExpansions, $this->timeBudgetMs);
+        $visitedStates = 1;
+        $visitedGuardReached = false;
+
+        /** @var list<ExecutionStep> $steps */
+        $steps = [];
+        $sequenceNumber = 1;
+
+        // Look for transfer orders (self-loop edges) at the currency
+        $node = $graph->node($currency);
+        if (null === $node) {
+            return ExecutionPlanSearchOutcome::empty(
+                SearchGuardReport::idle($this->maxVisitedStates, $this->maxExpansions, $this->timeBudgetMs)
+            );
+        }
+
+        // Find all transfer edges (self-loops)
+        $transferEdges = [];
+        foreach ($node->edges() as $edge) {
+            if ($edge->to() === $currency && $edge->order()->isTransfer()) {
+                $transferEdges[] = $edge;
+            }
+        }
+
+        if ([] === $transferEdges) {
+            // No transfer orders available
+            return ExecutionPlanSearchOutcome::empty(
+                SearchGuardReport::idle($this->maxVisitedStates, $this->maxExpansions, $this->timeBudgetMs)
+            );
+        }
+
+        // Execute transfers in sequence (sorted by cost - cheapest first)
+        while ($portfolio->hasBalance($currency)) {
+            if (!$guards->canExpand()) {
+                break;
+            }
+
+            if ($visitedStates >= $this->maxVisitedStates) {
+                $visitedGuardReached = true;
+                break;
+            }
+
+            $guards->recordExpansion();
+            ++$visitedStates;
+
+            // Find best unused transfer edge
+            $bestEdge = null;
+            $bestCost = null;
+
+            foreach ($transferEdges as $edge) {
+                if ($portfolio->hasUsedOrder($edge->order())) {
+                    continue;
+                }
+
+                $edgeCost = $this->calculateEdgeCost($edge);
+                if (null === $edgeCost) {
+                    continue;
+                }
+
+                if (null === $bestCost || $edgeCost->isGreaterThan($bestCost)) {
+                    $bestCost = $edgeCost;
+                    $bestEdge = $edge;
+                }
+            }
+
+            if (null === $bestEdge) {
+                // No more unused transfer orders
+                break;
+            }
+
+            // Calculate bottleneck for single-edge path
+            $bottleneck = $this->calculateBottleneck([$bestEdge], $portfolio, $currency);
+
+            if ($bottleneck->isZero()) {
+                $portfolio = $portfolio->markOrderUsed($bestEdge->order());
+                continue;
+            }
+
+            // Execute the transfer
+            $flowResult = $this->executeFlow([$bestEdge], $portfolio, $bottleneck, $currency, $sequenceNumber);
+            $portfolio = $flowResult['portfolio'];
+            /** @var list<ExecutionStep> $newSteps */
+            $newSteps = $flowResult['steps'];
+            $sequenceNumber = $flowResult['sequenceNumber'];
+
+            foreach ($newSteps as $step) {
+                $steps[] = $step;
+            }
+        }
+
+        $guardReport = $guards->finalize($visitedStates, $this->maxVisitedStates, $visitedGuardReached);
+
+        if ([] === $steps) {
+            return ExecutionPlanSearchOutcome::empty($guardReport);
+        }
+
+        $stepCollection = ExecutionStepCollection::fromList($steps);
+        $tolerance = DecimalTolerance::fromNumericString('0', self::SCALE);
+        $plan = ExecutionPlan::fromSteps($stepCollection, $currency, $currency, $tolerance);
+
+        // For transfers, we check if any balance remains
+        $remainingBalance = $portfolio->balance($currency);
+        $isComplete = !$remainingBalance->isZero();
 
         if ($isComplete) {
             return ExecutionPlanSearchOutcome::complete($plan, $guardReport);
@@ -341,6 +462,7 @@ final class ExecutionPlanSearchEngine
 
             foreach ($node->edges() as $edge) {
                 $nextCurrency = $edge->to();
+                $isTransferEdge = $edge->order()->isTransfer();
 
                 // Skip if order already used
                 if ($portfolio->hasUsedOrder($edge->order())) {
@@ -348,12 +470,21 @@ final class ExecutionPlanSearchEngine
                 }
 
                 // Skip if cannot receive into this currency (backtracking prevention)
-                if (!$portfolio->canReceiveInto($nextCurrency)) {
+                // Transfer edges (self-loops) skip this check since source === target
+                if (!$isTransferEdge && !$portfolio->canReceiveInto($nextCurrency)) {
                     continue;
                 }
 
                 // Skip if already visited (Dijkstra optimization)
-                if (isset($visited[$nextCurrency])) {
+                // Exception: transfer edges (self-loops) can be considered if order is unused
+                // since they represent different state transitions (using a different order)
+                if (!$isTransferEdge && isset($visited[$nextCurrency])) {
+                    continue;
+                }
+
+                // For self-loops (transfers), skip if we're already at the target
+                // since transfers don't help us reach the target faster
+                if ($isTransferEdge && $nextCurrency === $target) {
                     continue;
                 }
 

@@ -55,11 +55,22 @@ final class ExchangeRateTest extends TestCase
         self::assertSame(0, DecimalMath::decimal('0.007', 3)->compareTo($inverted->decimal()));
     }
 
-    public function test_from_string_rejects_identical_currencies(): void
+    public function test_from_string_allows_identical_currencies_for_transfers(): void
+    {
+        $rate = ExchangeRate::fromString('USD', 'USD', '1.0000', 4);
+
+        self::assertSame('USD', $rate->baseCurrency());
+        self::assertSame('USD', $rate->quoteCurrency());
+        self::assertSame('1.0000', $rate->rate());
+        self::assertTrue($rate->isTransfer());
+    }
+
+    public function test_conversion_factory_rejects_identical_currencies(): void
     {
         $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Conversion rate requires distinct currencies.');
 
-        ExchangeRate::fromString('USD', 'USD', '1.0000', 4);
+        ExchangeRate::conversion('USD', 'USD', '1.0000', 4);
     }
 
     /**
@@ -763,14 +774,63 @@ final class ExchangeRateTest extends TestCase
         }
     }
 
-    public function test_provides_specific_error_for_identical_currencies(): void
+    public function test_provides_specific_error_for_identical_currencies_in_conversion(): void
     {
         try {
-            ExchangeRate::fromString('USD', 'usd', '1.5', 2);
+            ExchangeRate::conversion('USD', 'usd', '1.5', 2);
             self::fail('Expected InvalidInput for identical currencies');
         } catch (InvalidInput $e) {
             self::assertStringContainsString('distinct currencies', $e->getMessage());
         }
+    }
+
+    // ==================== Transfer Rate Tests ====================
+
+    public function test_creates_transfer_rate_from_currency(): void
+    {
+        $rate = ExchangeRate::transfer('USDT');
+
+        self::assertSame('USDT', $rate->baseCurrency());
+        self::assertSame('USDT', $rate->quoteCurrency());
+        self::assertSame('1.00000000', $rate->rate());
+        self::assertTrue($rate->isTransfer());
+    }
+
+    public function test_transfer_rate_normalizes_currency(): void
+    {
+        $rate = ExchangeRate::transfer('usdt');
+
+        self::assertSame('USDT', $rate->baseCurrency());
+        self::assertSame('USDT', $rate->quoteCurrency());
+    }
+
+    public function test_transfer_rate_converts_one_to_one(): void
+    {
+        $rate = ExchangeRate::transfer('USDT');
+        $money = Money::fromString('USDT', '100.00', 2);
+
+        $converted = $rate->convert($money);
+
+        self::assertSame('USDT', $converted->currency());
+        self::assertSame('100.00000000', $converted->amount());
+    }
+
+    public function test_transfer_rate_inverts_to_itself(): void
+    {
+        $rate = ExchangeRate::transfer('BTC', 8);
+        $inverted = $rate->invert();
+
+        self::assertSame('BTC', $inverted->baseCurrency());
+        self::assertSame('BTC', $inverted->quoteCurrency());
+        self::assertSame('1.00000000', $inverted->rate());
+        self::assertTrue($inverted->isTransfer());
+    }
+
+    public function test_is_transfer_returns_false_for_conversion_rate(): void
+    {
+        $rate = ExchangeRate::fromString('BTC', 'USD', '65000.00', 2);
+
+        self::assertFalse($rate->isTransfer());
     }
 
     public function test_provides_specific_error_for_invalid_currencies(): void
