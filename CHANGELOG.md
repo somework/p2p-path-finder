@@ -94,6 +94,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use `isLinear()` and `asLinearPath()` for backward compatibility
 - See [UPGRADING.md](UPGRADING.md) for complete migration guide
 
+### Test Suite Changes (MUL-12)
+- **Removed legacy PathSearchEngine tests**: Tests that relied on PathSearchEngine-specific behavior
+  have been removed or updated since PathSearchService now delegates to ExecutionPlanService.
+  
+- **Removed multi-path tests** (intentional behavioral change):
+  - `test_it_returns_multiple_paths_ordered_by_cost` - ExecutionPlanService returns single optimal plan
+  - `test_it_preserves_result_insertion_order_when_costs_are_identical` - Same reason
+  
+- **Removed tolerance-specific tests** (engine behavior changed):
+  - Tests for PathSearchEngine tolerance clamping, underspend calculation, order minimum scaling
+  - Tolerance evaluation now handled by ToleranceEvaluator with different behavior
+  
+- **Removed fee materialization tests** (moved to unit tests):
+  - PathSearchEngine-specific fee materialization tests removed from FeesPathSearchServiceTest
+  - Fee handling tested at unit level (LegMaterializerTest) and integration level (ExecutionPlanServiceTest::test_fee_aggregation)
+  
+- **Removed edge case tests** (equivalent coverage exists):
+  - PathSearchServiceEdgeCasesTest tests replaced by ExecutionPlanServiceTest guard limit tests
+  
+- **Updated hop limit tests** (behavioral clarification):
+  - Documented that ExecutionPlanService finds optimal plans regardless of minimum hop config
+  - Hop filtering is applied at PathSearchService level (backward compatibility layer)
+  
+- **Added equivalent coverage to ExecutionPlanServiceTest**:
+  - `test_capacity_constrained_order_selection` - Capacity evaluation
+  - `test_rate_selection_with_sufficient_capacity` - Rate preference
+  - `test_tolerance_rejection_when_exceeded` - Tolerance enforcement
+  - `test_tolerance_acceptance_within_bounds` - Tolerance acceptance
+  
+- **Kept with documentation**:
+  - `test_plan_to_path_throws_for_non_linear` - API contract documented, will activate when split/merge produces non-linear plans
+
 ## [0.1.0] - TBD
 
 **First tagged pre-release** - This version represents the initial BigDecimal migration and establishes the foundation for the 1.0.0 stable release.

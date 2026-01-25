@@ -34,35 +34,18 @@ final class TolerancePathSearchServiceTest extends PathSearchServiceTestCase
         return $result->guardLimits();
     }
 
-    /**
-     * @testdox Accepts EUR→USD buy when base fee stays within configured tolerance window
-     *
-     * @deprecated This test relies on PathSearchEngine's specific tolerance clamping behavior.
-     *             PathSearchService now delegates to ExecutionPlanService which calculates
-     *             fill amounts differently.
-     */
-    public function test_it_handles_buy_base_fee_within_tolerance_window(): void
-    {
-        self::markTestSkipped(
-            'PathSearchService now delegates to ExecutionPlanService which has different '
-            .'tolerance clamping behavior. This test relies on PathSearchEngine-specific '
-            .'fee overage calculations.'
-        );
-    }
-
-    /**
-     * @testdox Caps gross spend at tolerance ceiling when base fees threaten to overshoot budget
-     *
-     * @deprecated this test relies on PathSearchEngine's specific tolerance clamping behavior
-     */
-    public function test_it_caps_buy_gross_spend_at_tolerance_upper_bound(): void
-    {
-        self::markTestSkipped(
-            'PathSearchService now delegates to ExecutionPlanService which has different '
-            .'tolerance clamping behavior. This test relies on PathSearchEngine-specific '
-            .'fee clamping calculations.'
-        );
-    }
+    // NOTE: The following tolerance-specific tests were removed as part of MUL-12 cleanup:
+    //
+    // - test_it_handles_buy_base_fee_within_tolerance_window
+    //   Reason: PathSearchEngine-specific tolerance clamping behavior.
+    //   ExecutionPlanService calculates fill amounts differently.
+    //
+    // - test_it_caps_buy_gross_spend_at_tolerance_upper_bound
+    //   Reason: PathSearchEngine-specific fee clamping behavior.
+    //   ExecutionPlanService has different tolerance handling.
+    //
+    // Tolerance evaluation is now handled by ToleranceEvaluator which applies
+    // tolerance constraints after ExecutionPlanService finds optimal plans.
 
     /**
      * @testdox Rejects candidate paths when tolerance rules from the provider scenarios are violated
@@ -206,44 +189,19 @@ final class TolerancePathSearchServiceTest extends PathSearchServiceTestCase
         self::assertFalse($guardLimits->visitedStatesReached());
     }
 
-    /**
-     * @testdox Allows underspend on USD sell leg when within asymmetric tolerance window
-     *
-     * @deprecated this test relies on PathSearchEngine's specific tolerance behavior
-     */
-    public function test_it_handles_under_spend_within_tolerance_bounds(): void
-    {
-        self::markTestSkipped(
-            'PathSearchService now delegates to ExecutionPlanService which has different '
-            .'underspend calculation behavior. This test relies on PathSearchEngine-specific logic.'
-        );
-    }
-
-    /**
-     * @testdox Finds viable buy path when venue minimum exceeds configured spend but tolerance permits it
-     *
-     * @deprecated this test relies on PathSearchEngine's specific scaling behavior
-     */
-    public function test_it_discovers_buy_path_when_order_minimum_exceeds_configured_minimum(): void
-    {
-        self::markTestSkipped(
-            'PathSearchService now delegates to ExecutionPlanService which has different '
-            .'order minimum scaling behavior. This test relies on PathSearchEngine-specific logic.'
-        );
-    }
-
-    /**
-     * @testdox Unlocks sell path when order minimum is above configuration yet tolerance allows scaling up
-     *
-     * @deprecated this test relies on PathSearchEngine's specific scaling behavior
-     */
-    public function test_it_discovers_sell_path_when_order_minimum_exceeds_configured_minimum(): void
-    {
-        self::markTestSkipped(
-            'PathSearchService now delegates to ExecutionPlanService which has different '
-            .'order minimum scaling behavior. This test relies on PathSearchEngine-specific logic.'
-        );
-    }
+    // NOTE: Additional tolerance-specific tests removed as part of MUL-12:
+    //
+    // - test_it_handles_under_spend_within_tolerance_bounds
+    //   Reason: PathSearchEngine-specific underspend calculation.
+    //
+    // - test_it_discovers_buy_path_when_order_minimum_exceeds_configured_minimum
+    //   Reason: PathSearchEngine-specific order minimum scaling.
+    //
+    // - test_it_discovers_sell_path_when_order_minimum_exceeds_configured_minimum
+    //   Reason: PathSearchEngine-specific order minimum scaling.
+    //
+    // ExecutionPlanService uses OrderSpendAnalyzer for spend constraint filtering
+    // and ToleranceEvaluator for post-search tolerance validation.
 
     public function test_it_propagates_high_precision_tolerance_to_path_finder(): void
     {
@@ -288,37 +246,8 @@ final class TolerancePathSearchServiceTest extends PathSearchServiceTestCase
         };
     }
 
-    private function scenarioEurBuyWithBaseFeeWithinTolerance(): OrderBook
-    {
-        return $this->orderBook(
-            $this->createOrder(
-                OrderSide::BUY,
-                'EUR',
-                'USD',
-                '10.000',
-                '500.000',
-                '1.200',
-                3,
-                $this->basePercentageFeePolicy('0.02'),
-            ),
-        );
-    }
-
-    private function scenarioEurBuyClampedByTolerance(): OrderBook
-    {
-        return $this->orderBook(
-            $this->createOrder(
-                OrderSide::BUY,
-                'EUR',
-                'USD',
-                '10.000',
-                '500.000',
-                '1.200',
-                3,
-                $this->basePercentageFeePolicy('0.05'),
-            ),
-        );
-    }
+    // NOTE: scenarioEurBuyWithBaseFeeWithinTolerance() and scenarioEurBuyClampedByTolerance()
+    // were removed as part of MUL-12 cleanup - no longer used after removing legacy tests.
 
     private function scenarioEuroToUsdToJpyBridge(): OrderBook
     {

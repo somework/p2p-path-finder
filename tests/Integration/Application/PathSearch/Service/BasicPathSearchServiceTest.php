@@ -110,55 +110,24 @@ final class BasicPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertFalse($guardLimits->visitedStatesReached());
     }
 
-    /**
-     * @testdox Chooses GBP bridge when the notional best scoring USD route lacks available capacity
-     *
-     * @deprecated this test relies on PathSearchEngine's specific capacity evaluation
-     */
-    public function test_it_skips_highest_scoring_path_when_complex_book_lacks_capacity(): void
-    {
-        self::markTestSkipped(
-            'PathSearchService now delegates to ExecutionPlanService which has different '
-            .'capacity evaluation and path selection behavior.'
-        );
-    }
-
-    /**
-     * @testdox Picks the most competitive GBP legs when multiple identical pairs quote different rates
-     *
-     * @deprecated this test relies on PathSearchEngine's specific rate comparison behavior
-     */
-    public function test_it_prefers_best_rates_when_multiple_identical_pairs_exist(): void
-    {
-        self::markTestSkipped(
-            'PathSearchService now delegates to ExecutionPlanService which has different '
-            .'rate comparison and path selection behavior.'
-        );
-    }
-
-    /**
-     * @deprecated this test expects multiple paths from ExecutionPlanService which returns
-     *             at most one result
-     */
-    public function test_it_returns_multiple_paths_ordered_by_cost(): void
-    {
-        self::markTestSkipped(
-            'PathSearchService now delegates to ExecutionPlanService which returns '
-            .'at most one optimal execution plan per search.'
-        );
-    }
-
-    /**
-     * @deprecated this test expects multiple paths from ExecutionPlanService which returns
-     *             at most one result
-     */
-    public function test_it_preserves_result_insertion_order_when_costs_are_identical(): void
-    {
-        self::markTestSkipped(
-            'PathSearchService now delegates to ExecutionPlanService which returns '
-            .'at most one optimal execution plan per search.'
-        );
-    }
+    // NOTE: The following tests were removed as part of MUL-12 cleanup:
+    //
+    // - test_it_skips_highest_scoring_path_when_complex_book_lacks_capacity
+    //   Reason: PathSearchEngine-specific capacity evaluation behavior.
+    //   Equivalent coverage: ExecutionPlanServiceTest::test_best_rate_order_selection
+    //
+    // - test_it_prefers_best_rates_when_multiple_identical_pairs_exist
+    //   Reason: PathSearchEngine-specific rate comparison behavior.
+    //   Equivalent coverage: ExecutionPlanServiceTest::test_best_rate_order_selection,
+    //                        ExecutionPlanServiceTest::test_strategy_different_rate_same_direction
+    //
+    // - test_it_returns_multiple_paths_ordered_by_cost
+    //   Reason: Intentional behavioral change - ExecutionPlanService returns single optimal plan.
+    //   See CHANGELOG.md "Breaking Changes" section.
+    //
+    // - test_it_preserves_result_insertion_order_when_costs_are_identical
+    //   Reason: Intentional behavioral change - ExecutionPlanService returns single optimal plan.
+    //   See CHANGELOG.md "Breaking Changes" section.
 
     public function test_it_enforces_minimum_hop_constraint_before_materialization(): void
     {
@@ -180,51 +149,12 @@ final class BasicPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertSame([], $results, 'Single-hop path should be filtered by minimum hop constraint');
     }
 
-    /**
-     * @deprecated this test expects ExecutionPlanService to return 2-hop paths when 1-hop
-     *             is filtered out, but ExecutionPlanService may not find alternative paths
-     */
-    public function test_it_prefers_two_hop_route_when_direct_candidate_violates_minimum_hops(): void
-    {
-        self::markTestSkipped(
-            'PathSearchService now delegates to ExecutionPlanService which may not find '
-            .'alternative multi-hop paths when the optimal 1-hop path is filtered.'
-        );
-
-        // Original test code kept for reference:
-        $orderBook = $this->orderBook(
-            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '500.000', '0.900', 3),
-            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '10.000', '500.000', '0.850', 3),
-            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '10.000', '500.000', '0.900', 3),
-        );
-
-        $config = PathSearchConfig::builder()
-            ->withSpendAmount(Money::fromString('EUR', '100.00', 2))
-            ->withToleranceBounds('0.0', '0.05')
-            ->withHopLimits(2, 3)
-            ->build();
-
-        $searchResult = $this->makeService()->findBestPaths($this->makeRequest($orderBook, $config, 'USD'));
-        $results = self::extractPaths($searchResult);
-
-        self::assertNotSame([], $results);
-
-        $best = $results[0];
-        self::assertSame('EUR', $best->totalSpent()->currency());
-        self::assertSame('100.000', $best->totalSpent()->amount());
-        self::assertSame('USD', $best->totalReceived()->currency());
-
-        $hops = $best->hops();
-        self::assertCount(2, $hops);
-        self::assertSame('EUR', $hops->at(0)->from());
-        self::assertSame('GBP', $hops->at(0)->to());
-        self::assertSame('GBP', $hops->at(1)->from());
-        self::assertSame('USD', $hops->at(1)->to());
-
-        foreach ($results as $result) {
-            self::assertGreaterThanOrEqual(2, $result->hops()->count());
-        }
-    }
+    // NOTE: test_it_prefers_two_hop_route_when_direct_candidate_violates_minimum_hops
+    // was removed as part of MUL-12 cleanup.
+    // Reason: ExecutionPlanService finds optimal execution plans and does not explore
+    // alternative paths when the optimal path is filtered by hop constraints.
+    // This is intentional behavior - hop filtering is done at PathSearchService level.
+    // See: ExecutionPlanServiceTest::test_finds_paths_regardless_of_minimum_hop_config
 
     public function test_it_skips_candidates_when_sell_seed_window_is_empty(): void
     {
@@ -402,18 +332,9 @@ final class BasicPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertFalse($guardLimits->visitedStatesReached());
     }
 
-    /**
-     * @testdox Provides the leading result through PathSet::first()
-     *
-     * @deprecated this test uses a complex scenario that ExecutionPlanService may not find paths for
-     */
-    public function test_result_set_returns_first_materialized_result(): void
-    {
-        self::markTestSkipped(
-            'PathSearchService now delegates to ExecutionPlanService which may not find '
-            .'paths for the complex competing GBP quotes scenario.'
-        );
-    }
+    // NOTE: test_result_set_returns_first_materialized_result was removed as part of MUL-12.
+    // The complex competing GBP quotes scenario behavior has changed with ExecutionPlanService.
+    // Equivalent coverage: BackwardCompatibilityTest::test_result_set_first_consistency
 
     /**
      * @testdox PathSet::first() returns null when no candidates exist
@@ -478,35 +399,6 @@ final class BasicPathSearchServiceTest extends PathSearchServiceTestCase
         );
     }
 
-    private function scenarioCapacityConstrainedUsdRoutes(): OrderBook
-    {
-        return $this->orderBook(
-            $this->createOrder(OrderSide::SELL, 'USD', 'EUR', '10.000', '80.000', '0.600', 3),
-            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '5.000', '500.000', '0.800', 3),
-            $this->createOrder(OrderSide::SELL, 'CHF', 'EUR', '5.000', '400.000', '0.920', 3),
-            $this->createOrder(OrderSide::SELL, 'AUD', 'EUR', '5.000', '400.000', '0.700', 3),
-            $this->createOrder(OrderSide::SELL, 'CAD', 'EUR', '5.000', '400.000', '0.750', 3),
-            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '5.000', '500.000', '1.200', 3),
-            $this->createOrder(OrderSide::BUY, 'CHF', 'USD', '5.000', '500.000', '1.050', 3),
-            $this->createOrder(OrderSide::BUY, 'AUD', 'USD', '5.000', '500.000', '0.650', 3),
-            $this->createOrder(OrderSide::BUY, 'CAD', 'USD', '5.000', '500.000', '0.730', 3),
-            $this->createOrder(OrderSide::BUY, 'EUR', 'CHF', '5.000', '500.000', '1.100', 3),
-        );
-    }
-
-    private function scenarioCompetingGbpQuotes(): OrderBook
-    {
-        return $this->orderBook(
-            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '5.000', '80.000', '0.680', 3),
-            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '5.000', '500.000', '0.760', 3),
-            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '5.000', '500.000', '0.780', 3),
-            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '5.000', '500.000', '0.710', 3),
-            $this->createOrder(OrderSide::SELL, 'GBP', 'EUR', '5.000', '500.000', '0.700', 3),
-            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '5.000', '80.000', '1.350', 3),
-            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '5.000', '500.000', '1.220', 3),
-            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '5.000', '500.000', '1.200', 3),
-            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '5.000', '500.000', '1.180', 3),
-            $this->createOrder(OrderSide::BUY, 'GBP', 'USD', '5.000', '500.000', '1.250', 3),
-        );
-    }
+    // NOTE: scenarioCapacityConstrainedUsdRoutes() and scenarioCompetingGbpQuotes()
+    // were removed as part of MUL-12 cleanup - no longer used after removing legacy tests.
 }

@@ -309,21 +309,31 @@ final class BackwardCompatibilityTest extends TestCase
 
     /**
      * @testdox PathSearchService::planToPath() throws for non-linear plans
+     *
+     * NOTE: This test documents the API contract for non-linear plan handling.
+     * The current ExecutionPlanSearchEngine implementation only produces linear paths.
+     * When split/merge execution is implemented in future versions, this test will
+     * become active and verify that planToPath() correctly rejects non-linear plans.
+     *
+     * API Contract: planToPath() MUST throw InvalidInput for non-linear ExecutionPlan.
+     * This ensures callers using the legacy Path API receive clear errors when
+     * attempting to convert incompatible plan topologies.
+     *
+     * @see ExecutionPlan::isLinear() for linearity check
+     * @see ExecutionPlan::asLinearPath() for conversion that returns null for non-linear
      */
     #[TestDox('PathSearchService::planToPath() throws for non-linear plans')]
     public function test_plan_to_path_throws_for_non_linear(): void
     {
-        // This test verifies the exception is thrown for non-linear plans
-        // We'll create a mock-like scenario to test the exception
-        // Since non-linear plans are rare in current implementation,
-        // we test via the exception path
+        // NOTE (MUL-12): This test is intentionally skipped because current implementation
+        // only produces linear plans. The test structure documents the API contract:
+        // - planToPath() MUST throw InvalidInput with "non-linear" message for non-linear plans
+        // - This will be testable when split/merge execution produces non-linear topologies
+        //
+        // The API contract exists and is implemented - it just can't be exercised with
+        // the current search algorithm. When ExecutionPlanSearchEngine is enhanced to
+        // produce split/merge plans, this skip condition will be removed.
 
-        $this->expectException(InvalidInput::class);
-        $this->expectExceptionMessage('non-linear');
-
-        // Create an ExecutionPlan manually that would be non-linear
-        // by using the asLinearPath() null return path indirectly
-        // For now, we verify the API contract exists
         $orderBook = $this->orderBook(
             OrderFactory::sell('USDT', 'RUB', '100.00', '1000.00', '100.00', 2, 2),
         );
@@ -342,10 +352,18 @@ final class BackwardCompatibilityTest extends TestCase
             /** @var ExecutionPlan $plan */
             $plan = $planOutcome->bestPath();
             if ($plan->isLinear()) {
-                // Skip this test if we can't create a non-linear plan
-                self::markTestSkipped('Current implementation only produces linear plans');
+                // Expected: current implementation only produces linear plans.
+                // This skip will be removed when split/merge execution is implemented.
+                self::markTestSkipped(
+                    'Current ExecutionPlanSearchEngine only produces linear plans. '
+                    .'This test documents the API contract and will become active when '
+                    .'split/merge execution is implemented. See ExecutionPlan::isLinear().'
+                );
             }
 
+            // If we ever get here with a non-linear plan, verify the exception:
+            $this->expectException(InvalidInput::class);
+            $this->expectExceptionMessage('non-linear');
             PathSearchService::planToPath($plan);
         } else {
             self::markTestSkipped('No plan found to test with');

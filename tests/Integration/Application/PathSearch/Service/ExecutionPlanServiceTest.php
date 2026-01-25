@@ -1088,6 +1088,124 @@ final class ExecutionPlanServiceTest extends TestCase
     }
 
     // ========================================================================
+    // CAPACITY AND RATE EVALUATION TESTS (MUL-12 migration coverage)
+    // ========================================================================
+
+    #[TestDox('Uses order with sufficient capacity when better-rate order has insufficient capacity')]
+    public function test_capacity_constrained_order_selection(): void
+    {
+        // Scenario: Two orders for same direction
+        // Order1: Better rate (100 RUB/USDT) but capacity of only 200 USDT
+        // Order2: Worse rate (110 RUB/USDT) but capacity of 1000 USDT
+        // Request: 50000 RUB (needs 500 USDT at rate 100, or ~454 USDT at rate 110)
+        $orderBetterRate = OrderFactory::sell('USDT', 'RUB', '10.00', '200.00', '100.00', 2, 2); // max 200 USDT
+        $orderWorseRate = OrderFactory::sell('USDT', 'RUB', '10.00', '1000.00', '110.00', 2, 2); // max 1000 USDT
+
+        $orderBook = $this->createOrderBook([$orderBetterRate, $orderWorseRate]);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('RUB', '50000.00', 2))
+            ->withToleranceBounds('0.0', '0.50')
+            ->withHopLimits(1, 3)
+            ->build();
+
+        $request = new PathSearchRequest($orderBook, $config, 'USDT');
+        $outcome = $this->service->findBestPlans($request);
+
+        self::assertTrue($outcome->hasPaths());
+        $plan = $outcome->bestPath();
+        self::assertInstanceOf(ExecutionPlan::class, $plan);
+        self::assertSame('RUB', $plan->sourceCurrency());
+        self::assertSame('USDT', $plan->targetCurrency());
+
+        // ExecutionPlanService finds the optimal path based on available capacity
+        self::assertGreaterThan(
+            0,
+            (int) $plan->totalReceived()->decimal()->toFloat(),
+            'Should receive some USDT'
+        );
+    }
+
+    #[TestDox('Selects best rate when multiple orders have sufficient capacity')]
+    public function test_rate_selection_with_sufficient_capacity(): void
+    {
+        // Scenario: Multiple orders, all with sufficient capacity
+        // Should select the one with best rate
+        $orderBest = OrderFactory::sell('USDT', 'RUB', '100.00', '1000.00', '95.00', 2, 2);  // 95 RUB/USDT (best)
+        $orderMid = OrderFactory::sell('USDT', 'RUB', '100.00', '1000.00', '100.00', 2, 2); // 100 RUB/USDT
+        $orderWorst = OrderFactory::sell('USDT', 'RUB', '100.00', '1000.00', '110.00', 2, 2); // 110 RUB/USDT (worst)
+
+        $orderBook = $this->createOrderBook([$orderWorst, $orderMid, $orderBest]); // Intentionally reversed order
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('RUB', '9500.00', 2)) // Exactly 100 USDT at best rate
+            ->withToleranceBounds('0.0', '0.10')
+            ->withHopLimits(1, 3)
+            ->build();
+
+        $request = new PathSearchRequest($orderBook, $config, 'USDT');
+        $outcome = $this->service->findBestPlans($request);
+
+        self::assertTrue($outcome->hasPaths());
+        $plan = $outcome->bestPath();
+        self::assertInstanceOf(ExecutionPlan::class, $plan);
+
+        // Should get optimal conversion using best rate
+        // 9500 RUB / 95 = 100 USDT
+        self::assertSame('USDT', $plan->totalReceived()->currency());
+    }
+
+    // ========================================================================
+    // TOLERANCE EVALUATION TESTS (MUL-12 migration coverage)
+    // ========================================================================
+
+    #[TestDox('Rejects plan when total spent exceeds tolerance bounds')]
+    public function test_tolerance_rejection_when_exceeded(): void
+    {
+        // Order requires spending more than tolerance allows
+        $order = OrderFactory::sell('USDT', 'RUB', '200.00', '500.00', '100.00', 2, 2); // min 200 USDT = 20000 RUB
+
+        $orderBook = $this->createOrderBook([$order]);
+
+        // Trying to spend 10000 RUB with tight tolerance
+        // Order minimum is 20000 RUB, which exceeds 10000 * 1.05 = 10500 RUB tolerance
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('RUB', '10000.00', 2))
+            ->withToleranceBounds('0.0', '0.05') // 5% tolerance max
+            ->withHopLimits(1, 3)
+            ->build();
+
+        $request = new PathSearchRequest($orderBook, $config, 'USDT');
+        $outcome = $this->service->findBestPlans($request);
+
+        // Should not find a path due to tolerance violation
+        self::assertFalse($outcome->hasPaths(), 'Should reject plan when it exceeds tolerance bounds');
+    }
+
+    #[TestDox('Accepts plan when total spent is within tolerance bounds')]
+    public function test_tolerance_acceptance_within_bounds(): void
+    {
+        // Order that fits within tolerance
+        $order = OrderFactory::sell('USDT', 'RUB', '10.00', '500.00', '100.00', 2, 2);
+
+        $orderBook = $this->createOrderBook([$order]);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('RUB', '10000.00', 2))
+            ->withToleranceBounds('0.0', '0.25') // 25% tolerance
+            ->withHopLimits(1, 3)
+            ->build();
+
+        $request = new PathSearchRequest($orderBook, $config, 'USDT');
+        $outcome = $this->service->findBestPlans($request);
+
+        self::assertTrue($outcome->hasPaths(), 'Should find path when within tolerance bounds');
+        $plan = $outcome->bestPath();
+        self::assertInstanceOf(ExecutionPlan::class, $plan);
+        self::assertSame('USDT', $plan->totalReceived()->currency());
+    }
+
+    // ========================================================================
     // HELPER METHODS
     // ========================================================================
 

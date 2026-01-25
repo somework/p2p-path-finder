@@ -57,31 +57,22 @@ final class HopLimitEnforcementTest extends TestCase
         self::assertTrue($result->paths()->isEmpty(), 'Expected no paths when target requires more than maxHops');
     }
 
-    /**
-     * @testdox Minimum hops are enforced: optimal 1-hop path is rejected when minHops = 2
-     *
-     * @deprecated executionPlanService returns only the optimal plan and doesn't explore alternatives
-     */
-    public function test_minimum_hops_enforcement(): void
-    {
-        self::markTestSkipped(
-            'PathSearchService now delegates to ExecutionPlanService which returns only the '
-            .'optimal plan. When that plan is filtered by hop constraints, no alternatives are explored.'
-        );
-    }
-
-    /**
-     * @testdox When minHops = maxHops, only paths with exactly that hop count are accepted
-     *
-     * @deprecated executionPlanService returns only the optimal plan and doesn't explore alternatives
-     */
-    public function test_min_hops_equals_max_hops(): void
-    {
-        self::markTestSkipped(
-            'PathSearchService now delegates to ExecutionPlanService which returns only the '
-            .'optimal plan. When the optimal 1-hop path is filtered, no 2-hop alternatives are explored.'
-        );
-    }
+    // NOTE: The following tests were removed as part of MUL-12 cleanup:
+    //
+    // - test_minimum_hops_enforcement
+    //   Reason: ExecutionPlanService returns only the optimal plan. When that plan
+    //   is filtered by hop constraints at the PathSearchService level, no alternatives
+    //   are explored. This is intentional behavior for performance optimization.
+    //
+    // - test_min_hops_equals_max_hops
+    //   Reason: Same as above - ExecutionPlanService finds optimal execution plans,
+    //   hop filtering is done at a higher level (PathSearchService).
+    //
+    // The hop limit enforcement still works - see test_callback_rejects_path_respecting_search_max_hops
+    // and test_maximum_hops_enforcement which verify that paths exceeding maxHops are rejected.
+    //
+    // For minimum hop enforcement, PathSearchService filters results from ExecutionPlanService.
+    // See: BackwardCompatibilityTest::test_path_search_minimum_hop_enforcement
 
     /**
      * @testdox Callback rejects paths even when search allows them (defense in depth)
@@ -203,16 +194,8 @@ final class HopLimitEnforcementTest extends TestCase
         self::assertSame(2, $paths[0]->hops()->count(), 'Path should have exactly 2 hops');
     }
 
-    /**
-     * @testdox Multiple paths with different hop counts are correctly filtered
-     *
-     * @deprecated executionPlanService returns only the optimal plan and doesn't explore alternatives
-     */
-    public function test_multiple_paths_filtered_by_hop_limits(): void
-    {
-        self::markTestSkipped(
-            'PathSearchService now delegates to ExecutionPlanService which returns only the '
-            .'optimal plan. When the optimal 1-hop path is filtered, no alternatives are explored.'
-        );
-    }
+    // NOTE: test_multiple_paths_filtered_by_hop_limits was removed as part of MUL-12.
+    // Reason: ExecutionPlanService returns only the single optimal plan, not multiple paths.
+    // Filtering by hop limits happens at PathSearchService level.
+    // See: BackwardCompatibilityTest::test_path_search_minimum_hop_enforcement
 }
