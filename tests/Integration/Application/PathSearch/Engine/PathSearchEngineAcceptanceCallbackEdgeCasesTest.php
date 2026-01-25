@@ -55,7 +55,7 @@ final class PathSearchEngineAcceptanceCallbackEdgeCasesTest extends TestCase
             'USD',
             'EUR',
             null,
-            function (CandidatePath $candidate) use (&$invocationCount, &$discoveredPaths): bool {
+            static function (CandidatePath $candidate) use (&$invocationCount, &$discoveredPaths): bool {
                 ++$invocationCount;
                 $discoveredPaths[] = [
                     'hops' => $candidate->hops(),
@@ -113,7 +113,7 @@ final class PathSearchEngineAcceptanceCallbackEdgeCasesTest extends TestCase
             'USD',
             'EUR',
             null,
-            fn (CandidatePath $c) => 2 === $c->hops()
+            static fn (CandidatePath $c) => 2 === $c->hops()
         );
 
         $paths = $result->paths()->toArray();
@@ -151,7 +151,7 @@ final class PathSearchEngineAcceptanceCallbackEdgeCasesTest extends TestCase
             'USD',
             'EUR',
             null,
-            function (CandidatePath $candidate) use (&$allCandidates): bool {
+            static function (CandidatePath $candidate) use (&$allCandidates): bool {
                 // Collect candidate details
                 $allCandidates[] = [
                     'hops' => $candidate->hops(),
@@ -210,7 +210,7 @@ final class PathSearchEngineAcceptanceCallbackEdgeCasesTest extends TestCase
             'USD',
             'EUR',
             null,
-            fn (CandidatePath $c) => $c->hops() >= 2
+            static fn (CandidatePath $c) => $c->hops() >= 2
         );
 
         $paths = $result->paths()->toArray();
@@ -278,7 +278,7 @@ final class PathSearchEngineAcceptanceCallbackEdgeCasesTest extends TestCase
             'USD',
             'EUR',
             null,
-            function (CandidatePath $candidate) use (&$invocations): bool {
+            static function (CandidatePath $candidate) use (&$invocations): bool {
                 $invocations[] = $candidate->hops();
 
                 return true;
@@ -321,7 +321,7 @@ final class PathSearchEngineAcceptanceCallbackEdgeCasesTest extends TestCase
             'USD',
             'EUR',
             $constraints,
-            function (CandidatePath $candidate) use (&$receivedConstraints): bool {
+            static function (CandidatePath $candidate) use (&$receivedConstraints): bool {
                 $receivedConstraints = $candidate->range();
 
                 return true;
@@ -364,7 +364,7 @@ final class PathSearchEngineAcceptanceCallbackEdgeCasesTest extends TestCase
             'USD',
             'EUR',
             null,
-            fn (CandidatePath $c) => true // Accept all
+            static fn (CandidatePath $c) => true // Accept all
         );
 
         $paths = $result->paths()->toArray();
@@ -406,7 +406,7 @@ final class PathSearchEngineAcceptanceCallbackEdgeCasesTest extends TestCase
             'USD',
             'EUR',
             null,
-            function (CandidatePath $candidate) use (&$metrics): bool {
+            static function (CandidatePath $candidate) use (&$metrics): bool {
                 ++$metrics['totalCandidates'];
 
                 $cost = (float) $candidate->cost();
@@ -465,7 +465,7 @@ final class PathSearchEngineAcceptanceCallbackEdgeCasesTest extends TestCase
             'USD',
             'EUR',
             null,
-            function (CandidatePath $candidate): bool {
+            static function (CandidatePath $candidate): bool {
                 throw new \RuntimeException('Callback error');
             }
         );
