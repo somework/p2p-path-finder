@@ -94,9 +94,11 @@ See [Domain Invariants](domain-invariants.md) for complete specifications.
 ### Application Layer
 
 **Service Layer**:
-- `PathSearchService` - Main facade coordinating search
+- `ExecutionPlanService` - **Recommended** facade for split/merge execution plans
+- `PathSearchService` - Legacy facade for linear paths only (deprecated in 2.0)
 - `PathSearchRequest` - Request DTO with order book + config
 - `LegMaterializer` - Converts search results to domain DTOs
+- `ExecutionPlanMaterializer` - Converts engine results to ExecutionPlan
 - `ToleranceEvaluator` - Validates path tolerance compliance
 
 **Graph Construction**:
@@ -106,7 +108,9 @@ See [Domain Invariants](domain-invariants.md) for complete specifications.
 - `GraphEdge` - Represents order with capacity and segments
 
 **Search Algorithm** (Internal):
-- `PathFinder` - Dijkstra-like tolerance-aware search
+- `ExecutionPlanSearchEngine` - Successive shortest augmenting paths algorithm
+- `PathFinder` - Legacy Dijkstra-like tolerance-aware search
+- `PortfolioState` - Multi-currency balance tracking for split/merge
 - `SearchState` - Immutable frontier state representation
 - `SearchStateRegistry` - Tracks visited states, dominance filtering
 - `SearchGuards` - Enforces resource limits (expansions, states, time)
@@ -117,16 +121,26 @@ See [Domain Invariants](domain-invariants.md) for complete specifications.
 - State registry prevents cycles and dominance filtering  
 - Guard rails prevent runaway searches
 - Segment pruning for fee optimization
+- **PortfolioState** enables multi-currency tracking for splits/merges
 
 ### Public API Layer
 
-**Entry Point**:
+**Entry Point (Recommended)**:
+```php
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+
+$service = new ExecutionPlanService(new GraphBuilder());
+$outcome = $service->findBestPlans($request);
+```
+
+**Legacy Entry Point (Deprecated)**:
 ```php
 use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
 
-$service = new PathSearchService(new GraphBuilder());
-$outcome = $service->findBestPaths($request);
+$service = new PathSearchService(new GraphBuilder());  // Deprecated
+$outcome = $service->findBestPaths($request);          // Triggers deprecation warning
 ```
 
 **Configuration**:
@@ -139,7 +153,29 @@ $config = PathSearchConfig::builder()
     ->build();
 ```
 
-**Results**:
+**Results (ExecutionPlanService)**:
+```php
+foreach ($outcome->paths() as $plan) {
+    $plan->totalSpent();           // Sum of spends from source currency
+    $plan->totalReceived();        // Sum of receives into target currency
+    $plan->residualTolerance();    // Remaining tolerance headroom
+    $plan->feeBreakdown();         // Aggregated MoneyMap across steps
+    $plan->isLinear();             // Check if plan is a simple linear path
+    $plan->asLinearPath();         // Convert to Path (returns null if non-linear)
+
+    foreach ($plan->steps() as $step) {
+        $step->from();             // Asset symbol
+        $step->to();               // Asset symbol
+        $step->order();            // Original Order driving this step
+        $step->fees();             // MoneyMap for step-level fees
+        $step->sequenceNumber();   // Execution order (1-based)
+    }
+}
+
+$outcome->guardLimits()->anyLimitReached();  // Check guard status
+```
+
+**Results (PathSearchService - Legacy)**:
 ```php
 foreach ($outcome->paths() as $path) {
     $path->totalSpent();           // Derived from first hop's spent amount
@@ -154,19 +190,29 @@ foreach ($outcome->paths() as $path) {
         $hop->fees();              // MoneyMap for hop-level fees
     }
 }
-
-$outcome->guardLimits()->anyLimitReached();  // Check guard status
 ```
 
-**Hop-centric model**: Each `Path` is derived from an ordered `PathHopCollection`. Totals (`totalSpent()`, `totalReceived()`),
-aggregated fees (`feeBreakdown()`), and remaining tolerance (`residualTolerance()`) are computed from the hop data, while each
-hop retains its originating `Order` for reconciliation.
+**Step-centric model (ExecutionPlan)**: Each `ExecutionPlan` is derived from an ordered `ExecutionStepCollection`. 
+Totals (`totalSpent()`, `totalReceived()`), aggregated fees (`feeBreakdown()`), and remaining tolerance are 
+computed from step data. Steps include `sequenceNumber()` for execution ordering and support split/merge topologies.
+
+**Hop-centric model (Path - Legacy)**: Each `Path` is derived from an ordered `PathHopCollection`. Totals,
+aggregated fees, and remaining tolerance are computed from the hop data, while each hop retains its originating 
+`Order` for reconciliation. Linear paths only.
 
 ---
 
 ## Search Flow
 
-### High-Level Flow
+### High-Level Flow (ExecutionPlanService)
+
+1. **Graph Construction** - `GraphBuilder` converts `OrderBook` to graph
+2. **Search Initialization** - Create `PortfolioState` with source currency balance
+3. **Augmenting Path Loop** - Find successive shortest paths until balance exhausted
+4. **Result Materialization** - `ExecutionPlanMaterializer` converts to `ExecutionPlan`
+5. **Outcome Assembly** - Combine results with guard report
+
+### Legacy Flow (PathSearchService - Deprecated)
 
 1. **Graph Construction** - `GraphBuilder` converts `OrderBook` to graph
 2. **Search Initialization** - Create initial state at source currency
@@ -174,7 +220,69 @@ hop retains its originating `Order` for reconciliation.
 4. **Result Materialization** - `LegMaterializer` converts paths to DTOs
 5. **Outcome Assembly** - Combine results with guard report
 
-### Search Algorithm Steps
+### ExecutionPlanSearchEngine Algorithm (Recommended)
+
+The `ExecutionPlanSearchEngine` uses a **successive shortest augmenting paths** algorithm:
+
+```
+1. Initialize PortfolioState with source currency balance
+2. While balance remains in non-target currencies AND guards allow:
+   a. Find cheapest augmenting path (Dijkstra from all currencies with balance)
+   b. Calculate bottleneck (maximum flow through path)
+   c. Execute flow along path:
+      - Deduct spent amounts from source currencies
+      - Add received amounts to target currencies
+      - Mark currencies as visited when depleted
+      - Record execution steps
+3. Return ExecutionPlanSearchOutcome with plan + guard report
+4. Service layer validates tolerance and creates SearchOutcome
+```
+
+**PortfolioState Invariants**:
+- Non-negative balances: All balances >= 0
+- Visited marking: Currency marked visited when balance depleted through spending
+- No backtracking: Cannot receive into visited currency (prevents cycles)
+- Order uniqueness: Each order used only once per portfolio state
+- Immutability: All operations return new instances
+
+### Split/Merge Flow Diagram
+
+```
+Split at Source (A → B and A → C):
+┌─────┐     ┌─────┐
+│  A  │────▶│  B  │
+│(USD)│     │(EUR)│
+└──┬──┘     └─────┘
+   │
+   │        ┌─────┐
+   └───────▶│  C  │
+            │(GBP)│
+            └─────┘
+
+Merge at Target (B → D and C → D):
+┌─────┐     ┌─────┐
+│  B  │────▶│     │
+│(EUR)│     │  D  │
+└─────┘     │(BTC)│
+            │     │
+┌─────┐     │     │
+│  C  │────▶│     │
+│(GBP)│     └─────┘
+└─────┘
+
+Diamond Pattern (Split + Merge):
+           ┌─────┐
+      ┌───▶│  B  │───┐
+      │    │(EUR)│   │
+┌─────┤    └─────┘   ├──▶┌─────┐
+│  A  │              │   │  D  │
+│(USD)│    ┌─────┐   │   │(BTC)│
+└─────┤    │  C  │   │   └─────┘
+      └───▶│(GBP)│───┘
+           └─────┘
+```
+
+### Legacy Search Algorithm Steps (PathSearchService)
 
 ```
 1. Initialize priority queue with start state

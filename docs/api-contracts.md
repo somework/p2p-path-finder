@@ -122,7 +122,166 @@ if ($tolerance->isGreaterThanOrEqual('0.03')) {
 
 ---
 
-## Path Results
+## Execution Plan Results (Recommended)
+
+### ExecutionPlan
+
+**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionPlan`
+
+**Purpose**: Represents a complete execution plan that can express both linear paths and split/merge execution.
+
+**API Methods**:
+
+```php
+// Access steps
+$steps = $plan->steps();            // ExecutionStepCollection object
+$stepCount = $plan->stepCount();    // int
+
+// Access totals
+$totalSpent = $plan->totalSpent();        // Money object
+$totalReceived = $plan->totalReceived();  // Money object
+
+// Access currencies
+$source = $plan->sourceCurrency();    // "USD"
+$target = $plan->targetCurrency();    // "BTC"
+
+// Access tolerance
+$tolerance = $plan->residualTolerance();  // DecimalTolerance object
+
+// Access fees
+$feeBreakdown = $plan->feeBreakdown();    // MoneyMap object
+
+// Check linearity
+$isLinear = $plan->isLinear();            // bool
+$path = $plan->asLinearPath();            // Path|null (null if non-linear)
+
+// Convenience method
+$summary = $plan->toArray();              // For debugging/internal use
+```
+
+**Properties**:
+- **steps**: ExecutionStepCollection object (individual execution steps)
+- **sourceCurrency**: Source currency code (uppercase)
+- **targetCurrency**: Target currency code (uppercase)
+- **totalSpent**: Money object (sum of spends from source currency)
+- **totalReceived**: Money object (sum of receives into target currency)
+- **residualTolerance**: DecimalTolerance object (remaining acceptable slippage)
+- **feeBreakdown**: MoneyMap object (aggregated fees across all steps)
+
+**Notes**:
+- Plans contain at least one step
+- `totalSpent()` sums amounts spent in the source currency
+- `totalReceived()` sums amounts received in the target currency
+- `isLinear()` returns true if the plan is a simple chain (no splits/merges)
+- `asLinearPath()` converts to `Path` only if linear, otherwise returns null
+
+**Version History**:
+- 2.0.0: Initial introduction
+
+---
+
+### ExecutionStep
+
+**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionStep`
+
+**Purpose**: Describes a single execution step in an execution plan with sequence ordering.
+
+**API Methods**:
+
+```php
+// Asset information
+$from = $step->from();     // "USD"
+$to = $step->to();         // "EUR"
+
+// Monetary amounts
+$spent = $step->spent();       // Money object (USD 100.00)
+$received = $step->received(); // Money object (EUR 90.91)
+
+// Fees
+$fees = $step->fees();             // MoneyMap object
+
+// Associated order
+$order = $step->order();           // Domain Order instance
+
+// Execution sequence
+$sequence = $step->sequenceNumber();  // int (1-based)
+
+// Convenience method
+$summary = $step->toArray();          // For debugging/internal use
+```
+
+**Properties**:
+- **from**: Source asset symbol (uppercase)
+- **to**: Destination asset symbol (uppercase)
+- **spent**: Money object (amount spent)
+- **received**: Money object (amount received, after fees)
+- **fees**: MoneyMap object (fees charged for this step)
+- **order**: Domain `Order` instance used to fill the step
+- **sequenceNumber**: Execution order (1-based integer)
+
+**Constraints**:
+- `spent.currency` always equals `from`
+- `received.currency` always equals `to`
+- `fees` keys are either `from` or `to` currencies
+- All asset symbols are uppercase
+- `sequenceNumber` is at least 1
+
+**Notes**:
+- The `received` amount reflects fees already deducted
+- `sequenceNumber` indicates execution order within the plan
+- Use `order()` to access order metadata (IDs, venue references, etc.)
+
+**Version History**:
+- 2.0.0: Initial introduction
+
+---
+
+### ExecutionStepCollection
+
+**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionStepCollection`
+
+**Purpose**: Immutable ordered collection of execution steps sorted by sequence number.
+
+**API Methods**:
+
+```php
+$collection = ExecutionStepCollection::fromList([$step1, $step2]);
+
+// Access steps
+$count = $collection->count();
+$isEmpty = $collection->isEmpty();
+$firstStep = $collection->first();
+$lastStep = $collection->last();
+$specificStep = $collection->at(0);  // Zero-indexed
+
+// Iterate
+foreach ($collection as $step) {
+    echo "Step {$step->sequenceNumber()}: {$step->from()} to {$step->to()}\n";
+}
+
+// Get as array
+$stepArray = $collection->all();      // list of ExecutionStep objects
+$simpleArray = $collection->toArray(); // For debugging
+```
+
+**Structure**:
+- Immutable ordered collection of ExecutionStep objects
+- Steps are sorted by sequence number
+- Empty collection available via `ExecutionStepCollection::empty()`
+
+**Notes**:
+- Steps are automatically sorted by `sequenceNumber()` on creation
+- Deterministic iteration order based on sequence numbers
+
+**Version History**:
+- 2.0.0: Initial introduction
+
+---
+
+## Path Results (Legacy)
+
+> **Deprecation Note**: `Path` and related classes are part of the deprecated `PathSearchService` API.
+> For new code, use `ExecutionPlan` with `ExecutionPlanService`.
 
 ### Path
 
@@ -391,9 +550,136 @@ $pathArray = $paths->toArray();
 
 ---
 
+---
+
+## Service Contracts
+
+### ExecutionPlanService (Recommended)
+
+**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService`
+
+**Purpose**: Service for finding optimal execution plans that may include split/merge routes.
+
+**API Methods**:
+
+```php
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+
+// Construction
+$service = new ExecutionPlanService(new GraphBuilder());
+
+// With custom ordering strategy
+$service = new ExecutionPlanService(new GraphBuilder(), $customOrderingStrategy);
+
+// Execute search
+$outcome = $service->findBestPlans($request);  // SearchOutcome<ExecutionPlan>
+```
+
+**Capabilities**:
+- Multiple orders for same currency direction
+- Split execution (input split across parallel routes)
+- Merge execution (routes converging at target)
+- Linear paths (single chain from source to target)
+
+**Version History**:
+- 2.0.0: Initial introduction
+
+---
+
+### PathSearchService (Deprecated)
+
+**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService`
+
+**Purpose**: Legacy service for finding linear conversion paths only.
+
+> **Deprecation Notice**: This service is deprecated since 2.0. Use `ExecutionPlanService::findBestPlans()` instead.
+
+**API Methods**:
+
+```php
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
+
+// Construction
+$service = new PathSearchService(new GraphBuilder());
+
+// Execute search (triggers deprecation warning)
+$outcome = $service->findBestPaths($request);  // SearchOutcome<Path>
+
+// Migration helper: convert ExecutionPlan to Path
+$path = PathSearchService::planToPath($executionPlan);  // Throws if non-linear
+```
+
+**Limitations**:
+- Returns only linear paths (no splits/merges)
+- Cannot combine multiple orders for same direction
+
+**Migration**:
+```php
+// Before (deprecated)
+$service = new PathSearchService(new GraphBuilder());
+$outcome = $service->findBestPaths($request);
+
+// After (recommended)
+$service = new ExecutionPlanService(new GraphBuilder());
+$outcome = $service->findBestPlans($request);
+```
+
+**Removal Timeline**:
+- 2.0: Deprecated
+- 3.0: Planned removal
+
+---
+
 ## Usage Examples
 
-### Working with Search Results
+### Working with Search Results (ExecutionPlanService)
+
+Here's how to work with a complete `SearchOutcome` from `ExecutionPlanService`:
+
+```php
+$outcome = $service->findBestPlans($request);
+
+// Access guard metrics
+$guards = $outcome->guardLimits();
+echo "Search took: {$guards->elapsedMilliseconds()}ms\n";
+echo "Expansions: {$guards->expansions()}\n";
+
+echo "Plans: {$outcome->paths()->count()}\n";
+
+// Process found plans
+foreach ($outcome->paths() as $plan) {
+    echo "Spent: {$plan->totalSpent()->amount()} {$plan->totalSpent()->currency()}\n";
+    echo "Received: {$plan->totalReceived()->amount()} {$plan->totalReceived()->currency()}\n";
+    echo "Tolerance remaining: {$plan->residualTolerance()->percentage(2)}\n";
+    echo "Is Linear: " . ($plan->isLinear() ? 'yes' : 'no') . "\n";
+
+    // Process aggregated fees
+    foreach ($plan->feeBreakdown() as $currency => $fee) {
+        echo "Fee in $currency: {$fee->amount()}\n";
+    }
+
+    // Process steps with sequence numbers
+    foreach ($plan->steps() as $step) {
+        echo "  Step {$step->sequenceNumber()}: {$step->from()} -> {$step->to()}: ";
+        echo "spent {$step->spent()->amount()}, received {$step->received()->amount()}\n";
+
+        // Order reference
+        $order = $step->order();
+        echo "  Filled order across {$order->assetPair()->base()} / {$order->assetPair()->quote()}\n";
+    }
+}
+
+// Check for guard breaches
+if ($guards->anyLimitReached()) {
+    echo "Warning: Search was limited by guard constraints\n";
+}
+```
+
+---
+
+### Working with Search Results (PathSearchService - Legacy)
 
 Here's how to work with a complete `SearchOutcome` containing paths and guard metrics:
 
@@ -455,5 +741,5 @@ All APIs use strongly-typed domain objects with PHPDoc annotations. This provide
 
 ---
 
-**Document Version**: 1.1.0
-**Last Updated**: April 2025
+**Document Version**: 2.0.0
+**Last Updated**: January 2026

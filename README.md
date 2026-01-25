@@ -34,14 +34,24 @@ Decimal math is handled by [`brick/math`](https://github.com/brick/math), so `ex
 
 ## Quick Start
 
-Find the best path from USD to BTC:
+Find the best execution plan from USD to BTC:
 
 ```php
 <?php
 
 require 'vendor/autoload.php';
 
-use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;use SomeWork\P2PPathFinder\Domain\Money\AssetPair;use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;use SomeWork\P2PPathFinder\Domain\Money\Money;use SomeWork\P2PPathFinder\Domain\Order\Order;use SomeWork\P2PPathFinder\Domain\Order\OrderBook;use SomeWork\P2PPathFinder\Domain\Order\OrderBounds;use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
+use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+use SomeWork\P2PPathFinder\Domain\Money\AssetPair;
+use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
+use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBook;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBounds;
+use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 
 // 1. Create an order book
 $order = new Order(
@@ -64,23 +74,44 @@ $config = PathSearchConfig::builder()
     ->build();
 
 // 3. Run the search
-$service = new PathSearchService(new GraphBuilder());
+$service = new ExecutionPlanService(new GraphBuilder());
 $request = new PathSearchRequest($orderBook, $config, 'BTC');
-$outcome = $service->findBestPaths($request);
+$outcome = $service->findBestPlans($request);
 
 // 4. Use the results
-foreach ($outcome->paths() as $path) {
-    echo "Spend: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()}\n";
-    echo "Receive: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
-    echo "Residual tolerance: {$path->residualTolerance()->percentage()}%\n";
+foreach ($outcome->paths() as $plan) {
+    echo "Spend: {$plan->totalSpent()->amount()} {$plan->totalSpent()->currency()}\n";
+    echo "Receive: {$plan->totalReceived()->amount()} {$plan->totalReceived()->currency()}\n";
+    echo "Residual tolerance: {$plan->residualTolerance()->percentage()}%\n";
 
-    foreach ($path->hops() as $hop) {
-        echo "Hop: {$hop->from()} -> {$hop->to()}\n";
-        echo "  Spent: {$hop->spent()->amount()} {$hop->spent()->currency()}\n";
-        echo "  Received: {$hop->received()->amount()} {$hop->received()->currency()}\n";
+    foreach ($plan->steps() as $step) {
+        echo "Step {$step->sequenceNumber()}: {$step->from()} -> {$step->to()}\n";
+        echo "  Spent: {$step->spent()->amount()} {$step->spent()->currency()}\n";
+        echo "  Received: {$step->received()->amount()} {$step->received()->currency()}\n";
     }
 }
 ```
+
+### ExecutionPlan vs Path
+
+The library offers two result types:
+
+| Aspect | `ExecutionPlan` (Recommended) | `Path` (Legacy) |
+|--------|-------------------------------|-----------------|
+| Service | `ExecutionPlanService` | `PathSearchService` (deprecated) |
+| Method | `findBestPlans()` | `findBestPaths()` |
+| Supports splits | Yes | No |
+| Supports merges | Yes | No |
+| Linear paths | Yes (via `isLinear()`) | Yes |
+
+**When to use ExecutionPlan:**
+- Multiple orders for same direction (USD→BTC via two market makers)
+- Split execution (USD→EUR and USD→GBP simultaneously)
+- Merge execution (EUR→BTC and GBP→BTC converge)
+
+**When to use Path:**
+- Legacy code migration (use `plan->asLinearPath()`)
+- Simple linear-only routing requirements
 
 ### Next Steps
 
@@ -123,9 +154,54 @@ USD → EUR → BTC        (2 hops)
 USD → USDT → ETH → BTC (3 hops)
 ```
 
-### Path-Level Transparency
+### Split/Merge Execution (New in 2.0)
 
-Search results return `Path` objects backed by ordered `PathHop` collections. Totals (`totalSpent()`, `totalReceived()`), fee breakdowns, and residual tolerance are derived from the hop data, while each hop exposes its originating `Order`, hop-level fees, and the spent/received amounts so you can reconcile fills or attach custom IDs without re-computing anything.
+`ExecutionPlanService` can find optimal execution plans that go beyond linear paths:
+
+```text
+Multi-order same direction:
+  USD → BTC (order1: rate 0.000033)
+  USD → BTC (order2: rate 0.000032)  ← selects best rate
+
+Split at source:
+  USD → EUR (order1)
+  USD → GBP (order2)  ← splits input across routes
+
+Merge at target:
+  EUR → BTC (order1)
+  GBP → BTC (order2)  ← routes converge at target
+
+Diamond pattern (split + merge):
+  USD → EUR → BTC
+  USD → GBP → BTC  ← parallel paths through different currencies
+```
+
+Use `ExecutionPlan::isLinear()` to check if a plan is a simple linear path:
+
+```php
+$plan = $outcome->bestPath();
+if ($plan->isLinear()) {
+    // Simple linear path - can convert to legacy Path if needed
+    $path = $plan->asLinearPath();
+} else {
+    // Complex execution with splits/merges
+    foreach ($plan->steps() as $step) {
+        // Each step has sequenceNumber() for execution order
+    }
+}
+```
+
+### Execution-Level Transparency
+
+Search results return `ExecutionPlan` objects backed by ordered `ExecutionStepCollection`. Totals (`totalSpent()`, `totalReceived()`), fee breakdowns, and residual tolerance are aggregated from step data. Each step exposes:
+
+- **`from()` / `to()`**: Source and destination currencies
+- **`spent()` / `received()`**: Monetary amounts for the step
+- **`order()`**: Originating `Order` for reconciliation or ID lookup
+- **`fees()`**: Step-level fee breakdown
+- **`sequenceNumber()`**: Execution order (1-based)
+
+For linear plans, `asLinearPath()` converts to `Path` with `PathHop` collections for backward compatibility.
 
 ### Guard Rails and Performance
 

@@ -75,6 +75,8 @@
         "phpdoc": "php bin/generate-phpdoc.php",
         "phpbench": "php -d memory_limit=-1 -d xdebug.mode=off vendor/bin/phpbench run --config=phpbench.json --report=p2p_aggregate",
         "examples": [
+            "@examples:execution-plan-basic",
+            "@examples:execution-plan-split-merge",
             "@examples:custom-order-filter",
             "@examples:custom-ordering-strategy",
             "@examples:custom-fee-policy",
@@ -84,6 +86,8 @@
             "@examples:bybit-p2p-integration",
             "@examples:advanced-search-strategies"
         ],
+        "examples:execution-plan-basic": "php examples/execution-plan-basic.php",
+        "examples:execution-plan-split-merge": "php examples/execution-plan-split-merge.php",
         "examples:custom-order-filter": "php examples/custom-order-filter.php",
         "examples:custom-ordering-strategy": "php examples/custom-ordering-strategy.php",
         "examples:custom-fee-policy": "php examples/custom-fee-policy.php",

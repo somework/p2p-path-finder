@@ -84,6 +84,58 @@ docker compose exec php composer examples
 
 ## Examples by Topic
 
+### ExecutionPlanService (Recommended)
+
+These examples demonstrate the recommended `ExecutionPlanService` API for path finding.
+
+#### 1. Basic ExecutionPlanService Usage
+**File**: [`execution-plan-basic.php`](execution-plan-basic.php)
+
+Demonstrates the basic usage of `ExecutionPlanService` for finding optimal execution plans.
+
+**What you'll learn**:
+- Creating an order book
+- Configuring search parameters
+- Using `ExecutionPlanService::findBestPlans()`
+- Processing `ExecutionPlan` results
+- Understanding `ExecutionStep` sequence numbers
+- Converting linear plans to legacy `Path` format
+
+**When to use**:
+- Starting a new project with the library
+- Learning the recommended API
+- Migrating from `PathSearchService`
+
+**Related docs**:
+- [Getting Started Guide](../docs/getting-started.md#executionplanservice-recommended)
+- [API Contracts](../docs/api-contracts.md#executionplan)
+
+---
+
+#### 2. Split/Merge Execution Patterns
+**File**: [`execution-plan-split-merge.php`](execution-plan-split-merge.php)
+
+Demonstrates advanced execution plan capabilities exclusive to `ExecutionPlanService`.
+
+**What you'll learn**:
+- Multi-order same direction (multiple orders for USD→BTC)
+- Split execution (input split across parallel routes)
+- Merge execution (routes converging at target)
+- Diamond patterns (combined split and merge)
+- Using `isLinear()` and `asLinearPath()` for migration
+
+**When to use**:
+- P2P trading platforms with multiple market makers
+- Multi-currency arbitrage detection
+- Optimal liquidity routing across fragmented markets
+- Exchange aggregation requiring split/merge execution
+
+**Related docs**:
+- [Architecture Guide](../docs/architecture.md#executionplansearchengine-algorithm-recommended)
+- [UPGRADING.md](../UPGRADING.md#upgrading-from-1x-to-20)
+
+---
+
 ### Customization & Extension
 
 These examples demonstrate the library's extension points and how to customize behavior for your specific needs.
@@ -310,33 +362,37 @@ Demonstrates ExecutionPlanService's ability to handle complex path-finding scena
 
 | Example                            | Lines      | Status      | Scenarios | Key Features                        |
 |------------------------------------|------------|-------------|-----------|-------------------------------------|
+| **execution-plan-basic.php**       | 170+       | Production  | 1         | ExecutionPlanService basics         |
+| **execution-plan-split-merge.php** | 260+       | Production  | 4         | Split/merge, diamond patterns       |
 | **custom-order-filter.php**        | 397        | Production  | 5         | 4 filters, composition pattern      |
 | **custom-ordering-strategy.php**   | 527        | Production  | 4         | 3 strategies, determinism test      |
 | **custom-fee-policy.php**          | 570        | Production  | 6         | 5 policies, realistic models        |
 | **error-handling.php**             | 473        | Production  | 7         | All exceptions, production pattern  |
 | **performance-optimization.php**   | 507        | Production  | 12        | 4 techniques, benchmarks            |
-| **guarded-search-example.php**     | Varies     | Production  | 1         | Complete workflow                   |
+| **guarded-search-example.php**     | Varies     | Production  | 1         | Complete workflow (legacy)          |
 | **bybit-p2p-integration.php**      | 600+       | Production  | 5         | API integration, real-world example |
 | **advanced-search-strategies.php** | 400+       | Production  | 8         | Multi-order, split/merge, diamond   |
-| **TOTAL**                          | **~3,500** | **8 files** | **48+**   | **Comprehensive coverage**          |
+| **TOTAL**                          | **~4,000** | **10 files** | **53+**  | **Comprehensive coverage**          |
 
 ### Example Categories
 
 #### By Difficulty Level
 
 **Beginner** (Start here):
-1. `guarded-search-example.php` - Complete basic workflow
-2. `custom-order-filter.php` - Simple filter implementations
+1. `execution-plan-basic.php` - **Recommended** starting point with ExecutionPlanService
+2. `guarded-search-example.php` - Complete basic workflow (legacy PathSearchService)
+3. `custom-order-filter.php` - Simple filter implementations
 
 **Intermediate**:
-3. `custom-fee-policy.php` - Realistic fee modeling
-4. `custom-ordering-strategy.php` - Custom ranking logic
-5. `bybit-p2p-integration.php` - Real-world API integration
-6. `advanced-search-strategies.php` - Multi-order, split, merge patterns
+4. `execution-plan-split-merge.php` - Split/merge execution patterns
+5. `custom-fee-policy.php` - Realistic fee modeling
+6. `custom-ordering-strategy.php` - Custom ranking logic
+7. `bybit-p2p-integration.php` - Real-world API integration
+8. `advanced-search-strategies.php` - Multi-order, split, merge patterns
 
 **Advanced**:
-7. `error-handling.php` - Production error handling
-8. `performance-optimization.php` - Performance tuning
+9. `error-handling.php` - Production error handling
+10. `performance-optimization.php` - Performance tuning
 
 #### By Use Case
 
@@ -344,12 +400,16 @@ Demonstrates ExecutionPlanService's ability to handle complex path-finding scena
 
 | Goal                                 | Example                          |
 |--------------------------------------|----------------------------------|
+| Learn the recommended API            | `execution-plan-basic.php`       |
+| Migrate from PathSearchService       | `execution-plan-basic.php`       |
+| Handle split/merge execution         | `execution-plan-split-merge.php` |
+| Multi-order liquidity aggregation    | `execution-plan-split-merge.php` |
 | Filter orders before search          | `custom-order-filter.php`        |
 | Change how paths are ranked          | `custom-ordering-strategy.php`   |
 | Model realistic exchange fees        | `custom-fee-policy.php`          |
 | Handle errors in production          | `error-handling.php`             |
 | Optimize search performance          | `performance-optimization.php`   |
-| See a complete basic workflow        | `guarded-search-example.php`     |
+| See legacy workflow (deprecated)     | `guarded-search-example.php`     |
 | Integrate with Bybit P2P API         | `bybit-p2p-integration.php`      |
 | Build a real-world trading app       | `bybit-p2p-integration.php`      |
 | Handle multi-order/split/merge paths | `advanced-search-strategies.php` |
@@ -445,15 +505,17 @@ If examples don't answer your question:
 ## Summary
 
 This examples directory provides:
-- ✅ **8 comprehensive examples** covering all major use cases
-- ✅ **3,500+ lines** of production-ready code
-- ✅ **48+ demonstration scenarios** showing different patterns
+- ✅ **10 comprehensive examples** covering all major use cases
+- ✅ **4,000+ lines** of production-ready code
+- ✅ **53+ demonstration scenarios** showing different patterns
+- ✅ **ExecutionPlanService examples** for the recommended API
+- ✅ **Split/merge patterns** demonstrating advanced execution topologies
 - ✅ **Complete workflows** from configuration to result handling
 - ✅ **Real-world integrations** with external APIs (Bybit P2P)
 - ✅ **Measurable improvements** via benchmarks and comparisons
-- ✅ **Advanced search strategies** covering multi-order, split, merge, and diamond patterns
+- ✅ **Migration guidance** from PathSearchService to ExecutionPlanService
 
-Start with `guarded-search-example.php` for a basic workflow, then explore customization and optimization examples based on your needs. Check out `bybit-p2p-integration.php` for a complete real-world API integration example. For complex path-finding scenarios (multi-order, split/merge, diamond patterns), see `advanced-search-strategies.php`.
+**Start with `execution-plan-basic.php`** for the recommended API, then explore `execution-plan-split-merge.php` for advanced execution patterns. For legacy code or simple linear paths, see `guarded-search-example.php`. Check out `bybit-p2p-integration.php` for a complete real-world API integration example.
 
 **Happy coding!** 🚀
 

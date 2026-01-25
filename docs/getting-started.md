@@ -1,7 +1,7 @@
 # Getting Started with P2P Path Finder
 
-**Version**: 1.0  
-**Last Updated**: 2024-11-22
+**Version**: 2.0  
+**Last Updated**: 2026-01-25
 
 This guide will help you get started with the P2P Path Finder library in just a few minutes.
 
@@ -14,6 +14,8 @@ This guide will help you get started with the P2P Path Finder library in just a 
 - [Understanding the Results](#understanding-the-results)
 - [Working with Orders](#working-with-orders)
 - [Customizing the Search](#customizing-the-search)
+- [ExecutionPlanService (Recommended)](#executionplanservice-recommended)
+- [Migration from PathSearchService](#migration-from-pathsearchservice)
 - [Next Steps](#next-steps)
 
 ---
@@ -593,6 +595,210 @@ echo "  Visited states: {$guardReport->visitedStates()}\n";
 echo "  Time: {$guardReport->elapsedMilliseconds()}ms\n";
 echo "  Any limit reached: " . ($guardReport->anyLimitReached() ? 'yes' : 'no') . "\n";
 ```
+
+---
+
+## ExecutionPlanService (Recommended)
+
+Starting with version 2.0, `ExecutionPlanService` is the recommended API for path finding. Unlike `PathSearchService` which only returns linear paths, `ExecutionPlanService` can find optimal execution plans that include:
+
+- **Multi-order same direction**: Multiple orders for USD→BTC combined
+- **Split execution**: Input split across parallel routes
+- **Merge execution**: Routes converging at target currency
+
+### Basic Usage
+
+```php
+<?php
+
+use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+
+// Create the execution plan service
+$graphBuilder = new GraphBuilder();
+$planService = new ExecutionPlanService($graphBuilder);
+
+// Configure and run search
+$config = PathSearchConfig::builder()
+    ->withSpendAmount($spendAmount)
+    ->withToleranceBounds('0.0', '0.10')
+    ->withHopLimits(1, 3)
+    ->build();
+
+$request = new PathSearchRequest($orderBook, $config, 'BTC');
+$outcome = $planService->findBestPlans($request);
+
+// Process results
+$bestPlan = $outcome->bestPath();
+if (null !== $bestPlan) {
+    echo "Spend: {$bestPlan->totalSpent()->amount()} {$bestPlan->totalSpent()->currency()}\n";
+    echo "Receive: {$bestPlan->totalReceived()->amount()} {$bestPlan->totalReceived()->currency()}\n";
+    
+    foreach ($bestPlan->steps() as $step) {
+        echo "Step {$step->sequenceNumber()}: {$step->from()} -> {$step->to()}\n";
+        echo "  Spent: {$step->spent()->amount()} {$step->spent()->currency()}\n";
+        echo "  Received: {$step->received()->amount()} {$step->received()->currency()}\n";
+    }
+}
+```
+
+### Split/Merge Example
+
+Here's an example with multiple orders that can be used for split/merge execution:
+
+```php
+<?php
+
+use SomeWork\P2PPathFinder\Domain\Money\AssetPair;
+use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
+use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBook;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBounds;
+use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
+
+// Create orders for a diamond pattern: USD → EUR → BTC and USD → GBP → BTC
+$orders = [
+    // USD -> EUR
+    Order::buy(
+        AssetPair::fromString('EUR/USD'),
+        OrderBounds::fromStrings('100', '5000', 2),
+        ExchangeRate::fromString('EUR', 'USD', '1.10', 4),
+        OrderSide::BUY
+    ),
+    // USD -> GBP (alternative route)
+    Order::buy(
+        AssetPair::fromString('GBP/USD'),
+        OrderBounds::fromStrings('100', '5000', 2),
+        ExchangeRate::fromString('GBP', 'USD', '1.25', 4),
+        OrderSide::BUY
+    ),
+    // EUR -> BTC
+    Order::buy(
+        AssetPair::fromString('BTC/EUR'),
+        OrderBounds::fromStrings('0.01', '1.0', 8),
+        ExchangeRate::fromString('BTC', 'EUR', '27000', 2),
+        OrderSide::BUY
+    ),
+    // GBP -> BTC (merge at target)
+    Order::buy(
+        AssetPair::fromString('BTC/GBP'),
+        OrderBounds::fromStrings('0.01', '1.0', 8),
+        ExchangeRate::fromString('BTC', 'GBP', '23500', 2),
+        OrderSide::BUY
+    ),
+];
+
+$orderBook = new OrderBook($orders);
+
+// Search will find the optimal plan, which may split USD across EUR and GBP routes
+$planService = new ExecutionPlanService(new GraphBuilder());
+$outcome = $planService->findBestPlans($request);
+
+$plan = $outcome->bestPath();
+
+// Check if the plan is linear (single path) or has splits/merges
+if ($plan->isLinear()) {
+    echo "Linear execution plan (single path)\n";
+    // Can convert to legacy Path format if needed
+    $path = $plan->asLinearPath();
+} else {
+    echo "Complex execution plan with splits/merges\n";
+    echo "Steps: {$plan->stepCount()}\n";
+}
+```
+
+### Understanding ExecutionPlan vs Path
+
+| Aspect | ExecutionPlan | Path |
+|--------|---------------|------|
+| Result type | `ExecutionStepCollection` | `PathHopCollection` |
+| Element type | `ExecutionStep` | `PathHop` |
+| Has sequence numbers | Yes (`sequenceNumber()`) | No (implicit ordering) |
+| Supports splits | Yes | No |
+| Supports merges | Yes | No |
+| Check linearity | `isLinear()` | Always linear |
+| Convert to Path | `asLinearPath()` | N/A |
+
+---
+
+## Migration from PathSearchService
+
+`PathSearchService` is deprecated since version 2.0. Here's how to migrate:
+
+### Before (Deprecated)
+
+```php
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
+
+$service = new PathSearchService(new GraphBuilder());
+$outcome = $service->findBestPaths($request);  // Triggers deprecation warning
+
+foreach ($outcome->paths() as $path) {
+    foreach ($path->hops() as $hop) {
+        echo "{$hop->from()} -> {$hop->to()}\n";
+    }
+}
+```
+
+### After (Recommended)
+
+```php
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
+
+$service = new ExecutionPlanService(new GraphBuilder());
+$outcome = $service->findBestPlans($request);
+
+foreach ($outcome->paths() as $plan) {
+    foreach ($plan->steps() as $step) {
+        echo "{$step->from()} -> {$step->to()}\n";
+    }
+}
+```
+
+### Incremental Migration
+
+If you need to maintain backward compatibility during migration:
+
+```php
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
+
+$planService = new ExecutionPlanService(new GraphBuilder());
+$outcome = $planService->findBestPlans($request);
+
+foreach ($outcome->paths() as $plan) {
+    // Convert linear plans to legacy Path format
+    if ($plan->isLinear()) {
+        $path = $plan->asLinearPath();
+        // Use $path with legacy code expecting PathHop objects
+        processLegacyPath($path);
+    } else {
+        // Handle non-linear plans with new code
+        processExecutionPlan($plan);
+    }
+}
+
+// Or use the static helper for direct conversion
+$plan = $outcome->bestPath();
+if ($plan->isLinear()) {
+    $path = PathSearchService::planToPath($plan);
+    // Use legacy $path
+}
+```
+
+### Key Differences
+
+| PathSearchService | ExecutionPlanService |
+|-------------------|---------------------|
+| `findBestPaths()` | `findBestPlans()` |
+| Returns `Path` | Returns `ExecutionPlan` |
+| `$path->hops()` | `$plan->steps()` |
+| `PathHop` | `ExecutionStep` |
+| No `sequenceNumber()` | Has `sequenceNumber()` |
+| Linear only | Linear + split/merge |
 
 ---
 

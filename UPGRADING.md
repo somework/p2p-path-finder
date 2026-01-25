@@ -114,11 +114,11 @@ use SomeWork\P2PPathFinder\Domain\Money\Money;
 
 ### Upgrading from 1.x to 2.0
 
-**Status**: 🚧 In Progress
+**Status**: ✅ Ready
 
 Version 2.0 introduces `ExecutionPlanService` as the recommended API for path finding, deprecating `PathSearchService`.
 
-#### Summary
+#### Summary of Changes
 
 The main change in 2.0 is the introduction of `ExecutionPlanService` which can find execution plans that:
 - Use multiple orders for the same currency direction
@@ -126,6 +126,19 @@ The main change in 2.0 is the introduction of `ExecutionPlanService` which can f
 - Merge multiple routes at the target currency
 
 The legacy `PathSearchService` only returns linear paths (single chain from source to target).
+
+#### New Features
+
+| Feature | Description |
+|---------|-------------|
+| **ExecutionPlanService** | New recommended service for path finding |
+| **ExecutionPlan** | Result type supporting split/merge execution |
+| **ExecutionStep** | Step with sequence number for execution ordering |
+| **ExecutionStepCollection** | Immutable collection of steps |
+| **Multi-order aggregation** | Multiple orders for same direction |
+| **Split execution** | Input split across parallel routes |
+| **Merge execution** | Routes converging at target |
+| **PortfolioState** | Internal multi-currency balance tracking |
 
 #### Why PathSearchService is Deprecated
 
@@ -139,47 +152,95 @@ The legacy `PathSearchService` only returns linear paths (single chain from sour
 
 #### Migration Path
 
-##### Using the New Service
+##### Step 1: Update Service Instantiation
 
 **Before (deprecated)**:
 
 ```php
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
 use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
 
 $service = new PathSearchService(new GraphBuilder());
-$outcome = $service->findBestPaths($request);
-
-foreach ($outcome->paths() as $path) {
-    echo "Spend: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()}\n";
-    echo "Receive: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
-    
-    foreach ($path->hops() as $hop) {
-        echo "  {$hop->from()} -> {$hop->to()}\n";
-    }
-}
 ```
 
 **After (recommended)**:
 
 ```php
 use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
 
 $service = new ExecutionPlanService(new GraphBuilder());
-$outcome = $service->findBestPlans($request);
+```
 
+##### Step 2: Update Search Method Call
+
+**Before**:
+
+```php
+$outcome = $service->findBestPaths($request);
+```
+
+**After**:
+
+```php
+$outcome = $service->findBestPlans($request);
+```
+
+##### Step 3: Update Result Processing
+
+**Before (Path with hops)**:
+
+```php
+foreach ($outcome->paths() as $path) {
+    echo "Spend: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()}\n";
+    echo "Receive: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
+    
+    foreach ($path->hops() as $hop) {
+        echo "  {$hop->from()} -> {$hop->to()}\n";
+        echo "  Order: {$hop->order()->assetPair()->base()}/{$hop->order()->assetPair()->quote()}\n";
+    }
+}
+```
+
+**After (ExecutionPlan with steps)**:
+
+```php
 foreach ($outcome->paths() as $plan) {
     echo "Spend: {$plan->totalSpent()->amount()} {$plan->totalSpent()->currency()}\n";
     echo "Receive: {$plan->totalReceived()->amount()} {$plan->totalReceived()->currency()}\n";
+    echo "Is Linear: " . ($plan->isLinear() ? 'yes' : 'no') . "\n";
     
     foreach ($plan->steps() as $step) {
-        echo "  {$step->from()} -> {$step->to()}\n";
+        echo "  Step {$step->sequenceNumber()}: {$step->from()} -> {$step->to()}\n";
+        echo "  Order: {$step->order()->assetPair()->base()}/{$step->order()->assetPair()->quote()}\n";
     }
-    
-    // If you need the legacy Path format for linear plans:
+}
+```
+
+##### Incremental Migration (Hybrid Approach)
+
+If you need to maintain backward compatibility during migration:
+
+```php
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+
+$planService = new ExecutionPlanService(new GraphBuilder());
+$outcome = $planService->findBestPlans($request);
+
+foreach ($outcome->paths() as $plan) {
+    // Convert linear plans to legacy Path format
     if ($plan->isLinear()) {
         $path = $plan->asLinearPath();
-        // Use $path as before
+        if (null !== $path) {
+            // Use $path with legacy code expecting PathHop objects
+            processLegacyPath($path);
+            continue;
+        }
     }
+    
+    // Handle non-linear plans with new code
+    processExecutionPlan($plan);
 }
 ```
 
@@ -202,27 +263,27 @@ try {
 }
 ```
 
-#### Key Differences
+#### API Comparison Table
 
-| Aspect | PathSearchService | ExecutionPlanService |
-|--------|------------------|---------------------|
-| Result type | `Path` | `ExecutionPlan` |
-| Supports splits | No | Yes |
-| Supports merges | No | Yes |
-| Linear paths | Yes | Yes (via `isLinear()`) |
-| Method name | `findBestPaths()` | `findBestPlans()` |
-
-#### Result Type Differences
-
-**Path** (linear only):
-- `hops()` - Returns `PathHopCollection`
-- Each hop has: `from()`, `to()`, `spent()`, `received()`, `order()`, `fees()`
-
-**ExecutionPlan** (linear and non-linear):
-- `steps()` - Returns `ExecutionStepCollection`
-- Each step has: `from()`, `to()`, `spent()`, `received()`, `order()`, `fees()`, `sequenceNumber()`
-- `isLinear()` - Check if plan can be converted to `Path`
-- `asLinearPath()` - Convert to `Path` (returns `null` if non-linear)
+| PathSearchService (Deprecated) | ExecutionPlanService (Recommended) |
+|-------------------------------|-----------------------------------|
+| `new PathSearchService($graphBuilder)` | `new ExecutionPlanService($graphBuilder)` |
+| `$service->findBestPaths($request)` | `$service->findBestPlans($request)` |
+| Returns `SearchOutcome<Path>` | Returns `SearchOutcome<ExecutionPlan>` |
+| `$path->hops()` | `$plan->steps()` |
+| `PathHop` | `ExecutionStep` |
+| No `sequenceNumber()` | Has `sequenceNumber()` |
+| `$hop->from()` | `$step->from()` |
+| `$hop->to()` | `$step->to()` |
+| `$hop->spent()` | `$step->spent()` |
+| `$hop->received()` | `$step->received()` |
+| `$hop->order()` | `$step->order()` |
+| `$hop->fees()` | `$step->fees()` |
+| Linear only | Linear + split/merge |
+| N/A | `$plan->isLinear()` |
+| N/A | `$plan->asLinearPath()` |
+| N/A | `$plan->sourceCurrency()` |
+| N/A | `$plan->targetCurrency()` |
 
 #### Deprecation Timeline
 
@@ -244,11 +305,15 @@ To suppress these notices during migration, configure your error handler or use 
 #### Upgrade Checklist
 
 - [ ] Identify all usages of `PathSearchService`
-- [ ] Replace with `ExecutionPlanService`
+- [ ] Replace service instantiation with `ExecutionPlanService`
+- [ ] Update method calls from `findBestPaths()` to `findBestPlans()`
 - [ ] Update result handling from `Path` to `ExecutionPlan`
-- [ ] Use `isLinear()` and `asLinearPath()` if legacy format needed
+- [ ] Replace `hops()` with `steps()` in iteration loops
+- [ ] Use `sequenceNumber()` for step ordering if needed
+- [ ] Handle non-linear plans or use `isLinear()` + `asLinearPath()` for legacy compatibility
 - [ ] Run tests to verify behavior
 - [ ] Remove deprecation notice suppressions after migration complete
+- [ ] Update any serialization/API responses that expose path structure
 
 ---
 

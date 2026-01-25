@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **ExecutionPlanService**: New recommended service for path finding that supports split/merge execution
+  - `ExecutionPlanService::findBestPlans()` - Returns `ExecutionPlan` objects
+  - Supports multi-order same direction (multiple orders for USD→BTC)
+  - Supports split execution (input split across parallel routes)
+  - Supports merge execution (routes converging at target)
+  - See [Getting Started Guide](docs/getting-started.md#executionplanservice-recommended)
+
+- **ExecutionPlan result type**: Complete execution plan that can express both linear and split/merge topologies
+  - `steps()` - Returns `ExecutionStepCollection`
+  - `isLinear()` - Check if plan is a simple linear path
+  - `asLinearPath()` - Convert to legacy `Path` format (returns null if non-linear)
+  - `sourceCurrency()` / `targetCurrency()` - Source and target currencies
+  - `stepCount()` - Number of execution steps
+  - See [API Contracts](docs/api-contracts.md#executionplan)
+
+- **ExecutionStep**: Single step in an execution plan with sequence ordering
+  - `sequenceNumber()` - Execution order (1-based)
+  - `from()` / `to()` - Source and destination currencies
+  - `spent()` / `received()` - Monetary amounts
+  - `order()` / `fees()` - Order reference and fees
+  - See [API Contracts](docs/api-contracts.md#executionstep)
+
+- **ExecutionStepCollection**: Immutable ordered collection sorted by sequence number
+  - `fromList()` - Create from array of steps
+  - `all()` / `at()` / `first()` / `last()` - Access steps
+  - Automatic sorting by sequence number
+
+- **PortfolioState** (internal): Multi-currency balance tracking for split/merge execution
+  - Tracks balances across multiple currencies simultaneously
+  - Prevents backtracking (cannot return to fully spent currency)
+  - Each order used only once per portfolio state
+  - See [Architecture Guide](docs/architecture.md#executionplansearchengine-algorithm-recommended)
+
+- **ExecutionPlanSearchEngine** (internal): Successive shortest augmenting paths algorithm
+  - Finds optimal execution plans considering all available liquidity
+  - Uses Dijkstra-based path finding with portfolio state tracking
+  - Supports complex topologies (splits, merges, diamond patterns)
+
+- **New examples**:
+  - `examples/execution-plan-basic.php` - Basic ExecutionPlanService usage
+  - `examples/execution-plan-split-merge.php` - Split/merge execution patterns
+  - Updated `examples/advanced-search-strategies.php` with ExecutionPlanService
+
 ### Changed
 - **Major namespace refactoring**: Reorganized entire codebase for better structure and maintainability
   - `Application/Graph/` → `Application/PathSearch/Model/Graph/`
@@ -18,15 +62,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Eliminated `JsonSerializable` implementations from core classes
   - Removed serialization-specific traits and logic
   - Updated examples to use direct object APIs
+- **Updated documentation**: All docs updated for ExecutionPlanService API
+  - README.md: New quick start with ExecutionPlanService
+  - Getting Started: ExecutionPlanService tutorial and migration guide
+  - Architecture: PortfolioState and ExecutionPlanSearchEngine algorithm
+  - API Contracts: ExecutionPlan, ExecutionStep, ExecutionStepCollection contracts
+
+### Deprecated
+- **PathSearchService**: Deprecated in favor of `ExecutionPlanService`
+  - `PathSearchService::findBestPaths()` triggers deprecation warning
+  - Use `ExecutionPlanService::findBestPlans()` instead
+  - Planned removal in 3.0
+  - See [UPGRADING.md](UPGRADING.md#upgrading-from-1x-to-20) for migration guide
+
+- **Path result type**: Legacy result type for linear paths only
+  - Use `ExecutionPlan` with `ExecutionPlanService` for new code
+  - Existing code can use `ExecutionPlan::asLinearPath()` for conversion
+  - `PathSearchService::planToPath()` helper available for migration
 
 ### Breaking Changes
 - **Namespace changes**: All public class namespaces have changed (breaking change for library consumers)
 - **Simplified APIs**: Classes now provide direct object access methods
+- **Recommended API change**: `PathSearchService` deprecated, `ExecutionPlanService` recommended
 
 ### Migration Guide
 - Update all import statements to use new namespace paths
-- Use direct object API methods for accessing data
-- See updated documentation for new API usage patterns
+- Replace `PathSearchService` with `ExecutionPlanService`
+- Replace `findBestPaths()` with `findBestPlans()`
+- Replace `Path` result handling with `ExecutionPlan`
+- Replace `hops()` iteration with `steps()` iteration
+- Use `isLinear()` and `asLinearPath()` for backward compatibility
+- See [UPGRADING.md](UPGRADING.md) for complete migration guide
 
 ## [0.1.0] - TBD
 
