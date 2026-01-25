@@ -61,6 +61,7 @@ composer examples:error-handling
 composer examples:performance-optimization
 composer examples:guarded-search
 composer examples:bybit-p2p-integration
+composer examples:advanced-search-strategies
 ```
 
 **Benefits of using composer scripts**:
@@ -276,20 +277,48 @@ Real-world integration example showing how to fetch P2P trading data from Bybit'
 
 ---
 
+#### 8. Advanced Search Strategies
+**File**: [`advanced-search-strategies.php`](advanced-search-strategies.php)
+
+Demonstrates ExecutionPlanService's ability to handle complex path-finding scenarios including multi-order aggregation, split/merge patterns, and diamond topologies.
+
+**What you'll learn**:
+- Multi-Order Same Direction: Multiple A→B orders with automatic best-rate selection
+- Split at Source: A→B and A→C patterns (source distributing to routes)
+- Merge at Target: B→D and C→D patterns (routes converging at target)
+- Diamond Pattern: A→B, A→C, B→D, C→D (combined split and merge)
+- Complex Real-World Graphs: Multi-layer currency networks
+- Step-by-step execution flow visualization
+- Performance metrics and guard limit handling
+
+**When to use**:
+- P2P trading platforms with multiple market makers
+- Multi-currency arbitrage detection
+- Optimal liquidity routing across fragmented markets
+- Exchange aggregation requiring split/merge execution
+- Understanding how the search engine selects optimal paths
+
+**Related docs**:
+- [Getting Started Guide](../docs/getting-started.md)
+- [Architecture Guide](../docs/architecture.md)
+
+---
+
 ## Example Details
 
 ### File Statistics
 
-| Example                          | Lines      | Status      | Scenarios | Key Features                        |
-|----------------------------------|------------|-------------|-----------|-------------------------------------|
-| **custom-order-filter.php**      | 397        | Production  | 5         | 4 filters, composition pattern      |
-| **custom-ordering-strategy.php** | 527        | Production  | 4         | 3 strategies, determinism test      |
-| **custom-fee-policy.php**        | 570        | Production  | 6         | 5 policies, realistic models        |
-| **error-handling.php**           | 473        | Production  | 7         | All exceptions, production pattern  |
-| **performance-optimization.php** | 507        | Production  | 12        | 4 techniques, benchmarks            |
-| **guarded-search-example.php**   | Varies     | Production  | 1         | Complete workflow                   |
-| **bybit-p2p-integration.php**    | 600+       | Production  | 5         | API integration, real-world example |
-| **TOTAL**                        | **~3,100** | **7 files** | **40+**   | **Comprehensive coverage**          |
+| Example                            | Lines      | Status      | Scenarios | Key Features                        |
+|------------------------------------|------------|-------------|-----------|-------------------------------------|
+| **custom-order-filter.php**        | 397        | Production  | 5         | 4 filters, composition pattern      |
+| **custom-ordering-strategy.php**   | 527        | Production  | 4         | 3 strategies, determinism test      |
+| **custom-fee-policy.php**          | 570        | Production  | 6         | 5 policies, realistic models        |
+| **error-handling.php**             | 473        | Production  | 7         | All exceptions, production pattern  |
+| **performance-optimization.php**   | 507        | Production  | 12        | 4 techniques, benchmarks            |
+| **guarded-search-example.php**     | Varies     | Production  | 1         | Complete workflow                   |
+| **bybit-p2p-integration.php**      | 600+       | Production  | 5         | API integration, real-world example |
+| **advanced-search-strategies.php** | 400+       | Production  | 8         | Multi-order, split/merge, diamond   |
+| **TOTAL**                          | **~3,500** | **8 files** | **48+**   | **Comprehensive coverage**          |
 
 ### Example Categories
 
@@ -303,25 +332,28 @@ Real-world integration example showing how to fetch P2P trading data from Bybit'
 3. `custom-fee-policy.php` - Realistic fee modeling
 4. `custom-ordering-strategy.php` - Custom ranking logic
 5. `bybit-p2p-integration.php` - Real-world API integration
+6. `advanced-search-strategies.php` - Multi-order, split, merge patterns
 
 **Advanced**:
-6. `error-handling.php` - Production error handling
-7. `performance-optimization.php` - Performance tuning
+7. `error-handling.php` - Production error handling
+8. `performance-optimization.php` - Performance tuning
 
 #### By Use Case
 
 **If you want to...**
 
-| Goal                           | Example                        |
-|--------------------------------|--------------------------------|
-| Filter orders before search    | `custom-order-filter.php`      |
-| Change how paths are ranked    | `custom-ordering-strategy.php` |
-| Model realistic exchange fees  | `custom-fee-policy.php`        |
-| Handle errors in production    | `error-handling.php`           |
-| Optimize search performance    | `performance-optimization.php` |
-| See a complete basic workflow  | `guarded-search-example.php`   |
-| Integrate with Bybit P2P API   | `bybit-p2p-integration.php`    |
-| Build a real-world trading app | `bybit-p2p-integration.php`    |
+| Goal                                 | Example                          |
+|--------------------------------------|----------------------------------|
+| Filter orders before search          | `custom-order-filter.php`        |
+| Change how paths are ranked          | `custom-ordering-strategy.php`   |
+| Model realistic exchange fees        | `custom-fee-policy.php`          |
+| Handle errors in production          | `error-handling.php`             |
+| Optimize search performance          | `performance-optimization.php`   |
+| See a complete basic workflow        | `guarded-search-example.php`     |
+| Integrate with Bybit P2P API         | `bybit-p2p-integration.php`      |
+| Build a real-world trading app       | `bybit-p2p-integration.php`      |
+| Handle multi-order/split/merge paths | `advanced-search-strategies.php` |
+| Understand complex path topologies   | `advanced-search-strategies.php` |
 
 ## Related Documentation
 
@@ -413,14 +445,15 @@ If examples don't answer your question:
 ## Summary
 
 This examples directory provides:
-- ✅ **7 comprehensive examples** covering all major use cases
-- ✅ **3,100+ lines** of production-ready code
-- ✅ **40+ demonstration scenarios** showing different patterns
+- ✅ **8 comprehensive examples** covering all major use cases
+- ✅ **3,500+ lines** of production-ready code
+- ✅ **48+ demonstration scenarios** showing different patterns
 - ✅ **Complete workflows** from configuration to result handling
 - ✅ **Real-world integrations** with external APIs (Bybit P2P)
 - ✅ **Measurable improvements** via benchmarks and comparisons
+- ✅ **Advanced search strategies** covering multi-order, split, merge, and diamond patterns
 
-Start with `guarded-search-example.php` for a basic workflow, then explore customization and optimization examples based on your needs. Check out `bybit-p2p-integration.php` for a complete real-world API integration example.
+Start with `guarded-search-example.php` for a basic workflow, then explore customization and optimization examples based on your needs. Check out `bybit-p2p-integration.php` for a complete real-world API integration example. For complex path-finding scenarios (multi-order, split/merge, diamond patterns), see `advanced-search-strategies.php`.
 
 **Happy coding!** 🚀
 

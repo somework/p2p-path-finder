@@ -81,7 +81,8 @@
             "@examples:error-handling",
             "@examples:performance-optimization",
             "@examples:guarded-search",
-            "@examples:bybit-p2p-integration"
+            "@examples:bybit-p2p-integration",
+            "@examples:advanced-search-strategies"
         ],
         "examples:custom-order-filter": "php examples/custom-order-filter.php",
         "examples:custom-ordering-strategy": "php examples/custom-ordering-strategy.php",
@@ -90,6 +91,7 @@
         "examples:performance-optimization": "php examples/performance-optimization.php",
         "examples:guarded-search": "php examples/guarded-search-example.php",
         "examples:bybit-p2p-integration": "php examples/bybit-p2p-integration.php",
+        "examples:advanced-search-strategies": "php examples/advanced-search-strategies.php",
         "check": [
             "@phpstan",
             "@psalm",
