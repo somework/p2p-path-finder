@@ -211,7 +211,7 @@ final class ExecutionPlanService
         );
 
         // Use materializer to convert raw fills into ExecutionPlan
-        $tolerance = $toleranceResult?->tolerance() ?? DecimalTolerance::fromNumericString('0', self::COST_SCALE);
+        $tolerance = $toleranceResult ?? DecimalTolerance::fromNumericString('0', self::COST_SCALE);
 
         /** @var list<array{order: \SomeWork\P2PPathFinder\Domain\Order\Order, spend: Money, sequence: int}> $rawFills */
         $rawFills = $searchOutcome->rawFills();

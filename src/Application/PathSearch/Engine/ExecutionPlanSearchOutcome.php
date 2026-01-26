@@ -153,9 +153,9 @@ final class ExecutionPlanSearchOutcome
      * @deprecated This method is deprecated. Use rawFills() with ExecutionPlanMaterializer instead.
      *             The engine no longer creates ExecutionPlan objects directly.
      *
-     * @return ExecutionPlan|null Always returns null. Use ExecutionPlanMaterializer to create plans.
+     * @return null Always returns null. Use ExecutionPlanMaterializer to create plans.
      */
-    public function plan(): ?ExecutionPlan
+    public function plan(): null
     {
         // This method is kept for backward compatibility but always returns null.
         // Use ExecutionPlanMaterializer::materialize() with rawFills() instead.

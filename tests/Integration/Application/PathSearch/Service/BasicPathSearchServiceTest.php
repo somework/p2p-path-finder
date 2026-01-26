@@ -50,7 +50,8 @@ final class BasicPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertSame('EUR', $result->totalSpent()->currency());
         self::assertSame('100.000', $result->totalSpent()->withScale(3)->amount());
         self::assertSame('JPY', $result->totalReceived()->currency());
-        self::assertSame('16665.000', $result->totalReceived()->withScale(3)->amount());
+        // 100 / 0.9 = 111.111... USD * 150 = 16666.667 JPY (improved precision with direct division)
+        self::assertSame('16666.667', $result->totalReceived()->withScale(3)->amount());
         self::assertTrue($result->residualTolerance()->isZero());
         self::assertSame('0.000000000000000000', $result->residualTolerance()->ratio());
 
@@ -60,12 +61,13 @@ final class BasicPathSearchServiceTest extends PathSearchServiceTestCase
         self::assertSame('EUR', $hops->at(0)->from());
         self::assertSame('USD', $hops->at(0)->to());
         self::assertSame('100.000', $hops->at(0)->spent()->withScale(3)->amount());
-        self::assertSame('111.100', $hops->at(0)->received()->withScale(3)->amount());
+        // 100 / 0.9 = 111.111... (improved precision with direct division instead of rate inversion)
+        self::assertSame('111.111', $hops->at(0)->received()->withScale(3)->amount());
 
         self::assertSame('USD', $hops->at(1)->from());
         self::assertSame('JPY', $hops->at(1)->to());
-        self::assertSame('111.100', $hops->at(1)->spent()->withScale(3)->amount());
-        self::assertSame('16665.000', $hops->at(1)->received()->withScale(3)->amount());
+        self::assertSame('111.111', $hops->at(1)->spent()->withScale(3)->amount());
+        self::assertSame('16666.667', $hops->at(1)->received()->withScale(3)->amount());
     }
 
     /**

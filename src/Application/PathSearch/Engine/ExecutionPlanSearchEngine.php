@@ -667,18 +667,24 @@ final class ExecutionPlanSearchEngine
         }
 
         // SELL order: spend quote, receive base
-        // Convert quote amount to base amount using inverted rate
+        // Convert quote amount to base amount using direct division (preserves precision)
+        // Using direct division instead of rate inversion avoids precision loss
         $rate = $order->effectiveRate();
-        $invertedRate = $rate->invert();
 
-        // Create quote money and convert to base
+        // Create quote money
         $quoteAmount = Money::fromString(
             $order->assetPair()->quote(),
             $spendAmount->amount(),
             $spendAmount->scale()
         );
 
-        $baseAmount = $invertedRate->convert($quoteAmount, self::SCALE);
+        // Direct division: base_amount = quote_amount / rate
+        $receivedDecimal = $quoteAmount->decimal()->dividedBy($rate->decimal(), self::SCALE, RoundingMode::HALF_UP);
+        $baseAmount = Money::fromString(
+            $order->assetPair()->base(),
+            self::decimalToString($receivedDecimal, self::SCALE),
+            self::SCALE
+        );
 
         // Apply fee deduction if present (fees are subtracted from received amount)
         $feePolicy = $order->feePolicy();
