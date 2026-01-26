@@ -140,6 +140,63 @@ The legacy `PathSearchService` only returns linear paths (single chain from sour
 | **Merge execution** | Routes converging at target |
 | **PortfolioState** | Internal multi-currency balance tracking |
 
+#### Multiple Paths → Single Plan
+
+**Breaking Change**: `ExecutionPlanService::findBestPlans()` returns at most **ONE** optimal execution plan, not multiple ranked paths.
+
+**Before (1.x with PathSearchService)**:
+
+```php
+$config = PathSearchConfig::builder()
+    ->withSpendAmount($spendAmount)
+    ->withTopK(10)  // Request top 10 paths
+    ->build();
+
+$outcome = $service->findBestPaths($request);
+$paths = $outcome->paths()->toArray();
+foreach ($paths as $path) {
+    // Process multiple alternative paths
+    echo "Path: {$path->totalSpent()->amount()} -> {$path->totalReceived()->amount()}\n";
+}
+```
+
+**After (2.x with ExecutionPlanService)**:
+
+```php
+$config = PathSearchConfig::builder()
+    ->withSpendAmount($spendAmount)
+    ->build();
+
+$outcome = $service->findBestPlans($request);
+$plan = $outcome->bestPath();  // Single optimal plan or null
+if (null !== $plan) {
+    // Process the single best plan
+    echo "Plan: {$plan->totalSpent()->amount()} -> {$plan->totalReceived()->amount()}\n";
+}
+
+// Note: $outcome->paths()->count() will be 0 or 1
+```
+
+**Why this changed**: The new execution plan algorithm optimizes for a single global optimum that may include split/merge execution. The concept of "alternative paths" doesn't map cleanly to split/merge topology where a single plan can utilize multiple routes simultaneously. For alternative routes, run separate searches with modified constraints:
+
+```php
+// Get alternatives by varying constraints:
+
+// 1. Run with different tolerance bounds
+$config1 = PathSearchConfig::builder()
+    ->withSpendAmount($spendAmount)
+    ->withToleranceBounds('0.0', '0.05')
+    ->build();
+
+// 2. Run with modified order book (filter out certain orders)
+$filteredBook = new OrderBook($filteredOrders);
+
+// 3. Run with different spend amounts
+$config2 = PathSearchConfig::builder()
+    ->withSpendAmount(Money::fromString('USD', '500.00', 2))
+    ->build();
+```
+
 #### Why PathSearchService is Deprecated
 
 `PathSearchService` returns `Path` objects representing sequential, linear execution routes. However, real-world P2P trading scenarios often benefit from:

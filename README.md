@@ -78,8 +78,9 @@ $service = new ExecutionPlanService(new GraphBuilder());
 $request = new PathSearchRequest($orderBook, $config, 'BTC');
 $outcome = $service->findBestPlans($request);
 
-// 4. Use the results
-foreach ($outcome->paths() as $plan) {
+// 4. Use the results (single optimal plan returned)
+$plan = $outcome->bestPath();  // Returns ExecutionPlan or null
+if (null !== $plan) {
     echo "Spend: {$plan->totalSpent()->amount()} {$plan->totalSpent()->currency()}\n";
     echo "Receive: {$plan->totalReceived()->amount()} {$plan->totalReceived()->currency()}\n";
     echo "Residual tolerance: {$plan->residualTolerance()->percentage()}%\n";
@@ -100,9 +101,12 @@ The library offers two result types:
 |--------|-------------------------------|-----------------|
 | Service | `ExecutionPlanService` | `PathSearchService` (deprecated) |
 | Method | `findBestPlans()` | `findBestPaths()` |
+| **Results returned** | **0 or 1 (single optimal)** | Multiple (via `topK`) |
 | Supports splits | Yes | No |
 | Supports merges | Yes | No |
 | Linear paths | Yes (via `isLinear()`) | Yes |
+
+> **Important**: `ExecutionPlanService` returns at most **ONE** optimal execution plan, not multiple ranked paths. The `paths()` collection will contain 0 or 1 entries. For alternative routes, run separate searches with different constraints.
 
 **When to use ExecutionPlan:**
 - Multiple orders for same direction (USD→BTC via two market makers)

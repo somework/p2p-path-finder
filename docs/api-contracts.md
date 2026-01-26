@@ -422,6 +422,37 @@ $simpleArray = $collection->toArray(); // For debugging
 
 **Purpose**: Container for search results and guard metrics.
 
+#### SearchOutcome\<ExecutionPlan\> (ExecutionPlanService)
+
+**Important**: Unlike legacy `PathSearchService`, `ExecutionPlanService` returns at most **one** optimal execution plan. The `paths()` collection will contain either 0 or 1 entries.
+
+```php
+$result = $service->findBestPlans($request);
+
+// Access the single plan (recommended approach)
+$hasPaths = $result->hasPaths();     // true if a plan was found
+$bestPath = $result->bestPath();     // ExecutionPlan or null
+$result->paths()->count();           // 0 or 1
+
+// Access guard report
+$guards = $result->guardLimits();    // SearchGuardReport object
+
+// Process the single optimal plan
+if (null !== $bestPath) {
+    echo "Plan has {$bestPath->stepCount()} steps\n";
+    echo "Is linear: " . ($bestPath->isLinear() ? 'yes' : 'no') . "\n";
+}
+
+// Check for guard breaches
+if ($guards->anyLimitReached()) {
+    echo "Search was limited by guards\n";
+}
+```
+
+**Why single plan?**: The `ExecutionPlanService` algorithm optimizes for a single global optimum that may include split/merge execution. For alternative routes, run separate searches with different constraints (modified tolerance bounds, different spend amounts, or filtered order books).
+
+#### SearchOutcome\<Path\> (PathSearchService - Legacy)
+
 **API Methods**:
 
 ```php
@@ -457,6 +488,7 @@ if ($guards->anyLimitReached()) {
 
 **Version History**:
 - 1.0.0: Initial structure
+- 2.0.0: `ExecutionPlanService` returns single optimal plan only
 
 ---
 

@@ -33,7 +33,11 @@ use function strtoupper;
 use function trim;
 
 /**
- * Service for finding optimal execution plans that may include split/merge routes.
+ * Service for finding the optimal execution plan that may include split/merge routes.
+ *
+ * **IMPORTANT**: This service returns at most **ONE** optimal execution plan, not multiple
+ * ranked paths. The `findBestPlans()` method returns a `SearchOutcome` where `paths()->count()`
+ * will be 0 or 1. Use `bestPath()` to get the single optimal plan or null.
  *
  * Unlike {@see PathSearchService} which returns linear paths only, this service can find
  * execution plans that:
@@ -43,6 +47,9 @@ use function trim;
  *
  * This service is the recommended public API for complex trading scenarios where
  * a single linear path may not optimally utilize available liquidity.
+ *
+ * For alternative routes, run separate searches with different parameters (modified
+ * tolerance bounds, different spend amounts, or filtered order books).
  *
  * @see PathSearchRequest For request structure
  * @see PathSearchConfig For configuration options
@@ -84,7 +91,16 @@ final class ExecutionPlanService
     }
 
     /**
-     * Searches for the best execution plans from the configured spend asset to the target asset.
+     * Searches for the optimal execution plan from the configured spend asset to the target asset.
+     *
+     * **IMPORTANT: Returns at most ONE plan (the optimal).** Unlike the legacy `PathSearchService`,
+     * this service does not return multiple alternative paths. The returned `SearchOutcome::paths()`
+     * collection will contain either 0 or 1 entries:
+     * - 0 entries: No valid execution plan could be found
+     * - 1 entry: The single optimal execution plan
+     *
+     * For alternative routes, run separate searches with different parameters (modified tolerance
+     * bounds, different spend amounts, or filtered order books).
      *
      * Guard limit breaches are reported through the returned {@see SearchOutcome::guardLimits()}
      * metadata. Inspect the {@see SearchGuardReport} via helpers like
@@ -97,7 +113,7 @@ final class ExecutionPlanService
      * @throws InvalidInput       when the requested target asset identifier is empty
      * @throws PrecisionViolation when arbitrary precision operations required for cost ordering cannot be performed
      *
-     * @return SearchOutcome<ExecutionPlan>
+     * @return SearchOutcome<ExecutionPlan> Contains 0 or 1 execution plans. Use `bestPath()` to get the single plan or null.
      *
      * @phpstan-return SearchOutcome<ExecutionPlan>
      *

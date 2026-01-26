@@ -350,19 +350,60 @@ $orderWithFees = Order::buy(
 
 ## Customizing the Search
 
-### Requesting Multiple Paths
+### Single Plan vs Multiple Paths
 
-By default, the search returns up to 5 paths. You can request more:
+**Important**: `ExecutionPlanService::findBestPlans()` returns at most **ONE** optimal execution plan, not multiple ranked paths. This is different from the legacy `PathSearchService` which could return multiple paths via `topK` configuration.
+
+```php
+// ExecutionPlanService (Recommended) - returns 0 or 1 plans
+$planService = new ExecutionPlanService(new GraphBuilder());
+$outcome = $planService->findBestPlans($request);
+
+$plan = $outcome->bestPath();  // Single optimal plan or null
+if (null !== $plan) {
+    echo "Spend: {$plan->totalSpent()->amount()} {$plan->totalSpent()->currency()}\n";
+    echo "Receive: {$plan->totalReceived()->amount()} {$plan->totalReceived()->currency()}\n";
+}
+
+// Note: $outcome->paths()->count() will be 0 or 1
+```
+
+**Why single plan?**: The execution plan algorithm optimizes for a single global optimum that may include split/merge execution. The concept of "alternative paths" doesn't map cleanly to split/merge topology.
+
+**Getting alternatives**: If you need alternative routes, run separate searches with different constraints:
+
+```php
+// Alternative 1: Different tolerance bounds
+$strictConfig = PathSearchConfig::builder()
+    ->withSpendAmount($spendAmount)
+    ->withToleranceBounds('0.0', '0.05')  // Tighter tolerance
+    ->build();
+
+// Alternative 2: Different spend amount
+$smallerConfig = PathSearchConfig::builder()
+    ->withSpendAmount(Money::fromString('USD', '500.00', 2))  // Smaller amount
+    ->build();
+
+// Alternative 3: Filtered order book
+$filteredBook = new OrderBook($filteredOrders);
+$filteredRequest = new PathSearchRequest($filteredBook, $config, 'BTC');
+```
+
+### Multiple Paths (Legacy PathSearchService Only)
+
+> **Note**: This section applies to the deprecated `PathSearchService`. For new code, use `ExecutionPlanService` which returns a single optimal plan.
+
+With `PathSearchService`, you can request multiple paths:
 
 ```php
 $config = PathSearchConfig::builder()
     ->withSpendAmount($spendAmount)
     ->withToleranceBounds('0.0', '0.10')
     ->withHopLimits(1, 3)
-    ->withTopK(10)  // Request top 10 paths
+    ->withTopK(10)  // Request top 10 paths (PathSearchService only)
     ->build();
 
-// Iterate through all paths
+// Iterate through all paths (PathSearchService only)
 foreach ($outcome->paths() as $path) {
     $route = [];
     foreach ($path->hopsAsArray() as $index => $hop) {

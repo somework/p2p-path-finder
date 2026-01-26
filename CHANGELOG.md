@@ -81,6 +81,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `PathSearchService::planToPath()` helper available for migration
 
 ### Breaking Changes
+- **Single execution plan returned**: `ExecutionPlanService::findBestPlans()` returns at most **ONE** optimal 
+  execution plan, not multiple ranked paths. The legacy `PathSearchService` could return multiple paths via 
+  `topK` configuration; this behavior is no longer supported. The `paths()` collection will contain either 
+  0 or 1 entries. If you need alternative paths, run multiple searches with different constraints 
+  (e.g., modified tolerance bounds, different guard limits, or filtered order books).
 - **Namespace changes**: All public class namespaces have changed (breaking change for library consumers)
 - **Simplified APIs**: Classes now provide direct object access methods
 - **Recommended API change**: `PathSearchService` deprecated, `ExecutionPlanService` recommended
