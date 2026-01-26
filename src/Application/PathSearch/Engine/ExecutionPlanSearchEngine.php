@@ -498,7 +498,7 @@ final class ExecutionPlanSearchEngine
                     // Use floor to avoid rounding issues
                     $costForPriority = $newCost->multipliedBy(BigDecimal::of(1000000))
                         ->toScale(0, RoundingMode::FLOOR);
-                    $costInt = (int) $costForPriority->toInt();
+                    $costInt = $costForPriority->toInt();
                     $queue->insert($nextCurrency, [-$costInt, -$insertOrder++]);
                 }
             }

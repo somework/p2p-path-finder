@@ -984,7 +984,7 @@ final class ExecutionPlanSearchEngineTest extends TestCase
         self::assertCount(2, $rawFills, 'Should have 2 fills for 2-hop path');
 
         // Get sequence numbers from raw fills
-        $rawSequences = array_map(fn ($fill) => $fill['sequence'], $rawFills);
+        $rawSequences = array_map(static fn ($fill) => $fill['sequence'], $rawFills);
 
         // Materialize
         $plan = $this->materializePlan($outcome);
@@ -992,7 +992,7 @@ final class ExecutionPlanSearchEngineTest extends TestCase
 
         // Get sequence numbers from materialized steps
         $steps = $plan->steps()->all();
-        $stepSequences = array_map(fn ($step) => $step->sequenceNumber(), $steps);
+        $stepSequences = array_map(static fn ($step) => $step->sequenceNumber(), $steps);
 
         // Sequences should match
         self::assertSame($rawSequences, $stepSequences, 'Sequence numbers should be preserved');

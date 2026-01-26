@@ -210,14 +210,14 @@ final class LegMaterializer
             // received = spent / rate (where rate is base/quote, e.g., USDT/RUB = 95)
             // Using direct division preserves precision (rate inversion can lose precision)
             $rate = $order->effectiveRate();
-            
+
             // Output scale matches input precision requirements
             $outputScale = max(
                 $targetEffectiveQuote->scale(),
                 $bounds->min()->scale(),
                 $rate->scale(),
             );
-            
+
             // Working scale uses higher precision for accurate calculation
             $workingScale = max($outputScale, self::SELL_RESOLUTION_COMPARISON_SCALE);
 

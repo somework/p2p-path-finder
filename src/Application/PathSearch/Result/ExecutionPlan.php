@@ -285,6 +285,7 @@ final class ExecutionPlan implements SearchResultInterface
      */
     private static function calculateTotalSpent(ExecutionStepCollection $steps, string $sourceCurrency): Money
     {
+        /** @var Money|null $total */
         $total = null;
 
         foreach ($steps as $step) {
@@ -303,6 +304,7 @@ final class ExecutionPlan implements SearchResultInterface
             throw new InvalidInput('No steps found spending the source currency.');
         }
 
+        /* @var Money $total */
         return $total;
     }
 
@@ -311,6 +313,7 @@ final class ExecutionPlan implements SearchResultInterface
      */
     private static function calculateTotalReceived(ExecutionStepCollection $steps, string $targetCurrency): Money
     {
+        /** @var Money|null $total */
         $total = null;
 
         foreach ($steps as $step) {
@@ -329,6 +332,7 @@ final class ExecutionPlan implements SearchResultInterface
             throw new InvalidInput('No steps found receiving the target currency.');
         }
 
+        /* @var Money $total */
         return $total;
     }
 
