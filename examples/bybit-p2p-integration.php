@@ -26,8 +26,8 @@ require __DIR__.'/../vendor/autoload.php';
 use Brick\Math\RoundingMode;
 use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
 use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
 use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
 use SomeWork\P2PPathFinder\Domain\Money\AssetPair;
 use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
@@ -455,37 +455,37 @@ try {
         ->withSearchGuards(50000, 100000)      // Reasonable limits
         ->build();
 
-    $service = new PathSearchService(new GraphBuilder());
+    $service = new ExecutionPlanService(new GraphBuilder());
     $request1 = new PathSearchRequest($orderBook, $config1, 'BTC');
-    $outcome1 = $service->findBestPaths($request1);
+    $outcome1 = $service->findBestPlans($request1);
 
     if ($outcome1->hasPaths()) {
-        echo '✓ Found '.count($outcome1->paths())." path(s)\n\n";
+        echo '✓ Found '.count($outcome1->paths())." execution plan(s)\n\n";
 
-        foreach ($outcome1->paths() as $idx => $path) {
+        foreach ($outcome1->paths() as $idx => $plan) {
             $num = $idx + 1;
-            echo "  Path #{$num}:\n";
-            echo "    Spend: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()}\n";
-            echo "    Receive: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
-            $hops = $path->hopsAsArray();
-            echo '    Hops: '.count($hops)."\n";
-            echo "    Residual tolerance: {$path->residualTolerancePercentage()}%\n";
+            echo "  Plan #{$num}:\n";
+            echo "    Spend: {$plan->totalSpent()->amount()} {$plan->totalSpent()->currency()}\n";
+            echo "    Receive: {$plan->totalReceived()->amount()} {$plan->totalReceived()->currency()}\n";
+            $steps = iterator_to_array($plan->steps());
+            echo "    Steps: {$plan->stepCount()}\n";
+            echo "    Residual tolerance: {$plan->residualTolerance()->percentage()}%\n";
 
             echo '    Route: ';
             $route = [];
-            foreach ($hops as $hop) {
-                $route[] = $hop->from();
+            foreach ($steps as $step) {
+                $route[] = $step->from();
             }
 
-            if (count($hops) > 0) {
-                $route[] = $hops[count($hops) - 1]->to();
+            if (count($steps) > 0) {
+                $route[] = $steps[count($steps) - 1]->to();
             }
             echo implode(' → ', $route)."\n";
 
             echo "\n";
         }
     } else {
-        echo "✗ No paths found from USD to BTC\n\n";
+        echo "✗ No execution plans found from USD to BTC\n\n";
     }
 
     // Check guard limits
@@ -513,23 +513,23 @@ try {
         ->build();
 
     $request2 = new PathSearchRequest($orderBook, $config2, 'BTC');
-    $outcome2 = $service->findBestPaths($request2);
+    $outcome2 = $service->findBestPlans($request2);
 
     if ($outcome2->hasPaths()) {
-        echo '✓ Found '.count($outcome2->paths())." path(s)\n\n";
+        echo '✓ Found '.count($outcome2->paths())." execution plan(s)\n\n";
 
-        $bestPath = $outcome2->paths()->first();
-        echo "  Best Path:\n";
-        echo "    Spend: {$bestPath->totalSpent()->amount()} {$bestPath->totalSpent()->currency()}\n";
-        echo "    Receive: {$bestPath->totalReceived()->amount()} {$bestPath->totalReceived()->currency()}\n";
+        $bestPlan = $outcome2->paths()->first();
+        echo "  Best Plan:\n";
+        echo "    Spend: {$bestPlan->totalSpent()->amount()} {$bestPlan->totalSpent()->currency()}\n";
+        echo "    Receive: {$bestPlan->totalReceived()->amount()} {$bestPlan->totalReceived()->currency()}\n";
 
         // Calculate effective rate using brick/math (received / spent)
-        $effectiveRate = $bestPath->totalReceived()->decimal()
-            ->dividedBy($bestPath->totalSpent()->decimal(), 10, RoundingMode::HALF_UP);
-        echo "    Effective rate: {$effectiveRate} {$bestPath->totalReceived()->currency()}/{$bestPath->totalSpent()->currency()}\n";
+        $effectiveRate = $bestPlan->totalReceived()->decimal()
+            ->dividedBy($bestPlan->totalSpent()->decimal(), 10, RoundingMode::HALF_UP);
+        echo "    Effective rate: {$effectiveRate} {$bestPlan->totalReceived()->currency()}/{$bestPlan->totalSpent()->currency()}\n";
         echo "\n";
     } else {
-        echo "✗ No paths found from EUR to BTC\n\n";
+        echo "✗ No execution plans found from EUR to BTC\n\n";
     }
 
     // Scenario 3: Multi-hop path finding (GBP → BTC via USDT)
@@ -544,28 +544,28 @@ try {
         ->build();
 
     $request3 = new PathSearchRequest($orderBook, $config3, 'BTC');
-    $outcome3 = $service->findBestPaths($request3);
+    $outcome3 = $service->findBestPlans($request3);
 
     if ($outcome3->hasPaths()) {
-        echo '✓ Found '.count($outcome3->paths())." path(s)\n\n";
+        echo '✓ Found '.count($outcome3->paths())." execution plan(s)\n\n";
 
-        foreach ($outcome3->paths() as $idx => $path) {
+        foreach ($outcome3->paths() as $idx => $plan) {
             $num = $idx + 1;
-            $hops = $path->hopsAsArray();
-            echo "  Path #{$num} (".count($hops)." hops):\n";
+            $steps = iterator_to_array($plan->steps());
+            echo "  Plan #{$num} ({$plan->stepCount()} steps):\n";
 
-            foreach ($hops as $hopIdx => $hop) {
-                $hopNum = $hopIdx + 1;
-                echo "    Hop {$hopNum}: {$hop->from()} → {$hop->to()}\n";
-                echo "      Spend: {$hop->spent()->amount()} {$hop->spent()->currency()}\n";
-                echo "      Receive: {$hop->received()->amount()} {$hop->received()->currency()}\n";
+            foreach ($steps as $stepIdx => $step) {
+                $stepNum = $stepIdx + 1;
+                echo "    Step {$stepNum}: {$step->from()} → {$step->to()}\n";
+                echo "      Spend: {$step->spent()->amount()} {$step->spent()->currency()}\n";
+                echo "      Receive: {$step->received()->amount()} {$step->received()->currency()}\n";
             }
 
-            echo "    Final: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()} → ";
-            echo "{$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n\n";
+            echo "    Final: {$plan->totalSpent()->amount()} {$plan->totalSpent()->currency()} → ";
+            echo "{$plan->totalReceived()->amount()} {$plan->totalReceived()->currency()}\n\n";
         }
     } else {
-        echo "✗ No paths found from GBP to BTC\n\n";
+        echo "✗ No execution plans found from GBP to BTC\n\n";
     }
 
     // ============================================================================
@@ -579,7 +579,7 @@ try {
     echo "Complete production-ready function for Bybit P2P integration:\n\n";
 
     /**
-     * Production-ready function to find P2P trading paths using Bybit data.
+     * Production-ready function to find P2P trading execution plans using Bybit data.
      *
      * @param BybitP2PClient $client         Bybit API client
      * @param string         $sourceCurrency Starting currency (e.g., 'USD')
@@ -587,7 +587,7 @@ try {
      * @param string         $amount         Amount to spend
      * @param int            $scale          Currency scale
      */
-    function findBybitP2PPath(
+    function findBybitP2PPlan(
         BybitP2PClient $client,
         string $sourceCurrency,
         string $targetToken,
@@ -595,7 +595,7 @@ try {
         int $scale = 2
     ): void {
         try {
-            echo "Finding path: {$amount} {$sourceCurrency} → {$targetToken}\n\n";
+            echo "Finding execution plan: {$amount} {$sourceCurrency} → {$targetToken}\n\n";
 
             // Step 1: Fetch relevant market data
             echo "1. Fetching market data...\n";
@@ -637,23 +637,23 @@ try {
                 ->build();
             echo "   ✓ Configuration ready\n\n";
 
-            // Step 4: Find paths
-            echo "4. Searching for optimal paths...\n";
-            $service = new PathSearchService(new GraphBuilder());
+            // Step 4: Find execution plans
+            echo "4. Searching for optimal execution plans...\n";
+            $service = new ExecutionPlanService(new GraphBuilder());
             $request = new PathSearchRequest($orderBook, $config, $targetToken);
-            $outcome = $service->findBestPaths($request);
+            $outcome = $service->findBestPlans($request);
 
             // Step 5: Process results
             if ($outcome->hasPaths()) {
-                $bestPath = $outcome->paths()->first();
-                echo "   ✓ Found optimal path!\n\n";
-                echo "   Best Path:\n";
-                echo "     Input: {$bestPath->totalSpent()->amount()} {$bestPath->totalSpent()->currency()}\n";
-                echo "     Output: {$bestPath->totalReceived()->amount()} {$bestPath->totalReceived()->currency()}\n";
-                echo '     Hops: '.count($bestPath->hops())."\n";
-                echo "     Tolerance: {$bestPath->residualTolerancePercentage()}%\n";
+                $bestPlan = $outcome->paths()->first();
+                echo "   ✓ Found optimal execution plan!\n\n";
+                echo "   Best Plan:\n";
+                echo "     Input: {$bestPlan->totalSpent()->amount()} {$bestPlan->totalSpent()->currency()}\n";
+                echo "     Output: {$bestPlan->totalReceived()->amount()} {$bestPlan->totalReceived()->currency()}\n";
+                echo "     Steps: {$bestPlan->stepCount()}\n";
+                echo "     Tolerance: {$bestPlan->residualTolerance()->percentage()}%\n";
             } else {
-                echo "   ✗ No paths found\n";
+                echo "   ✗ No execution plans found\n";
                 echo "   Suggestions:\n";
                 echo "     - Check if liquidity is available\n";
                 echo "     - Try a different amount\n";
@@ -673,7 +673,7 @@ try {
     }
 
     // Test the production function
-    findBybitP2PPath($client, 'USD', 'BTC', '1500.00', 2);
+    findBybitP2PPlan($client, 'USD', 'BTC', '1500.00', 2);
 
     // ============================================================================
     // Summary and Best Practices
@@ -689,7 +689,7 @@ try {
     echo "  1. BybitP2PClient - Fetches advertisement data from Bybit API\n";
     echo "  2. BybitOrderConverter - Maps Bybit ads to PathFinder Orders\n";
     echo "  3. OrderBook - Aggregates all orders for path finding\n";
-    echo "  4. PathFinderService - Executes path search algorithm\n";
+    echo "  4. ExecutionPlanService - Executes path search algorithm\n";
     echo "  5. SearchOutcome - Contains results and metrics\n";
     echo "\n";
 
@@ -698,7 +698,7 @@ try {
     echo "  2. Convert ads to Order objects (handle BUY/SELL correctly)\n";
     echo "  3. Create OrderBook with all converted orders\n";
     echo "  4. Configure search parameters (amount, tolerance, hops, guards)\n";
-    echo "  5. Execute path search via PathFinderService\n";
+    echo "  5. Execute search via ExecutionPlanService::findBestPlans()\n";
     echo "  6. Process results and check guard limits\n";
     echo "\n";
 

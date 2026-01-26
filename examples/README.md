@@ -282,11 +282,11 @@ These examples demonstrate complete end-to-end workflows.
 #### 6. Guarded Search Example
 **File**: [`guarded-search-example.php`](guarded-search-example.php)
 
-Complete workflow demonstrating path search with guard rails and result interpretation.
+Complete workflow demonstrating execution plan search with guard rails and result interpretation.
 
 **What you'll learn**:
 - Complete PathSearchConfig setup
-- Running searches with guard limits
+- Running searches with guard limits using `ExecutionPlanService`
 - Interpreting SearchOutcome and guard reports
 - Checking for guard limit breaches
 - Understanding when results may be incomplete
@@ -369,7 +369,7 @@ Demonstrates ExecutionPlanService's ability to handle complex path-finding scena
 | **custom-fee-policy.php**          | 570        | Production  | 6         | 5 policies, realistic models        |
 | **error-handling.php**             | 473        | Production  | 7         | All exceptions, production pattern  |
 | **performance-optimization.php**   | 507        | Production  | 12        | 4 techniques, benchmarks            |
-| **guarded-search-example.php**     | Varies     | Production  | 1         | Complete workflow (legacy)          |
+| **guarded-search-example.php**     | Varies     | Production  | 1         | Complete workflow                   |
 | **bybit-p2p-integration.php**      | 600+       | Production  | 5         | API integration, real-world example |
 | **advanced-search-strategies.php** | 400+       | Production  | 8         | Multi-order, split/merge, diamond   |
 | **TOTAL**                          | **~4,000** | **10 files** | **53+**  | **Comprehensive coverage**          |
@@ -380,7 +380,7 @@ Demonstrates ExecutionPlanService's ability to handle complex path-finding scena
 
 **Beginner** (Start here):
 1. `execution-plan-basic.php` - **Recommended** starting point with ExecutionPlanService
-2. `guarded-search-example.php` - Complete basic workflow (legacy PathSearchService)
+2. `guarded-search-example.php` - Complete basic workflow with guard rails
 3. `custom-order-filter.php` - Simple filter implementations
 
 **Intermediate**:
@@ -401,7 +401,7 @@ Demonstrates ExecutionPlanService's ability to handle complex path-finding scena
 | Goal                                 | Example                          |
 |--------------------------------------|----------------------------------|
 | Learn the recommended API            | `execution-plan-basic.php`       |
-| Migrate from PathSearchService       | `execution-plan-basic.php`       |
+| Get started quickly                  | `guarded-search-example.php`     |
 | Handle split/merge execution         | `execution-plan-split-merge.php` |
 | Multi-order liquidity aggregation    | `execution-plan-split-merge.php` |
 | Filter orders before search          | `custom-order-filter.php`        |
@@ -409,7 +409,7 @@ Demonstrates ExecutionPlanService's ability to handle complex path-finding scena
 | Model realistic exchange fees        | `custom-fee-policy.php`          |
 | Handle errors in production          | `error-handling.php`             |
 | Optimize search performance          | `performance-optimization.php`   |
-| See legacy workflow (deprecated)     | `guarded-search-example.php`     |
+| Understand guard rails               | `guarded-search-example.php`     |
 | Integrate with Bybit P2P API         | `bybit-p2p-integration.php`      |
 | Build a real-world trading app       | `bybit-p2p-integration.php`      |
 | Handle multi-order/split/merge paths | `advanced-search-strategies.php` |
@@ -508,14 +508,16 @@ This examples directory provides:
 - ✅ **10 comprehensive examples** covering all major use cases
 - ✅ **4,000+ lines** of production-ready code
 - ✅ **53+ demonstration scenarios** showing different patterns
-- ✅ **ExecutionPlanService examples** for the recommended API
+- ✅ **All examples use ExecutionPlanService** - the recommended API
 - ✅ **Split/merge patterns** demonstrating advanced execution topologies
 - ✅ **Complete workflows** from configuration to result handling
 - ✅ **Real-world integrations** with external APIs (Bybit P2P)
 - ✅ **Measurable improvements** via benchmarks and comparisons
-- ✅ **Migration guidance** from PathSearchService to ExecutionPlanService
+- ✅ **No deprecated PathSearchService usage** - all migrated to ExecutionPlanService
 
-**Start with `execution-plan-basic.php`** for the recommended API, then explore `execution-plan-split-merge.php` for advanced execution patterns. For legacy code or simple linear paths, see `guarded-search-example.php`. Check out `bybit-p2p-integration.php` for a complete real-world API integration example.
+**Start with `execution-plan-basic.php`** for the recommended API, then explore `execution-plan-split-merge.php` for advanced execution patterns. See `guarded-search-example.php` for a quick start with guard rails. Check out `bybit-p2p-integration.php` for a complete real-world API integration example.
+
+**Note**: All examples now use `ExecutionPlanService`, which is the recommended API for all path-finding operations.
 
 **Happy coding!** 🚀
 
