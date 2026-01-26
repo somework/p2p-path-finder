@@ -141,7 +141,7 @@ Returns: TPath|null the first path from the result set, or `null` if none exist
 `SearchOutcome::guardLimits(): SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport`
 
 ## SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig
-Immutable configuration carrying constraints used by {@see PathSearchService}.
+Immutable configuration carrying constraints used by {@see ExecutionPlanService}.
 
 ## Invariants
 
@@ -290,7 +290,7 @@ Configures an optional wall-clock budget (in milliseconds) for the path finder s
 Builds a validated {@see PathSearchConfig} instance.
 
 ## SomeWork\P2PPathFinder\Application\PathSearch\Config\SearchGuardConfig
-Immutable guard limits used by the {@see \SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService} guard mechanism.
+Immutable guard limits used by the {@see \SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService} guard mechanism.
 
 These limits control both computational cost and memory usage during path search.
 
@@ -471,18 +471,18 @@ an appropriate scale to avoid floating-point issues.
 - **Hybrid**: Balance cost and hops using weighted scoring.
 - **Route-aware**: Prefer certain currencies or exchanges in the path.
 
-## Usage with PathSearchService
+## Usage with ExecutionPlanService
 
-Pass your custom strategy to the `PathSearchService` constructor:
+Pass your custom strategy to the `ExecutionPlanService` constructor:
 
 ```php
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\MinimizeHopsStrategy;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
 use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
 
 $graphBuilder = new GraphBuilder();
 $customStrategy = new MinimizeHopsStrategy(costScale: 6);
-$service = new PathSearchService($graphBuilder, $customStrategy);
+$service = new ExecutionPlanService($graphBuilder, $customStrategy);
 ```
 
 ### Public methods
@@ -835,69 +835,6 @@ Converts a collection of domain orders into a weighted directed graph representa
 `GraphBuilder::build(iterable $orders): SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\Graph`
 
 Parameter $orders: iterable&lt;Order&gt;
-
-## SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService
-High level facade orchestrating order filtering, graph building and path search.
-
-
-
-psalm-type CandidateCallback = callable(CandidatePath):bool
-
-### Public methods
-
-### __construct
-`PathSearchService::__construct(SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder $graphBuilder, ?SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathOrderStrategy $orderingStrategy = null)`
-
-### findBestPaths
-`PathSearchService::findBestPaths(SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest $request): SomeWork\P2PPathFinder\Application\PathSearch\Api\Response\SearchOutcome`
-
-Searches for the best conversion paths from the configured spend asset to the target asset.
-
-Guard limit breaches are reported through the returned {@see SearchOutcome::guardLimits()}
-metadata. Inspect the {@see SearchGuardReport} via helpers like
-{@see SearchGuardReport::anyLimitReached()} to determine whether the search exhausted its
-configured protections.
-
-
-
-Returns: SearchOutcome&lt;Path&gt;
-
-
-
-
-// Create request and execute search
-$request = new PathSearchRequest($orderBook, $config, 'BTC');
-$outcome = $service->findBestPaths($request);
-
-// Process results
-$bestPath = $outcome->bestPath();
-if (null !== $bestPath) {
-echo "Best path spends {$bestPath->totalSpent()->amount()} {$bestPath->totalSpent()->currency()}\n";
-echo "Best path receives {$bestPath->totalReceived()->amount()} {$bestPath->totalReceived()->currency()}\n";
-
-foreach ($bestPath->hops() as $index => $hop) {
-$order = $hop->order();
-$pair = $order->assetPair();
-
-printf(
-"Hop %d (%s order %s/%s): spend %s %s to receive %s %s\n",
-$index + 1,
-$order->side()->value,
-$pair->base(),
-$pair->quote(),
-$hop->spent()->amount(),
-$hop->spent()->currency(),
-$hop->received()->amount(),
-$hop->received()->currency(),
-);
-}
-}
-
-// Check guard limits
-if ($outcome->guardLimits()->anyLimitReached()) {
-echo "Search was limited by guard rails\n";
-}
-```
 
 ## SomeWork\P2PPathFinder\Application\PathSearch\Support\PathResultFormatter
 Provides machine and human friendly representations of {@see Path} instances.

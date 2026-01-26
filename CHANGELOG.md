@@ -62,20 +62,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Eliminated `JsonSerializable` implementations from core classes
   - Removed serialization-specific traits and logic
   - Updated examples to use direct object APIs
-- **Updated documentation**: All docs updated for ExecutionPlanService API
-  - README.md: New quick start with ExecutionPlanService
-  - Getting Started: ExecutionPlanService tutorial and migration guide
-  - Architecture: PortfolioState and ExecutionPlanSearchEngine algorithm
-  - API Contracts: ExecutionPlan, ExecutionStep, ExecutionStepCollection contracts
+- **Documentation overhaul**: All documentation now uses `ExecutionPlanService` exclusively as the primary API
+  - `getting-started.md`: Updated all examples to use `ExecutionPlanService`, removed legacy migration section
+  - `architecture.md`: Updated component diagrams and flow descriptions, removed legacy `PathSearchService` flow
+  - `api-contracts.md`: Removed deprecated `Path`, `PathHop`, `PathSearchService` sections
+  - `api/index.md`: Removed `PathSearchService` API documentation
+  - `memory-characteristics.md`: Removed legacy comparison section
+  - `api-stability.md`: Updated entry point references to `ExecutionPlanService`
+  - `exceptions.md`: Updated all example code to use `ExecutionPlanService`
+  - `decimal-strategy.md`: Updated service and DTO references
+  - `releases-and-support.md`: Updated BC break examples
 
-### Deprecated
-- **PathSearchService**: Deprecated in favor of `ExecutionPlanService`
-  - `PathSearchService::findBestPaths()` triggers deprecation warning
+### Removed
+- **PathSearchService**: Removed deprecated service class
   - Use `ExecutionPlanService::findBestPlans()` instead
-  - Planned removal in 3.0
-  - See [UPGRADING.md](UPGRADING.md#upgrading-from-1x-to-20) for migration guide
-
-- **Path result type**: Legacy result type for linear paths only
+  
+- **Path result type**: Removed legacy result type for linear paths only
   - Use `ExecutionPlan` with `ExecutionPlanService` for new code
   - Existing code can use `ExecutionPlan::asLinearPath()` for conversion
   - `PathSearchService::planToPath()` helper available for migration

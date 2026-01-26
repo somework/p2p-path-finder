@@ -12,7 +12,7 @@ Based on benchmark profiling with PHP 8.3:
 - **Per-graph-edge memory:** ~2-3 KB (graph representation with segments and capacity bounds)
 - **Per-search-state memory:** ~0.8-1.2 KB (visited state tracking in registry)
 - **Registry overhead:** ~1 KB per 10 unique visited states
-- **Result materialization:** ~3-5 KB per hop (`PathHop` snapshots plus `Path` header built by `LegMaterializer`)
+- **Result materialization:** ~3-5 KB per step (`ExecutionStep` snapshots plus `ExecutionPlan` header built by `ExecutionPlanMaterializer`)
 
 ### Baseline Memory Usage
 
@@ -72,7 +72,7 @@ Where D = hop depth, S = states per hop
 Where K = resultLimit, H = average hops per path
 
 - **Result limit impact:** Minimal (default K = 1-10)
-- **Per-path overhead:** ~1 KB `Path` header managed by `LegMaterializer` + (3-5 KB × hop count for serialized `PathHop` entries)
+- **Per-plan overhead:** ~1 KB `ExecutionPlan` header managed by `ExecutionPlanMaterializer` + (3-5 KB × step count for serialized `ExecutionStep` entries)
 - **Example:** 10 results × (1 KB + 3 hops × 4 KB) ≈ 130 KB (hop storage dominates)
 
 ## Practical Limits and Recommendations
@@ -287,7 +287,7 @@ $filtered = $orderBook->filter(
 
 ```php
 // No filtering, full order book
-$service->findBestPaths(new PathSearchRequest($orderBook, $config, $target));
+$service->findBestPlans(new PathSearchRequest($orderBook, $config, $target));
 
 // Expected: 0% reduction, complete path discovery
 ```
@@ -314,7 +314,7 @@ Use the minimum viable limits for your use case. See "Guard Limit Decision Tree"
 
 ```php
 // Monitor actual usage
-$outcome = $service->findBestPaths($request);
+$outcome = $service->findBestPlans($request);
 $metrics = $outcome->guardLimits()->metrics();
 
 if ($metrics['visited_states'] > 0.8 * $config->searchGuards()->maxVisitedStates()) {
@@ -484,7 +484,7 @@ $config = PathSearchConfig::builder()
 After deploying with your calculated limits, monitor these metrics:
 
 ```php
-$outcome = $service->findBestPaths($request);
+$outcome = $service->findBestPlans($request);
 $report = $outcome->guardLimits();
 $metrics = $report->expansions(); // Access metrics directly
 
@@ -652,7 +652,7 @@ For most production use cases:
 ### Check Guard Metrics
 
 ```php
-$outcome = $service->findBestPaths($request);
+$outcome = $service->findBestPlans($request);
 $report = $outcome->guardLimits();
 
 $metrics = [
@@ -805,7 +805,7 @@ Track these metrics to understand memory behavior:
 
 ```php
 $startMemory = memory_get_usage(true);
-$outcome = $service->findBestPaths($request);
+$outcome = $service->findBestPlans($request);
 $peakMemory = memory_get_peak_usage(true);
 $report = $outcome->guardLimits();
 $metrics = [
@@ -863,9 +863,9 @@ Based on profiling with PHP 8.3:
 - Optimization: Memoized ExchangeRate instances shared across orders
 
 **Result materialization** (`LegMaterializer`):
-- Allocation pattern: Stack-allocated candidate DTOs that materialize `Path` headers and `PathHop` collections
-- Memory share: ~5-10% of peak, scaling primarily with hop count per path rather than resultLimit
-- Optimization: Buffers reused across expansions, allocations deferred until tolerance passes so most `PathHop` snapshots only materialize for viable paths
+- Allocation pattern: Stack-allocated candidate DTOs that materialize `ExecutionPlan` headers and `ExecutionStep` collections
+- Memory share: ~5-10% of peak, scaling primarily with step count per plan
+- Optimization: Buffers reused across expansions, allocations deferred until tolerance passes so most `ExecutionStep` snapshots only materialize for viable plans
 
 ### Memory Growth Patterns
 
@@ -897,7 +897,6 @@ The `ExecutionPlanSearchEngine` (introduced in version 2.0) implements a success
 | Split/merge (100 orders) | < 50ms | < 200ms |
 | Split/merge (1000 orders) | < 500ms | < 2000ms |
 | Memory (1000 orders) | < 10MB | < 50MB |
-| vs Legacy linear paths | < 2x slower | < 5x slower |
 
 ### Recommended Guard Limits by Order Book Size
 
@@ -937,23 +936,6 @@ $config = PathSearchConfig::builder()
 $service = new ExecutionPlanService(new GraphBuilder());
 $outcome = $service->findBestPlans(new PathSearchRequest($orderBook, $config, $target));
 ```
-
-### Comparison with Legacy PathSearchService
-
-The legacy `PathSearchService` (deprecated since 2.0) only supports linear paths. For equivalent linear path scenarios:
-
-| Scenario | PathSearchService | ExecutionPlanService | Overhead |
-|----------|-------------------|----------------------|----------|
-| Linear 100 orders | ~8ms | ~12ms | ~1.5x |
-| Linear 500 orders | ~35ms | ~60ms | ~1.7x |
-| Linear 1000 orders | ~80ms | ~150ms | ~1.9x |
-
-The overhead is due to:
-1. Portfolio state tracking for multi-currency balances
-2. Augmenting path search (Dijkstra-based)
-3. Backtracking prevention logic
-
-**Migration recommendation:** For applications only needing linear paths, the overhead is acceptable. For applications needing split/merge routes, `ExecutionPlanService` is required.
 
 ### Optimization Tips
 
@@ -998,9 +980,6 @@ vendor/bin/phpbench run benchmarks/ExecutionPlanBench.php --report=aggregate
 # Run specific group
 vendor/bin/phpbench run --group=linear --report=aggregate
 vendor/bin/phpbench run --group=split_merge --report=aggregate
-
-# Compare with legacy service
-vendor/bin/phpbench run benchmarks/LegacyComparisonBench.php --report=aggregate
 
 # Memory profiling
 vendor/bin/phpbench run --group=memory --report=default

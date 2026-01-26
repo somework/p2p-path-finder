@@ -56,8 +56,8 @@ MAJOR.MINOR.PATCH (e.g., 1.3.2)
 
 ```php
 // ❌ BC BREAK: Removing public methods
-class PathSearchService {
-    // public function findPath(...): ?PathResult  // Removed
+class ExecutionPlanService {
+    // public function findBestPlans(...): SearchOutcome  // Removed
 }
 
 // ❌ BC BREAK: Adding required parameters
@@ -76,8 +76,8 @@ $amount = $money->amount();
 
 ```php
 // ✅ OK: Adding new public methods
-class PathSearchService {
-    public function findAllPaths(): Generator  // New method
+class ExecutionPlanService {
+    public function findBestPlans(): SearchOutcome  // New method
 }
 
 // ✅ OK: Adding optional parameters

@@ -34,11 +34,11 @@ The library follows a three-layer architecture with strict dependency rules.
 
 ### Layer Overview
 
-| Layer           | Responsibility                               | Example Components                                        |
-|-----------------|----------------------------------------------|-----------------------------------------------------------|
-| **Domain**      | Business entities, value objects, invariants | `Money`, `Order`, `ExchangeRate`, `FeePolicy`             |
-| **Application** | Use cases, algorithms, orchestration         | `PathFinder`, `GraphBuilder`, `SearchGuards`              |
-| **Public API**  | Entry points, request/response DTOs          | `PathSearchService`, `SearchOutcome`, `Path`, `PathHop`   |
+| Layer           | Responsibility                               | Example Components                                                  |
+|-----------------|----------------------------------------------|---------------------------------------------------------------------|
+| **Domain**      | Business entities, value objects, invariants | `Money`, `Order`, `ExchangeRate`, `FeePolicy`                       |
+| **Application** | Use cases, algorithms, orchestration         | `ExecutionPlanSearchEngine`, `GraphBuilder`, `SearchGuards`         |
+| **Public API**  | Entry points, request/response DTOs          | `ExecutionPlanService`, `SearchOutcome`, `ExecutionPlan`, `ExecutionStep` |
 
 ### Dependency Rule
 
@@ -53,15 +53,15 @@ The library follows a three-layer architecture with strict dependency rules.
 ```
 User Code
     ↓
-PathSearchService (Public API)
+ExecutionPlanService (Public API)
     ↓
-┌────────────────────────────────┐
-│ 1. GraphBuilder                │ → Builds graph from OrderBook
-│ 2. PathFinder                  │ → Searches for optimal paths  
-│ 3. LegMaterializer             │ → Converts results to DTOs
-└────────────────────────────────┘
+┌────────────────────────────────────────────┐
+│ 1. GraphBuilder                            │ → Builds graph from OrderBook
+│ 2. ExecutionPlanSearchEngine               │ → Finds optimal execution plan  
+│ 3. ExecutionPlanMaterializer               │ → Converts results to DTOs
+└────────────────────────────────────────────┘
     ↓
-SearchOutcome (paths + guard report)
+SearchOutcome<ExecutionPlan> (plan + guard report)
 ```
 
 ---
@@ -94,11 +94,10 @@ See [Domain Invariants](domain-invariants.md) for complete specifications.
 ### Application Layer
 
 **Service Layer**:
-- `ExecutionPlanService` - **Recommended** facade for split/merge execution plans
-- `PathSearchService` - Legacy facade for linear paths only (deprecated in 2.0)
+- `ExecutionPlanService` - Public API facade for execution plan search
 - `PathSearchRequest` - Request DTO with order book + config
-- `LegMaterializer` - Converts search results to domain DTOs
 - `ExecutionPlanMaterializer` - Converts engine results to ExecutionPlan
+- `LegMaterializer` - Converts raw fills to execution steps
 - `ToleranceEvaluator` - Validates path tolerance compliance
 
 **Graph Construction**:
@@ -109,7 +108,6 @@ See [Domain Invariants](domain-invariants.md) for complete specifications.
 
 **Search Algorithm** (Internal):
 - `ExecutionPlanSearchEngine` - Successive shortest augmenting paths algorithm
-- `PathFinder` - Legacy Dijkstra-like tolerance-aware search
 - `PortfolioState` - Multi-currency balance tracking for split/merge
 - `SearchState` - Immutable frontier state representation
 - `SearchStateRegistry` - Tracks visited states, dominance filtering
@@ -125,22 +123,13 @@ See [Domain Invariants](domain-invariants.md) for complete specifications.
 
 ### Public API Layer
 
-**Entry Point (Recommended)**:
+**Entry Point**:
 ```php
 use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
 use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
 
 $service = new ExecutionPlanService(new GraphBuilder());
 $outcome = $service->findBestPlans($request);
-```
-
-**Legacy Entry Point (Deprecated)**:
-```php
-use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
-
-$service = new PathSearchService(new GraphBuilder());  // Deprecated
-$outcome = $service->findBestPaths($request);          // Triggers deprecation warning
 ```
 
 **Configuration**:
@@ -153,15 +142,17 @@ $config = PathSearchConfig::builder()
     ->build();
 ```
 
-**Results (ExecutionPlanService)**:
+**Results**:
 ```php
-foreach ($outcome->paths() as $plan) {
+$plan = $outcome->bestPath();  // Single optimal ExecutionPlan or null
+
+if (null !== $plan) {
     $plan->totalSpent();           // Sum of spends from source currency
     $plan->totalReceived();        // Sum of receives into target currency
     $plan->residualTolerance();    // Remaining tolerance headroom
     $plan->feeBreakdown();         // Aggregated MoneyMap across steps
     $plan->isLinear();             // Check if plan is a simple linear path
-    $plan->asLinearPath();         // Convert to Path (returns null if non-linear)
+    $plan->stepCount();            // Number of execution steps
 
     foreach ($plan->steps() as $step) {
         $step->from();             // Asset symbol
@@ -175,36 +166,15 @@ foreach ($outcome->paths() as $plan) {
 $outcome->guardLimits()->anyLimitReached();  // Check guard status
 ```
 
-**Results (PathSearchService - Legacy)**:
-```php
-foreach ($outcome->paths() as $path) {
-    $path->totalSpent();           // Derived from first hop's spent amount
-    $path->totalReceived();        // Derived from last hop's received amount
-    $path->residualTolerance();    // Remaining tolerance headroom
-    $path->feeBreakdown();         // Aggregated MoneyMap across hops
-
-    foreach ($path->hops() as $hop) {
-        $hop->from();              // Asset symbol
-        $hop->to();                // Asset symbol
-        $hop->order();             // Original Order driving this hop
-        $hop->fees();              // MoneyMap for hop-level fees
-    }
-}
-```
-
-**Step-centric model (ExecutionPlan)**: Each `ExecutionPlan` is derived from an ordered `ExecutionStepCollection`. 
+**Step-centric model**: Each `ExecutionPlan` is derived from an ordered `ExecutionStepCollection`. 
 Totals (`totalSpent()`, `totalReceived()`), aggregated fees (`feeBreakdown()`), and remaining tolerance are 
 computed from step data. Steps include `sequenceNumber()` for execution ordering and support split/merge topologies.
-
-**Hop-centric model (Path - Legacy)**: Each `Path` is derived from an ordered `PathHopCollection`. Totals,
-aggregated fees, and remaining tolerance are computed from the hop data, while each hop retains its originating 
-`Order` for reconciliation. Linear paths only.
 
 ---
 
 ## Search Flow
 
-### High-Level Flow (ExecutionPlanService)
+### High-Level Flow
 
 1. **Graph Construction** - `GraphBuilder` converts `OrderBook` to graph
 2. **Search Initialization** - Create `PortfolioState` with source currency balance
@@ -212,15 +182,7 @@ aggregated fees, and remaining tolerance are computed from the hop data, while e
 4. **Result Materialization** - `ExecutionPlanMaterializer` converts to `ExecutionPlan`
 5. **Outcome Assembly** - Combine results with guard report
 
-### Legacy Flow (PathSearchService - Deprecated)
-
-1. **Graph Construction** - `GraphBuilder` converts `OrderBook` to graph
-2. **Search Initialization** - Create initial state at source currency
-3. **Search Loop** - Dijkstra-like expansion until target reached or limits hit
-4. **Result Materialization** - `LegMaterializer` converts paths to DTOs
-5. **Outcome Assembly** - Combine results with guard report
-
-### ExecutionPlanSearchEngine Algorithm (Recommended)
+### ExecutionPlanSearchEngine Algorithm
 
 The `ExecutionPlanSearchEngine` uses a **successive shortest augmenting paths** algorithm:
 
@@ -282,25 +244,6 @@ Diamond Pattern (Split + Merge):
            └─────┘
 ```
 
-### Legacy Search Algorithm Steps (PathSearchService)
-
-```
-1. Initialize priority queue with start state
-2. While queue not empty and guards allow:
-   a. Dequeue state with lowest cost
-   b. If reached target:
-      - Create candidate path
-      - Add to result heap (top-K)
-   c. For each outgoing edge:
-      - Check feasibility (constraints, capacity)
-      - Calculate next state
-      - Check if dominated (registry)
-      - Enqueue if not dominated
-3. Return CandidateSearchOutcome with candidate paths + guard report
-4. Service layer materializes candidates to full `Path` objects
-5. Return SearchOutcome with materialized results + guard report
-```
-
 ### Engine-to-Service Layer Communication
 
 The search algorithm operates at two levels of abstraction to maintain clean separation of concerns:
@@ -312,7 +255,7 @@ The search algorithm operates at two levels of abstraction to maintain clean sep
 
 **Service Layer** (Public API):
 - Consumes `CandidateSearchOutcome` from engine
-- Materializes `CandidatePath` objects into full `Path` objects with `PathHopCollection`
+- Materializes `CandidatePath` objects into full `ExecutionPlan` objects with `ExecutionStepCollection`
 - Applies domain rules (fee calculation, tolerance validation, order reconciliation)
 - Returns `SearchOutcome` - public API DTO with complete domain objects
 
@@ -389,11 +332,12 @@ final readonly class Money
 **Used for**: Simplify complex subsystem
 
 ```php
-class PathSearchService  // Facade
+class ExecutionPlanService  // Facade
 {
-    public function findBestPaths(PathSearchRequest $request): SearchOutcome
+    public function findBestPlans(PathSearchRequest $request): SearchOutcome
     {
-        // Coordinates GraphBuilder, PathFinder, LegMaterializer, ToleranceEvaluator
+        // Coordinates GraphBuilder, ExecutionPlanSearchEngine, 
+        // ExecutionPlanMaterializer, ToleranceEvaluator
     }
 }
 ```
@@ -470,7 +414,7 @@ class MinimizeHopsStrategy implements PathOrderStrategy
 }
 
 // Use strategy
-$service = new PathSearchService($graphBuilder, new MinimizeHopsStrategy());
+$service = new ExecutionPlanService($graphBuilder, new MinimizeHopsStrategy());
 ```
 
 **Use cases**:

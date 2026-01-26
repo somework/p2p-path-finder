@@ -32,7 +32,7 @@ Throwable
 use SomeWork\P2PPathFinder\Exception\ExceptionInterface;
 
 try {
-    $outcome = $service->findBestPaths($request);
+    $outcome = $service->findBestPlans($request);
 } catch (ExceptionInterface $e) {
     // Handle any library exception
     error_log("Path search failed: " . $e->getMessage());
@@ -154,7 +154,7 @@ $config = PathSearchConfig::builder()
 use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 
 try {
-    $outcome = $service->findBestPaths($request);
+    $outcome = $service->findBestPlans($request);
 } catch (GuardLimitExceeded $e) {
     $report = $e->getReport();
     
@@ -177,7 +177,7 @@ try {
 
 ```php
 // Default mode (no exception)
-$outcome = $service->findBestPaths($request);
+$outcome = $service->findBestPlans($request);
 
 if ($outcome->guardLimits()->anyLimitReached()) {
     // Log warning but continue with partial results
@@ -229,7 +229,7 @@ use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
 try {
-    $outcome = $service->findBestPaths($request);
+    $outcome = $service->findBestPlans($request);
     
     // Process results...
     
@@ -258,7 +258,7 @@ Simpler catch-all approach:
 use SomeWork\P2PPathFinder\Exception\ExceptionInterface;
 
 try {
-    $outcome = $service->findBestPaths($request);
+    $outcome = $service->findBestPlans($request);
 } catch (ExceptionInterface $e) {
     error_log("Path search failed: " . $e->getMessage());
     
@@ -273,7 +273,7 @@ Use guard reports instead of exceptions:
 
 ```php
 // No try-catch needed for guards (default mode)
-$outcome = $service->findBestPaths($request);
+$outcome = $service->findBestPlans($request);
 
 // Check for guard limits
 if ($outcome->guardLimits()->anyLimitReached()) {
@@ -336,7 +336,7 @@ try {
         ->withHopLimits($minHops, $maxHops)
         ->build();
         
-    $outcome = $service->findBestPaths($request);
+    $outcome = $service->findBestPlans($request);
     
 } catch (ExceptionInterface $e) {
     // Shouldn't happen if validation passed
@@ -356,15 +356,15 @@ use SomeWork\P2PPathFinder\Exception\ExceptionInterface;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
-use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
 use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
 
 function handlePathSearch(
-    PathSearchService $service,
+    ExecutionPlanService $service,
     PathSearchRequest $request
 ): array {
     try {
-        $outcome = $service->findBestPaths($request);
+        $outcome = $service->findBestPlans($request);
         
         // Check guard limits (metadata mode)
         if ($outcome->guardLimits()->anyLimitReached()) {
@@ -563,7 +563,7 @@ try {
 
 ```php
 // Good: Check metadata
-$outcome = $service->findBestPaths($request);
+$outcome = $service->findBestPlans($request);
 if ($outcome->guardLimits()->anyLimitReached()) {
     // Handle gracefully
 }

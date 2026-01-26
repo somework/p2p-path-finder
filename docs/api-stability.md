@@ -65,7 +65,7 @@ This document defines the public API surface that remains stable across minor an
 
 | Category             | Class                     | Purpose                              |
 |----------------------|---------------------------|--------------------------------------|
-| **Entry Point**      | `PathSearchService`       | Main facade for path finding         |
+| **Entry Point**      | `ExecutionPlanService`    | Main facade for path finding         |
 |                      | `PathSearchRequest`       | Request DTO with order book + config |
 | **Configuration**    | `PathSearchConfig`        | Immutable search configuration       |
 |                      | `PathSearchConfigBuilder` | Fluent configuration builder         |
@@ -73,7 +73,7 @@ This document defines the public API surface that remains stable across minor an
 | **Results**          | `SearchOutcome`           | Search results + guard report        |
 |                      | `PathResultSet`           | Immutable collection of paths        |
 |                      | `Path`                    | Hop-centric path with derived totals |
-|                      | `PathHop`                 | Single conversion hop with `Order`   |
+|                      | `ExecutionStep`           | Single execution step with `Order`   |
 |                      | `SearchGuardReport`       | Guard metrics and breach status      |
 | **Order Management** | `OrderBook`               | Order collection with filtering      |
 | **Domain**           | `Money`                   | Monetary amount with currency        |
@@ -101,7 +101,11 @@ This document defines the public API surface that remains stable across minor an
 ### Basic Usage (Always Stable)
 
 ```php
-use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;use SomeWork\P2PPathFinder\Domain\Money\Money;
+use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
 
 // Configuration
 $config = PathSearchConfig::builder()
@@ -114,18 +118,19 @@ $config = PathSearchConfig::builder()
 $request = new PathSearchRequest($orderBook, $config, 'BTC');
 
 // Execute
-$service = new PathSearchService($graphBuilder);
-$outcome = $service->findBestPaths($request);
+$service = new ExecutionPlanService(new GraphBuilder());
+$outcome = $service->findBestPlans($request);
 
 // Access results
-foreach ($outcome->paths() as $path) {
-    echo $path->totalSpent()->amount();
-    echo $path->totalReceived()->amount();
-    echo $path->residualTolerance()->percentage();
+$plan = $outcome->bestPath();
+if (null !== $plan) {
+    echo $plan->totalSpent()->amount();
+    echo $plan->totalReceived()->amount();
+    echo $plan->residualTolerance()->percentage();
 
-    foreach ($path->hops() as $hop) {
-        echo $hop->from() . ' -> ' . $hop->to();
-        echo $hop->order()->assetPair()->base();
+    foreach ($plan->steps() as $step) {
+        echo $step->from() . ' -> ' . $step->to();
+        echo $step->order()->assetPair()->base();
     }
 }
 
@@ -135,7 +140,7 @@ if ($outcome->guardLimits()->anyLimitReached()) {
 }
 ```
 
-**Guarantee**: This pattern will work across all 1.x versions.
+**Guarantee**: This pattern will work across all 2.x versions.
 
 ### Domain Objects (Always Stable)
 
@@ -196,8 +201,8 @@ Classes and namespaces marked `@internal` or in these packages:
 - Not intended for direct consumer use
 
 **Example Internal Classes** (may change without notice):
-- `GraphBuilder` - Implementation detail (use `PathSearchService` instead)
-- `PathFinder` - Search algorithm (use `PathSearchService` instead)
+- `GraphBuilder` - Implementation detail (use `ExecutionPlanService` instead)
+- `ExecutionPlanSearchEngine` - Search algorithm (use `ExecutionPlanService` instead)
 - `SearchState` - Internal state representation
 - `EdgeSegment` - Graph representation detail
 
@@ -450,17 +455,17 @@ This allows MINOR and PATCH updates (1.0.0 → 1.9.9) but prevents MAJOR updates
 ### Quick Reference
 
 **✅ Safe to use** (public API):
-- `PathSearchService`
+- `ExecutionPlanService`
 - `PathSearchConfig` / `PathSearchConfigBuilder`
 - `PathSearchRequest`
-- `SearchOutcome` / `PathResultSet` / `Path` / `PathHop`
+- `SearchOutcome` / `PathResultSet` / `ExecutionPlan` / `ExecutionStep`
 - All domain classes (`Money`, `ExchangeRate`, `Order`, etc.)
 - All exceptions (`InvalidInput`, `GuardLimitExceeded`, etc.)
 - Extension interfaces (`OrderFilterInterface`, `PathOrderStrategy`, `FeePolicy`)
 
 **⚠️ Avoid** (internal API):
 - `GraphBuilder`
-- `PathFinder`
+- `ExecutionPlanSearchEngine`
 - `SearchState`
 - Classes marked `@internal`
 - Anything in `Application\PathSearch\*` (except public API namespaces)
@@ -469,7 +474,7 @@ This allows MINOR and PATCH updates (1.0.0 → 1.9.9) but prevents MAJOR updates
 1. Only import from public API namespaces
 2. Use extension interfaces for customization
 3. Check for `@deprecated` warnings
-4. Lock to `^1.0` in composer.json
+4. Lock to `^2.0` in composer.json
 5. Read CHANGELOG.md before upgrading
 6. Test after MINOR version upgrades
 

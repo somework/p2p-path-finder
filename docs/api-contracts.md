@@ -278,142 +278,6 @@ $simpleArray = $collection->toArray(); // For debugging
 
 ---
 
-## Path Results (Legacy)
-
-> **Deprecation Note**: `Path` and related classes are part of the deprecated `PathSearchService` API.
-> For new code, use `ExecutionPlan` with `ExecutionPlanService`.
-
-### Path
-
-**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\Path`
-
-**Purpose**: Aggregated representation of a discovered conversion path derived from hops.
-
-**API Methods**:
-
-```php
-// Access hops
-$hops = $path->hops();            // PathHopCollection object
-$hopArray = $path->hopsAsArray(); // list<PathHop>
-
-// Access totals
-$totalSpent = $path->totalSpent();        // Money object
-$totalReceived = $path->totalReceived();  // Money object
-
-// Access tolerance
-$tolerance = $path->residualTolerance();          // DecimalTolerance object
-$percentage = $path->residualTolerancePercentage(2); // "1.23"
-
-// Access fees
-$feeBreakdown = $path->feeBreakdown();    // MoneyMap object
-$allFees = $path->feeBreakdownAsArray();  // array<string, Money>
-
-// Convenience method (returns array of key properties)
-$summary = $path->toArray();              // For debugging/internal use
-```
-
-**Properties**:
-- **hops**: PathHopCollection object (individual conversion steps)
-- **totalSpent**: Money object derived from the first hop's `spent()` amount
-- **totalReceived**: Money object derived from the last hop's `received()` amount
-- **residualTolerance**: DecimalTolerance object (remaining acceptable slippage)
-- **feeBreakdown**: MoneyMap object that merges fees across all hops by currency
-
-**Notes**:
-- Paths are always built from at least one hop
-- `feeBreakdown` aggregates hop fees deterministically by currency
-- `hopsAsArray()` preserves hop ordering for serialization-friendly scenarios
-- Derived totals stay in sync with the hop collection supplied at construction
-
----
-
-### PathHop
-
-**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHop`
-
-**Purpose**: Describes a single conversion hop in a path and the order that produced it.
-
-**API Methods**:
-
-```php
-// Asset information
-$from = $hop->from();     // "USD"
-$to = $hop->to();         // "GBP"
-
-// Monetary amounts
-$spent = $hop->spent();       // Money object (USD 100.00)
-$received = $hop->received(); // Money object (GBP 79.60)
-
-// Fees
-$fees = $hop->fees();             // MoneyMap object
-$feeArray = $hop->feesAsArray();  // array<string, Money>
-
-// Associated order (the same instance you supplied to the order book)
-$order = $hop->order();
-
-// Convenience method
-$summary = $hop->toArray();       // For debugging/internal use
-```
-
-**Properties**:
-- **from**: Source asset symbol (uppercase)
-- **to**: Destination asset symbol (uppercase)
-- **spent**: Money object (amount spent)
-- **received**: Money object (amount received, after fees)
-- **fees**: MoneyMap object (fees charged for this hop)
-- **order**: Domain `Order` instance used to fill the hop
-
-**Constraints**:
-- `spent.currency` always equals `from`
-- `received.currency` always equals `to`
-- `fees` keys are either `from` or `to` currencies
-- All asset symbols are uppercase
-
-**Notes**:
-- The `received` amount reflects fees already deducted
-- Fees may be charged in source or destination currency; multi-currency fees are supported
-- Use `order()` to access your upstream order metadata (IDs, venue references, etc.). Because the exact identifier shape is application-specific, attach IDs to your `Order` instances or map them externally (for example, via `spl_object_id($hop->order())`).
-
----
-
-### PathHopCollection
-
-**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHopCollection`
-
-**Purpose**: Ordered collection of path hops representing a conversion path.
-
-**API Methods**:
-
-```php
-$collection = PathHopCollection::fromList([$hop1, $hop2]);
-
-// Access hops
-$count = $collection->count();
-$firstHop = $collection->first();
-$specificHop = $collection->at(0);  // Zero-indexed
-
-// Iterate
-foreach ($collection as $hop) {
-    echo "Convert {$hop->from()} to {$hop->to()}\n";
-}
-
-// Get as array
-$hopArray = $collection->all();      // list of PathHop objects
-$simpleArray = $collection->toArray(); // For debugging
-```
-
-**Structure**:
-- Immutable ordered collection of PathHop objects
-- Hops are ordered by path sequence
-- Empty collection available via `PathHopCollection::empty()`
-
-**Notes**:
-- First hop's `from` is the path's source asset
-- Last hop's `to` is the path's destination asset
-- Each hop's `to` matches the next hop's `from` (if any)
-
----
-
 ## Search Results
 
 ### SearchOutcome
@@ -422,9 +286,7 @@ $simpleArray = $collection->toArray(); // For debugging
 
 **Purpose**: Container for search results and guard metrics.
 
-#### SearchOutcome\<ExecutionPlan\> (ExecutionPlanService)
-
-**Important**: Unlike legacy `PathSearchService`, `ExecutionPlanService` returns at most **one** optimal execution plan. The `paths()` collection will contain either 0 or 1 entries.
+**Important**: `ExecutionPlanService::findBestPlans()` returns at most **one** optimal execution plan. The `paths()` collection will contain either 0 or 1 entries.
 
 ```php
 $result = $service->findBestPlans($request);
@@ -449,46 +311,18 @@ if ($guards->anyLimitReached()) {
 }
 ```
 
-**Why single plan?**: The `ExecutionPlanService` algorithm optimizes for a single global optimum that may include split/merge execution. For alternative routes, run separate searches with different constraints (modified tolerance bounds, different spend amounts, or filtered order books).
-
-#### SearchOutcome\<Path\> (PathSearchService - Legacy)
-
-**API Methods**:
-
-```php
-$result = $service->findBestPaths($request);
-
-// Access paths
-$paths = $result->paths();           // PathResultSet object
-$hasPaths = $result->hasPaths();     // boolean
-$bestPath = $result->bestPath();     // Path|null
-
-// Access guard report
-$guards = $result->guardLimits();    // SearchGuardReport object
-
-// Iterate through paths
-foreach ($result->paths() as $path) {
-    echo "Path has {$path->hops()->count()} hops\n";
-}
-
-// Check for guard breaches
-if ($guards->anyLimitReached()) {
-    echo "Search was limited by guards\n";
-}
-```
+**Why single plan?**: The algorithm optimizes for a single global optimum that may include split/merge execution. For alternative routes, run separate searches with different constraints (modified tolerance bounds, different spend amounts, or filtered order books).
 
 **Properties**:
-- **paths**: PathResultSet object (found conversion paths)
+- **paths**: PathResultSet object containing 0 or 1 ExecutionPlan
 - **guardLimits**: SearchGuardReport object (search performance metrics)
 
 **Notes**:
-- Paths are ordered by configured strategy (default: cost, then hops, then route signature)
-- Number of paths limited by `PathSearchConfig.resultLimit`
 - Guard report provides diagnostic information about search limits and performance
 
 **Version History**:
 - 1.0.0: Initial structure
-- 2.0.0: `ExecutionPlanService` returns single optimal plan only
+- 2.0.0: Returns single optimal ExecutionPlan only
 
 ---
 
@@ -619,51 +453,6 @@ $outcome = $service->findBestPlans($request);  // SearchOutcome<ExecutionPlan>
 
 ---
 
-### PathSearchService (Deprecated)
-
-**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService`
-
-**Purpose**: Legacy service for finding linear conversion paths only.
-
-> **Deprecation Notice**: This service is deprecated since 2.0. Use `ExecutionPlanService::findBestPlans()` instead.
-
-**API Methods**:
-
-```php
-use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
-
-// Construction
-$service = new PathSearchService(new GraphBuilder());
-
-// Execute search (triggers deprecation warning)
-$outcome = $service->findBestPaths($request);  // SearchOutcome<Path>
-
-// Migration helper: convert ExecutionPlan to Path
-$path = PathSearchService::planToPath($executionPlan);  // Throws if non-linear
-```
-
-**Limitations**:
-- Returns only linear paths (no splits/merges)
-- Cannot combine multiple orders for same direction
-
-**Migration**:
-```php
-// Before (deprecated)
-$service = new PathSearchService(new GraphBuilder());
-$outcome = $service->findBestPaths($request);
-
-// After (recommended)
-$service = new ExecutionPlanService(new GraphBuilder());
-$outcome = $service->findBestPlans($request);
-```
-
-**Removal Timeline**:
-- 2.0: Deprecated
-- 3.0: Planned removal
-
----
-
 ## Usage Examples
 
 ### Working with Search Results (ExecutionPlanService)
@@ -709,55 +498,6 @@ if ($guards->anyLimitReached()) {
 }
 ```
 
----
-
-### Working with Search Results (PathSearchService - Legacy)
-
-Here's how to work with a complete `SearchOutcome` containing paths and guard metrics:
-
-```php
-$outcome = $service->findBestPaths($request);
-
-// Access guard metrics
-$guards = $outcome->guardLimits();
-echo "Search took: {$guards->elapsedMilliseconds()}ms\n";
-echo "Expansions: {$guards->expansions()}\n";
-
-echo "Paths: {$outcome->paths()->count()}\n";
-
-// Process found paths
-foreach ($outcome->paths() as $path) {
-    echo "Spent: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()}\n";
-    echo "Received: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
-    echo "Tolerance remaining: {$path->residualTolerance()->percentage(2)}\n";
-
-    // Process aggregated fees
-    foreach ($path->feeBreakdown() as $currency => $fee) {
-        echo "Fee in $currency: {$fee->amount()}\n";
-    }
-
-    // Process hops and related orders
-    foreach ($path->hops() as $hop) {
-        echo "  {$hop->from()} -> {$hop->to()}: ";
-        echo "spent {$hop->spent()->amount()}, received {$hop->received()->amount()}\n";
-
-        // Order reference: use your own identifiers on the supplied order instances
-        $order = $hop->order();
-        echo "  Filled order across {$order->assetPair()->base()} / {$order->assetPair()->quote()}\n";
-    }
-}
-
-// Check for guard breaches
-if ($guards->anyLimitReached()) {
-    echo "Warning: Search was limited by guard constraints\n";
-}
-```
-
-This example demonstrates:
-- Paths composed of ordered hops with deterministic totals
-- Fees in multiple currencies aggregated at the path level
-- Hop-by-hop access to the originating orders for downstream reconciliation
-- Guard metrics showing the search completed within limits
 
 ### Type Safety
 
