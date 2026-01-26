@@ -11,20 +11,16 @@ use SomeWork\P2PPathFinder\Application\PathSearch\Engine\State\PortfolioState;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\EdgeCapacity;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\GraphEdge;
-use SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionPlan;
-use SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionStep;
-use SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionStepCollection;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
-use SomeWork\P2PPathFinder\Domain\Money\MoneyMap;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
-use SomeWork\P2PPathFinder\Domain\Tolerance\DecimalTolerance;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalHelperTrait;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 use function array_key_exists;
 use function array_keys;
+use function array_push;
 use function array_reverse;
 use function strtoupper;
 
@@ -146,8 +142,8 @@ final class ExecutionPlanSearchEngine
         $visitedStates = 1;
         $visitedGuardReached = false;
 
-        /** @var list<ExecutionStep> $steps */
-        $steps = [];
+        /** @var list<array{order: Order, spend: Money, sequence: int}> $rawFills */
+        $rawFills = [];
         $sequenceNumber = 1;
 
         // Main loop: find augmenting paths until no more balance to convert
@@ -188,27 +184,21 @@ final class ExecutionPlanSearchEngine
                 continue;
             }
 
-            // Execute flow along path
+            // Execute flow along path and collect raw fills
             $flowResult = $this->executeFlow($path, $portfolio, $bottleneck, $startCurrency, $sequenceNumber);
             $portfolio = $flowResult['portfolio'];
-            /** @var list<ExecutionStep> $newSteps */
-            $newSteps = $flowResult['steps'];
+            /** @var list<array{order: Order, spend: Money, sequence: int}> $newFills */
+            $newFills = $flowResult['fills'];
             $sequenceNumber = $flowResult['sequenceNumber'];
 
-            foreach ($newSteps as $step) {
-                $steps[] = $step;
-            }
+            array_push($rawFills, ...$newFills);
         }
 
         $guardReport = $guards->finalize($visitedStates, $this->maxVisitedStates, $visitedGuardReached);
 
-        if ([] === $steps) {
+        if ([] === $rawFills) {
             return ExecutionPlanSearchOutcome::empty($guardReport);
         }
-
-        $stepCollection = ExecutionStepCollection::fromList($steps);
-        $tolerance = DecimalTolerance::fromNumericString('0', self::SCALE);
-        $plan = ExecutionPlan::fromSteps($stepCollection, $sourceCurrency, $targetCurrency, $tolerance);
 
         // Check if we achieved full conversion: source currency balance should be zero
         // and we should have received something in target currency
@@ -217,10 +207,10 @@ final class ExecutionPlanSearchEngine
         $isComplete = $sourceBalance->isZero() && !$targetBalance->isZero();
 
         if ($isComplete) {
-            return ExecutionPlanSearchOutcome::complete($plan, $guardReport);
+            return ExecutionPlanSearchOutcome::complete($rawFills, $guardReport, $sourceCurrency, $targetCurrency);
         }
 
-        return ExecutionPlanSearchOutcome::partial($plan, $guardReport);
+        return ExecutionPlanSearchOutcome::partial($rawFills, $guardReport, $sourceCurrency, $targetCurrency);
     }
 
     /**
@@ -238,9 +228,10 @@ final class ExecutionPlanSearchEngine
         $guards = new SearchGuards($this->maxExpansions, $this->timeBudgetMs);
         $visitedStates = 1;
         $visitedGuardReached = false;
+        $exitedDueToGuards = false;
 
-        /** @var list<ExecutionStep> $steps */
-        $steps = [];
+        /** @var list<array{order: Order, spend: Money, sequence: int}> $rawFills */
+        $rawFills = [];
         $sequenceNumber = 1;
 
         // Look for transfer orders (self-loop edges) at the currency
@@ -269,11 +260,13 @@ final class ExecutionPlanSearchEngine
         // Execute transfers in sequence (sorted by cost - cheapest first)
         while ($portfolio->hasBalance($currency)) {
             if (!$guards->canExpand()) {
+                $exitedDueToGuards = true;
                 break;
             }
 
             if ($visitedStates >= $this->maxVisitedStates) {
                 $visitedGuardReached = true;
+                $exitedDueToGuards = true;
                 break;
             }
 
@@ -301,7 +294,7 @@ final class ExecutionPlanSearchEngine
             }
 
             if (null === $bestEdge) {
-                // No more unused transfer orders
+                // No more unused transfer orders - natural completion
                 break;
             }
 
@@ -313,37 +306,33 @@ final class ExecutionPlanSearchEngine
                 continue;
             }
 
-            // Execute the transfer
+            // Execute the transfer and collect raw fills
             $flowResult = $this->executeFlow([$bestEdge], $portfolio, $bottleneck, $currency, $sequenceNumber);
             $portfolio = $flowResult['portfolio'];
-            /** @var list<ExecutionStep> $newSteps */
-            $newSteps = $flowResult['steps'];
+            /** @var list<array{order: Order, spend: Money, sequence: int}> $newFills */
+            $newFills = $flowResult['fills'];
             $sequenceNumber = $flowResult['sequenceNumber'];
 
-            foreach ($newSteps as $step) {
-                $steps[] = $step;
-            }
+            array_push($rawFills, ...$newFills);
         }
 
         $guardReport = $guards->finalize($visitedStates, $this->maxVisitedStates, $visitedGuardReached);
 
-        if ([] === $steps) {
+        if ([] === $rawFills) {
             return ExecutionPlanSearchOutcome::empty($guardReport);
         }
 
-        $stepCollection = ExecutionStepCollection::fromList($steps);
-        $tolerance = DecimalTolerance::fromNumericString('0', self::SCALE);
-        $plan = ExecutionPlan::fromSteps($stepCollection, $currency, $currency, $tolerance);
-
-        // For transfers, we check if any balance remains
-        $remainingBalance = $portfolio->balance($currency);
-        $isComplete = !$remainingBalance->isZero();
-
-        if ($isComplete) {
-            return ExecutionPlanSearchOutcome::complete($plan, $guardReport);
+        // For same-currency transfers, completion semantics differ from cross-currency conversions:
+        // - "Complete" means we naturally finished: exhausted all transfer capacity or balance
+        // - "Partial" means we stopped early due to guard limits (time/expansion/visited states)
+        //
+        // Since transfers are self-loops (source === target), checking source=0 && target>0
+        // doesn't apply. Instead, we track whether we exited due to guard limits.
+        if ($exitedDueToGuards) {
+            return ExecutionPlanSearchOutcome::partial($rawFills, $guardReport, $currency, $currency);
         }
 
-        return ExecutionPlanSearchOutcome::partial($plan, $guardReport);
+        return ExecutionPlanSearchOutcome::complete($rawFills, $guardReport, $currency, $currency);
     }
 
     /**
@@ -712,11 +701,14 @@ final class ExecutionPlanSearchEngine
     }
 
     /**
-     * Executes flow along a path, creating execution steps.
+     * Executes flow along a path, collecting raw order fills.
+     *
+     * Returns raw fill data (order, spend amount, sequence) that can be materialized
+     * into ExecutionStep objects by the ExecutionPlanMaterializer.
      *
      * @param list<GraphEdge> $path
      *
-     * @return array{portfolio: PortfolioState, steps: list<ExecutionStep>, sequenceNumber: int}
+     * @return array{portfolio: PortfolioState, fills: list<array{order: Order, spend: Money, sequence: int}>, sequenceNumber: int}
      */
     private function executeFlow(
         array $path,
@@ -725,8 +717,8 @@ final class ExecutionPlanSearchEngine
         string $startCurrency,
         int $sequenceNumber,
     ): array {
-        /** @var list<ExecutionStep> $steps */
-        $steps = [];
+        /** @var list<array{order: Order, spend: Money, sequence: int}> $fills */
+        $fills = [];
         $currentAmount = $bottleneck;
 
         foreach ($path as $edge) {
@@ -755,24 +747,15 @@ final class ExecutionPlanSearchEngine
                 $spendAmount = $boundsMin;
             }
 
-            // Calculate received amount based on order side
+            // Calculate received amount based on order side (needed for portfolio update)
             $received = $this->calculateReceivedAmount($edge, $spendAmount);
 
-            // Calculate fees
-            $fees = $this->calculateFeesForEdge($edge, $spendAmount, $received);
-
-            // Create step with proper from/to based on edge direction
-            $step = new ExecutionStep(
-                $edge->from(),
-                $edge->to(),
-                Money::fromString($edge->from(), $spendAmount->amount(), $spendAmount->scale()),
-                Money::fromString($edge->to(), $received->amount(), $received->scale()),
-                $order,
-                $fees,
-                $sequenceNumber++,
-            );
-
-            $steps[] = $step;
+            // Record raw fill data - materialization will happen in the service layer
+            $fills[] = [
+                'order' => $order,
+                'spend' => Money::fromString($spendCurrency, $spendAmount->amount(), $spendAmount->scale()),
+                'sequence' => $sequenceNumber++,
+            ];
 
             // Calculate cost for portfolio update
             $cost = $this->calculateStepCost($spendAmount, $received);
@@ -788,66 +771,9 @@ final class ExecutionPlanSearchEngine
 
         return [
             'portfolio' => $portfolio,
-            'steps' => $steps,
+            'fills' => $fills,
             'sequenceNumber' => $sequenceNumber,
         ];
-    }
-
-    /**
-     * Calculates fees for an edge execution.
-     *
-     * Handles both BUY and SELL orders by determining the correct base/quote amounts.
-     */
-    private function calculateFeesForEdge(GraphEdge $edge, Money $spendAmount, Money $receivedAmount): MoneyMap
-    {
-        $order = $edge->order();
-        $feePolicy = $order->feePolicy();
-        if (null === $feePolicy) {
-            return MoneyMap::empty();
-        }
-
-        // Determine base and quote amounts based on order side
-        if (OrderSide::BUY === $edge->orderSide()) {
-            // BUY: spend base, receive quote
-            $baseAmount = Money::fromString(
-                $order->assetPair()->base(),
-                $spendAmount->amount(),
-                $spendAmount->scale()
-            );
-            $quoteAmount = Money::fromString(
-                $order->assetPair()->quote(),
-                $receivedAmount->amount(),
-                $receivedAmount->scale()
-            );
-        } else {
-            // SELL: spend quote, receive base
-            $baseAmount = Money::fromString(
-                $order->assetPair()->base(),
-                $receivedAmount->amount(),
-                $receivedAmount->scale()
-            );
-            $quoteAmount = Money::fromString(
-                $order->assetPair()->quote(),
-                $spendAmount->amount(),
-                $spendAmount->scale()
-            );
-        }
-
-        $feeBreakdown = $feePolicy->calculate($order->side(), $baseAmount, $quoteAmount);
-
-        $fees = [];
-        $baseFee = $feeBreakdown->baseFee();
-        $quoteFee = $feeBreakdown->quoteFee();
-
-        if (null !== $baseFee && !$baseFee->isZero()) {
-            $fees[] = $baseFee;
-        }
-
-        if (null !== $quoteFee && !$quoteFee->isZero()) {
-            $fees[] = $quoteFee;
-        }
-
-        return MoneyMap::fromList($fees);
     }
 
     /**

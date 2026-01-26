@@ -584,4 +584,65 @@ final class ExecutionPlanServiceTest extends TestCase
         self::assertSame('USD', $bestPlan->sourceCurrency());
         self::assertSame('BTC', $bestPlan->targetCurrency());
     }
+
+    /**
+     * Test that service accepts custom materializer injection.
+     *
+     * This verifies the service uses ExecutionPlanMaterializer in its pipeline
+     * and accepts it as a constructor dependency (MUL-14 integration).
+     */
+    public function test_service_accepts_custom_materializer(): void
+    {
+        $customMaterializer = new \SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanMaterializer();
+        $service = new ExecutionPlanService(new GraphBuilder(), null, $customMaterializer);
+
+        $order = OrderFactory::buy('USD', 'BTC', '10.00', '1000.00', '0.00002', 2, 8);
+        $orderBook = new OrderBook([$order]);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+            ->withToleranceBounds('0.0', '0.10')
+            ->withHopLimits(1, 3)
+            ->build();
+
+        $request = new PathSearchRequest($orderBook, $config, 'BTC');
+        $outcome = $service->findBestPlans($request);
+
+        self::assertTrue($outcome->hasPaths());
+        $bestPlan = $outcome->bestPath();
+        self::assertInstanceOf(ExecutionPlan::class, $bestPlan);
+    }
+
+    /**
+     * Test that execution plan steps have correct sequence numbers from materializer.
+     *
+     * Verifies the materializer correctly preserves sequence numbers from raw fills.
+     */
+    public function test_execution_plan_steps_have_sequential_numbers(): void
+    {
+        // Create multi-hop path to get multiple steps
+        $order1 = OrderFactory::buy('USD', 'USDT', '10.00', '1000.00', '1.00', 2, 2);
+        $order2 = OrderFactory::buy('USDT', 'BTC', '10.00', '1000.00', '0.00002', 2, 8);
+        $orderBook = new OrderBook([$order1, $order2]);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+            ->withToleranceBounds('0.0', '0.10')
+            ->withHopLimits(1, 4)
+            ->build();
+
+        $request = new PathSearchRequest($orderBook, $config, 'BTC');
+        $outcome = $this->service->findBestPlans($request);
+
+        self::assertTrue($outcome->hasPaths());
+        $bestPlan = $outcome->bestPath();
+        self::assertInstanceOf(ExecutionPlan::class, $bestPlan);
+
+        $steps = $bestPlan->steps()->all();
+        self::assertCount(2, $steps);
+
+        // Sequence numbers should start at 1 and increment
+        self::assertSame(1, $steps[0]->sequenceNumber());
+        self::assertSame(2, $steps[1]->sequenceNumber());
+    }
 }

@@ -6,21 +6,30 @@ namespace SomeWork\P2PPathFinder\Application\PathSearch\Engine;
 
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionPlan;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
+use SomeWork\P2PPathFinder\Domain\Order\Order;
 
 /**
  * Outcome of an execution plan search operation.
  *
- * Contains the execution plan (if found), guard report describing resource usage,
+ * Contains raw order fills from the search engine, guard report describing resource usage,
  * and completion status indicating whether the full requested amount was converted.
+ *
+ * The raw fills can be materialized into an ExecutionPlan using the ExecutionPlanMaterializer.
  *
  * @api
  */
 final class ExecutionPlanSearchOutcome
 {
+    /**
+     * @param list<array{order: Order, spend: Money, sequence: int}>|null $rawFills
+     */
     public function __construct(
-        private readonly ?ExecutionPlan $plan,
+        private readonly ?array $rawFills,
         private readonly SearchGuardReport $guardReport,
         private readonly bool $isComplete,
+        private readonly string $sourceCurrency = '',
+        private readonly string $targetCurrency = '',
     ) {
     }
 
@@ -33,27 +42,67 @@ final class ExecutionPlanSearchOutcome
     }
 
     /**
-     * Creates a successful outcome with a complete plan.
+     * Creates a successful outcome with complete raw fills.
+     *
+     * @param list<array{order: Order, spend: Money, sequence: int}> $rawFills
      */
-    public static function complete(ExecutionPlan $plan, SearchGuardReport $guardReport): self
-    {
-        return new self($plan, $guardReport, true);
+    public static function complete(
+        array $rawFills,
+        SearchGuardReport $guardReport,
+        string $sourceCurrency,
+        string $targetCurrency,
+    ): self {
+        return new self($rawFills, $guardReport, true, $sourceCurrency, $targetCurrency);
     }
 
     /**
-     * Creates a partial outcome when the plan does not satisfy the full amount.
+     * Creates a partial outcome when fills do not satisfy the full amount.
+     *
+     * @param list<array{order: Order, spend: Money, sequence: int}> $rawFills
      */
-    public static function partial(ExecutionPlan $plan, SearchGuardReport $guardReport): self
-    {
-        return new self($plan, $guardReport, false);
+    public static function partial(
+        array $rawFills,
+        SearchGuardReport $guardReport,
+        string $sourceCurrency,
+        string $targetCurrency,
+    ): self {
+        return new self($rawFills, $guardReport, false, $sourceCurrency, $targetCurrency);
     }
 
     /**
-     * Returns the execution plan, or null if no valid plan was found.
+     * Returns the raw order fills from the search engine.
+     *
+     * Use ExecutionPlanMaterializer to convert these fills into an ExecutionPlan.
+     *
+     * @return list<array{order: Order, spend: Money, sequence: int}>|null
      */
-    public function plan(): ?ExecutionPlan
+    public function rawFills(): ?array
     {
-        return $this->plan;
+        return $this->rawFills;
+    }
+
+    /**
+     * Returns true if raw fills are available.
+     */
+    public function hasRawFills(): bool
+    {
+        return null !== $this->rawFills && [] !== $this->rawFills;
+    }
+
+    /**
+     * Returns the source currency for the search.
+     */
+    public function sourceCurrency(): string
+    {
+        return $this->sourceCurrency;
+    }
+
+    /**
+     * Returns the target currency for the search.
+     */
+    public function targetCurrency(): string
+    {
+        return $this->targetCurrency;
     }
 
     /**
@@ -65,7 +114,7 @@ final class ExecutionPlanSearchOutcome
     }
 
     /**
-     * Returns true if the plan satisfies the full requested amount.
+     * Returns true if the fills satisfy the full requested amount.
      */
     public function isComplete(): bool
     {
@@ -73,26 +122,43 @@ final class ExecutionPlanSearchOutcome
     }
 
     /**
-     * Returns true if a plan exists but does not satisfy the full amount.
+     * Returns true if fills exist but do not satisfy the full amount.
      */
     public function isPartial(): bool
     {
-        return null !== $this->plan && !$this->isComplete;
+        return $this->hasRawFills() && !$this->isComplete;
     }
 
     /**
-     * Returns true if a valid plan was found (complete or partial).
+     * Returns true if raw fills were found (complete or partial).
+     *
+     * @deprecated Use hasRawFills() instead. This method exists for backward compatibility.
      */
     public function hasPlan(): bool
     {
-        return null !== $this->plan;
+        return $this->hasRawFills();
     }
 
     /**
-     * Returns true if no plan was found.
+     * Returns true if no fills were found.
      */
     public function isEmpty(): bool
     {
-        return null === $this->plan;
+        return !$this->hasRawFills();
+    }
+
+    /**
+     * Returns the execution plan.
+     *
+     * @deprecated This method is deprecated. Use rawFills() with ExecutionPlanMaterializer instead.
+     *             The engine no longer creates ExecutionPlan objects directly.
+     *
+     * @return ExecutionPlan|null Always returns null. Use ExecutionPlanMaterializer to create plans.
+     */
+    public function plan(): ?ExecutionPlan
+    {
+        // This method is kept for backward compatibility but always returns null.
+        // Use ExecutionPlanMaterializer::materialize() with rawFills() instead.
+        return null;
     }
 }

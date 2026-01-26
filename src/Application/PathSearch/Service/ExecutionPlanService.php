@@ -21,6 +21,7 @@ use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSetEntry;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Application\PathSearch\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
+use SomeWork\P2PPathFinder\Domain\Tolerance\DecimalTolerance;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalHelperTrait;
 use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
@@ -63,6 +64,7 @@ final class ExecutionPlanService
     private readonly OrderSpendAnalyzer $orderSpendAnalyzer;
     private readonly ToleranceEvaluator $toleranceEvaluator;
     private readonly PathOrderStrategy $orderingStrategy;
+    private readonly ExecutionPlanMaterializer $materializer;
 
     /**
      * @api
@@ -70,6 +72,7 @@ final class ExecutionPlanService
     public function __construct(
         private readonly GraphBuilder $graphBuilder,
         ?PathOrderStrategy $orderingStrategy = null,
+        ?ExecutionPlanMaterializer $materializer = null,
     ) {
         $strategy = $orderingStrategy ?? new CostHopsSignatureOrderingStrategy(self::COST_SCALE);
         $fillEvaluator = new OrderFillEvaluator();
@@ -77,6 +80,7 @@ final class ExecutionPlanService
         $this->orderSpendAnalyzer = new OrderSpendAnalyzer($fillEvaluator, $legMaterializer);
         $this->toleranceEvaluator = new ToleranceEvaluator();
         $this->orderingStrategy = $strategy;
+        $this->materializer = $materializer ?? new ExecutionPlanMaterializer($fillEvaluator, $legMaterializer);
     }
 
     /**
@@ -189,18 +193,44 @@ final class ExecutionPlanService
         $guardLimits = $searchOutcome->guardReport();
         $this->assertGuardLimits($config, $guardLimits);
 
-        // Process the result
-        if (!$searchOutcome->hasPlan()) {
+        // Process the result - check for raw fills
+        if (!$searchOutcome->hasRawFills()) {
             /** @var SearchOutcome<ExecutionPlan> $empty */
             $empty = SearchOutcome::empty($guardLimits);
 
             return $empty;
         }
 
-        /** @var ExecutionPlan $plan */
-        $plan = $searchOutcome->plan();
+        // Initial tolerance evaluation with requested spend as placeholder.
+        // This provides a starting tolerance for materialization; we'll validate
+        // against actual spent amount after the plan is materialized.
+        $toleranceResult = $this->toleranceEvaluator->evaluate(
+            $config,
+            $requestedSpend,
+            $requestedSpend,
+        );
 
-        // Evaluate tolerance
+        // Use materializer to convert raw fills into ExecutionPlan
+        $tolerance = $toleranceResult?->tolerance() ?? DecimalTolerance::fromNumericString('0', self::COST_SCALE);
+
+        /** @var list<array{order: \SomeWork\P2PPathFinder\Domain\Order\Order, spend: Money, sequence: int}> $rawFills */
+        $rawFills = $searchOutcome->rawFills();
+
+        $plan = $this->materializer->materialize(
+            $rawFills,
+            $sourceCurrency,
+            $targetCurrency,
+            $tolerance,
+        );
+
+        if (null === $plan) {
+            /** @var SearchOutcome<ExecutionPlan> $empty */
+            $empty = SearchOutcome::empty($guardLimits);
+
+            return $empty;
+        }
+
+        // Re-evaluate tolerance with actual spent amount
         $toleranceResult = $this->toleranceEvaluator->evaluate(
             $config,
             $requestedSpend,

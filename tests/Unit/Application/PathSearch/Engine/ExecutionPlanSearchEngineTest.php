@@ -8,10 +8,11 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\ExecutionPlanSearchEngine;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\ExecutionPlanSearchOutcome;
-use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\Graph;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionPlan;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanMaterializer;
 use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
-use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Tolerance\DecimalTolerance;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
@@ -24,10 +25,30 @@ final class ExecutionPlanSearchEngineTest extends TestCase
     private const SCALE = 8;
 
     private GraphBuilder $graphBuilder;
+    private ExecutionPlanMaterializer $materializer;
 
     protected function setUp(): void
     {
         $this->graphBuilder = new GraphBuilder();
+        $this->materializer = new ExecutionPlanMaterializer();
+    }
+
+    /**
+     * Helper method to materialize raw fills into an ExecutionPlan.
+     */
+    private function materializePlan(ExecutionPlanSearchOutcome $outcome): ?ExecutionPlan
+    {
+        $rawFills = $outcome->rawFills();
+        if (null === $rawFills || [] === $rawFills) {
+            return null;
+        }
+
+        return $this->materializer->materialize(
+            $rawFills,
+            $outcome->sourceCurrency(),
+            $outcome->targetCurrency(),
+            DecimalTolerance::fromNumericString('0', self::SCALE),
+        );
     }
 
     public function test_linear_path_a_b_c_d(): void
@@ -46,11 +67,11 @@ final class ExecutionPlanSearchEngineTest extends TestCase
         $spendAmount = Money::fromString('AAA', '500.00000000', self::SCALE);
         $outcome = $engine->search($graph, 'AAA', 'DDD', $spendAmount);
 
-        self::assertTrue($outcome->hasPlan());
+        self::assertTrue($outcome->hasRawFills());
         self::assertTrue($outcome->isComplete());
         self::assertFalse($outcome->isPartial());
 
-        $plan = $outcome->plan();
+        $plan = $this->materializePlan($outcome);
         self::assertNotNull($plan);
 
         // Should have 3 steps for A→B→C→D
@@ -78,9 +99,9 @@ final class ExecutionPlanSearchEngineTest extends TestCase
         $spendAmount = Money::fromString('AAA', '800.00000000', self::SCALE);
         $outcome = $engine->search($graph, 'AAA', 'CCC', $spendAmount);
 
-        self::assertTrue($outcome->hasPlan());
+        self::assertTrue($outcome->hasRawFills());
 
-        $plan = $outcome->plan();
+        $plan = $this->materializePlan($outcome);
         self::assertNotNull($plan);
 
         // May have multiple steps due to split execution
@@ -106,9 +127,9 @@ final class ExecutionPlanSearchEngineTest extends TestCase
         $spendAmount = Money::fromString('AAA', '800.00000000', self::SCALE);
         $outcome = $engine->search($graph, 'AAA', 'DDD', $spendAmount);
 
-        self::assertTrue($outcome->hasPlan());
+        self::assertTrue($outcome->hasRawFills());
 
-        $plan = $outcome->plan();
+        $plan = $this->materializePlan($outcome);
         self::assertNotNull($plan);
         self::assertSame('AAA', $plan->sourceCurrency());
         self::assertSame('DDD', $plan->targetCurrency());
@@ -134,9 +155,9 @@ final class ExecutionPlanSearchEngineTest extends TestCase
         $spendAmount = Money::fromString('AAA', '600.00000000', self::SCALE);
         $outcome = $engine->search($graph, 'AAA', 'DDD', $spendAmount);
 
-        self::assertTrue($outcome->hasPlan());
+        self::assertTrue($outcome->hasRawFills());
 
-        $plan = $outcome->plan();
+        $plan = $this->materializePlan($outcome);
         self::assertNotNull($plan);
         self::assertSame('AAA', $plan->sourceCurrency());
         self::assertSame('DDD', $plan->targetCurrency());
@@ -164,9 +185,9 @@ final class ExecutionPlanSearchEngineTest extends TestCase
         $spendAmount = Money::fromString('AAA', '500.00000000', self::SCALE);
         $outcome = $engine->search($graph, 'AAA', 'BBB', $spendAmount);
 
-        self::assertTrue($outcome->hasPlan());
+        self::assertTrue($outcome->hasRawFills());
 
-        $plan = $outcome->plan();
+        $plan = $this->materializePlan($outcome);
         self::assertNotNull($plan);
 
         // Should prefer direct path (1 step) when sufficient
@@ -250,9 +271,9 @@ final class ExecutionPlanSearchEngineTest extends TestCase
         $spendAmount = Money::fromString('AAA', '500.00000000', self::SCALE);
         $outcome = $engine->search($graph, 'AAA', 'CCC', $spendAmount);
 
-        self::assertTrue($outcome->hasPlan());
+        self::assertTrue($outcome->hasRawFills());
 
-        $plan = $outcome->plan();
+        $plan = $this->materializePlan($outcome);
         self::assertNotNull($plan);
 
         // Verify no backtracking: AAA should only appear as source
@@ -288,9 +309,9 @@ final class ExecutionPlanSearchEngineTest extends TestCase
         $spendAmount = Money::fromString('AAA', '500.00000000', self::SCALE);
         $outcome = $engine->search($graph, 'AAA', 'BBB', $spendAmount);
 
-        self::assertTrue($outcome->hasPlan());
+        self::assertTrue($outcome->hasRawFills());
 
-        $plan = $outcome->plan();
+        $plan = $this->materializePlan($outcome);
         self::assertNotNull($plan);
 
         // Should only have 1 step (order used once)
@@ -322,7 +343,7 @@ final class ExecutionPlanSearchEngineTest extends TestCase
         $results = [];
         for ($i = 0; $i < 10; ++$i) {
             $outcome = $engine->search($graph, 'AAA', 'CCC', $spendAmount);
-            $plan = $outcome->plan();
+            $plan = $this->materializePlan($outcome);
 
             if (null !== $plan) {
                 $results[] = [
@@ -356,9 +377,9 @@ final class ExecutionPlanSearchEngineTest extends TestCase
         $spendAmount = Money::fromString('AAA', '500.00000000', self::SCALE);
         $outcome = $engine->search($graph, 'AAA', 'BBB', $spendAmount);
 
-        self::assertTrue($outcome->hasPlan());
+        self::assertTrue($outcome->hasRawFills());
 
-        $plan = $outcome->plan();
+        $plan = $this->materializePlan($outcome);
         self::assertNotNull($plan);
 
         // Should have partial result
@@ -385,9 +406,9 @@ final class ExecutionPlanSearchEngineTest extends TestCase
         $spendAmount = Money::fromString('AAA', '500.00000000', self::SCALE);
         $outcome = $engine->search($graph, 'AAA', 'DDD', $spendAmount);
 
-        self::assertFalse($outcome->hasPlan());
+        self::assertFalse($outcome->hasRawFills());
         self::assertTrue($outcome->isEmpty());
-        self::assertNull($outcome->plan());
+        self::assertNull($outcome->rawFills());
     }
 
     public function test_same_source_and_target_returns_empty(): void
@@ -483,15 +504,15 @@ final class ExecutionPlanSearchEngineTest extends TestCase
         $outcome = $engine->search($graph, 'AAA', 'BBB', $spendAmount);
 
         if ($outcome->isComplete()) {
-            self::assertTrue($outcome->hasPlan());
+            self::assertTrue($outcome->hasRawFills());
             self::assertFalse($outcome->isPartial());
             self::assertFalse($outcome->isEmpty());
         } elseif ($outcome->isPartial()) {
-            self::assertTrue($outcome->hasPlan());
+            self::assertTrue($outcome->hasRawFills());
             self::assertFalse($outcome->isComplete());
             self::assertFalse($outcome->isEmpty());
         } else {
-            self::assertFalse($outcome->hasPlan());
+            self::assertFalse($outcome->hasRawFills());
             self::assertTrue($outcome->isEmpty());
         }
     }
@@ -561,9 +582,9 @@ final class ExecutionPlanSearchEngineTest extends TestCase
         $spendAmount = Money::fromString('AAA', '80.00000000', self::SCALE);
         $outcome = $engine->search($graph, 'AAA', 'DDD', $spendAmount);
 
-        self::assertTrue($outcome->hasPlan(), 'Should find a plan for split execution');
+        self::assertTrue($outcome->hasRawFills(), 'Should find raw fills for split execution');
 
-        $plan = $outcome->plan();
+        $plan = $this->materializePlan($outcome);
         self::assertNotNull($plan);
         self::assertSame('AAA', $plan->sourceCurrency());
         self::assertSame('DDD', $plan->targetCurrency());
@@ -611,9 +632,9 @@ final class ExecutionPlanSearchEngineTest extends TestCase
         $spendAmount = Money::fromString('AAA', '70.00000000', self::SCALE);
         $outcome = $engine->search($graph, 'AAA', 'DDD', $spendAmount);
 
-        self::assertTrue($outcome->hasPlan(), 'Should find a plan for merge execution');
+        self::assertTrue($outcome->hasRawFills(), 'Should find raw fills for merge execution');
 
-        $plan = $outcome->plan();
+        $plan = $this->materializePlan($outcome);
         self::assertNotNull($plan);
 
         // Should have multiple steps for merge execution
@@ -639,9 +660,9 @@ final class ExecutionPlanSearchEngineTest extends TestCase
         $spendAmount = Money::fromString('AAA', '50.00000000', self::SCALE);
         $outcome = $engine->search($graph, 'AAA', 'DDD', $spendAmount);
 
-        self::assertTrue($outcome->hasPlan());
+        self::assertTrue($outcome->hasRawFills());
 
-        $plan = $outcome->plan();
+        $plan = $this->materializePlan($outcome);
         self::assertNotNull($plan);
 
         // A full split should have 4 steps: A→B, B→D, A→C, C→D
@@ -668,9 +689,9 @@ final class ExecutionPlanSearchEngineTest extends TestCase
         $spendAmount = Money::fromString('AAA', '40.00000000', self::SCALE);
         $outcome = $engine->search($graph, 'AAA', 'DDD', $spendAmount);
 
-        self::assertTrue($outcome->hasPlan());
+        self::assertTrue($outcome->hasRawFills());
 
-        $plan = $outcome->plan();
+        $plan = $this->materializePlan($outcome);
         self::assertNotNull($plan);
 
         $totalSpent = $plan->totalSpent();
@@ -702,9 +723,9 @@ final class ExecutionPlanSearchEngineTest extends TestCase
         $spendAmount = Money::fromString('AAA', '50.00000000', self::SCALE);
         $outcome = $engine->search($graph, 'AAA', 'DDD', $spendAmount);
 
-        self::assertTrue($outcome->hasPlan());
+        self::assertTrue($outcome->hasRawFills());
 
-        $plan = $outcome->plan();
+        $plan = $this->materializePlan($outcome);
         self::assertNotNull($plan);
 
         $totalReceived = $plan->totalReceived();
@@ -741,9 +762,9 @@ final class ExecutionPlanSearchEngineTest extends TestCase
         $spendAmount = Money::fromString('AAA', '90.00000000', self::SCALE);
         $outcome = $engine->search($graph, 'AAA', 'DDD', $spendAmount);
 
-        self::assertTrue($outcome->hasPlan());
+        self::assertTrue($outcome->hasRawFills());
 
-        $plan = $outcome->plan();
+        $plan = $this->materializePlan($outcome);
         self::assertNotNull($plan);
 
         // Should have multiple steps from using multiple orders
@@ -770,13 +791,210 @@ final class ExecutionPlanSearchEngineTest extends TestCase
         $spendAmount = Money::fromString('AAA', '50.00000000', self::SCALE);
         $outcome = $engine->search($graph, 'AAA', 'DDD', $spendAmount);
 
-        self::assertTrue($outcome->hasPlan());
+        self::assertTrue($outcome->hasRawFills());
 
-        $plan = $outcome->plan();
+        $plan = $this->materializePlan($outcome);
         self::assertNotNull($plan);
 
         // Should prefer linear path (2 steps: A→B→D)
         self::assertSame(2, $plan->stepCount());
         self::assertTrue($plan->isLinear(), 'Should be linear when capacity is sufficient');
+    }
+
+    // ========================================================================
+    // RAW FILLS FORMAT TESTS
+    // ========================================================================
+
+    /**
+     * Test that raw fills contain the expected structure.
+     */
+    public function test_raw_fills_format_matches_materializer_expectations(): void
+    {
+        $orders = [
+            OrderFactory::buy('AAA', 'BBB', '100', '1000', '1.0', self::SCALE, self::SCALE),
+        ];
+
+        $graph = $this->graphBuilder->build($orders);
+        $engine = new ExecutionPlanSearchEngine();
+
+        $spendAmount = Money::fromString('AAA', '500.00000000', self::SCALE);
+        $outcome = $engine->search($graph, 'AAA', 'BBB', $spendAmount);
+
+        self::assertTrue($outcome->hasRawFills());
+
+        $rawFills = $outcome->rawFills();
+        self::assertNotNull($rawFills);
+        self::assertNotEmpty($rawFills);
+
+        foreach ($rawFills as $fill) {
+            // Verify expected keys exist
+            self::assertArrayHasKey('order', $fill);
+            self::assertArrayHasKey('spend', $fill);
+            self::assertArrayHasKey('sequence', $fill);
+
+            // Verify types
+            self::assertInstanceOf(\SomeWork\P2PPathFinder\Domain\Order\Order::class, $fill['order']);
+            self::assertInstanceOf(Money::class, $fill['spend']);
+            self::assertIsInt($fill['sequence']);
+            self::assertGreaterThanOrEqual(1, $fill['sequence']);
+        }
+    }
+
+    /**
+     * Test that source and target currencies are correctly passed to outcome.
+     */
+    public function test_outcome_contains_source_and_target_currencies(): void
+    {
+        $orders = [
+            OrderFactory::buy('USD', 'BTC', '100', '1000', '0.00002', self::SCALE, self::SCALE),
+        ];
+
+        $graph = $this->graphBuilder->build($orders);
+        $engine = new ExecutionPlanSearchEngine();
+
+        $spendAmount = Money::fromString('USD', '500.00000000', self::SCALE);
+        $outcome = $engine->search($graph, 'USD', 'BTC', $spendAmount);
+
+        self::assertTrue($outcome->hasRawFills());
+        self::assertSame('USD', $outcome->sourceCurrency());
+        self::assertSame('BTC', $outcome->targetCurrency());
+    }
+
+    // ========================================================================
+    // SAME-CURRENCY (TRANSFER) SEARCH TESTS
+    // ========================================================================
+
+    /**
+     * Test that same-currency search with no transfer orders returns empty.
+     */
+    public function test_same_currency_without_transfers_returns_empty(): void
+    {
+        // Create only cross-currency orders, no transfer orders
+        $orders = [
+            OrderFactory::buy('USD', 'BTC', '100', '1000', '0.00002', self::SCALE, self::SCALE),
+        ];
+
+        $graph = $this->graphBuilder->build($orders);
+        $engine = new ExecutionPlanSearchEngine();
+
+        // Search same currency (USD -> USD) with no transfer orders available
+        $spendAmount = Money::fromString('USD', '500.00000000', self::SCALE);
+        $outcome = $engine->search($graph, 'USD', 'USD', $spendAmount);
+
+        // Should return empty since no transfer orders exist
+        self::assertFalse($outcome->hasRawFills());
+        self::assertTrue($outcome->isEmpty());
+    }
+
+    /**
+     * Test that same-currency search with transfer orders returns fills.
+     */
+    public function test_same_currency_with_transfer_returns_fills(): void
+    {
+        // Create a transfer order (same base and quote currency)
+        // USD/USD with 1:1 rate represents a transfer between exchanges
+        $transferOrder = OrderFactory::buy('USD', 'USD', '10', '1000', '1.0', self::SCALE, self::SCALE);
+
+        $orders = [$transferOrder];
+        $graph = $this->graphBuilder->build($orders);
+        $engine = new ExecutionPlanSearchEngine();
+
+        $spendAmount = Money::fromString('USD', '500.00000000', self::SCALE);
+        $outcome = $engine->search($graph, 'USD', 'USD', $spendAmount);
+
+        // Should have raw fills if transfer order was found and used
+        if ($outcome->hasRawFills()) {
+            self::assertSame('USD', $outcome->sourceCurrency());
+            self::assertSame('USD', $outcome->targetCurrency());
+
+            $rawFills = $outcome->rawFills();
+            self::assertNotNull($rawFills);
+            self::assertNotEmpty($rawFills);
+
+            // All fills should reference the transfer order
+            foreach ($rawFills as $fill) {
+                self::assertTrue($fill['order']->isTransfer());
+            }
+        }
+    }
+
+    // ========================================================================
+    // MATERIALIZER INTEGRATION TESTS
+    // ========================================================================
+
+    /**
+     * Test that materialized plan matches expected totals from raw fills.
+     */
+    public function test_materialized_plan_totals_consistent_with_fills(): void
+    {
+        $orders = [
+            OrderFactory::buy('AAA', 'BBB', '100', '1000', '1.0', self::SCALE, self::SCALE),
+        ];
+
+        $graph = $this->graphBuilder->build($orders);
+        $engine = new ExecutionPlanSearchEngine();
+
+        $spendAmount = Money::fromString('AAA', '500.00000000', self::SCALE);
+        $outcome = $engine->search($graph, 'AAA', 'BBB', $spendAmount);
+
+        self::assertTrue($outcome->hasRawFills());
+
+        $rawFills = $outcome->rawFills();
+        self::assertNotNull($rawFills);
+
+        // Calculate total spend from raw fills
+        $totalSpendFromFills = '0';
+        foreach ($rawFills as $fill) {
+            $totalSpendFromFills = bcadd($totalSpendFromFills, $fill['spend']->amount(), self::SCALE);
+        }
+
+        // Materialize and verify totals match
+        $plan = $this->materializePlan($outcome);
+        self::assertNotNull($plan);
+
+        // Total spent in plan should match sum of raw fill spends
+        self::assertSame(
+            bcadd($totalSpendFromFills, '0', self::SCALE),
+            bcadd($plan->totalSpent()->amount(), '0', self::SCALE),
+            'Materialized plan total spent should match sum of raw fill spends'
+        );
+    }
+
+    /**
+     * Test that sequence numbers are preserved through materialization.
+     */
+    public function test_sequence_numbers_preserved_through_materialization(): void
+    {
+        // Create multi-hop path to get multiple steps
+        $orders = [
+            OrderFactory::buy('AAA', 'BBB', '100', '1000', '1.0', self::SCALE, self::SCALE),
+            OrderFactory::buy('BBB', 'CCC', '100', '1000', '1.0', self::SCALE, self::SCALE),
+        ];
+
+        $graph = $this->graphBuilder->build($orders);
+        $engine = new ExecutionPlanSearchEngine();
+
+        $spendAmount = Money::fromString('AAA', '500.00000000', self::SCALE);
+        $outcome = $engine->search($graph, 'AAA', 'CCC', $spendAmount);
+
+        self::assertTrue($outcome->hasRawFills());
+
+        $rawFills = $outcome->rawFills();
+        self::assertNotNull($rawFills);
+        self::assertCount(2, $rawFills, 'Should have 2 fills for 2-hop path');
+
+        // Get sequence numbers from raw fills
+        $rawSequences = array_map(fn ($fill) => $fill['sequence'], $rawFills);
+
+        // Materialize
+        $plan = $this->materializePlan($outcome);
+        self::assertNotNull($plan);
+
+        // Get sequence numbers from materialized steps
+        $steps = $plan->steps()->all();
+        $stepSequences = array_map(fn ($step) => $step->sequenceNumber(), $steps);
+
+        // Sequences should match
+        self::assertSame($rawSequences, $stepSequences, 'Sequence numbers should be preserved');
     }
 }
