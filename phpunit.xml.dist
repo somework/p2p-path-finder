@@ -11,9 +11,6 @@
     <testsuite name="Integration Tests">
       <directory>tests/Integration</directory>
     </testsuite>
-    <testsuite name="Benchmarks Helpers Tests">
-      <directory>tests/Benchmarks</directory>
-    </testsuite>
     <testsuite name="Tests Helpers Module">
       <directory>tests/Helpers/Tests</directory>
     </testsuite>

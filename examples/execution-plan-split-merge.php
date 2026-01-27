@@ -9,7 +9,7 @@
  * - Merge execution (routes converging at target)
  * - Diamond patterns (combined split and merge)
  *
- * These patterns are only available with ExecutionPlanService (not PathSearchService).
+ * These patterns are available with ExecutionPlanService.
  *
  * Run with: php examples/execution-plan-split-merge.php
  * Or: composer examples:execution-plan-split-merge

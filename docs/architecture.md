@@ -109,16 +109,11 @@ See [Domain Invariants](domain-invariants.md) for complete specifications.
 **Search Algorithm** (Internal):
 - `ExecutionPlanSearchEngine` - Successive shortest augmenting paths algorithm
 - `PortfolioState` - Multi-currency balance tracking for split/merge
-- `SearchState` - Immutable frontier state representation
-- `SearchStateRegistry` - Tracks visited states, dominance filtering
 - `SearchGuards` - Enforces resource limits (expansions, states, time)
-- `CandidateSearchOutcome` - Internal DTO for engine-to-service layer communication
 
 **Key Algorithm Features**:
-- Priority queue for cost-based exploration
-- State registry prevents cycles and dominance filtering  
+- Dijkstra-based augmenting path search
 - Guard rails prevent runaway searches
-- Segment pruning for fee optimization
 - **PortfolioState** enables multi-currency tracking for splits/merges
 
 ### Public API Layer
@@ -249,13 +244,12 @@ Diamond Pattern (Split + Merge):
 The search algorithm operates at two levels of abstraction to maintain clean separation of concerns:
 
 **Engine Layer** (`@internal`):
-- Works with `CandidatePath` objects containing raw search data (cost, product, hops, edge sequence)
-- Returns `CandidateSearchOutcome` - lightweight DTO for internal communication
+- Returns raw fill data (order, spend amount, sequence number)
 - Focus: Pure algorithmic search without domain object materialization
 
 **Service Layer** (Public API):
-- Consumes `CandidateSearchOutcome` from engine
-- Materializes `CandidatePath` objects into full `ExecutionPlan` objects with `ExecutionStepCollection`
+- Consumes raw fill data from engine
+- Materializes fills into full `ExecutionPlan` objects with `ExecutionStepCollection`
 - Applies domain rules (fee calculation, tolerance validation, order reconciliation)
 - Returns `SearchOutcome` - public API DTO with complete domain objects
 
@@ -263,7 +257,6 @@ The search algorithm operates at two levels of abstraction to maintain clean sep
 - Engine remains focused on algorithmic efficiency (no domain object overhead)
 - Service layer handles complex domain logic (fees, materialization, validation)
 - Clear contract between layers enables independent testing and evolution
-- Internal `CandidateSearchOutcome` can change without breaking public API
 
 ### Key Optimizations
 
@@ -355,10 +348,7 @@ class OrderBook  // In-memory repository
 
 ### 6. Priority Queue Pattern
 
-**Used for**: Efficient best-first search
-
-- `SearchStatePriorityQueue` - Dijkstra-like lowest cost first
-- `CandidateResultHeap` - Top-K best paths
+**Used for**: Efficient best-first search in the execution plan engine
 
 ---
 
@@ -522,7 +512,6 @@ $config = PathSearchConfig::builder()
 
 **Avoid depending on**:
 - `Application\PathSearch\*` (except public API namespaces) - Search algorithm internals
-- `CandidateSearchOutcome` - Internal DTO for engine-to-service communication
 - Classes marked `@internal`
 
 **Why**: Internal APIs may change in MINOR versions for performance or implementation improvements.

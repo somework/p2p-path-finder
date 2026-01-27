@@ -7,7 +7,7 @@ namespace SomeWork\P2PPathFinder\Application\PathSearch\Config;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
-use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Tolerance\ToleranceWindow;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
@@ -16,7 +16,7 @@ use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 use function max;
 
 /**
- * Immutable configuration carrying constraints used by {@see PathSearchService}.
+ * Immutable configuration carrying constraints used by {@see ExecutionPlanService}.
  *
  * ## Invariants
  *

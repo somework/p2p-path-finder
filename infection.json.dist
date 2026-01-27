@@ -17,40 +17,40 @@
         "@default": true,
         "MethodCallRemoval": {
             "ignore": [
-                "SomeWork\\P2PPathFinder\\Application\\Filter\\ToleranceWindowFilter::__construct"
+                "SomeWork\\P2PPathFinder\\Application\\Order\\Filter\\ToleranceWindowFilter::__construct"
             ]
         },
         "LogicalAnd": {
             "ignore": [
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::materialize",
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::resolveBuyLegAmounts",
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::resolveSellLegAmounts"
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::materialize",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::resolveBuyLegAmounts",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::resolveSellLegAmounts"
             ]
         },
         "LogicalAndAllSubExprNegation": {
             "ignore": [
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::materialize",
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::resolveBuyLegAmounts",
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::resolveSellLegAmounts"
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::materialize",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::resolveBuyLegAmounts",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::resolveSellLegAmounts"
             ]
         },
         "LogicalAndNegation": {
             "ignore": [
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::materialize",
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::resolveBuyLegAmounts",
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::resolveSellLegAmounts"
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::materialize",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::resolveBuyLegAmounts",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::resolveSellLegAmounts"
             ]
         },
         "LogicalAndSingleSubExprNegation": {
             "ignore": [
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::materialize",
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::resolveBuyLegAmounts",
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::resolveSellLegAmounts"
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::materialize",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::resolveBuyLegAmounts",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::resolveSellLegAmounts"
             ]
         },
         "Identical": {
             "ignore": [
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::materialize"
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::materialize"
             ]
         }
     }

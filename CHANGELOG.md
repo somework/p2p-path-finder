@@ -77,20 +77,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **PathSearchService**: Removed deprecated service class
   - Use `ExecutionPlanService::findBestPlans()` instead
   
-- **Path result type**: Removed legacy result type for linear paths only
-  - Use `ExecutionPlan` with `ExecutionPlanService` for new code
-  - Existing code can use `ExecutionPlan::asLinearPath()` for conversion
-  - `PathSearchService::planToPath()` helper available for migration
+- **PathSearchEngine** (~1128 lines): Removed legacy best-first search engine
+  - Replaced by `ExecutionPlanSearchEngine` with successive augmenting paths algorithm
+  
+- **CandidateSearchOutcome**: Removed internal DTO (no longer needed)
+
+- **Legacy State classes** (in `Engine/State/`):
+  - `SearchState`, `SearchStateRecord`, `SearchStateRecordCollection`
+  - `SearchStatePriority`, `SearchStatePriorityQueue`
+  - `SearchStateRegistry`, `SearchStateSignature`, `SearchStateSignatureFormatter`
+  - `SearchQueueEntry`, `SearchBootstrap`, `SegmentPruner`, `InsertionOrderCounter`
+  
+- **Legacy Queue classes** (in `Engine/Queue/`):
+  - `CandidateHeapEntry`, `CandidatePriority`, `CandidatePriorityQueue`
+  - `CandidateResultHeap`, `StatePriorityQueue`
+
+- **Legacy benchmarks**: Removed `PathFinderBench.php` and `LegacyComparisonBench.php`
 
 ### Breaking Changes
+- **PathSearchService removed**: Use `ExecutionPlanService::findBestPlans()` instead
 - **Single execution plan returned**: `ExecutionPlanService::findBestPlans()` returns at most **ONE** optimal 
-  execution plan, not multiple ranked paths. The legacy `PathSearchService` could return multiple paths via 
-  `topK` configuration; this behavior is no longer supported. The `paths()` collection will contain either 
+  execution plan, not multiple ranked paths. The `paths()` collection will contain either 
   0 or 1 entries. If you need alternative paths, run multiple searches with different constraints 
   (e.g., modified tolerance bounds, different guard limits, or filtered order books).
 - **Namespace changes**: All public class namespaces have changed (breaking change for library consumers)
 - **Simplified APIs**: Classes now provide direct object access methods
-- **Recommended API change**: `PathSearchService` deprecated, `ExecutionPlanService` recommended
 
 ### Migration Guide
 - Update all import statements to use new namespace paths

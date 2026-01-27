@@ -9,7 +9,7 @@
  * Key concepts demonstrated:
  * - Creating an order book
  * - Configuring the search
- * - Using ExecutionPlanService (recommended over deprecated PathSearchService)
+ * - Using ExecutionPlanService
  * - Processing ExecutionPlan results
  * - Understanding ExecutionStep sequence numbers
  *

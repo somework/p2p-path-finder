@@ -39,7 +39,7 @@ use function trim;
  * ranked paths. The `findBestPlans()` method returns a `SearchOutcome` where `paths()->count()`
  * will be 0 or 1. Use `bestPath()` to get the single optimal plan or null.
  *
- * Unlike {@see PathSearchService} which returns linear paths only, this service can find
+ * This service can find
  * execution plans that:
  * - Use multiple orders for the same currency direction
  * - Split input across parallel routes
@@ -93,8 +93,7 @@ final class ExecutionPlanService
     /**
      * Searches for the optimal execution plan from the configured spend asset to the target asset.
      *
-     * **IMPORTANT: Returns at most ONE plan (the optimal).** Unlike the legacy `PathSearchService`,
-     * this service does not return multiple alternative paths. The returned `SearchOutcome::paths()`
+     * **IMPORTANT: Returns at most ONE plan (the optimal).** The returned `SearchOutcome::paths()`
      * collection will contain either 0 or 1 entries:
      * - 0 entries: No valid execution plan could be found
      * - 1 entry: The single optimal execution plan

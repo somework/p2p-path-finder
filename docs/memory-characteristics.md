@@ -851,11 +851,10 @@ Based on profiling with PHP 8.3:
 - Memory share: ~10-20% of peak (depending on order count)
 - Optimization: Reuses zero-value `Money` instances, reducing allocations by ~40%
 
-**Search state tracking** (`SearchStateRegistry`):
-- Allocation pattern: Hash-based registry for visited states
+**Search state tracking** (`PortfolioState`):
+- Allocation pattern: Multi-currency balance tracking for split/merge execution
 - Memory share: ~15-25% of peak (scales with hop depth and graph density)
-- Typical size: 1,000-20,000 states for moderate graphs
-- Per-state cost: ~1 KB (includes path history, cost, currency trail)
+- Per-state cost: ~1 KB (includes balance map, order usage tracking)
 
 **Order book and domain objects**:
 - Allocation pattern: Immutable value objects (Money, ExchangeRate, OrderBounds)

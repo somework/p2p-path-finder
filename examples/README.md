@@ -104,7 +104,6 @@ Demonstrates the basic usage of `ExecutionPlanService` for finding optimal execu
 **When to use**:
 - Starting a new project with the library
 - Learning the recommended API
-- Migrating from `PathSearchService`
 
 **Related docs**:
 - [Getting Started Guide](../docs/getting-started.md#executionplanservice-recommended)
@@ -513,7 +512,7 @@ This examples directory provides:
 - ✅ **Complete workflows** from configuration to result handling
 - ✅ **Real-world integrations** with external APIs (Bybit P2P)
 - ✅ **Measurable improvements** via benchmarks and comparisons
-- ✅ **No deprecated PathSearchService usage** - all migrated to ExecutionPlanService
+- ✅ **ExecutionPlanService** - the recommended API for path finding
 
 **Start with `execution-plan-basic.php`** for the recommended API, then explore `execution-plan-split-merge.php` for advanced execution patterns. See `guarded-search-example.php` for a quick start with guard rails. Check out `bybit-p2p-integration.php` for a complete real-world API integration example.
 

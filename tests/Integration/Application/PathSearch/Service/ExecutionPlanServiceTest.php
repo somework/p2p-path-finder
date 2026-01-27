@@ -763,7 +763,6 @@ final class ExecutionPlanServiceTest extends TestCase
         $orderBook = $this->createOrderBook([$usdToEur]);
 
         // Note: ExecutionPlanService finds best execution plans regardless of hop limits.
-        // Hop filtering is typically done at the PathSearchService layer.
         $config = PathSearchConfig::builder()
             ->withSpendAmount(Money::fromString('USD', '100.00', 2))
             ->withToleranceBounds('0.0', '0.50')

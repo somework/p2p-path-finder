@@ -203,7 +203,7 @@ Classes and namespaces marked `@internal` or in these packages:
 **Example Internal Classes** (may change without notice):
 - `GraphBuilder` - Implementation detail (use `ExecutionPlanService` instead)
 - `ExecutionPlanSearchEngine` - Search algorithm (use `ExecutionPlanService` instead)
-- `SearchState` - Internal state representation
+- `PortfolioState` - Internal multi-currency balance tracking
 - `EdgeSegment` - Graph representation detail
 
 ### Safe vs Unsafe Dependencies
@@ -218,7 +218,7 @@ Classes and namespaces marked `@internal` or in these packages:
 **❌ Unsafe** (Internal API):
 
 ```php
-use SomeWork\P2PPathFinder\Application\PathSearch\Engine\SearchState;
+use SomeWork\P2PPathFinder\Application\PathSearch\Engine\State\PortfolioState;
 
 ```
 
@@ -419,7 +419,7 @@ set_error_handler(function ($errno, $errstr) {
 
 ```php
 // ❌ These imports may break in MINOR versions
-use SomeWork\P2PPathFinder\Application\PathSearch\Engine\SearchState;
+use SomeWork\P2PPathFinder\Application\PathSearch\Engine\State\PortfolioState;
 
 ```
 
@@ -466,7 +466,7 @@ This allows MINOR and PATCH updates (1.0.0 → 1.9.9) but prevents MAJOR updates
 **⚠️ Avoid** (internal API):
 - `GraphBuilder`
 - `ExecutionPlanSearchEngine`
-- `SearchState`
+- `PortfolioState`
 - Classes marked `@internal`
 - Anything in `Application\PathSearch\*` (except public API namespaces)
 

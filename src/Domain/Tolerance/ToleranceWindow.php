@@ -6,7 +6,6 @@ namespace SomeWork\P2PPathFinder\Domain\Tolerance;
 
 use Brick\Math\BigDecimal;
 use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
-use SomeWork\P2PPathFinder\Application\PathSearch\Engine\PathSearchEngine;
 use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalHelperTrait;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
@@ -28,7 +27,6 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
  * @invariant heuristicSource = (min == max) ? 'minimum' : 'maximum'
  *
  * @see PathSearchConfig For how tolerance affects search
- * @see PathSearchEngine For tolerance amplifier algorithm
  * @see docs/decimal-strategy.md For precision guarantees
  *
  * @api

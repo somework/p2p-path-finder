@@ -93,29 +93,26 @@ if (null !== $plan) {
 }
 ```
 
-### ExecutionPlan vs Path
+### ExecutionPlan
 
-The library offers two result types:
+The library uses `ExecutionPlanService` which returns `ExecutionPlan` objects supporting:
 
-| Aspect | `ExecutionPlan` (Recommended) | `Path` (Legacy) |
-|--------|-------------------------------|-----------------|
-| Service | `ExecutionPlanService` | `PathSearchService` (deprecated) |
-| Method | `findBestPlans()` | `findBestPaths()` |
-| **Results returned** | **0 or 1 (single optimal)** | Multiple (via `topK`) |
-| Supports splits | Yes | No |
-| Supports merges | Yes | No |
-| Linear paths | Yes (via `isLinear()`) | Yes |
+| Feature | Description |
+|---------|-------------|
+| Service | `ExecutionPlanService` |
+| Method | `findBestPlans()` |
+| Results | 0 or 1 (single optimal plan) |
+| Splits | Yes |
+| Merges | Yes |
+| Linear paths | Yes (via `isLinear()`) |
 
-> **Important**: `ExecutionPlanService` returns at most **ONE** optimal execution plan, not multiple ranked paths. The `paths()` collection will contain 0 or 1 entries. For alternative routes, run separate searches with different constraints.
+> **Important**: `ExecutionPlanService` returns at most **ONE** optimal execution plan. The `paths()` collection will contain 0 or 1 entries. For alternative routes, run separate searches with different constraints.
 
-**When to use ExecutionPlan:**
+**Supported execution patterns:**
 - Multiple orders for same direction (USD→BTC via two market makers)
 - Split execution (USD→EUR and USD→GBP simultaneously)
 - Merge execution (EUR→BTC and GBP→BTC converge)
-
-**When to use Path:**
-- Legacy code migration (use `plan->asLinearPath()`)
-- Simple linear-only routing requirements
+- Linear paths (use `plan->asLinearPath()` for simple Path format)
 
 ### Next Steps
 
