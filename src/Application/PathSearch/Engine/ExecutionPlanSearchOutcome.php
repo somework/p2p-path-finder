@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathSearch\Engine;
 
-use SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionPlan;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
@@ -130,35 +129,10 @@ final class ExecutionPlanSearchOutcome
     }
 
     /**
-     * Returns true if raw fills were found (complete or partial).
-     *
-     * @deprecated Use hasRawFills() instead. This method exists for backward compatibility.
-     */
-    public function hasPlan(): bool
-    {
-        return $this->hasRawFills();
-    }
-
-    /**
      * Returns true if no fills were found.
      */
     public function isEmpty(): bool
     {
         return !$this->hasRawFills();
-    }
-
-    /**
-     * Returns the execution plan.
-     *
-     * @deprecated This method is deprecated. Use rawFills() with ExecutionPlanMaterializer instead.
-     *             The engine no longer creates ExecutionPlan objects directly.
-     *
-     * @return null Always returns null. Use ExecutionPlanMaterializer to create plans.
-     */
-    public function plan(): null
-    {
-        // This method is kept for backward compatibility but always returns null.
-        // Use ExecutionPlanMaterializer::materialize() with rawFills() instead.
-        return null;
     }
 }

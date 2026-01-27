@@ -191,7 +191,7 @@ The `ExecutionPlanSearchEngine` uses a **successive shortest augmenting paths** 
       - Add received amounts to target currencies
       - Mark currencies as visited when depleted
       - Record execution steps
-3. Return ExecutionPlanSearchOutcome with plan + guard report
+3. Return ExecutionPlanSearchOutcome with raw fills + guard report
 4. Service layer validates tolerance and creates SearchOutcome
 ```
 
