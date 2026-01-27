@@ -59,7 +59,7 @@ This document provides step-by-step instructions for upgrading between major ver
 | Your Version | Target Version | Difficulty | Breaking Changes | Required Actions                                           |
 |--------------|----------------|------------|------------------|------------------------------------------------------------|
 | **0.x**      | 1.0            | Medium     | Yes              | See [0.x → 1.0](#upgrading-from-0x-to-10)                  |
-| **1.x**      | 2.0            | TBD        | TBD              | See [1.x → 2.0](#upgrading-from-1x-to-20) (when available) |
+| **1.x**      | 2.0            | Medium     | Yes              | See [1.x → 2.0](#upgrading-from-1x-to-20)                  |
 
 ---
 
@@ -116,7 +116,11 @@ use SomeWork\P2PPathFinder\Domain\Money\Money;
 
 **Status**: ✅ Ready
 
-Version 2.0 introduces `ExecutionPlanService` as the sole API for path finding. The deprecated `PathSearchService` and its underlying `PathSearchEngine` have been removed.
+**Release Date**: TBD  
+**Difficulty**: Medium  
+**Estimated Time**: 1-2 hours
+
+Version 2.0 introduces `ExecutionPlanService` as the sole API for path finding. The deprecated `PathSearchService` and its underlying `PathSearchEngine` have been removed. This version also removes deprecated methods from `ExecutionPlanSearchOutcome`.
 
 #### Summary of Changes
 
@@ -124,6 +128,20 @@ The main change in 2.0 is `ExecutionPlanService` which can find execution plans 
 - Use multiple orders for the same currency direction
 - Split input across parallel routes
 - Merge multiple routes at the target currency
+
+#### Removed APIs
+
+The following classes and methods have been removed in version 2.0:
+
+##### Removed Classes
+
+- **`PathSearchService`** - Use `ExecutionPlanService` instead
+- **`PathSearchEngine`** - Internal class, no longer accessible
+
+##### Removed Methods
+
+- **`ExecutionPlanSearchOutcome::hasPlan()`** - Use `hasRawFills()` instead
+- **`ExecutionPlanSearchOutcome::plan()`** - Use `rawFills()` + `ExecutionPlanMaterializer` instead
 
 #### New Features
 
@@ -193,6 +211,15 @@ The legacy `PathSearchService` returned `Path` objects representing sequential, 
 
 ##### Step 1: Update Service Instantiation
 
+**Before (1.x)**:
+
+```php
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+
+$service = new PathSearchService(new GraphBuilder());
+```
+
 **After (2.x)**:
 
 ```php
@@ -204,13 +231,13 @@ $service = new ExecutionPlanService(new GraphBuilder());
 
 ##### Step 2: Update Search Method Call
 
-**Before**:
+**Before (1.x)**:
 
 ```php
 $outcome = $service->findBestPaths($request);
 ```
 
-**After**:
+**After (2.x)**:
 
 ```php
 $outcome = $service->findBestPlans($request);
@@ -218,7 +245,7 @@ $outcome = $service->findBestPlans($request);
 
 ##### Step 3: Update Result Processing
 
-**Before (Path with hops)**:
+**Before (1.x with Path and hops)**:
 
 ```php
 foreach ($outcome->paths() as $path) {
@@ -232,20 +259,60 @@ foreach ($outcome->paths() as $path) {
 }
 ```
 
-**After (ExecutionPlan with steps)**:
+**After (2.x with ExecutionPlan and steps)**:
 
 ```php
-foreach ($outcome->paths() as $plan) {
-    echo "Spend: {$plan->totalSpent()->amount()} {$plan->totalSpent()->currency()}\n";
-    echo "Receive: {$plan->totalReceived()->amount()} {$plan->totalReceived()->currency()}\n";
-    echo "Is Linear: " . ($plan->isLinear() ? 'yes' : 'no') . "\n";
+$bestPlan = $outcome->bestPath();
+if (null !== $bestPlan) {
+    echo "Spend: {$bestPlan->totalSpent()->amount()} {$bestPlan->totalSpent()->currency()}\n";
+    echo "Receive: {$bestPlan->totalReceived()->amount()} {$bestPlan->totalReceived()->currency()}\n";
+    echo "Is Linear: " . ($bestPlan->isLinear() ? 'yes' : 'no') . "\n";
     
-    foreach ($plan->steps() as $step) {
+    foreach ($bestPlan->steps() as $step) {
         echo "  Step {$step->sequenceNumber()}: {$step->from()} -> {$step->to()}\n";
         echo "  Order: {$step->order()->assetPair()->base()}/{$step->order()->assetPair()->quote()}\n";
     }
 }
 ```
+
+**Note**: `ExecutionPlanService::findBestPlans()` returns at most **ONE** optimal execution plan. The `paths()` collection will contain either 0 or 1 entries. Use `bestPath()` to get the single plan or null.
+
+##### Step 4: Update ExecutionPlanSearchOutcome Usage
+
+If you're working directly with `ExecutionPlanSearchOutcome` (public API), update method calls:
+
+**Before (1.x)**:
+
+```php
+$searchOutcome = $engine->search($graph, $source, $target, $spend);
+
+if ($searchOutcome->hasPlan()) {
+    $plan = $searchOutcome->plan();
+    // Use $plan directly
+}
+```
+
+**After (2.x)**:
+
+```php
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanMaterializer;
+
+$searchOutcome = $engine->search($graph, $source, $target, $spend);
+
+if ($searchOutcome->hasRawFills()) {
+    $rawFills = $searchOutcome->rawFills();
+    $materializer = new ExecutionPlanMaterializer();
+    $plan = $materializer->materialize(
+        $rawFills,
+        $source,
+        $target,
+        $tolerance
+    );
+    // Use $plan
+}
+```
+
+**Rationale**: The search engine now returns raw order fills instead of pre-materialized plans. This separation allows for more flexible materialization strategies and better separation of concerns.
 
 ##### Incremental Migration (Hybrid Approach)
 
@@ -311,14 +378,126 @@ if (null !== $plan && $plan->isLinear()) {
 | `$step->order()` | Get order reference |
 | `$step->fees()` | Get fee breakdown |
 
+#### Code Examples
+
+##### Example 1: Basic Migration
+
+**Before (1.x)**:
+
+```php
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
+
+$service = new PathSearchService(new GraphBuilder());
+$config = PathSearchConfig::builder()
+    ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+    ->build();
+
+$request = new PathSearchRequest($orderBook, $config, 'BTC');
+$outcome = $service->findBestPaths($request);
+
+foreach ($outcome->paths() as $path) {
+    foreach ($path->hops() as $hop) {
+        // Process hop
+    }
+}
+```
+
+**After (2.x)**:
+
+```php
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
+
+$service = new ExecutionPlanService(new GraphBuilder());
+$config = PathSearchConfig::builder()
+    ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+    ->build();
+
+$request = new PathSearchRequest($orderBook, $config, 'BTC');
+$outcome = $service->findBestPlans($request);
+
+$bestPlan = $outcome->bestPath();
+if (null !== $bestPlan) {
+    foreach ($bestPlan->steps() as $step) {
+        // Process step
+    }
+}
+```
+
+##### Example 2: Converting Linear Plans to Legacy Path Format
+
+If you need to maintain compatibility with code expecting `Path` objects:
+
+```php
+$bestPlan = $outcome->bestPath();
+if (null !== $bestPlan && $bestPlan->isLinear()) {
+    $path = $bestPlan->asLinearPath();
+    if (null !== $path) {
+        // Use $path with legacy code expecting PathHop objects
+        foreach ($path->hops() as $hop) {
+            // Legacy code here
+        }
+    }
+}
+```
+
+##### Example 3: Working with ExecutionPlanSearchOutcome (Public API)
+
+**Before (1.x)**:
+
+```php
+$searchOutcome = $engine->search($graph, 'USD', 'BTC', $spend);
+
+if ($searchOutcome->hasPlan()) {
+    $plan = $searchOutcome->plan();
+    // Use plan directly
+}
+```
+
+**After (2.x)**:
+
+```php
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanMaterializer;
+use SomeWork\P2PPathFinder\Domain\Tolerance\DecimalTolerance;
+
+$searchOutcome = $engine->search($graph, 'USD', 'BTC', $spend);
+
+if ($searchOutcome->hasRawFills()) {
+    $rawFills = $searchOutcome->rawFills();
+    $materializer = new ExecutionPlanMaterializer();
+    $tolerance = DecimalTolerance::fromNumericString('0', 18);
+    
+    $plan = $materializer->materialize(
+        $rawFills,
+        'USD',
+        'BTC',
+        $tolerance
+    );
+    
+    if (null !== $plan) {
+        // Use plan
+    }
+}
+```
+
 #### Upgrade Checklist
 
 - [ ] Replace `PathSearchService` with `ExecutionPlanService`
 - [ ] Update method calls from `findBestPaths()` to `findBestPlans()`
 - [ ] Update result handling from `Path` to `ExecutionPlan`
 - [ ] Replace `hops()` with `steps()` in iteration loops
+- [ ] Replace `ExecutionPlanSearchOutcome::hasPlan()` with `hasRawFills()`
+- [ ] Replace `ExecutionPlanSearchOutcome::plan()` with `rawFills()` + `ExecutionPlanMaterializer`
 - [ ] Use `sequenceNumber()` for step ordering if needed
 - [ ] Handle non-linear plans or use `isLinear()` + `asLinearPath()` for legacy compatibility
+- [ ] Update code expecting multiple paths (now returns 0 or 1 plan)
 - [ ] Run tests to verify behavior
 - [ ] Remove deprecation notice suppressions after migration complete
 - [ ] Update any serialization/API responses that expose path structure

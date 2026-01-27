@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- TBD
+
+### Changed
+- TBD
+
+### Removed
+- TBD
+
+---
+
+## [2.0.0] - TBD
+
+**⚠️ BREAKING CHANGES**: This version removes deprecated APIs and introduces `ExecutionPlanService` as the sole public API for path finding. See [UPGRADING.md](UPGRADING.md#upgrading-from-1x-to-20) for complete migration guide.
+
+### Added
 - **ExecutionPlanService**: New recommended service for path finding that supports split/merge execution
   - `ExecutionPlanService::findBestPlans()` - Returns `ExecutionPlan` objects
   - Supports multi-order same direction (multiple orders for USD→BTC)
@@ -74,13 +89,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `releases-and-support.md`: Updated BC break examples
 
 ### Removed
-- **PathSearchService**: Removed deprecated service class
-  - Use `ExecutionPlanService::findBestPlans()` instead
-  
-- **PathSearchEngine** (~1128 lines): Removed legacy best-first search engine
+
+#### Public API Removals
+
+- **`PathSearchService` class**: Removed deprecated service class
+  - **Replacement**: Use `ExecutionPlanService::findBestPlans()` instead
+  - **Migration**: See [UPGRADING.md](UPGRADING.md#step-1-update-service-instantiation)
+
+- **`ExecutionPlanSearchOutcome::hasPlan()` method**: Removed deprecated method
+  - **Replacement**: Use `hasRawFills()` instead
+  - **Migration**: See [UPGRADING.md](UPGRADING.md#step-4-update-executionplansearchoutcome-usage)
+
+- **`ExecutionPlanSearchOutcome::plan()` method**: Removed deprecated method
+  - **Replacement**: Use `rawFills()` + `ExecutionPlanMaterializer::materialize()` instead
+  - **Migration**: See [UPGRADING.md](UPGRADING.md#step-4-update-executionplansearchoutcome-usage)
+
+#### Internal API Removals
+
+- **`PathSearchEngine` class** (~1128 lines): Removed legacy best-first search engine
   - Replaced by `ExecutionPlanSearchEngine` with successive augmenting paths algorithm
+  - Internal class, not part of public API
   
-- **CandidateSearchOutcome**: Removed internal DTO (no longer needed)
+- **`CandidateSearchOutcome` class**: Removed internal DTO (no longer needed)
 
 - **Legacy State classes** (in `Engine/State/`):
   - `SearchState`, `SearchStateRecord`, `SearchStateRecordCollection`
@@ -99,22 +129,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `PathFinderScenarioGeneratorTest` - tests for the orphaned generator
 
 ### Breaking Changes
-- **PathSearchService removed**: Use `ExecutionPlanService::findBestPlans()` instead
+
+#### Removed Classes
+
+- **`PathSearchService`**: Removed in favor of `ExecutionPlanService`
+  - **Impact**: All code using `PathSearchService` must migrate
+  - **Replacement**: `ExecutionPlanService::findBestPlans()`
+  - **Migration**: See [UPGRADING.md](UPGRADING.md#step-1-update-service-instantiation)
+
+#### Removed Methods
+
+- **`ExecutionPlanSearchOutcome::hasPlan()`**: Removed in favor of `hasRawFills()`
+  - **Impact**: Code checking for plan existence must update
+  - **Replacement**: `hasRawFills()`
+  - **Migration**: See [UPGRADING.md](UPGRADING.md#step-4-update-executionplansearchoutcome-usage)
+
+- **`ExecutionPlanSearchOutcome::plan()`**: Removed in favor of materialization pattern
+  - **Impact**: Code accessing plans directly must use materializer
+  - **Replacement**: `rawFills()` + `ExecutionPlanMaterializer::materialize()`
+  - **Migration**: See [UPGRADING.md](UPGRADING.md#step-4-update-executionplansearchoutcome-usage)
+
+#### Changed Behavior
+
 - **Single execution plan returned**: `ExecutionPlanService::findBestPlans()` returns at most **ONE** optimal 
   execution plan, not multiple ranked paths. The `paths()` collection will contain either 
   0 or 1 entries. If you need alternative paths, run multiple searches with different constraints 
   (e.g., modified tolerance bounds, different guard limits, or filtered order books).
-- **Namespace changes**: All public class namespaces have changed (breaking change for library consumers)
-- **Simplified APIs**: Classes now provide direct object access methods
+  - **Impact**: Code expecting multiple paths will need updates
+  - **Migration**: Use `bestPath()` to get the single plan or null
+
+- **Result type change**: `findBestPlans()` returns `SearchOutcome<ExecutionPlan>` instead of `SearchOutcome<Path>`
+  - **Impact**: Code iterating over results must update from `Path` to `ExecutionPlan`
+  - **Migration**: Replace `hops()` with `steps()`, see [UPGRADING.md](UPGRADING.md#step-3-update-result-processing)
 
 ### Migration Guide
-- Update all import statements to use new namespace paths
-- Replace `PathSearchService` with `ExecutionPlanService`
-- Replace `findBestPaths()` with `findBestPlans()`
-- Replace `Path` result handling with `ExecutionPlan`
-- Replace `hops()` iteration with `steps()` iteration
-- Use `isLinear()` and `asLinearPath()` for backward compatibility
-- See [UPGRADING.md](UPGRADING.md) for complete migration guide
+
+For comprehensive migration instructions, see [UPGRADING.md](UPGRADING.md#upgrading-from-1x-to-20).
+
+**Quick Migration Checklist**:
+1. Replace `PathSearchService` with `ExecutionPlanService`
+2. Replace `findBestPaths()` with `findBestPlans()`
+3. Replace `ExecutionPlanSearchOutcome::hasPlan()` with `hasRawFills()`
+4. Replace `ExecutionPlanSearchOutcome::plan()` with `rawFills()` + `ExecutionPlanMaterializer`
+5. Replace `Path` result handling with `ExecutionPlan`
+6. Replace `hops()` iteration with `steps()` iteration
+7. Use `bestPath()` instead of iterating over `paths()` (returns 0 or 1 plan)
+8. Use `isLinear()` and `asLinearPath()` for backward compatibility if needed
 
 ### Test Suite Changes (MUL-12, MUL-21)
 - **Final test count**: 1622 tests, 35683 assertions (reduced from 1625 tests after legacy cleanup)
@@ -319,5 +379,6 @@ Each version should follow this structure:
 
 ### Version Comparison Links
 
-[Unreleased]: https://github.com/somework/p2p-path-finder/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/somework/p2p-path-finder/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/somework/p2p-path-finder/compare/v0.1.0...v2.0.0
 [0.1.0]: https://github.com/somework/p2p-path-finder/releases/tag/v0.1.0
