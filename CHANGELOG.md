@@ -94,6 +94,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Legacy benchmarks**: Removed `PathFinderBench.php` and `LegacyComparisonBench.php`
 
+- **Orphaned test helpers** (MUL-21):
+  - `PathFinderScenarioGenerator` - generator used by removed legacy engine tests
+  - `PathFinderScenarioGeneratorTest` - tests for the orphaned generator
+
 ### Breaking Changes
 - **PathSearchService removed**: Use `ExecutionPlanService::findBestPlans()` instead
 - **Single execution plan returned**: `ExecutionPlanService::findBestPlans()` returns at most **ONE** optimal 
@@ -112,7 +116,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use `isLinear()` and `asLinearPath()` for backward compatibility
 - See [UPGRADING.md](UPGRADING.md) for complete migration guide
 
-### Test Suite Changes (MUL-12)
+### Test Suite Changes (MUL-12, MUL-21)
+- **Final test count**: 1622 tests, 35683 assertions (reduced from 1625 tests after legacy cleanup)
+  
 - **Removed legacy PathSearchEngine tests**: Tests that relied on PathSearchEngine-specific behavior
   have been removed or updated since PathSearchService now delegates to ExecutionPlanService.
   
