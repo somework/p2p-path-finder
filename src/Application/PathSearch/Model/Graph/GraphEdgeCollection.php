@@ -157,6 +157,38 @@ final class GraphEdgeCollection implements Countable, IteratorAggregate
     }
 
     /**
+     * Returns a new collection excluding edges whose orders are in the exclusion set.
+     *
+     * @param array<int, true> $excludedOrderIds Order object IDs to exclude (spl_object_id)
+     *
+     * @return self New collection without the excluded edges
+     */
+    public function withoutOrders(array $excludedOrderIds): self
+    {
+        if ([] === $excludedOrderIds || [] === $this->edges) {
+            return $this;
+        }
+
+        $filtered = [];
+        foreach ($this->edges as $edge) {
+            $orderId = spl_object_id($edge->order());
+            if (!isset($excludedOrderIds[$orderId])) {
+                $filtered[] = $edge;
+            }
+        }
+
+        if ([] === $filtered) {
+            return self::empty();
+        }
+
+        if (count($filtered) === count($this->edges)) {
+            return $this;
+        }
+
+        return new self($filtered, $this->originCurrency, $this->comparator);
+    }
+
+    /**
      * Canonical comparator ordering edges by quote currency, serialized order payload, then side.
      *
      * @return Closure(GraphEdge, GraphEdge): int

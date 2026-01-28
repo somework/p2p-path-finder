@@ -52,6 +52,37 @@
             "ignore": [
                 "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::materialize"
             ]
+        },
+        "UnwrapTrim": {
+            "ignoreSourceCodeByRegex": [
+                ".*strtoupper\\(trim\\(.*"
+            ]
+        },
+        "UnwrapStrToUpper": {
+            "ignoreSourceCodeByRegex": [
+                ".*strtoupper\\(trim\\(.*"
+            ]
+        },
+        "LessThan": {
+            "ignore": [
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Result\\SearchGuardReport::fromMetrics"
+            ]
+        },
+        "DecrementInteger": {
+            "ignore": [
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Result\\SearchGuardReport::idle",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Result\\SearchGuardReport::none"
+            ]
+        },
+        "CastFloat": {
+            "ignore": [
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Result\\SearchGuardReport::fromMetrics"
+            ]
+        },
+        "TrueValue": {
+            "ignoreSourceCodeByRegex": [
+                ".*\\$excludedOrderIds\\[.*\\] = true.*"
+            ]
         }
     }
 }

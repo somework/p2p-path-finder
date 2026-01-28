@@ -47,4 +47,33 @@ final class Graph implements IteratorAggregate
     {
         return $this->nodes->getIterator();
     }
+
+    /**
+     * Returns a new Graph with specified orders excluded.
+     *
+     * Creates a filtered copy of this graph where edges referencing any of the
+     * excluded orders are removed. Nodes are preserved even if they lose all
+     * edges, as they may still be needed as source/target currencies.
+     *
+     * This method is used for Top-K path finding, where each subsequent search
+     * excludes orders already used in previously found plans.
+     *
+     * @param array<int, true> $excludedOrderIds Order object IDs to exclude (spl_object_id keys)
+     *
+     * @return self New graph without the excluded orders
+     */
+    public function withoutOrders(array $excludedOrderIds): self
+    {
+        if ([] === $excludedOrderIds) {
+            return $this;
+        }
+
+        $filteredNodes = $this->nodes->withoutOrders($excludedOrderIds);
+
+        if ($filteredNodes === $this->nodes) {
+            return $this;
+        }
+
+        return new self($filteredNodes);
+    }
 }

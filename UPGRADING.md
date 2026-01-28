@@ -155,10 +155,56 @@ The following classes and methods have been removed in version 2.0:
 | **Split execution** | Input split across parallel routes |
 | **Merge execution** | Routes converging at target |
 | **PortfolioState** | Internal multi-currency balance tracking |
+| **Top-K Discovery** | Return up to K distinct alternative plans |
 
-#### Multiple Paths → Single Plan
+#### Top-K Execution Plan Discovery
 
-**Breaking Change**: `ExecutionPlanService::findBestPlans()` returns at most **ONE** optimal execution plan, not multiple ranked paths. The `PathSearchService` class has been removed.
+**New Feature**: `ExecutionPlanService::findBestPlans()` now supports **Top-K execution plan discovery**, returning up to K distinct, ranked execution plans when configured via `PathSearchConfig::resultLimit()`.
+
+**How it works**:
+- Set `resultLimit(K)` in PathSearchConfig to request K alternative plans
+- Default is `resultLimit(1)` for backward compatibility
+- Each plan uses a **completely disjoint set of orders** (no order reuse)
+- Plans are ranked by cost (best/cheapest first)
+- If fewer than K alternatives exist, returns as many as found
+
+**Example**:
+
+```php
+$config = PathSearchConfig::builder()
+    ->withSpendAmount(Money::fromString('USD', '1000.00', 2))
+    ->withToleranceBounds('0.0', '0.10')
+    ->withHopLimits(1, 3)
+    ->withResultLimit(5)  // Request top 5 plans
+    ->build();
+
+$outcome = $service->findBestPlans($request);
+
+// Get all alternative plans
+echo "Found {$outcome->paths()->count()} alternative plans:\n";
+foreach ($outcome->paths() as $rank => $plan) {
+    echo "Plan #{$rank}: {$plan->totalReceived()->amount()} received\n";
+}
+
+// Best plan is always first
+$bestPlan = $outcome->bestPath();
+```
+
+**Use cases**:
+- **Fallback options**: Have backup plans if primary fails during execution
+- **Rate comparison**: Compare trade-offs across different routes
+- **Risk diversification**: Spread execution across multiple strategies
+- **User selection**: Display alternatives for user to choose from
+
+**Guard limits**: Metrics are aggregated across all K search iterations. Use `guardLimits()->anyLimitReached()` to check if any iteration hit a limit.
+
+See [examples/top-k-execution-plans.php](examples/top-k-execution-plans.php) for a complete demonstration.
+
+---
+
+#### Multiple Paths → Single Plan (Default K=1)
+
+**Note**: With `resultLimit(1)` (the default), `ExecutionPlanService::findBestPlans()` returns at most **ONE** optimal execution plan. The `PathSearchService` class has been removed.
 
 **After (2.x with ExecutionPlanService)**:
 
@@ -497,7 +543,8 @@ if ($searchOutcome->hasRawFills()) {
 - [ ] Replace `ExecutionPlanSearchOutcome::plan()` with `rawFills()` + `ExecutionPlanMaterializer`
 - [ ] Use `sequenceNumber()` for step ordering if needed
 - [ ] Handle non-linear plans or use `isLinear()` + `asLinearPath()` for legacy compatibility
-- [ ] Update code expecting multiple paths (now returns 0 or 1 plan)
+- [ ] Consider using `resultLimit(K)` for Top-K plan discovery if alternatives are needed
+- [ ] Update code expecting multiple paths (default is now 0 or 1 plan; use `resultLimit` for more)
 - [ ] Run tests to verify behavior
 - [ ] Remove deprecation notice suppressions after migration complete
 - [ ] Update any serialization/API responses that expose path structure

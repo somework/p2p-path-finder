@@ -124,4 +124,50 @@ final class GraphNodeCollection implements Countable, IteratorAggregate
 
         return $ordered;
     }
+
+    /**
+     * Returns a new collection excluding edges whose orders are in the exclusion set.
+     *
+     * Each node is filtered to remove edges referencing excluded orders. Nodes
+     * that become empty (no remaining edges) are removed from the collection.
+     *
+     * @param array<int, true> $excludedOrderIds Order object IDs to exclude (spl_object_id)
+     *
+     * @return self New collection without the excluded orders
+     */
+    public function withoutOrders(array $excludedOrderIds): self
+    {
+        if ([] === $excludedOrderIds || [] === $this->nodes) {
+            return $this;
+        }
+
+        /** @var array<string, GraphNode> $filteredNodes */
+        $filteredNodes = [];
+        /** @var list<string> $filteredOrder */
+        $filteredOrder = [];
+        $changed = false;
+
+        foreach ($this->order as $currency) {
+            $node = $this->nodes[$currency];
+            $filteredNode = $node->withoutOrders($excludedOrderIds);
+
+            if ($filteredNode !== $node) {
+                $changed = true;
+            }
+
+            // Keep the node even if it has no edges - it might still be needed as a target
+            $filteredNodes[$currency] = $filteredNode;
+            $filteredOrder[] = $currency;
+        }
+
+        if (!$changed) {
+            return $this;
+        }
+
+        if ([] === $filteredNodes) {
+            return self::empty();
+        }
+
+        return new self($filteredNodes, $filteredOrder);
+    }
 }

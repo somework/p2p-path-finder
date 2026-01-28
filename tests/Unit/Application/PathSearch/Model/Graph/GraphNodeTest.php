@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Unit\Application\PathSearch\Model\Graph;
 
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\Graph;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\GraphEdgeCollection;
@@ -132,6 +133,150 @@ final class GraphNodeTest extends TestCase
 
         self::assertSame('USD', $node->currency());
         self::assertTrue($node->edges()->isEmpty());
+    }
+
+    // ========================================================================
+    // withoutOrders() Tests - Top-K Support
+    // ========================================================================
+
+    #[TestDox('withoutOrders returns same instance when exclusion array is empty')]
+    public function test_without_orders_returns_same_instance_when_exclusion_empty(): void
+    {
+        $order = OrderFactory::buy(base: 'BTC', quote: 'USD');
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $this->edge($graph, 'BTC', 0);
+
+        $node = new GraphNode('BTC', [$edge]);
+        $filtered = $node->withoutOrders([]);
+
+        self::assertSame($node, $filtered);
+    }
+
+    #[TestDox('withoutOrders returns same instance when node has no edges')]
+    public function test_without_orders_returns_same_instance_when_no_edges(): void
+    {
+        $node = new GraphNode('USD');
+        $filtered = $node->withoutOrders([12345 => true]);
+
+        self::assertSame($node, $filtered);
+    }
+
+    #[TestDox('withoutOrders excludes matching order')]
+    public function test_without_orders_excludes_matching_order(): void
+    {
+        $order1 = OrderFactory::buy(base: 'BTC', quote: 'USD');
+        $order2 = OrderFactory::buy(base: 'BTC', quote: 'EUR');
+        $graph = (new GraphBuilder())->build([$order1, $order2]);
+        $edge1 = $this->edge($graph, 'BTC', 0);
+        $edge2 = $this->edge($graph, 'BTC', 1);
+
+        $node = new GraphNode('BTC', [$edge1, $edge2]);
+
+        $excludedIds = [spl_object_id($order1) => true];
+        $filtered = $node->withoutOrders($excludedIds);
+
+        self::assertNotSame($node, $filtered);
+        self::assertSame('BTC', $filtered->currency());
+        self::assertSame(1, $filtered->edges()->count());
+    }
+
+    #[TestDox('withoutOrders returns new instance when edges removed')]
+    public function test_without_orders_returns_new_instance_when_changed(): void
+    {
+        $order = OrderFactory::buy(base: 'BTC', quote: 'USD');
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $this->edge($graph, 'BTC', 0);
+
+        $node = new GraphNode('BTC', [$edge]);
+
+        $excludedIds = [spl_object_id($order) => true];
+        $filtered = $node->withoutOrders($excludedIds);
+
+        self::assertNotSame($node, $filtered);
+    }
+
+    #[TestDox('withoutOrders returns same instance when no orders match')]
+    public function test_without_orders_returns_same_when_no_match(): void
+    {
+        $order = OrderFactory::buy(base: 'BTC', quote: 'USD');
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $this->edge($graph, 'BTC', 0);
+
+        $node = new GraphNode('BTC', [$edge]);
+
+        $filtered = $node->withoutOrders([999999999 => true]);
+
+        self::assertSame($node, $filtered);
+    }
+
+    #[TestDox('withoutOrders preserves currency')]
+    public function test_without_orders_preserves_currency(): void
+    {
+        $order = OrderFactory::buy(base: 'BTC', quote: 'USD');
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $this->edge($graph, 'BTC', 0);
+
+        $node = new GraphNode('BTC', [$edge]);
+
+        $excludedIds = [spl_object_id($order) => true];
+        $filtered = $node->withoutOrders($excludedIds);
+
+        self::assertSame('BTC', $filtered->currency());
+    }
+
+    #[TestDox('withoutOrders returns node with empty edges when all excluded')]
+    public function test_without_orders_returns_empty_edges_when_all_excluded(): void
+    {
+        $order = OrderFactory::buy(base: 'BTC', quote: 'USD');
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $this->edge($graph, 'BTC', 0);
+
+        $node = new GraphNode('BTC', [$edge]);
+
+        $excludedIds = [spl_object_id($order) => true];
+        $filtered = $node->withoutOrders($excludedIds);
+
+        self::assertSame('BTC', $filtered->currency());
+        self::assertTrue($filtered->edges()->isEmpty());
+    }
+
+    #[TestDox('withoutOrders excludes multiple orders')]
+    public function test_without_orders_excludes_multiple_orders(): void
+    {
+        $order1 = OrderFactory::buy(base: 'BTC', quote: 'USD');
+        $order2 = OrderFactory::buy(base: 'BTC', quote: 'EUR');
+        $order3 = OrderFactory::buy(base: 'BTC', quote: 'GBP');
+        $graph = (new GraphBuilder())->build([$order1, $order2, $order3]);
+
+        $edge1 = $this->edge($graph, 'BTC', 0);
+        $edge2 = $this->edge($graph, 'BTC', 1);
+        $edge3 = $this->edge($graph, 'BTC', 2);
+
+        $node = new GraphNode('BTC', [$edge1, $edge2, $edge3]);
+
+        $excludedIds = [
+            spl_object_id($order1) => true,
+            spl_object_id($order3) => true,
+        ];
+        $filtered = $node->withoutOrders($excludedIds);
+
+        self::assertSame(1, $filtered->edges()->count());
+    }
+
+    #[TestDox('withoutOrders is idempotent')]
+    public function test_without_orders_idempotent(): void
+    {
+        $order = OrderFactory::buy(base: 'BTC', quote: 'USD');
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $this->edge($graph, 'BTC', 0);
+
+        $node = new GraphNode('BTC', [$edge]);
+
+        $excludedIds = [spl_object_id($order) => true];
+        $filtered1 = $node->withoutOrders($excludedIds);
+        $filtered2 = $filtered1->withoutOrders($excludedIds);
+
+        self::assertSame($filtered1, $filtered2);
     }
 
     private function edge(Graph $graph, string $currency, int $index): \SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\GraphEdge

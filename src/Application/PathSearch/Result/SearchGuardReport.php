@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathSearch\Result;
 
+use function count;
+
 /**
  * Immutable snapshot describing how the search interacted with its guard rails.
  *
@@ -175,5 +177,72 @@ final class SearchGuardReport
     public function timeBudgetLimit(): ?int
     {
         return $this->timeBudgetLimit;
+    }
+
+    /**
+     * Aggregates multiple guard reports into a single report.
+     *
+     * Combines metrics from multiple search iterations (e.g., Top-K searches):
+     * - Expansions: summed across all reports
+     * - Visited states: summed across all reports
+     * - Elapsed time: summed across all reports
+     * - Limits: preserved from the first report (all reports should have same limits)
+     * - Breached flags: true if ANY report breached the limit
+     *
+     * @param list<self> $reports Guard reports to aggregate
+     *
+     * @return self Aggregated report with combined metrics
+     */
+    public static function aggregate(array $reports): self
+    {
+        if ([] === $reports) {
+            return self::none();
+        }
+
+        if (1 === count($reports)) {
+            return $reports[0];
+        }
+
+        // Use limits from first report (should be same for all)
+        $first = $reports[0];
+        $expansionLimit = $first->expansionLimit;
+        $visitedStateLimit = $first->visitedStateLimit;
+        $timeBudgetLimit = $first->timeBudgetLimit;
+
+        // Aggregate metrics
+        $totalExpansions = 0;
+        $totalVisitedStates = 0;
+        $totalElapsedMs = 0.0;
+        $anyExpansionsReached = false;
+        $anyVisitedStatesReached = false;
+        $anyTimeBudgetReached = false;
+
+        foreach ($reports as $report) {
+            $totalExpansions += $report->expansions;
+            $totalVisitedStates += $report->visitedStates;
+            $totalElapsedMs += $report->elapsedMilliseconds;
+
+            if ($report->expansionsReached) {
+                $anyExpansionsReached = true;
+            }
+            if ($report->visitedStatesReached) {
+                $anyVisitedStatesReached = true;
+            }
+            if ($report->timeBudgetReached) {
+                $anyTimeBudgetReached = true;
+            }
+        }
+
+        return new self(
+            expansionsReached: $anyExpansionsReached,
+            visitedStatesReached: $anyVisitedStatesReached,
+            timeBudgetReached: $anyTimeBudgetReached,
+            expansions: $totalExpansions,
+            visitedStates: $totalVisitedStates,
+            elapsedMilliseconds: $totalElapsedMs,
+            expansionLimit: $expansionLimit,
+            visitedStateLimit: $visitedStateLimit,
+            timeBudgetLimit: $timeBudgetLimit,
+        );
     }
 }

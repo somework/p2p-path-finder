@@ -135,6 +135,30 @@ Demonstrates advanced execution plan capabilities exclusive to `ExecutionPlanSer
 
 ---
 
+#### 3. Top-K Execution Plans
+**File**: [`top-k-execution-plans.php`](top-k-execution-plans.php)
+
+Demonstrates how to find multiple alternative execution plans (Top-K discovery).
+
+**What you'll learn**:
+- Configuring `resultLimit` for Top-K search
+- Understanding iterative exclusion algorithm
+- Verifying disjoint order sets across plans
+- Aggregated guard reports across K searches
+- Ranking plans by cost (best first)
+- Fallback strategy patterns
+
+**When to use**:
+- Fallback options if primary plan fails during execution
+- Comparing rate/fee trade-offs across different routes
+- Risk diversification across multiple execution strategies
+- UI display of alternatives for user selection
+
+**Related docs**:
+- [UPGRADING.md](../UPGRADING.md#top-k-execution-plan-discovery)
+
+---
+
 ### Customization & Extension
 
 These examples demonstrate the library's extension points and how to customize behavior for your specific needs.
@@ -363,6 +387,7 @@ Demonstrates ExecutionPlanService's ability to handle complex path-finding scena
 |------------------------------------|------------|-------------|-----------|-------------------------------------|
 | **execution-plan-basic.php**       | 170+       | Production  | 1         | ExecutionPlanService basics         |
 | **execution-plan-split-merge.php** | 260+       | Production  | 4         | Split/merge, diamond patterns       |
+| **top-k-execution-plans.php**      | 230+       | Production  | 7         | Top-K discovery, alternatives       |
 | **custom-order-filter.php**        | 397        | Production  | 5         | 4 filters, composition pattern      |
 | **custom-ordering-strategy.php**   | 527        | Production  | 4         | 3 strategies, determinism test      |
 | **custom-fee-policy.php**          | 570        | Production  | 6         | 5 policies, realistic models        |
@@ -371,7 +396,7 @@ Demonstrates ExecutionPlanService's ability to handle complex path-finding scena
 | **guarded-search-example.php**     | Varies     | Production  | 1         | Complete workflow                   |
 | **bybit-p2p-integration.php**      | 600+       | Production  | 5         | API integration, real-world example |
 | **advanced-search-strategies.php** | 400+       | Production  | 8         | Multi-order, split/merge, diamond   |
-| **TOTAL**                          | **~4,000** | **10 files** | **53+**  | **Comprehensive coverage**          |
+| **TOTAL**                          | **~4,200** | **11 files** | **60+**  | **Comprehensive coverage**          |
 
 ### Example Categories
 
@@ -384,14 +409,15 @@ Demonstrates ExecutionPlanService's ability to handle complex path-finding scena
 
 **Intermediate**:
 4. `execution-plan-split-merge.php` - Split/merge execution patterns
-5. `custom-fee-policy.php` - Realistic fee modeling
-6. `custom-ordering-strategy.php` - Custom ranking logic
-7. `bybit-p2p-integration.php` - Real-world API integration
-8. `advanced-search-strategies.php` - Multi-order, split, merge patterns
+5. `top-k-execution-plans.php` - Top-K alternative plan discovery
+6. `custom-fee-policy.php` - Realistic fee modeling
+7. `custom-ordering-strategy.php` - Custom ranking logic
+8. `bybit-p2p-integration.php` - Real-world API integration
+9. `advanced-search-strategies.php` - Multi-order, split, merge patterns
 
 **Advanced**:
-9. `error-handling.php` - Production error handling
-10. `performance-optimization.php` - Performance tuning
+10. `error-handling.php` - Production error handling
+11. `performance-optimization.php` - Performance tuning
 
 #### By Use Case
 
@@ -403,6 +429,8 @@ Demonstrates ExecutionPlanService's ability to handle complex path-finding scena
 | Get started quickly                  | `guarded-search-example.php`     |
 | Handle split/merge execution         | `execution-plan-split-merge.php` |
 | Multi-order liquidity aggregation    | `execution-plan-split-merge.php` |
+| Find alternative execution plans     | `top-k-execution-plans.php`      |
+| Fallback strategies                  | `top-k-execution-plans.php`      |
 | Filter orders before search          | `custom-order-filter.php`        |
 | Change how paths are ranked          | `custom-ordering-strategy.php`   |
 | Model realistic exchange fees        | `custom-fee-policy.php`          |

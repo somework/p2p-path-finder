@@ -6,6 +6,7 @@ namespace SomeWork\P2PPathFinder\Tests\Unit\Application\PathSearch\Model\Graph;
 
 use LogicException;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\EdgeCapacity;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\EdgeSegment;
@@ -341,6 +342,216 @@ final class GraphEdgeCollectionTest extends TestCase
         // BUY should come before SELL (BUY value = 1, SELL value = 2)
         self::assertSame(OrderSide::BUY, $collection->at(0)->orderSide());
         self::assertSame(OrderSide::SELL, $collection->at(1)->orderSide());
+    }
+
+    // ========================================================================
+    // withoutOrders() Tests - Top-K Support
+    // ========================================================================
+
+    #[TestDox('withoutOrders returns same instance when exclusion array is empty')]
+    public function test_without_orders_returns_same_instance_when_exclusion_empty(): void
+    {
+        $edge = $this->createEdge();
+        $collection = GraphEdgeCollection::fromArray([$edge]);
+
+        $filtered = $collection->withoutOrders([]);
+
+        self::assertSame($collection, $filtered);
+    }
+
+    #[TestDox('withoutOrders returns same instance when collection is empty')]
+    public function test_without_orders_returns_same_instance_when_collection_empty(): void
+    {
+        $collection = GraphEdgeCollection::empty();
+
+        $filtered = $collection->withoutOrders([12345 => true]);
+
+        self::assertSame($collection, $filtered);
+    }
+
+    #[TestDox('withoutOrders excludes single matching order')]
+    public function test_without_orders_excludes_single_matching_order(): void
+    {
+        $edge1 = $this->createEdgeForQuote('USD');
+        $edge2 = $this->createEdgeForQuote('EUR');
+        $collection = GraphEdgeCollection::fromArray([$edge1, $edge2]);
+
+        $orderId = spl_object_id($edge1->order());
+        $filtered = $collection->withoutOrders([$orderId => true]);
+
+        self::assertSame(1, $filtered->count());
+        self::assertSame('EUR', $filtered->first()->order()->assetPair()->quote());
+    }
+
+    #[TestDox('withoutOrders excludes multiple matching orders')]
+    public function test_without_orders_excludes_multiple_matching_orders(): void
+    {
+        $edge1 = $this->createEdgeForQuote('USD');
+        $edge2 = $this->createEdgeForQuote('EUR');
+        $edge3 = $this->createEdgeForQuote('GBP');
+        $collection = GraphEdgeCollection::fromArray([$edge1, $edge2, $edge3]);
+
+        $excludedIds = [
+            spl_object_id($edge1->order()) => true,
+            spl_object_id($edge3->order()) => true,
+        ];
+        $filtered = $collection->withoutOrders($excludedIds);
+
+        self::assertSame(1, $filtered->count());
+        self::assertSame('EUR', $filtered->first()->order()->assetPair()->quote());
+    }
+
+    #[TestDox('withoutOrders returns empty collection when all edges excluded')]
+    public function test_without_orders_returns_empty_when_all_excluded(): void
+    {
+        $edge1 = $this->createEdgeForQuote('USD');
+        $edge2 = $this->createEdgeForQuote('EUR');
+        $collection = GraphEdgeCollection::fromArray([$edge1, $edge2]);
+
+        $excludedIds = [
+            spl_object_id($edge1->order()) => true,
+            spl_object_id($edge2->order()) => true,
+        ];
+        $filtered = $collection->withoutOrders($excludedIds);
+
+        self::assertTrue($filtered->isEmpty());
+        self::assertSame(0, $filtered->count());
+    }
+
+    #[TestDox('withoutOrders returns same instance when no orders match')]
+    public function test_without_orders_returns_same_instance_when_no_match(): void
+    {
+        $edge = $this->createEdge();
+        $collection = GraphEdgeCollection::fromArray([$edge]);
+
+        $filtered = $collection->withoutOrders([999999999 => true]);
+
+        self::assertSame($collection, $filtered);
+    }
+
+    #[TestDox('withoutOrders preserves comparator in new collection')]
+    public function test_without_orders_preserves_comparator(): void
+    {
+        $edge1 = $this->createEdgeForQuote('USD');
+        $edge2 = $this->createEdgeForQuote('EUR');
+
+        // Custom comparator
+        $customComparator = static fn (GraphEdge $a, GraphEdge $b): int => $b->order()->assetPair()->quote() <=> $a->order()->assetPair()->quote();
+
+        $collection = GraphEdgeCollection::fromArray([$edge1, $edge2], $customComparator);
+        $orderId = spl_object_id($edge1->order());
+        $filtered = $collection->withoutOrders([$orderId => true]);
+
+        // Comparator should be preserved
+        $storedComparator = $filtered->comparator();
+        self::assertInstanceOf(\Closure::class, $storedComparator);
+    }
+
+    #[TestDox('withoutOrders preserves origin currency in new collection')]
+    public function test_without_orders_preserves_origin_currency(): void
+    {
+        $edge1 = $this->createEdgeForQuote('USD');
+        $edge2 = $this->createEdgeForQuote('EUR');
+        $collection = GraphEdgeCollection::fromArray([$edge1, $edge2]);
+
+        $orderId = spl_object_id($edge1->order());
+        $filtered = $collection->withoutOrders([$orderId => true]);
+
+        self::assertSame('BTC', $filtered->originCurrency());
+    }
+
+    #[TestDox('withoutOrders returns new instance when edges removed')]
+    public function test_without_orders_returns_new_instance_when_changed(): void
+    {
+        $edge1 = $this->createEdgeForQuote('USD');
+        $edge2 = $this->createEdgeForQuote('EUR');
+        $collection = GraphEdgeCollection::fromArray([$edge1, $edge2]);
+
+        $orderId = spl_object_id($edge1->order());
+        $filtered = $collection->withoutOrders([$orderId => true]);
+
+        self::assertNotSame($collection, $filtered);
+    }
+
+    #[TestDox('withoutOrders handles large exclusion set efficiently')]
+    public function test_without_orders_handles_large_exclusion_set(): void
+    {
+        $edge = $this->createEdge();
+        $collection = GraphEdgeCollection::fromArray([$edge]);
+
+        // Create a large exclusion set that doesn't include our edge
+        $excludedIds = [];
+        for ($i = 0; $i < 1000; ++$i) {
+            $excludedIds[$i] = true;
+        }
+
+        $filtered = $collection->withoutOrders($excludedIds);
+
+        // Edge should still be present (its ID won't be in 0-999)
+        self::assertSame($collection, $filtered);
+    }
+
+    #[TestDox('withoutOrders maintains order of remaining edges')]
+    public function test_without_orders_maintains_edge_order(): void
+    {
+        $edge1 = $this->createEdgeForQuote('AAA');
+        $edge2 = $this->createEdgeForQuote('BBB');
+        $edge3 = $this->createEdgeForQuote('CCC');
+        $collection = GraphEdgeCollection::fromArray([$edge1, $edge2, $edge3]);
+
+        // Remove middle edge
+        $orderId = spl_object_id($edge2->order());
+        $filtered = $collection->withoutOrders([$orderId => true]);
+
+        $edges = $filtered->toArray();
+        self::assertSame(2, count($edges));
+        self::assertSame('AAA', $edges[0]->order()->assetPair()->quote());
+        self::assertSame('CCC', $edges[1]->order()->assetPair()->quote());
+    }
+
+    #[TestDox('withoutOrders with single edge collection returns empty when excluded')]
+    public function test_without_orders_single_edge_returns_empty(): void
+    {
+        $edge = $this->createEdge();
+        $collection = GraphEdgeCollection::fromArray([$edge]);
+
+        $orderId = spl_object_id($edge->order());
+        $filtered = $collection->withoutOrders([$orderId => true]);
+
+        self::assertTrue($filtered->isEmpty());
+        self::assertNull($filtered->first());
+    }
+
+    #[TestDox('withoutOrders is idempotent for same exclusion set')]
+    public function test_without_orders_idempotent(): void
+    {
+        $edge1 = $this->createEdgeForQuote('USD');
+        $edge2 = $this->createEdgeForQuote('EUR');
+        $collection = GraphEdgeCollection::fromArray([$edge1, $edge2]);
+
+        $excludedIds = [spl_object_id($edge1->order()) => true];
+
+        $filtered1 = $collection->withoutOrders($excludedIds);
+        $filtered2 = $filtered1->withoutOrders($excludedIds);
+
+        // Second call should return same instance (no change)
+        self::assertSame($filtered1, $filtered2);
+    }
+
+    #[TestDox('withoutOrders handles duplicate IDs in exclusion set gracefully')]
+    public function test_without_orders_handles_duplicate_ids(): void
+    {
+        $edge1 = $this->createEdgeForQuote('USD');
+        $edge2 = $this->createEdgeForQuote('EUR');
+        $collection = GraphEdgeCollection::fromArray([$edge1, $edge2]);
+
+        $orderId = spl_object_id($edge1->order());
+        // Array keys are inherently unique, but test the behavior
+        $excludedIds = [$orderId => true];
+
+        $filtered = $collection->withoutOrders($excludedIds);
+
+        self::assertSame(1, $filtered->count());
     }
 
     private function createEdge(): GraphEdge

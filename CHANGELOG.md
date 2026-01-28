@@ -8,7 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- TBD
+
+- **Top-K Execution Plan Discovery**: `ExecutionPlanService::findBestPlans()` now returns up to K distinct execution plans
+  - Configure via `PathSearchConfig::withResultLimit(K)` (default: 1 for backward compatibility)
+  - Each plan uses **completely disjoint order sets** - no order appears in multiple plans
+  - Plans are ranked by cost (best/cheapest first)
+  - If fewer than K alternatives exist, returns as many as found
+  - Guard metrics (expansions, visited states, elapsed time) are aggregated across all K iterations
+  - See [UPGRADING.md](UPGRADING.md#top-k-execution-plan-discovery) for usage examples
+  - New example: `examples/top-k-execution-plans.php`
+
+- **Graph filtering**: `Graph::withoutOrders(array $excludedOrderIds)` for immutable graph filtering
+  - Filters edges by order ID (via `spl_object_id`)
+  - Returns new graph instance if changes occur, same instance if no changes
+  - Propagates through `GraphNodeCollection`, `GraphNode`, `GraphEdgeCollection`
+
+- **SearchGuardReport aggregation**: `SearchGuardReport::aggregate(array $reports)` combines metrics from multiple searches
+  - Sums numerical metrics (expansions, visitedStates, elapsedMilliseconds)
+  - Uses logical OR for boolean "reached" flags
+  - Takes limits from first report
+
+- **Top-K benchmarks**: New benchmark scenarios in `ExecutionPlanBench.php`
+  - `benchFindTopKPlans`: Varying K values with different order book sizes
+  - `benchGraphFiltering`: Graph filtering performance with varying exclusion set sizes
 
 ### Changed
 - TBD

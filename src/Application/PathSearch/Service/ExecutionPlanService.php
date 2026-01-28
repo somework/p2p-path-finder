@@ -33,14 +33,28 @@ use function strtoupper;
 use function trim;
 
 /**
- * Service for finding the optimal execution plan that may include split/merge routes.
+ * Service for finding optimal execution plans that may include split/merge routes.
  *
- * **IMPORTANT**: This service returns at most **ONE** optimal execution plan, not multiple
- * ranked paths. The `findBestPlans()` method returns a `SearchOutcome` where `paths()->count()`
- * will be 0 or 1. Use `bestPath()` to get the single optimal plan or null.
+ * This service supports **Top-K execution plan discovery**, returning up to K distinct,
+ * ranked execution plans ordered by cost (best first). Use `PathSearchConfig::resultLimit()`
+ * to configure K (defaults to 1 for backward compatibility).
  *
- * This service can find
- * execution plans that:
+ * ## Top-K Algorithm
+ *
+ * The Top-K implementation uses **Iterative Exclusion**:
+ * 1. Find the optimal execution plan
+ * 2. For each subsequent plan (up to K-1 more):
+ *    - Exclude all orders used in previously found plans
+ *    - Search for the next best plan using the filtered order set
+ *    - Stop if no more plans can be found
+ * 3. Return all found plans, ordered by cost (best first)
+ *
+ * Each returned plan uses a **completely disjoint set of orders** - no order appears
+ * in multiple plans. This ensures true alternatives for fallback or comparison.
+ *
+ * ## Capabilities
+ *
+ * This service can find execution plans that:
  * - Use multiple orders for the same currency direction
  * - Split input across parallel routes
  * - Merge multiple routes at the target currency
@@ -48,11 +62,8 @@ use function trim;
  * This service is the recommended public API for complex trading scenarios where
  * a single linear path may not optimally utilize available liquidity.
  *
- * For alternative routes, run separate searches with different parameters (modified
- * tolerance bounds, different spend amounts, or filtered order books).
- *
  * @see PathSearchRequest For request structure
- * @see PathSearchConfig For configuration options
+ * @see PathSearchConfig For configuration options (including resultLimit for Top-K)
  * @see SearchOutcome For result structure
  * @see ExecutionPlan For the result type containing execution steps
  * @see docs/getting-started.md For complete usage examples
@@ -91,20 +102,21 @@ final class ExecutionPlanService
     }
 
     /**
-     * Searches for the optimal execution plan from the configured spend asset to the target asset.
+     * Searches for up to K best execution plans from the configured spend asset to the target asset.
      *
-     * **IMPORTANT: Returns at most ONE plan (the optimal).** The returned `SearchOutcome::paths()`
-     * collection will contain either 0 or 1 entries:
+     * Returns up to `config->resultLimit()` distinct execution plans, each using a completely
+     * disjoint set of orders. Plans are ordered by cost (best/cheapest first).
+     *
+     * The returned `SearchOutcome::paths()` collection will contain 0 to K entries:
      * - 0 entries: No valid execution plan could be found
-     * - 1 entry: The single optimal execution plan
+     * - 1 to K entries: Distinct execution plans ordered by cost
      *
-     * For alternative routes, run separate searches with different parameters (modified tolerance
-     * bounds, different spend amounts, or filtered order books).
+     * Use `bestPath()` to get the optimal (first) plan, or iterate `paths()` for alternatives.
      *
      * Guard limit breaches are reported through the returned {@see SearchOutcome::guardLimits()}
-     * metadata. Inspect the {@see SearchGuardReport} via helpers like
-     * {@see SearchGuardReport::anyLimitReached()} to determine whether the search exhausted its
-     * configured protections.
+     * metadata, aggregated across all K search iterations. Inspect the {@see SearchGuardReport}
+     * via helpers like {@see SearchGuardReport::anyLimitReached()} to determine whether any
+     * search iteration exhausted its configured protections.
      *
      * @api
      *
@@ -112,7 +124,7 @@ final class ExecutionPlanService
      * @throws InvalidInput       when the requested target asset identifier is empty
      * @throws PrecisionViolation when arbitrary precision operations required for cost ordering cannot be performed
      *
-     * @return SearchOutcome<ExecutionPlan> Contains 0 or 1 execution plans. Use `bestPath()` to get the single plan or null.
+     * @return SearchOutcome<ExecutionPlan> Contains 0 to K execution plans. Use `bestPath()` for optimal plan or `paths()` for all.
      *
      * @phpstan-return SearchOutcome<ExecutionPlan>
      *
@@ -120,36 +132,35 @@ final class ExecutionPlanService
      *
      * @example
      * ```php
-     * // Create configuration
+     * // Create configuration with Top-K
      * $config = PathSearchConfig::builder()
-     *     ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+     *     ->withSpendAmount(Money::fromString('USD', '1000.00', 2))
      *     ->withToleranceBounds('0.0', '0.10')  // 0-10% tolerance
      *     ->withHopLimits(1, 3)  // Allow 1-3 hop paths
+     *     ->withResultLimit(5)  // Request top 5 plans
      *     ->build();
      *
      * // Create request and execute search
      * $request = new PathSearchRequest($orderBook, $config, 'BTC');
      * $outcome = $service->findBestPlans($request);
      *
-     * // Process results
-     * $bestPlan = $outcome->bestPath();
-     * if (null !== $bestPlan) {
-     *     echo "Best plan spends {$bestPlan->totalSpent()->amount()} {$bestPlan->totalSpent()->currency()}\n";
-     *     echo "Best plan receives {$bestPlan->totalReceived()->amount()} {$bestPlan->totalReceived()->currency()}\n";
-     *
-     *     foreach ($bestPlan->steps() as $step) {
-     *         printf(
-     *             "Step %d: spend %s %s to receive %s %s\n",
-     *             $step->sequenceNumber(),
-     *             $step->spent()->amount(),
-     *             $step->from(),
-     *             $step->received()->amount(),
-     *             $step->to(),
-     *         );
-     *     }
+     * // Process all alternative plans
+     * echo "Found {$outcome->paths()->count()} alternative plans:\n";
+     * foreach ($outcome->paths() as $rank => $plan) {
+     *     printf(
+     *         "Plan #%d: spend %s %s to receive %s %s\n",
+     *         $rank + 1,
+     *         $plan->totalSpent()->amount(),
+     *         $plan->totalSpent()->currency(),
+     *         $plan->totalReceived()->amount(),
+     *         $plan->totalReceived()->currency(),
+     *     );
      * }
      *
-     * // Check guard limits
+     * // Best plan is always first
+     * $bestPlan = $outcome->bestPath();
+     *
+     * // Check guard limits (aggregated across all K searches)
      * if ($outcome->guardLimits()->anyLimitReached()) {
      *     echo "Search was limited by guard rails\n";
      * }
@@ -163,6 +174,7 @@ final class ExecutionPlanService
         $sourceCurrency = strtoupper(trim($request->sourceAsset()));
         $targetCurrency = strtoupper(trim($targetAsset));
         $requestedSpend = $request->spendAmount();
+        $resultLimit = $config->resultLimit();
 
         // Validate inputs
         if ('' === $sourceCurrency) {
@@ -182,7 +194,7 @@ final class ExecutionPlanService
             return $empty;
         }
 
-        // Build graph from filtered orders
+        // Build initial graph from filtered orders
         $graph = $this->graphBuilder->build($orders);
         if (!$graph->hasNode($sourceCurrency) || !$graph->hasNode($targetCurrency)) {
             /** @var SearchOutcome<ExecutionPlan> $empty */
@@ -191,85 +203,116 @@ final class ExecutionPlanService
             return $empty;
         }
 
-        // Create and run the search engine
+        // Create the search engine
         $engine = new ExecutionPlanSearchEngine(
             $config->pathFinderMaxExpansions(),
             $config->pathFinderTimeBudgetMs(),
             $config->pathFinderMaxVisitedStates(),
         );
 
-        $searchOutcome = $engine->search(
-            $graph,
-            $sourceCurrency,
-            $targetCurrency,
-            $requestedSpend,
-        );
+        // Top-K iterative exclusion loop
+        /** @var list<PathResultSetEntry<ExecutionPlan>> $entries */
+        $entries = [];
+        /** @var list<SearchGuardReport> $guardReports */
+        $guardReports = [];
+        /** @var array<int, true> $excludedOrderIds */
+        $excludedOrderIds = [];
+        $currentGraph = $graph;
 
-        $guardLimits = $searchOutcome->guardReport();
-        $this->assertGuardLimits($config, $guardLimits);
+        for ($iteration = 0; $iteration < $resultLimit; ++$iteration) {
+            // Search for next best plan
+            $searchOutcome = $engine->search(
+                $currentGraph,
+                $sourceCurrency,
+                $targetCurrency,
+                $requestedSpend,
+            );
 
-        // Process the result - check for raw fills
-        if (!$searchOutcome->hasRawFills()) {
+            $guardReports[] = $searchOutcome->guardReport();
+
+            // Check guard limits after each iteration
+            $this->assertGuardLimits($config, $searchOutcome->guardReport());
+
+            // Stop if no path found
+            if (!$searchOutcome->hasRawFills()) {
+                break;
+            }
+
+            // Initial tolerance evaluation
+            $toleranceResult = $this->toleranceEvaluator->evaluate(
+                $config,
+                $requestedSpend,
+                $requestedSpend,
+            );
+            $tolerance = $toleranceResult ?? DecimalTolerance::fromNumericString('0', self::COST_SCALE);
+
+            /** @var list<array{order: \SomeWork\P2PPathFinder\Domain\Order\Order, spend: Money, sequence: int}> $rawFills */
+            $rawFills = $searchOutcome->rawFills();
+
+            // Materialize the plan
+            $plan = $this->materializer->materialize(
+                $rawFills,
+                $sourceCurrency,
+                $targetCurrency,
+                $tolerance,
+            );
+
+            if (null === $plan) {
+                break;
+            }
+
+            // Re-evaluate tolerance with actual spent amount
+            $toleranceResult = $this->toleranceEvaluator->evaluate(
+                $config,
+                $requestedSpend,
+                $plan->totalSpent(),
+            );
+
+            if (null === $toleranceResult) {
+                break;
+            }
+
+            // Create ordering key for the result
+            $orderKey = $this->createOrderKey($plan, $iteration);
+
+            /** @var PathResultSetEntry<ExecutionPlan> $entry */
+            $entry = new PathResultSetEntry($plan, $orderKey);
+            $entries[] = $entry;
+
+            // Collect order IDs for exclusion in next iteration
+            foreach ($plan->steps() as $step) {
+                $excludedOrderIds[spl_object_id($step->order())] = true;
+            }
+
+            // Stop if we have enough plans or if guard was breached
+            if ($searchOutcome->guardReport()->anyLimitReached()) {
+                break;
+            }
+
+            // Filter graph for next iteration (if we need more plans)
+            if ($iteration + 1 < $resultLimit) {
+                $currentGraph = $currentGraph->withoutOrders($excludedOrderIds);
+            }
+        }
+
+        // Aggregate guard reports from all iterations
+        $aggregatedGuardReport = SearchGuardReport::aggregate($guardReports);
+
+        // Return empty result if no plans found
+        if ([] === $entries) {
             /** @var SearchOutcome<ExecutionPlan> $empty */
-            $empty = SearchOutcome::empty($guardLimits);
+            $empty = SearchOutcome::empty(
+                [] === $guardReports ? $this->idleGuardReport($config) : $aggregatedGuardReport
+            );
 
             return $empty;
         }
-
-        // Initial tolerance evaluation with requested spend as placeholder.
-        // This provides a starting tolerance for materialization; we'll validate
-        // against actual spent amount after the plan is materialized.
-        $toleranceResult = $this->toleranceEvaluator->evaluate(
-            $config,
-            $requestedSpend,
-            $requestedSpend,
-        );
-
-        // Use materializer to convert raw fills into ExecutionPlan
-        $tolerance = $toleranceResult ?? DecimalTolerance::fromNumericString('0', self::COST_SCALE);
-
-        /** @var list<array{order: \SomeWork\P2PPathFinder\Domain\Order\Order, spend: Money, sequence: int}> $rawFills */
-        $rawFills = $searchOutcome->rawFills();
-
-        $plan = $this->materializer->materialize(
-            $rawFills,
-            $sourceCurrency,
-            $targetCurrency,
-            $tolerance,
-        );
-
-        if (null === $plan) {
-            /** @var SearchOutcome<ExecutionPlan> $empty */
-            $empty = SearchOutcome::empty($guardLimits);
-
-            return $empty;
-        }
-
-        // Re-evaluate tolerance with actual spent amount
-        $toleranceResult = $this->toleranceEvaluator->evaluate(
-            $config,
-            $requestedSpend,
-            $plan->totalSpent(),
-        );
-
-        if (null === $toleranceResult) {
-            /** @var SearchOutcome<ExecutionPlan> $empty */
-            $empty = SearchOutcome::empty($guardLimits);
-
-            return $empty;
-        }
-
-        // Create ordering key for the result
-        $orderKey = $this->createOrderKey($plan, 0);
-
-        /** @var PathResultSetEntry<ExecutionPlan> $entry */
-        $entry = new PathResultSetEntry($plan, $orderKey);
 
         /** @var PathResultSet<ExecutionPlan> $resultSet */
-        $resultSet = PathResultSet::fromEntries($this->orderingStrategy, [$entry]);
+        $resultSet = PathResultSet::fromEntries($this->orderingStrategy, $entries);
 
         /** @var SearchOutcome<ExecutionPlan> $outcome */
-        $outcome = new SearchOutcome($resultSet, $guardLimits);
+        $outcome = new SearchOutcome($resultSet, $aggregatedGuardReport);
 
         return $outcome;
     }

@@ -50,4 +50,22 @@ final class GraphNode implements IteratorAggregate
     {
         return $this->edges->getIterator();
     }
+
+    /**
+     * Returns a new node excluding edges whose orders are in the exclusion set.
+     *
+     * @param array<int, true> $excludedOrderIds Order object IDs to exclude (spl_object_id)
+     *
+     * @return self New node without the excluded edges
+     */
+    public function withoutOrders(array $excludedOrderIds): self
+    {
+        $filteredEdges = $this->edges->withoutOrders($excludedOrderIds);
+
+        if ($filteredEdges === $this->edges) {
+            return $this;
+        }
+
+        return new self($this->currency, $filteredEdges);
+    }
 }

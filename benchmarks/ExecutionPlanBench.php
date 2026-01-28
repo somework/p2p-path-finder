@@ -256,6 +256,112 @@ class ExecutionPlanBench
     }
 
     // ========================================================================
+    // TOP-K EXECUTION PLAN BENCHMARKS
+    // ========================================================================
+
+    /**
+     * Benchmarks Top-K execution plan discovery with varying K values.
+     *
+     * @param array{k: int, orderCount: int} $params
+     */
+    #[Revs(5)]
+    #[Iterations(3)]
+    #[Groups(['topk', 'execution_plan'])]
+    #[ParamProviders('provideTopKScenarios')]
+    public function benchFindTopKPlans(array $params): void
+    {
+        $orderBook = $this->buildTopKOrderBook($params['orderCount']);
+
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(self::money('SRC', '1000.00', 2))
+            ->withToleranceBounds('0.00', '0.20')
+            ->withHopLimits(1, 2)
+            ->withResultLimit($params['k'])
+            ->withSearchGuards(10000, 25000)
+            ->build();
+
+        $request = new PathSearchRequest($orderBook, $config, 'DST');
+        $this->service->findBestPlans($request);
+    }
+
+    /**
+     * @return iterable<string, array{k: int, orderCount: int}>
+     */
+    public function provideTopKScenarios(): iterable
+    {
+        yield 'topk-1-from-10' => ['k' => 1, 'orderCount' => 10];
+        yield 'topk-3-from-10' => ['k' => 3, 'orderCount' => 10];
+        yield 'topk-5-from-20' => ['k' => 5, 'orderCount' => 20];
+        yield 'topk-10-from-50' => ['k' => 10, 'orderCount' => 50];
+        yield 'topk-5-from-100' => ['k' => 5, 'orderCount' => 100];
+    }
+
+    /**
+     * Benchmarks graph filtering (withoutOrders) performance.
+     *
+     * @param array{orderCount: int, excludeCount: int} $params
+     */
+    #[Revs(10)]
+    #[Iterations(5)]
+    #[Groups(['topk', 'graph_filter'])]
+    #[ParamProviders('provideGraphFilterScenarios')]
+    public function benchGraphFiltering(array $params): void
+    {
+        $orderBook = $this->buildTopKOrderBook($params['orderCount']);
+        $graph = (new GraphBuilder())->build($orderBook->all());
+
+        // Collect order IDs to exclude
+        $excludedIds = [];
+        $count = 0;
+        foreach ($orderBook->all() as $order) {
+            if ($count >= $params['excludeCount']) {
+                break;
+            }
+            $excludedIds[spl_object_id($order)] = true;
+            ++$count;
+        }
+
+        // Measure filtering performance
+        $graph->withoutOrders($excludedIds);
+    }
+
+    /**
+     * @return iterable<string, array{orderCount: int, excludeCount: int}>
+     */
+    public function provideGraphFilterScenarios(): iterable
+    {
+        yield 'filter-10-exclude-1' => ['orderCount' => 10, 'excludeCount' => 1];
+        yield 'filter-50-exclude-5' => ['orderCount' => 50, 'excludeCount' => 5];
+        yield 'filter-100-exclude-10' => ['orderCount' => 100, 'excludeCount' => 10];
+        yield 'filter-100-exclude-50' => ['orderCount' => 100, 'excludeCount' => 50];
+    }
+
+    /**
+     * Builds an order book suitable for Top-K testing.
+     * Creates multiple alternative routes from SRC to DST.
+     */
+    private function buildTopKOrderBook(int $orderCount): OrderBook
+    {
+        $orders = [];
+
+        // Create orderCount direct routes from SRC to DST with varying rates
+        for ($i = 0; $i < $orderCount; ++$i) {
+            $rate = '0.9' . str_pad((string) ($i % 100), 2, '0', STR_PAD_LEFT);
+            $orders[] = new Order(
+                OrderSide::SELL,
+                self::assetPair('DST', 'SRC'),
+                OrderBounds::from(
+                    self::money('DST', '100.00', 2),
+                    self::money('DST', '10000.00', 2),
+                ),
+                self::exchangeRate('DST', 'SRC', $rate, 4),
+            );
+        }
+
+        return new OrderBook($orders);
+    }
+
+    // ========================================================================
     // GUARD LIMIT IMPACT BENCHMARKS
     // ========================================================================
 
