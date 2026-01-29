@@ -170,4 +170,43 @@ final class GraphNodeCollection implements Countable, IteratorAggregate
 
         return new self($filteredNodes, $filteredOrder);
     }
+
+    /**
+     * Returns a new collection with capacity penalties applied to specified orders.
+     *
+     * @param array<int, int> $usageCounts   Order object ID => usage count
+     * @param string          $penaltyFactor Penalty multiplier per usage
+     *
+     * @return self New collection with penalized edges
+     */
+    public function withOrderPenalties(array $usageCounts, string $penaltyFactor): self
+    {
+        if ([] === $usageCounts || [] === $this->nodes) {
+            return $this;
+        }
+
+        /** @var array<string, GraphNode> $penalizedNodes */
+        $penalizedNodes = [];
+        /** @var list<string> $penalizedOrder */
+        $penalizedOrder = [];
+        $changed = false;
+
+        foreach ($this->order as $currency) {
+            $node = $this->nodes[$currency];
+            $penalizedNode = $node->withOrderPenalties($usageCounts, $penaltyFactor);
+
+            if ($penalizedNode !== $node) {
+                $changed = true;
+            }
+
+            $penalizedNodes[$currency] = $penalizedNode;
+            $penalizedOrder[] = $currency;
+        }
+
+        if (!$changed) {
+            return $this;
+        }
+
+        return new self($penalizedNodes, $penalizedOrder);
+    }
 }

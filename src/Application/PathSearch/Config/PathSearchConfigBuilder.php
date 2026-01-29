@@ -31,6 +31,8 @@ final class PathSearchConfigBuilder
 
     private bool $throwOnGuardLimit = false;
 
+    private bool $disjointPlans = true;
+
     /**
      * Sets the amount of the source asset that will be spent during path search.
      */
@@ -127,6 +129,25 @@ final class PathSearchConfigBuilder
     }
 
     /**
+     * Sets whether Top-K plans must use disjoint (non-overlapping) order sets.
+     *
+     * - true (default): Each plan uses completely different orders (independent fallbacks)
+     * - false: Plans can share orders (more alternatives, but not independent)
+     *
+     * When disabled (false), the algorithm uses penalty-based diversification to
+     * encourage variety while allowing order reuse across plans. This is useful
+     * for rate comparison scenarios where only one plan will actually execute.
+     *
+     * @param bool $disjoint Whether to enforce disjoint order sets
+     */
+    public function withDisjointPlans(bool $disjoint): self
+    {
+        $this->disjointPlans = $disjoint;
+
+        return $this;
+    }
+
+    /**
      * Builds a validated {@see PathSearchConfig} instance.
      *
      * @throws InvalidInput when required configuration pieces are missing or inconsistent
@@ -155,6 +176,7 @@ final class PathSearchConfigBuilder
             $this->resultLimit,
             $searchGuards,
             throwOnGuardLimit: $this->throwOnGuardLimit,
+            disjointPlans: $this->disjointPlans,
         );
     }
 }

@@ -76,4 +76,37 @@ final class Graph implements IteratorAggregate
 
         return new self($filteredNodes);
     }
+
+    /**
+     * Returns a new Graph with capacity penalties applied to specified orders.
+     *
+     * Creates a modified copy of this graph where edges referencing penalized
+     * orders have their capacity reduced proportionally. This encourages the
+     * search algorithm to explore alternative orders while still allowing reuse.
+     *
+     * The penalty reduces the edge's effective capacity:
+     * - penalizedCapacity = baseCapacity / (1 + usageCount * penaltyFactor)
+     *
+     * This method is used for reusable Top-K path finding, where order reuse
+     * is allowed but discouraged through soft penalties.
+     *
+     * @param array<int, int> $usageCounts   Order object ID => usage count
+     * @param string          $penaltyFactor Penalty multiplier per usage (e.g., "0.15" = 15%)
+     *
+     * @return self New graph with penalized edge capacities
+     */
+    public function withOrderPenalties(array $usageCounts, string $penaltyFactor): self
+    {
+        if ([] === $usageCounts) {
+            return $this;
+        }
+
+        $penalizedNodes = $this->nodes->withOrderPenalties($usageCounts, $penaltyFactor);
+
+        if ($penalizedNodes === $this->nodes) {
+            return $this;
+        }
+
+        return new self($penalizedNodes);
+    }
 }

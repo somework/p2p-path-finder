@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathSearch\Result;
 
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Money\MoneyMap;
 use SomeWork\P2PPathFinder\Domain\Tolerance\DecimalTolerance;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 use function count;
+use function implode;
+use function sort;
+use function spl_object_id;
 use function strtoupper;
 use function trim;
 
@@ -249,6 +254,85 @@ final class ExecutionPlan implements SearchResultInterface
     public function residualTolerance(): DecimalTolerance
     {
         return $this->residualTolerance;
+    }
+
+    /**
+     * Returns a deterministic signature for duplicate detection.
+     *
+     * The signature combines the route (source->target currencies) with
+     * sorted order object IDs to uniquely identify a plan's structure.
+     * Plans with identical signatures use the exact same orders for the
+     * exact same currency transformation.
+     *
+     * @return string Deterministic signature based on route and orders
+     */
+    public function signature(): string
+    {
+        $orderIds = [];
+        foreach ($this->steps as $step) {
+            $orderIds[] = spl_object_id($step->order());
+        }
+        sort($orderIds);
+
+        return $this->sourceCurrency.'->'.$this->targetCurrency
+             .':'.implode(',', $orderIds);
+    }
+
+    /**
+     * Checks if this plan is effectively a duplicate of another plan.
+     *
+     * Plans are considered duplicates if they have:
+     * - Identical signature (same orders for same route), OR
+     * - Identical effective cost within epsilon tolerance
+     *
+     * This is used during reusable Top-K search to filter out plans that
+     * would provide no additional value to the user.
+     *
+     * @param self   $other       The plan to compare against
+     * @param string $costEpsilon Maximum cost difference to consider equal (default: 0.000001)
+     *
+     * @return bool True if this plan is effectively a duplicate of the other
+     */
+    public function isDuplicateOf(self $other, string $costEpsilon = '0.000001'): bool
+    {
+        // Same signature = definite duplicate
+        if ($this->signature() === $other->signature()) {
+            return true;
+        }
+
+        // Same route required for cost comparison to be meaningful
+        if ($this->sourceCurrency !== $other->sourceCurrency
+            || $this->targetCurrency !== $other->targetCurrency) {
+            return false;
+        }
+
+        // Compare effective costs (spent / received ratio)
+        // Lower cost = better (spend less to receive more)
+        $thisCost = $this->calculateEffectiveCost();
+        $otherCost = $other->calculateEffectiveCost();
+
+        $diff = $thisCost->minus($otherCost)->abs();
+        $epsilon = BigDecimal::of($costEpsilon);
+
+        return $diff->isLessThanOrEqualTo($epsilon);
+    }
+
+    /**
+     * Calculates the effective cost ratio (spent / received).
+     *
+     * @return BigDecimal Cost ratio with high precision
+     */
+    private function calculateEffectiveCost(): BigDecimal
+    {
+        if ($this->totalReceived->isZero()) {
+            return BigDecimal::of('999999999999999999');
+        }
+
+        return $this->totalSpent->decimal()->dividedBy(
+            $this->totalReceived->decimal(),
+            18,
+            RoundingMode::HALF_UP
+        );
     }
 
     /**

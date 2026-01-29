@@ -189,6 +189,42 @@ final class GraphEdgeCollection implements Countable, IteratorAggregate
     }
 
     /**
+     * Returns a new collection with capacity penalties applied to specified orders.
+     *
+     * @param array<int, int> $usageCounts   Order object ID => usage count
+     * @param string          $penaltyFactor Penalty multiplier per usage
+     *
+     * @return self New collection with penalized edges
+     */
+    public function withOrderPenalties(array $usageCounts, string $penaltyFactor): self
+    {
+        if ([] === $usageCounts || [] === $this->edges) {
+            return $this;
+        }
+
+        $penalized = [];
+        $changed = false;
+
+        foreach ($this->edges as $edge) {
+            $orderId = spl_object_id($edge->order());
+            $usageCount = $usageCounts[$orderId] ?? 0;
+
+            if ($usageCount > 0) {
+                $penalized[] = $edge->withCapacityPenalty($usageCount, $penaltyFactor);
+                $changed = true;
+            } else {
+                $penalized[] = $edge;
+            }
+        }
+
+        if (!$changed) {
+            return $this;
+        }
+
+        return new self($penalized, $this->originCurrency, $this->comparator);
+    }
+
+    /**
      * Canonical comparator ordering edges by quote currency, serialized order payload, then side.
      *
      * @return Closure(GraphEdge, GraphEdge): int

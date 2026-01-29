@@ -407,6 +407,163 @@ final class GraphTest extends TestCase
         self::assertSame(1, $result->node('USD')->edges()->count());
     }
 
+    // ========================================================================
+    // withOrderPenalties TESTS
+    // ========================================================================
+
+    #[TestDox('withOrderPenalties applies penalties to specified orders')]
+    public function test_with_order_penalties_applies_penalties(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.00', '1000.00', '0.92', 2, 2);
+        $edge = $this->createEdge('USD', 'EUR', $order);
+
+        $nodeUsd = new GraphNode('USD', [$edge]);
+        $nodeEur = new GraphNode('EUR');
+        $graph = new Graph([$nodeUsd, $nodeEur]);
+
+        $orderId = spl_object_id($order);
+        $penalized = $graph->withOrderPenalties([$orderId => 1], '0.15');
+
+        // Should be different instance
+        self::assertNotSame($graph, $penalized);
+
+        // Penalized edge should have reduced capacity
+        $penalizedNode = $penalized->node('USD');
+        self::assertNotNull($penalizedNode);
+        self::assertSame(1, $penalizedNode->edges()->count());
+
+        $penalizedEdge = $penalizedNode->edges()->first();
+        self::assertNotNull($penalizedEdge);
+
+        $originalMax = $edge->baseCapacity()->max()->decimal();
+        $penalizedMax = $penalizedEdge->baseCapacity()->max()->decimal();
+
+        self::assertTrue($penalizedMax->isLessThan($originalMax));
+    }
+
+    #[TestDox('withOrderPenalties with empty usage counts returns same graph')]
+    public function test_with_order_penalties_empty_returns_same(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.00', '1000.00', '0.92', 2, 2);
+        $edge = $this->createEdge('USD', 'EUR', $order);
+
+        $nodeUsd = new GraphNode('USD', [$edge]);
+        $graph = new Graph([$nodeUsd]);
+
+        $penalized = $graph->withOrderPenalties([], '0.15');
+
+        // Should return same instance
+        self::assertSame($graph, $penalized);
+    }
+
+    #[TestDox('withOrderPenalties preserves unpenalized orders')]
+    public function test_with_order_penalties_preserves_unpenalized(): void
+    {
+        $order1 = OrderFactory::buy('USD', 'EUR', '10.00', '1000.00', '0.92', 2, 2);
+        $order2 = OrderFactory::buy('USD', 'GBP', '10.00', '1000.00', '0.80', 2, 2);
+        $edge1 = $this->createEdge('USD', 'EUR', $order1);
+        $edge2 = $this->createEdge('USD', 'GBP', $order2);
+
+        $nodeUsd = new GraphNode('USD', [$edge1, $edge2]);
+        $graph = new Graph([$nodeUsd]);
+
+        // Only penalize order1
+        $orderId1 = spl_object_id($order1);
+        $penalized = $graph->withOrderPenalties([$orderId1 => 1], '0.15');
+
+        $penalizedNode = $penalized->node('USD');
+        self::assertNotNull($penalizedNode);
+        self::assertSame(2, $penalizedNode->edges()->count());
+    }
+
+    #[TestDox('withOrderPenalties with non-existent order IDs returns same graph')]
+    public function test_with_order_penalties_nonexistent_returns_same(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.00', '1000.00', '0.92', 2, 2);
+        $edge = $this->createEdge('USD', 'EUR', $order);
+
+        $nodeUsd = new GraphNode('USD', [$edge]);
+        $graph = new Graph([$nodeUsd]);
+
+        // Penalize a non-existent order ID
+        $penalized = $graph->withOrderPenalties([999999999 => 1], '0.15');
+
+        // Should return same instance since no changes
+        self::assertSame($graph, $penalized);
+    }
+
+    #[TestDox('withOrderPenalties on empty graph returns same instance')]
+    public function test_with_order_penalties_empty_graph(): void
+    {
+        $graph = new Graph([]);
+
+        $penalized = $graph->withOrderPenalties([12345 => 1], '0.15');
+
+        self::assertSame($graph, $penalized);
+    }
+
+    #[TestDox('withOrderPenalties higher usage count applies more penalty')]
+    public function test_with_order_penalties_higher_count_more_penalty(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.00', '1000.00', '0.92', 2, 2);
+        $edge = $this->createEdge('USD', 'EUR', $order);
+
+        $nodeUsd = new GraphNode('USD', [$edge]);
+        $graph = new Graph([$nodeUsd]);
+
+        $orderId = spl_object_id($order);
+
+        $penalized1 = $graph->withOrderPenalties([$orderId => 1], '0.15');
+        $penalized2 = $graph->withOrderPenalties([$orderId => 2], '0.15');
+        $penalized3 = $graph->withOrderPenalties([$orderId => 3], '0.15');
+
+        $max1 = $penalized1->node('USD')->edges()->first()->baseCapacity()->max()->decimal();
+        $max2 = $penalized2->node('USD')->edges()->first()->baseCapacity()->max()->decimal();
+        $max3 = $penalized3->node('USD')->edges()->first()->baseCapacity()->max()->decimal();
+
+        // Higher usage count = lower max
+        self::assertTrue($max1->isGreaterThan($max2));
+        self::assertTrue($max2->isGreaterThan($max3));
+    }
+
+    #[TestDox('withoutOrders with empty array returns instance with unchanged structure')]
+    public function test_without_orders_empty_returns_unchanged_structure(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.00', '1000.00', '0.92', 2, 2);
+        $edge = $this->createEdge('USD', 'EUR', $order);
+        $nodeUsd = new GraphNode('USD', [$edge]);
+        $graph = new Graph([$nodeUsd]);
+
+        $result = $graph->withoutOrders([]);
+
+        // Should return same instance (optimization)
+        self::assertSame($graph, $result);
+
+        // But also verify structure is intact
+        self::assertTrue($result->hasNode('USD'));
+        self::assertSame(1, $result->node('USD')->edges()->count());
+        self::assertSame($order, $result->node('USD')->edges()->first()->order());
+    }
+
+    #[TestDox('withOrderPenalties with empty usage returns instance with unchanged structure')]
+    public function test_with_order_penalties_empty_returns_unchanged_structure(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.00', '1000.00', '0.92', 2, 2);
+        $edge = $this->createEdge('USD', 'EUR', $order);
+        $nodeUsd = new GraphNode('USD', [$edge]);
+        $graph = new Graph([$nodeUsd]);
+
+        $result = $graph->withOrderPenalties([], '0.15');
+
+        // Should return same instance (optimization)
+        self::assertSame($graph, $result);
+
+        // But also verify structure is intact
+        self::assertTrue($result->hasNode('USD'));
+        self::assertSame(1, $result->node('USD')->edges()->count());
+        self::assertSame($order, $result->node('USD')->edges()->first()->order());
+    }
+
     /**
      * Helper to create a GraphEdge for testing.
      */

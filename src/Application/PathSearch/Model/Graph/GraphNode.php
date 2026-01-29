@@ -68,4 +68,23 @@ final class GraphNode implements IteratorAggregate
 
         return new self($this->currency, $filteredEdges);
     }
+
+    /**
+     * Returns a new node with capacity penalties applied to specified orders.
+     *
+     * @param array<int, int> $usageCounts   Order object ID => usage count
+     * @param string          $penaltyFactor Penalty multiplier per usage
+     *
+     * @return self New node with penalized edges
+     */
+    public function withOrderPenalties(array $usageCounts, string $penaltyFactor): self
+    {
+        $penalizedEdges = $this->edges->withOrderPenalties($usageCounts, $penaltyFactor);
+
+        if ($penalizedEdges === $this->edges) {
+            return $this;
+        }
+
+        return new self($this->currency, $penalizedEdges);
+    }
 }

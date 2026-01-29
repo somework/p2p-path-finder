@@ -15,6 +15,7 @@ use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathCost;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathOrderStrategy;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\RouteSignature;
+use SomeWork\P2PPathFinder\Application\PathSearch\Model;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionPlan;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSetEntry;
@@ -27,6 +28,7 @@ use SomeWork\P2PPathFinder\Exception\GuardLimitExceeded;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 
+use function count;
 use function implode;
 use function sprintf;
 use function strtoupper;
@@ -39,9 +41,13 @@ use function trim;
  * ranked execution plans ordered by cost (best first). Use `PathSearchConfig::resultLimit()`
  * to configure K (defaults to 1 for backward compatibility).
  *
- * ## Top-K Algorithm
+ * ## Top-K Modes
  *
- * The Top-K implementation uses **Iterative Exclusion**:
+ * The service supports two Top-K modes, controlled by `PathSearchConfig::disjointPlans()`:
+ *
+ * ### Disjoint Mode (default, `disjointPlans=true`)
+ *
+ * Uses **Iterative Exclusion**:
  * 1. Find the optimal execution plan
  * 2. For each subsequent plan (up to K-1 more):
  *    - Exclude all orders used in previously found plans
@@ -50,7 +56,21 @@ use function trim;
  * 3. Return all found plans, ordered by cost (best first)
  *
  * Each returned plan uses a **completely disjoint set of orders** - no order appears
- * in multiple plans. This ensures true alternatives for fallback or comparison.
+ * in multiple plans. This ensures true alternatives for fallback scenarios.
+ *
+ * ### Reusable Mode (`disjointPlans=false`)
+ *
+ * Uses **Penalty-Based Diversification**:
+ * 1. Find the optimal execution plan
+ * 2. For each subsequent plan:
+ *    - Apply capacity penalties to previously used orders
+ *    - Search for the next best plan (orders can be reused)
+ *    - Skip duplicate plans (same signature or cost)
+ *    - Stop if no more unique plans can be found
+ * 3. Return all unique plans, ordered by cost (best first)
+ *
+ * Plans CAN share orders since only one plan will actually execute. This mode is
+ * useful for rate comparison scenarios where users want to see more alternatives.
  *
  * ## Capabilities
  *
@@ -174,7 +194,6 @@ final class ExecutionPlanService
         $sourceCurrency = strtoupper(trim($request->sourceAsset()));
         $targetCurrency = strtoupper(trim($targetAsset));
         $requestedSpend = $request->spendAmount();
-        $resultLimit = $config->resultLimit();
 
         // Validate inputs
         if ('' === $sourceCurrency) {
@@ -210,7 +229,46 @@ final class ExecutionPlanService
             $config->pathFinderMaxVisitedStates(),
         );
 
-        // Top-K iterative exclusion loop
+        // Branch based on Top-K mode
+        if ($config->disjointPlans()) {
+            return $this->findDisjointTopK(
+                $config,
+                $engine,
+                $graph,
+                $sourceCurrency,
+                $targetCurrency,
+                $requestedSpend,
+            );
+        }
+
+        return $this->findReusableTopK(
+            $config,
+            $engine,
+            $graph,
+            $sourceCurrency,
+            $targetCurrency,
+            $requestedSpend,
+        );
+    }
+
+    /**
+     * Finds Top-K plans using disjoint order sets (original algorithm).
+     *
+     * Each subsequent search excludes all orders used in previously found plans,
+     * ensuring each plan uses completely different orders.
+     *
+     * @return SearchOutcome<ExecutionPlan>
+     */
+    private function findDisjointTopK(
+        PathSearchConfig $config,
+        ExecutionPlanSearchEngine $engine,
+        Model\Graph\Graph $graph,
+        string $sourceCurrency,
+        string $targetCurrency,
+        Money $requestedSpend,
+    ): SearchOutcome {
+        $resultLimit = $config->resultLimit();
+
         /** @var list<PathResultSetEntry<ExecutionPlan>> $entries */
         $entries = [];
         /** @var list<SearchGuardReport> $guardReports */
@@ -295,6 +353,182 @@ final class ExecutionPlanService
             }
         }
 
+        return $this->buildSearchOutcome($config, $entries, $guardReports);
+    }
+
+    /**
+     * Finds Top-K plans allowing order reuse with penalty-based diversification.
+     *
+     * Plans can share orders since only one will actually execute. Uses capacity
+     * penalties to encourage diversity while detecting and skipping duplicates.
+     *
+     * @return SearchOutcome<ExecutionPlan>
+     */
+    private function findReusableTopK(
+        PathSearchConfig $config,
+        ExecutionPlanSearchEngine $engine,
+        Model\Graph\Graph $graph,
+        string $sourceCurrency,
+        string $targetCurrency,
+        Money $requestedSpend,
+    ): SearchOutcome {
+        $resultLimit = $config->resultLimit();
+        $penaltyFactor = '0.15'; // 15% penalty per reuse
+
+        /** @var list<PathResultSetEntry<ExecutionPlan>> $entries */
+        $entries = [];
+        /** @var list<SearchGuardReport> $guardReports */
+        $guardReports = [];
+        /** @var array<string, true> $signatures */
+        $signatures = [];
+        /** @var array<int, int> $usageCounts Order object ID => usage count */
+        $usageCounts = [];
+        /** @var list<ExecutionPlan> $acceptedPlans */
+        $acceptedPlans = [];
+
+        // Allow extra iterations to handle duplicates (up to 2x resultLimit)
+        $maxIterations = $resultLimit * 2;
+        $consecutiveDuplicates = 0;
+        $maxConsecutiveDuplicates = $resultLimit; // Stop after too many duplicates
+
+        for ($iteration = 0; $iteration < $maxIterations; ++$iteration) {
+            // Apply penalties to used orders
+            $penalizedGraph = $graph->withOrderPenalties($usageCounts, $penaltyFactor);
+
+            // Search for next best plan
+            $searchOutcome = $engine->search(
+                $penalizedGraph,
+                $sourceCurrency,
+                $targetCurrency,
+                $requestedSpend,
+            );
+
+            $guardReports[] = $searchOutcome->guardReport();
+
+            // Check guard limits after each iteration
+            $this->assertGuardLimits($config, $searchOutcome->guardReport());
+
+            // Stop if no path found
+            if (!$searchOutcome->hasRawFills()) {
+                break;
+            }
+
+            // Initial tolerance evaluation
+            $toleranceResult = $this->toleranceEvaluator->evaluate(
+                $config,
+                $requestedSpend,
+                $requestedSpend,
+            );
+            $tolerance = $toleranceResult ?? DecimalTolerance::fromNumericString('0', self::COST_SCALE);
+
+            /** @var list<array{order: \SomeWork\P2PPathFinder\Domain\Order\Order, spend: Money, sequence: int}> $rawFills */
+            $rawFills = $searchOutcome->rawFills();
+
+            // Materialize the plan
+            $plan = $this->materializer->materialize(
+                $rawFills,
+                $sourceCurrency,
+                $targetCurrency,
+                $tolerance,
+            );
+
+            if (null === $plan) {
+                break;
+            }
+
+            // Re-evaluate tolerance with actual spent amount
+            $toleranceResult = $this->toleranceEvaluator->evaluate(
+                $config,
+                $requestedSpend,
+                $plan->totalSpent(),
+            );
+
+            if (null === $toleranceResult) {
+                break;
+            }
+
+            // Check for signature duplicate
+            $sig = $plan->signature();
+            if (isset($signatures[$sig])) {
+                // Increment penalties for orders in this duplicate plan
+                foreach ($plan->steps() as $step) {
+                    $orderId = spl_object_id($step->order());
+                    $usageCounts[$orderId] = ($usageCounts[$orderId] ?? 0) + 1;
+                }
+                ++$consecutiveDuplicates;
+                if ($consecutiveDuplicates >= $maxConsecutiveDuplicates) {
+                    break; // Too many duplicates, stop iteration
+                }
+                continue;
+            }
+
+            // Check for effective duplicate (same cost)
+            $isDuplicate = false;
+            foreach ($acceptedPlans as $existingPlan) {
+                if ($plan->isDuplicateOf($existingPlan)) {
+                    $isDuplicate = true;
+                    break;
+                }
+            }
+
+            if ($isDuplicate) {
+                // Increment penalties and continue
+                foreach ($plan->steps() as $step) {
+                    $orderId = spl_object_id($step->order());
+                    $usageCounts[$orderId] = ($usageCounts[$orderId] ?? 0) + 1;
+                }
+                ++$consecutiveDuplicates;
+                if ($consecutiveDuplicates >= $maxConsecutiveDuplicates) {
+                    break;
+                }
+                continue;
+            }
+
+            // Accept this unique plan
+            $consecutiveDuplicates = 0; // Reset counter
+            $signatures[$sig] = true;
+            $acceptedPlans[] = $plan;
+
+            // Create ordering key for the result
+            $orderKey = $this->createOrderKey($plan, count($entries));
+
+            /** @var PathResultSetEntry<ExecutionPlan> $entry */
+            $entry = new PathResultSetEntry($plan, $orderKey);
+            $entries[] = $entry;
+
+            // Update usage counts for orders in this plan
+            foreach ($plan->steps() as $step) {
+                $orderId = spl_object_id($step->order());
+                $usageCounts[$orderId] = ($usageCounts[$orderId] ?? 0) + 1;
+            }
+
+            // Stop if we have enough plans
+            if (count($entries) >= $resultLimit) {
+                break;
+            }
+
+            // Stop if guard was breached
+            if ($searchOutcome->guardReport()->anyLimitReached()) {
+                break;
+            }
+        }
+
+        return $this->buildSearchOutcome($config, $entries, $guardReports);
+    }
+
+    /**
+     * Builds the final search outcome from collected entries and guard reports.
+     *
+     * @param list<PathResultSetEntry<ExecutionPlan>> $entries
+     * @param list<SearchGuardReport>                 $guardReports
+     *
+     * @return SearchOutcome<ExecutionPlan>
+     */
+    private function buildSearchOutcome(
+        PathSearchConfig $config,
+        array $entries,
+        array $guardReports,
+    ): SearchOutcome {
         // Aggregate guard reports from all iterations
         $aggregatedGuardReport = SearchGuardReport::aggregate($guardReports);
 

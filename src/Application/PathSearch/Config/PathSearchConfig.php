@@ -70,6 +70,7 @@ final class PathSearchConfig
         ?SearchGuardConfig $searchGuards = null,
         ?string $pathFinderToleranceOverride = null,
         bool $throwOnGuardLimit = false,
+        private readonly bool $disjointPlans = true,
     ) {
         if ($minimumHops < 1) {
             throw new InvalidInput('Minimum hops must be at least one.');
@@ -241,6 +242,21 @@ final class PathSearchConfig
     public function throwOnGuardLimit(): bool
     {
         return $this->throwOnGuardLimit;
+    }
+
+    /**
+     * Returns whether Top-K plans must use disjoint (non-overlapping) order sets.
+     *
+     * - true (default): Each plan uses completely different orders (independent fallbacks)
+     * - false: Plans can share orders (more alternatives, but not independent)
+     *
+     * When disabled (false), the algorithm uses penalty-based diversification to
+     * encourage variety while allowing order reuse across plans. This is useful
+     * for rate comparison scenarios where only one plan will actually execute.
+     */
+    public function disjointPlans(): bool
+    {
+        return $this->disjointPlans;
     }
 
     /**

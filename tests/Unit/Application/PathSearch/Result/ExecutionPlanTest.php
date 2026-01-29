@@ -764,4 +764,328 @@ final class ExecutionPlanTest extends TestCase
         self::assertInstanceOf(Path::class, $path);
         self::assertSame($tolerance->ratio(), $path->residualTolerance()->ratio());
     }
+
+    // ==================== Signature and Duplicate Detection Tests ====================
+
+    public function test_signature_is_deterministic(): void
+    {
+        $order = OrderFactory::sell('USD', 'BTC');
+        $step = new ExecutionStep(
+            'USD',
+            'BTC',
+            Money::fromString('USD', '100.00', 2),
+            Money::fromString('BTC', '0.00250000', 8),
+            $order,
+            MoneyMap::empty(),
+            1,
+        );
+
+        $steps = ExecutionStepCollection::fromList([$step]);
+        $tolerance = DecimalTolerance::fromNumericString('0.01');
+
+        $plan = ExecutionPlan::fromSteps($steps, 'USD', 'BTC', $tolerance);
+
+        // Same plan should produce same signature on repeated calls
+        $sig1 = $plan->signature();
+        $sig2 = $plan->signature();
+
+        self::assertSame($sig1, $sig2);
+        self::assertStringContainsString('USD->BTC:', $sig1);
+    }
+
+    public function test_signature_differs_for_different_orders(): void
+    {
+        $order1 = OrderFactory::sell('USD', 'BTC');
+        $order2 = OrderFactory::sell('USD', 'BTC'); // Different object
+
+        $step1 = new ExecutionStep(
+            'USD',
+            'BTC',
+            Money::fromString('USD', '100.00', 2),
+            Money::fromString('BTC', '0.00250000', 8),
+            $order1,
+            MoneyMap::empty(),
+            1,
+        );
+
+        $step2 = new ExecutionStep(
+            'USD',
+            'BTC',
+            Money::fromString('USD', '100.00', 2),
+            Money::fromString('BTC', '0.00250000', 8),
+            $order2,
+            MoneyMap::empty(),
+            1,
+        );
+
+        $tolerance = DecimalTolerance::fromNumericString('0.01');
+
+        $plan1 = ExecutionPlan::fromSteps(ExecutionStepCollection::fromList([$step1]), 'USD', 'BTC', $tolerance);
+        $plan2 = ExecutionPlan::fromSteps(ExecutionStepCollection::fromList([$step2]), 'USD', 'BTC', $tolerance);
+
+        // Different order objects should produce different signatures
+        self::assertNotSame($plan1->signature(), $plan2->signature());
+    }
+
+    public function test_signature_differs_for_different_routes(): void
+    {
+        $order = OrderFactory::sell('USD', 'BTC');
+        $order2 = OrderFactory::sell('EUR', 'BTC');
+
+        $step1 = new ExecutionStep(
+            'USD',
+            'BTC',
+            Money::fromString('USD', '100.00', 2),
+            Money::fromString('BTC', '0.00250000', 8),
+            $order,
+            MoneyMap::empty(),
+            1,
+        );
+
+        $step2 = new ExecutionStep(
+            'EUR',
+            'BTC',
+            Money::fromString('EUR', '100.00', 2),
+            Money::fromString('BTC', '0.00250000', 8),
+            $order2,
+            MoneyMap::empty(),
+            1,
+        );
+
+        $tolerance = DecimalTolerance::fromNumericString('0.01');
+
+        $plan1 = ExecutionPlan::fromSteps(ExecutionStepCollection::fromList([$step1]), 'USD', 'BTC', $tolerance);
+        $plan2 = ExecutionPlan::fromSteps(ExecutionStepCollection::fromList([$step2]), 'EUR', 'BTC', $tolerance);
+
+        // Different source currencies should produce different signatures
+        self::assertNotSame($plan1->signature(), $plan2->signature());
+        self::assertStringContainsString('USD->BTC', $plan1->signature());
+        self::assertStringContainsString('EUR->BTC', $plan2->signature());
+    }
+
+    public function test_signature_sorted_by_order_id(): void
+    {
+        $order1 = OrderFactory::sell('USD', 'USDT');
+        $order2 = OrderFactory::sell('USDT', 'BTC');
+
+        // Create two steps in different orders
+        $stepA = new ExecutionStep(
+            'USD',
+            'USDT',
+            Money::fromString('USD', '100.00', 2),
+            Money::fromString('USDT', '100.00', 2),
+            $order1,
+            MoneyMap::empty(),
+            1,
+        );
+
+        $stepB = new ExecutionStep(
+            'USDT',
+            'BTC',
+            Money::fromString('USDT', '100.00', 2),
+            Money::fromString('BTC', '0.00250000', 8),
+            $order2,
+            MoneyMap::empty(),
+            2,
+        );
+
+        $tolerance = DecimalTolerance::fromNumericString('0.01');
+
+        // Steps in different orders should produce same signature (order IDs are sorted)
+        $plan1 = ExecutionPlan::fromSteps(ExecutionStepCollection::fromList([$stepA, $stepB]), 'USD', 'BTC', $tolerance);
+        $plan2 = ExecutionPlan::fromSteps(ExecutionStepCollection::fromList([$stepB, $stepA]), 'USD', 'BTC', $tolerance);
+
+        // Same orders should produce same signature regardless of step order
+        self::assertSame($plan1->signature(), $plan2->signature());
+    }
+
+    public function test_is_duplicate_of_detects_same_signature(): void
+    {
+        $order = OrderFactory::sell('USD', 'BTC');
+
+        $step = new ExecutionStep(
+            'USD',
+            'BTC',
+            Money::fromString('USD', '100.00', 2),
+            Money::fromString('BTC', '0.00250000', 8),
+            $order,
+            MoneyMap::empty(),
+            1,
+        );
+
+        $tolerance = DecimalTolerance::fromNumericString('0.01');
+        $steps = ExecutionStepCollection::fromList([$step]);
+
+        // Create two plans with the same step (same order)
+        $plan1 = ExecutionPlan::fromSteps($steps, 'USD', 'BTC', $tolerance);
+
+        // Create second plan with same order
+        $plan2 = new ExecutionPlan(
+            $steps,
+            'USD',
+            'BTC',
+            Money::fromString('USD', '100.00', 2),
+            Money::fromString('BTC', '0.00250000', 8),
+            MoneyMap::empty(),
+            $tolerance,
+        );
+
+        // Same signature should be considered duplicate
+        self::assertTrue($plan1->isDuplicateOf($plan2));
+        self::assertTrue($plan2->isDuplicateOf($plan1));
+    }
+
+    public function test_is_duplicate_of_detects_same_cost_within_epsilon(): void
+    {
+        $order1 = OrderFactory::sell('USD', 'BTC');
+        $order2 = OrderFactory::sell('USD', 'BTC');
+
+        $step1 = new ExecutionStep(
+            'USD',
+            'BTC',
+            Money::fromString('USD', '100.00', 2),
+            Money::fromString('BTC', '0.00250000', 8),
+            $order1,
+            MoneyMap::empty(),
+            1,
+        );
+
+        $step2 = new ExecutionStep(
+            'USD',
+            'BTC',
+            Money::fromString('USD', '100.00', 2),
+            Money::fromString('BTC', '0.00250000', 8), // Same cost
+            $order2,
+            MoneyMap::empty(),
+            1,
+        );
+
+        $tolerance = DecimalTolerance::fromNumericString('0.01');
+
+        $plan1 = ExecutionPlan::fromSteps(ExecutionStepCollection::fromList([$step1]), 'USD', 'BTC', $tolerance);
+        $plan2 = ExecutionPlan::fromSteps(ExecutionStepCollection::fromList([$step2]), 'USD', 'BTC', $tolerance);
+
+        // Different orders but same cost should be considered duplicates
+        self::assertTrue($plan1->isDuplicateOf($plan2));
+    }
+
+    public function test_is_duplicate_of_returns_false_for_different_plans(): void
+    {
+        $order1 = OrderFactory::sell('USD', 'BTC');
+        $order2 = OrderFactory::sell('USD', 'BTC');
+
+        $step1 = new ExecutionStep(
+            'USD',
+            'BTC',
+            Money::fromString('USD', '100.00', 2),
+            Money::fromString('BTC', '0.00250000', 8),
+            $order1,
+            MoneyMap::empty(),
+            1,
+        );
+
+        $step2 = new ExecutionStep(
+            'USD',
+            'BTC',
+            Money::fromString('USD', '100.00', 2),
+            Money::fromString('BTC', '0.00200000', 8), // Different cost (different received amount)
+            $order2,
+            MoneyMap::empty(),
+            1,
+        );
+
+        $tolerance = DecimalTolerance::fromNumericString('0.01');
+
+        $plan1 = ExecutionPlan::fromSteps(ExecutionStepCollection::fromList([$step1]), 'USD', 'BTC', $tolerance);
+        $plan2 = ExecutionPlan::fromSteps(ExecutionStepCollection::fromList([$step2]), 'USD', 'BTC', $tolerance);
+
+        // Different orders and different costs should not be duplicates
+        self::assertFalse($plan1->isDuplicateOf($plan2));
+    }
+
+    public function test_is_duplicate_of_returns_false_for_different_routes(): void
+    {
+        $order1 = OrderFactory::sell('USD', 'BTC');
+        $order2 = OrderFactory::sell('EUR', 'BTC');
+
+        $step1 = new ExecutionStep(
+            'USD',
+            'BTC',
+            Money::fromString('USD', '100.00', 2),
+            Money::fromString('BTC', '0.00250000', 8),
+            $order1,
+            MoneyMap::empty(),
+            1,
+        );
+
+        $step2 = new ExecutionStep(
+            'EUR',
+            'BTC',
+            Money::fromString('EUR', '92.00', 2),
+            Money::fromString('BTC', '0.00250000', 8), // Same received amount
+            $order2,
+            MoneyMap::empty(),
+            1,
+        );
+
+        $tolerance = DecimalTolerance::fromNumericString('0.01');
+
+        $plan1 = ExecutionPlan::fromSteps(ExecutionStepCollection::fromList([$step1]), 'USD', 'BTC', $tolerance);
+        $plan2 = ExecutionPlan::fromSteps(ExecutionStepCollection::fromList([$step2]), 'EUR', 'BTC', $tolerance);
+
+        // Different source currencies - not duplicates even with similar costs
+        self::assertFalse($plan1->isDuplicateOf($plan2));
+    }
+
+    public function test_is_duplicate_of_handles_zero_received_amount(): void
+    {
+        $order = OrderFactory::sell('USD', 'BTC');
+
+        // Create plan with zero received amount (edge case)
+        $tolerance = DecimalTolerance::fromNumericString('0.01');
+
+        $plan = new ExecutionPlan(
+            ExecutionStepCollection::fromList([
+                new ExecutionStep(
+                    'USD',
+                    'BTC',
+                    Money::fromString('USD', '100.00', 2),
+                    Money::fromString('BTC', '0.00000000', 8), // Zero received
+                    $order,
+                    MoneyMap::empty(),
+                    1,
+                ),
+            ]),
+            'USD',
+            'BTC',
+            Money::fromString('USD', '100.00', 2),
+            Money::fromString('BTC', '0.00000000', 8),
+            MoneyMap::empty(),
+            $tolerance,
+        );
+
+        $order2 = OrderFactory::sell('USD', 'BTC');
+        $plan2 = new ExecutionPlan(
+            ExecutionStepCollection::fromList([
+                new ExecutionStep(
+                    'USD',
+                    'BTC',
+                    Money::fromString('USD', '100.00', 2),
+                    Money::fromString('BTC', '0.00000000', 8),
+                    $order2,
+                    MoneyMap::empty(),
+                    1,
+                ),
+            ]),
+            'USD',
+            'BTC',
+            Money::fromString('USD', '100.00', 2),
+            Money::fromString('BTC', '0.00000000', 8),
+            MoneyMap::empty(),
+            $tolerance,
+        );
+
+        // Both have zero received, so cost would be infinite - should compare equal
+        self::assertTrue($plan->isDuplicateOf($plan2));
+    }
 }
