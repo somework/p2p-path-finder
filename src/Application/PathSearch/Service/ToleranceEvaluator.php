@@ -66,8 +66,8 @@ final class ToleranceEvaluator
     {
         $targetScale = ToleranceWindow::scale();
         $scale = max($desired->scale(), $actual->scale(), $targetScale);
-        $desiredDecimal = $desired->decimal()->toScale($scale, RoundingMode::HALF_UP);
-        $actualDecimal = $actual->decimal()->toScale($scale, RoundingMode::HALF_UP);
+        $desiredDecimal = $desired->decimal()->toScale($scale, RoundingMode::HalfUp);
+        $actualDecimal = $actual->decimal()->toScale($scale, RoundingMode::HalfUp);
 
         if ($desiredDecimal->isZero()) {
             if ($actualDecimal->isZero()) {
@@ -84,7 +84,7 @@ final class ToleranceEvaluator
         }
 
         $ratioScale = $targetScale + 4;
-        $ratio = $difference->dividedBy($desiredDecimal, $ratioScale, RoundingMode::HALF_UP);
+        $ratio = $difference->dividedBy($desiredDecimal, $ratioScale, RoundingMode::HalfUp);
 
         return $this->decimalToString($ratio, $targetScale);
     }
@@ -96,7 +96,7 @@ final class ToleranceEvaluator
 
     private function scaleDecimal(BigDecimal $decimal, int $scale): BigDecimal
     {
-        return $decimal->toScale($scale, RoundingMode::HALF_UP);
+        return $decimal->toScale($scale, RoundingMode::HalfUp);
     }
 
     /**

@@ -331,7 +331,7 @@ final class ExecutionPlan implements SearchResultInterface
         return $this->totalSpent->decimal()->dividedBy(
             $this->totalReceived->decimal(),
             18,
-            RoundingMode::HALF_UP
+            RoundingMode::HalfUp
         );
     }
 

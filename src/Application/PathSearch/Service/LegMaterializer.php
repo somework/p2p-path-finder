@@ -223,7 +223,7 @@ final class LegMaterializer
 
             $spent = $targetEffectiveQuote->withScale($outputScale);
             // Direct division: base_amount = quote_amount / rate (use high precision, then scale result)
-            $receivedDecimal = $targetEffectiveQuote->decimal()->dividedBy($rate->decimal(), $workingScale, RoundingMode::HALF_UP);
+            $receivedDecimal = $targetEffectiveQuote->decimal()->dividedBy($rate->decimal(), $workingScale, RoundingMode::HalfUp);
             $received = Money::fromString(
                 $order->assetPair()->base(),
                 self::decimalToString($receivedDecimal, $outputScale),
@@ -432,7 +432,7 @@ final class LegMaterializer
             }
 
             $divisionScale = $ratioScale + self::BUY_ADJUSTMENT_RATIO_EXTRA_SCALE;
-            $ratio = $ceilingDecimal->dividedBy($grossDecimal, $divisionScale, RoundingMode::HALF_UP);
+            $ratio = $ceilingDecimal->dividedBy($grossDecimal, $divisionScale, RoundingMode::HalfUp);
 
             if ($ratio->isZero()) {
                 // Adjustment ratio collapsed to zero - cannot make progress
@@ -569,7 +569,7 @@ final class LegMaterializer
 
         $difference = $actualDecimal->minus($targetDecimal)->abs();
         $relativeScale = $comparisonScale + self::SELL_RESOLUTION_RATIO_EXTRA_SCALE;
-        $relative = $difference->dividedBy($targetDecimal->abs(), $relativeScale, RoundingMode::HALF_UP);
+        $relative = $difference->dividedBy($targetDecimal->abs(), $relativeScale, RoundingMode::HalfUp);
 
         $tolerance = self::scaleDecimal(
             BigDecimal::of(self::SELL_RESOLUTION_RELATIVE_TOLERANCE),
@@ -601,7 +601,7 @@ final class LegMaterializer
         }
 
         $ratioScale = $scale + self::SELL_RESOLUTION_RATIO_EXTRA_SCALE;
-        $ratio = $targetDecimal->dividedBy($actualDecimal, $ratioScale, RoundingMode::HALF_UP);
+        $ratio = $targetDecimal->dividedBy($actualDecimal, $ratioScale, RoundingMode::HalfUp);
 
         return self::decimalToString($ratio, $ratioScale);
     }

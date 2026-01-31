@@ -57,7 +57,7 @@ final class CandidatePath
     public function cost(): string
     {
         /** @var numeric-string $value */
-        $value = $this->cost->toScale(18, \Brick\Math\RoundingMode::HALF_UP)->__toString();
+        $value = $this->cost->toScale(18, \Brick\Math\RoundingMode::HalfUp)->__toString();
 
         return $value;
     }
@@ -73,7 +73,7 @@ final class CandidatePath
     public function product(): string
     {
         /** @var numeric-string $value */
-        $value = $this->product->toScale(18, \Brick\Math\RoundingMode::HALF_UP)->__toString();
+        $value = $this->product->toScale(18, \Brick\Math\RoundingMode::HalfUp)->__toString();
 
         return $value;
     }

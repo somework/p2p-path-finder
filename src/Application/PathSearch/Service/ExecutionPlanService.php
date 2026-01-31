@@ -593,7 +593,7 @@ final class ExecutionPlanService
         }
 
         return self::scaleDecimal(
-            $spent->decimal()->dividedBy($received->decimal(), self::COST_SCALE, RoundingMode::HALF_UP),
+            $spent->decimal()->dividedBy($received->decimal(), self::COST_SCALE, RoundingMode::HalfUp),
             self::COST_SCALE
         );
     }

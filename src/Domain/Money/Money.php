@@ -237,7 +237,7 @@ final class Money
             throw new InvalidInput('Division by zero.');
         }
 
-        $result = self::scaleDecimal($this->decimal->dividedBy($divisorDecimal, $scale, RoundingMode::HALF_UP), $scale);
+        $result = self::scaleDecimal($this->decimal->dividedBy($divisorDecimal, $scale, RoundingMode::HalfUp), $scale);
 
         return new self($this->currency, $result, $scale);
     }
@@ -364,7 +364,7 @@ final class Money
     {
         self::assertScale($scale);
 
-        return $decimal->toScale($scale, RoundingMode::HALF_UP);
+        return $decimal->toScale($scale, RoundingMode::HalfUp);
     }
 
     /**

@@ -484,7 +484,7 @@ final class ExecutionPlanSearchEngine
                 }
 
                 $newCost = self::scaleDecimal(
-                    $currentCost->dividedBy($edgeCost, self::SCALE, RoundingMode::HALF_UP),
+                    $currentCost->dividedBy($edgeCost, self::SCALE, RoundingMode::HalfUp),
                     self::SCALE
                 );
 
@@ -497,7 +497,7 @@ final class ExecutionPlanSearchEngine
                     // Insert with negative cost for min-heap behavior
                     // Use floor to avoid rounding issues
                     $costForPriority = $newCost->multipliedBy(BigDecimal::of(1000000))
-                        ->toScale(0, RoundingMode::FLOOR);
+                        ->toScale(0, RoundingMode::Floor);
                     $costInt = $costForPriority->toInt();
                     $queue->insert($nextCurrency, [-$costInt, -$insertOrder++]);
                 }
@@ -560,7 +560,7 @@ final class ExecutionPlanSearchEngine
         $quoteCapacity = $edge->quoteCapacity();
         $quoteMax = $quoteCapacity->max()->decimal();
 
-        return $quoteMax->dividedBy($baseMax, self::SCALE, RoundingMode::HALF_UP);
+        return $quoteMax->dividedBy($baseMax, self::SCALE, RoundingMode::HalfUp);
     }
 
     /**
@@ -679,7 +679,7 @@ final class ExecutionPlanSearchEngine
         );
 
         // Direct division: base_amount = quote_amount / rate
-        $receivedDecimal = $quoteAmount->decimal()->dividedBy($rate->decimal(), self::SCALE, RoundingMode::HALF_UP);
+        $receivedDecimal = $quoteAmount->decimal()->dividedBy($rate->decimal(), self::SCALE, RoundingMode::HalfUp);
         $baseAmount = Money::fromString(
             $order->assetPair()->base(),
             self::decimalToString($receivedDecimal, self::SCALE),
@@ -795,7 +795,7 @@ final class ExecutionPlanSearchEngine
         }
 
         return self::scaleDecimal(
-            $spent->decimal()->dividedBy($received->decimal(), self::SCALE, RoundingMode::HALF_UP),
+            $spent->decimal()->dividedBy($received->decimal(), self::SCALE, RoundingMode::HalfUp),
             self::SCALE
         );
     }

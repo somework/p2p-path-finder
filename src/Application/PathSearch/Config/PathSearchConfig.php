@@ -301,7 +301,7 @@ final class PathSearchConfig
     private static function decimalToString(BigDecimal $decimal, int $scale): string
     {
         /** @var numeric-string $result */
-        $result = $decimal->toScale($scale, RoundingMode::HALF_UP)->__toString();
+        $result = $decimal->toScale($scale, RoundingMode::HalfUp)->__toString();
 
         return $result;
     }

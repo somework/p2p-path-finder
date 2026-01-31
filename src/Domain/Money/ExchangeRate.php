@@ -146,7 +146,7 @@ final class ExchangeRate
      */
     public function invert(): self
     {
-        $inverseRaw = BigDecimal::one()->dividedBy($this->decimal, $this->scale + 1, RoundingMode::HALF_UP);
+        $inverseRaw = BigDecimal::one()->dividedBy($this->decimal, $this->scale + 1, RoundingMode::HalfUp);
         $inverse = self::scaleDecimal($inverseRaw, $this->scale);
 
         return new self($this->quoteCurrency, $this->baseCurrency, $inverse, $this->scale);
@@ -229,7 +229,7 @@ final class ExchangeRate
     {
         self::assertScale($scale);
 
-        return $decimal->toScale($scale, RoundingMode::HALF_UP);
+        return $decimal->toScale($scale, RoundingMode::HalfUp);
     }
 
     /**

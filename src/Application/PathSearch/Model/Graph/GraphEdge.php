@@ -154,7 +154,7 @@ final class GraphEdge implements IteratorAggregate
     private function applyPenaltyToCapacity(EdgeCapacity $capacity, BigDecimal $divisor): EdgeCapacity
     {
         $originalMax = $capacity->max();
-        $penalizedMaxDecimal = $originalMax->decimal()->dividedBy($divisor, $originalMax->scale(), RoundingMode::HALF_UP);
+        $penalizedMaxDecimal = $originalMax->decimal()->dividedBy($divisor, $originalMax->scale(), RoundingMode::HalfUp);
 
         // Ensure penalized max is not below min
         $minDecimal = $capacity->min()->decimal();
@@ -164,7 +164,7 @@ final class GraphEdge implements IteratorAggregate
 
         $penalizedMax = Money::fromString(
             $originalMax->currency(),
-            $penalizedMaxDecimal->toScale($originalMax->scale(), RoundingMode::HALF_UP)->__toString(),
+            $penalizedMaxDecimal->toScale($originalMax->scale(), RoundingMode::HalfUp)->__toString(),
             $originalMax->scale()
         );
 
