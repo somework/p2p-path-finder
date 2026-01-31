@@ -76,6 +76,36 @@ jobs:
             -   name: Run Infection with coverage thresholds
                 run: composer infection -- --log-verbosity=none
 
+    phpbench-baseline:
+        name: PhpBench baseline (main)
+        runs-on: ubuntu-latest
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        steps:
+            -   name: Checkout repository
+                uses: actions/checkout@v6
+
+            -   name: Install dependencies
+                uses: ./.github/actions/composer-install
+                with:
+                    php-version: '8.3'
+                    ini_values: 'memory_limit=-1'
+
+            -   name: Generate and store PhpBench baseline
+                run: >-
+                    php -d memory_limit=-1 -d xdebug.mode=off vendor/bin/phpbench run
+                    --config=phpbench.json
+                    --store
+                    --tag=baseline
+                    --progress=plain
+                env:
+                    PHPBENCH_REF: baseline
+
+            -   name: Upload PhpBench baseline
+                uses: actions/upload-artifact@v6
+                with:
+                    name: phpbench-baseline-storage
+                    path: .phpbench
+
     phpbench:
         name: PhpBench
         runs-on: ubuntu-latest
@@ -89,14 +119,32 @@ jobs:
                     php-version: '8.3'
                     ini_values: 'memory_limit=-1'
 
-            -   name: Run PhpBench regression suite
-                run: >-
-                    php -d memory_limit=-1 -d xdebug.mode=off vendor/bin/phpbench run
-                    --config=phpbench.json
-                    --ref=baseline
-                    --progress=plain
-                    --assert="mean(variant.time.avg) <= mean(baseline.time.avg) +/- 20%"
-                    --assert="mean(variant.mem.peak) <= mean(baseline.mem.peak) +/- 30%"
+            -   name: Download PhpBench baseline (from main)
+                uses: dawidd6/action-download-artifact@v3
+                with:
+                    workflow: quality.yml
+                    branch: main
+                    name: phpbench-baseline-storage
+                    path: .
+                    if_no_artifact_found: ignore
+
+            -   name: Run PhpBench (with baseline comparison if available)
+                run: |
+                    set -e
+                    if [ -d .phpbench/storage ] && [ -n "$(ls -A .phpbench/storage 2>/dev/null)" ]; then
+                      echo "Baseline found — running with comparison"
+                      php -d memory_limit=-1 -d xdebug.mode=off vendor/bin/phpbench run \
+                        --config=phpbench.json \
+                        --ref=baseline \
+                        --progress=plain \
+                        --assert="mean(variant.time.avg) <= mean(baseline.time.avg) +/- 20%" \
+                        --assert="mean(variant.mem.peak) <= mean(baseline.mem.peak) +/- 30%"
+                    else
+                      echo "No baseline — running benchmarks only"
+                      php -d memory_limit=-1 -d xdebug.mode=off vendor/bin/phpbench run \
+                        --config=phpbench.json \
+                        --progress=plain
+                    fi
 
     artefacts:
         name: Docs & performance artefacts
@@ -122,18 +170,38 @@ jobs:
                     name: phpdoc-md
                     path: docs/api
                     if-no-files-found: error
+            -   name: Download PhpBench baseline (from main)
+                uses: dawidd6/action-download-artifact@v3
+                with:
+                    workflow: quality.yml
+                    branch: main
+                    name: phpbench-baseline-storage
+                    path: .
+                    if_no_artifact_found: ignore
+
             -   name: Prepare PhpBench artefact bundle
                 run: |
                     set -o pipefail
                     mkdir -p build/phpbench
-                    cp -R .phpbench/storage build/phpbench/
-                    php -d memory_limit=-1 -d xdebug.mode=off vendor/bin/phpbench run \
-                      --config=phpbench.json \
-                      --ref=baseline \
-                      --progress=plain \
-                      --report=p2p_aggregate \
-                      --iterations=1 \
-                      --revs=1 | tee build/phpbench/p2p_aggregate.txt
+                    if [ -d .phpbench/storage ] && [ -n "$(ls -A .phpbench/storage 2>/dev/null)" ]; then
+                      echo "Baseline found — running with comparison"
+                      php -d memory_limit=-1 -d xdebug.mode=off vendor/bin/phpbench run \
+                        --config=phpbench.json \
+                        --ref=baseline \
+                        --progress=plain \
+                        --report=p2p_aggregate \
+                        --iterations=1 \
+                        --revs=1 | tee build/phpbench/p2p_aggregate.txt
+                    else
+                      echo "No baseline — running benchmarks only"
+                      php -d memory_limit=-1 -d xdebug.mode=off vendor/bin/phpbench run \
+                        --config=phpbench.json \
+                        --progress=plain \
+                        --report=p2p_aggregate \
+                        --iterations=1 \
+                        --revs=1 | tee build/phpbench/p2p_aggregate.txt
+                    fi
+                    if [ -d .phpbench/storage ]; then cp -R .phpbench/storage build/phpbench/; fi
             -   name: Upload PhpBench artefact
                 uses: actions/upload-artifact@v6
                 with:
