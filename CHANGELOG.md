@@ -173,12 +173,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Changed Behavior
 
-- **Single execution plan returned**: `ExecutionPlanService::findBestPlans()` returns at most **ONE** optimal 
-  execution plan, not multiple ranked paths. The `paths()` collection will contain either 
-  0 or 1 entries. If you need alternative paths, run multiple searches with different constraints 
-  (e.g., modified tolerance bounds, different guard limits, or filtered order books).
-  - **Impact**: Code expecting multiple paths will need updates
-  - **Migration**: Use `bestPath()` to get the single plan or null
+- **Execution plan return (2.0.0)**: In 2.0.0, `ExecutionPlanService::findBestPlans()` returns at most **one**
+  execution plan; the `paths()` collection contains 0 or 1 entries. **Top-K support** (multiple ranked plans)
+  was introduced in Unreleased: `findBestPlans()` can now return multiple ranked `ExecutionPlan` entries
+  (up to K) in the `paths()` collection when configured via `PathSearchConfig::withResultLimit(K)`.
+  The return type remains `SearchOutcome<ExecutionPlan>` in both cases.
+  - **Impact**: Code written for 2.0.0 single-plan behavior remains valid; use `bestPath()` or iterate `paths()`
+  - **Migration**: For Top-K, set `withResultLimit(K)` and iterate `paths()` for alternatives
 
 - **Result type change**: `findBestPlans()` returns `SearchOutcome<ExecutionPlan>` instead of `SearchOutcome<Path>`
   - **Impact**: Code iterating over results must update from `Path` to `ExecutionPlan`

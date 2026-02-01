@@ -57,7 +57,7 @@ This document provides step-by-step instructions for upgrading between major ver
 ## Version Compatibility Matrix
 
 | Your Version | Target Version | Difficulty | Breaking Changes | Required Actions                                           |
-|--------------|----------------|------------|------------------|------------------------------------------------------------|
+| ------------ | -------------- | ---------- | ---------------- | ---------------------------------------------------------- |
 | **0.x**      | 1.0            | Medium     | Yes              | See [0.x → 1.0](#upgrading-from-0x-to-10)                  |
 | **1.x**      | 2.0            | Medium     | Yes              | See [1.x → 2.0](#upgrading-from-1x-to-20)                  |
 
@@ -76,7 +76,7 @@ Version 1.0 will be the first stable release with major architectural improvemen
 **Breaking Change**: All public class namespaces have been reorganized for better clarity:
 
 | Old Namespace | New Namespace |
-|---------------|---------------|
+| ------------- | ------------- |
 | `Application\Service\*` | `Application\PathSearch\Service\*` |
 | `Application\Config\*` | `Application\PathSearch\Config\*` |
 | `Application\Graph\*` | `Application\PathSearch\Model\Graph\*` |
@@ -146,7 +146,7 @@ The following classes and methods have been removed in version 2.0:
 #### New Features
 
 | Feature | Description |
-|---------|-------------|
+| --------- | ------------- |
 | **ExecutionPlanService** | New recommended service for path finding |
 | **ExecutionPlan** | Result type supporting split/merge execution |
 | **ExecutionStep** | Step with sequence number for execution ordering |
@@ -407,7 +407,7 @@ if (null !== $plan && $plan->isLinear()) {
 **ExecutionPlanService API**:
 
 | Method/Property | Description |
-|----------------|-------------|
+| ---------------- | ------------- |
 | `new ExecutionPlanService($graphBuilder)` | Create service with GraphBuilder |
 | `$service->findBestPlans($request)` | Find best execution plan |
 | Returns `SearchOutcome<ExecutionPlan>` | Search result with plan |

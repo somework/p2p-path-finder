@@ -997,4 +997,58 @@ final class ExecutionPlanSearchEngineTest extends TestCase
         // Sequences should match
         self::assertSame($rawSequences, $stepSequences, 'Sequence numbers should be preserved');
     }
+
+    // ========================================================================
+    // ExecutionPlanSearchOutcome empty/partial/complete invariants
+    // ========================================================================
+
+    public function test_execution_plan_search_outcome_complete_throws_when_raw_fills_empty(): void
+    {
+        $guardReport = \SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport::none();
+
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Complete outcome requires at least one raw fill.');
+
+        ExecutionPlanSearchOutcome::complete([], $guardReport, 'USD', 'BTC');
+    }
+
+    public function test_execution_plan_search_outcome_partial_throws_when_raw_fills_empty(): void
+    {
+        $guardReport = \SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport::none();
+
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Partial outcome requires at least one raw fill.');
+
+        ExecutionPlanSearchOutcome::partial([], $guardReport, 'USD', 'BTC');
+    }
+
+    public function test_execution_plan_search_outcome_complete_with_non_empty_fills(): void
+    {
+        $guardReport = \SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport::none();
+        $order = OrderFactory::buy('USD', 'BTC', '100', '1000', '0.00005', self::SCALE, self::SCALE);
+        $spend = Money::fromString('USD', '500.00000000', self::SCALE);
+        $rawFills = [['order' => $order, 'spend' => $spend, 'sequence' => 1]];
+
+        $outcome = ExecutionPlanSearchOutcome::complete($rawFills, $guardReport, 'USD', 'BTC');
+
+        self::assertTrue($outcome->hasRawFills());
+        self::assertTrue($outcome->isComplete());
+        self::assertFalse($outcome->isEmpty());
+        self::assertFalse($outcome->isPartial());
+    }
+
+    public function test_execution_plan_search_outcome_partial_with_non_empty_fills(): void
+    {
+        $guardReport = \SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport::none();
+        $order = OrderFactory::buy('USD', 'BTC', '100', '1000', '0.00005', self::SCALE, self::SCALE);
+        $spend = Money::fromString('USD', '500.00000000', self::SCALE);
+        $rawFills = [['order' => $order, 'spend' => $spend, 'sequence' => 1]];
+
+        $outcome = ExecutionPlanSearchOutcome::partial($rawFills, $guardReport, 'USD', 'BTC');
+
+        self::assertTrue($outcome->hasRawFills());
+        self::assertFalse($outcome->isComplete());
+        self::assertFalse($outcome->isEmpty());
+        self::assertTrue($outcome->isPartial());
+    }
 }

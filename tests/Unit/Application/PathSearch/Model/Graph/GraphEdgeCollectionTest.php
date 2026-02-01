@@ -554,6 +554,101 @@ final class GraphEdgeCollectionTest extends TestCase
         self::assertSame(1, $filtered->count());
     }
 
+    // ========================================================================
+    // withOrderPenalties() Tests
+    // ========================================================================
+
+    #[TestDox('withOrderPenalties returns same instance when usageCounts empty')]
+    public function test_with_order_penalties_returns_same_instance_when_usage_counts_empty(): void
+    {
+        $edge = $this->createEdge();
+        $collection = GraphEdgeCollection::fromArray([$edge]);
+
+        $result = $collection->withOrderPenalties([], '0.15');
+
+        self::assertSame($collection, $result);
+    }
+
+    #[TestDox('withOrderPenalties returns same instance when collection empty')]
+    public function test_with_order_penalties_returns_same_instance_when_collection_empty(): void
+    {
+        $collection = GraphEdgeCollection::empty();
+
+        $result = $collection->withOrderPenalties([12345 => 2], '0.15');
+
+        self::assertSame($collection, $result);
+    }
+
+    #[TestDox('withOrderPenalties returns same instance when no usageCount > 0')]
+    public function test_with_order_penalties_returns_same_instance_when_no_usage(): void
+    {
+        $edge1 = $this->createEdgeForQuote('USD');
+        $edge2 = $this->createEdgeForQuote('EUR');
+        $collection = GraphEdgeCollection::fromArray([$edge1, $edge2]);
+
+        // All usage counts are 0
+        $usageCounts = [
+            spl_object_id($edge1->order()) => 0,
+            spl_object_id($edge2->order()) => 0,
+        ];
+        $result = $collection->withOrderPenalties($usageCounts, '0.15');
+
+        self::assertSame($collection, $result);
+    }
+
+    #[TestDox('withOrderPenalties returns new collection with penalized edges when usageCount > 0')]
+    public function test_with_order_penalties_applies_penalty_when_usage_count_positive(): void
+    {
+        $edge1 = $this->createEdgeForQuote('USD');
+        $edge2 = $this->createEdgeForQuote('EUR');
+        $collection = GraphEdgeCollection::fromArray([$edge1, $edge2]);
+
+        $orderId = spl_object_id($edge1->order());
+        $usageCounts = [$orderId => 1];
+        $result = $collection->withOrderPenalties($usageCounts, '0.15');
+
+        self::assertNotSame($collection, $result);
+        self::assertSame(2, $result->count());
+
+        // Find the edge that was penalized (same order as edge1)
+        $resultEdges = $result->toArray();
+        $penalizedEdge = null;
+        foreach ($resultEdges as $e) {
+            if (spl_object_id($e->order()) === $orderId) {
+                $penalizedEdge = $e;
+                break;
+            }
+        }
+        self::assertNotNull($penalizedEdge);
+        self::assertNotSame($edge1, $penalizedEdge, 'Penalized edge should be a new instance from withCapacityPenalty');
+        self::assertTrue(
+            $penalizedEdge->baseCapacity()->max()->lessThan($edge1->baseCapacity()->max()),
+            'Edge with usageCount > 0 should have reduced max capacity'
+        );
+    }
+
+    #[TestDox('withOrderPenalties replaces only edges with usageCount > 0')]
+    public function test_with_order_penalties_only_penalizes_edges_with_positive_usage(): void
+    {
+        $edge1 = $this->createEdgeForQuote('USD');
+        $edge2 = $this->createEdgeForQuote('EUR');
+        $collection = GraphEdgeCollection::fromArray([$edge1, $edge2]);
+
+        $usageCounts = [spl_object_id($edge1->order()) => 2];
+        $result = $collection->withOrderPenalties($usageCounts, '0.15');
+
+        $resultEdges = $result->toArray();
+        $usdResult = $resultEdges[1]->order()->assetPair()->quote() === 'USD' ? $resultEdges[1] : $resultEdges[0];
+        $eurResult = $resultEdges[1]->order()->assetPair()->quote() === 'EUR' ? $resultEdges[1] : $resultEdges[0];
+
+        // Edge with usageCount 2 should have lower max than original
+        $usdOriginal = $edge1->order()->assetPair()->quote() === 'USD' ? $edge1 : $edge2;
+        $eurOriginal = $edge1->order()->assetPair()->quote() === 'EUR' ? $edge1 : $edge2;
+        self::assertTrue($usdResult->baseCapacity()->max()->lessThan($usdOriginal->baseCapacity()->max()));
+        // Edge with usageCount 0 unchanged (same capacity)
+        self::assertTrue($eurResult->baseCapacity()->max()->equals($eurOriginal->baseCapacity()->max()));
+    }
+
     private function createEdge(): GraphEdge
     {
         $order = OrderFactory::sell(

@@ -200,11 +200,18 @@ final class ExecutionPlanSearchEngine
             return ExecutionPlanSearchOutcome::empty($guardReport);
         }
 
-        // Check if we achieved full conversion: source currency balance should be zero
-        // and we should have received something in target currency
-        $sourceBalance = $portfolio->balance($sourceCurrency);
+        // Check if we achieved full conversion: only target currency may have non-zero balance;
+        // all other currencies (including source) must be zero so no funds remain elsewhere
         $targetBalance = $portfolio->balance($targetCurrency);
-        $isComplete = $sourceBalance->isZero() && !$targetBalance->isZero();
+        $isComplete = !$targetBalance->isZero();
+        if ($isComplete) {
+            foreach ($portfolio->balances() as $currency => $balance) {
+                if ($currency !== $targetCurrency && !$balance->isZero()) {
+                    $isComplete = false;
+                    break;
+                }
+            }
+        }
 
         if ($isComplete) {
             return ExecutionPlanSearchOutcome::complete($rawFills, $guardReport, $sourceCurrency, $targetCurrency);

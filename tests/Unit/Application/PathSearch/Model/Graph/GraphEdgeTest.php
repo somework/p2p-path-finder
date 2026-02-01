@@ -423,20 +423,47 @@ final class GraphEdgeTest extends TestCase
 
     public function test_with_capacity_penalty_caps_at_maximum_divisor(): void
     {
-        $fixture = $this->createEdgeFixture();
-        $edge = $fixture['edge'];
+        // Edge where min is low enough that originalMax/10 is still >= min,
+        // so we can verify divisor is capped at 10 (penalized max = original max / 10)
+        $order = OrderFactory::sell(
+            base: 'USD',
+            quote: 'EUR',
+            minAmount: '0.100',
+            maxAmount: '5.000',
+            rate: '0.900',
+            amountScale: 3,
+            rateScale: 3,
+        );
+        $edge = new GraphEdge(
+            from: 'USD',
+            to: 'EUR',
+            orderSide: OrderSide::SELL,
+            order: $order,
+            rate: $order->effectiveRate(),
+            baseCapacity: new EdgeCapacity(
+                Money::fromString('USD', '0.100', 3),
+                Money::fromString('USD', '5.000', 3),
+            ),
+            quoteCapacity: new EdgeCapacity(
+                Money::fromString('EUR', '0.090', 3),
+                Money::fromString('EUR', '4.500', 3),
+            ),
+            grossBaseCapacity: new EdgeCapacity(
+                Money::fromString('USD', '0.100', 3),
+                Money::fromString('USD', '5.000', 3),
+            ),
+        );
 
-        // Very high usage count that would exceed 10x divisor
-        // e.g., usageCount=100, factor=0.15 -> divisor = 1 + 15 = 16 > 10
-        // Should be capped at 10
+        // usageCount=100, factor=0.15 -> divisor = 1 + 15 = 16 > 10, capped at 10
         $penalized = $edge->withCapacityPenalty(100, '0.15');
 
-        // At 10x divisor, max = 5.000 / 10 = 0.5
+        $originalMax = $edge->baseCapacity()->max()->decimal();
         $penalizedMax = $penalized->baseCapacity()->max()->decimal();
-        $expectedMin = $edge->baseCapacity()->min()->decimal();
+        $expectedCappedMax = $originalMax->dividedBy(10, 3); // 5.000 / 10 = 0.5
 
-        // Max should be at least min (never go below)
-        self::assertTrue($penalizedMax->isGreaterThanOrEqualTo($expectedMin));
+        // Divisor is capped at 10: penalized max should equal original max / 10
+        self::assertTrue($penalizedMax->isEqualTo($expectedCappedMax));
+        self::assertTrue($penalizedMax->isGreaterThanOrEqualTo($edge->baseCapacity()->min()->decimal()));
     }
 
     public function test_with_capacity_penalty_does_not_go_below_min(): void

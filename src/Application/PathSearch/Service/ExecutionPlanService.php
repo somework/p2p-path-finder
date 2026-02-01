@@ -124,19 +124,19 @@ final class ExecutionPlanService
     /**
      * Searches for up to K best execution plans from the configured spend asset to the target asset.
      *
-     * Returns up to `config->resultLimit()` distinct execution plans, each using a completely
-     * disjoint set of orders. Plans are ordered by cost (best/cheapest first).
+     * When {@see PathSearchConfig::disjointPlans()} is true (default): returns up to
+     * `config->resultLimit()` distinct execution plans that use completely disjoint sets of
+     * orders (no order appears in more than one plan). Plans are ordered by cost (best first).
      *
-     * The returned `SearchOutcome::paths()` collection will contain 0 to K entries:
-     * - 0 entries: No valid execution plan could be found
-     * - 1 to K entries: Distinct execution plans ordered by cost
+     * When disjointPlans is false: returns up to K plans that may reuse orders across plans;
+     * plans are still ordered by cost but are not guaranteed to be disjoint. Useful for
+     * rate comparison when only one plan will execute.
      *
-     * Use `bestPath()` to get the optimal (first) plan, or iterate `paths()` for alternatives.
+     * In either mode, `SearchOutcome::paths()` contains 0..K entries; guard metrics from
+     * {@see SearchOutcome::guardLimits()} / {@see SearchGuardReport} are aggregated across
+     * all iterations.
      *
-     * Guard limit breaches are reported through the returned {@see SearchOutcome::guardLimits()}
-     * metadata, aggregated across all K search iterations. Inspect the {@see SearchGuardReport}
-     * via helpers like {@see SearchGuardReport::anyLimitReached()} to determine whether any
-     * search iteration exhausted its configured protections.
+     * Use `bestPath()` for the optimal (first) plan or iterate `paths()` for alternatives.
      *
      * @api
      *

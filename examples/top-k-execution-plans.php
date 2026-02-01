@@ -159,7 +159,7 @@ try {
             $received = $plan->totalReceived()->decimal();
 
             if (!$received->isZero()) {
-                $costPerUnit = $spent->dividedBy($received, 4, RoundingMode::HALF_UP);
+                $costPerUnit = $spent->dividedBy($received, 4, RoundingMode::HalfUp);
             } else {
                 $costPerUnit = BigDecimal::of('0');
             }

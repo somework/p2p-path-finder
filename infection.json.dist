@@ -86,14 +86,14 @@
         },
         "Continue_": {
             "ignore": [
-                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\ExecutionPlanService::findPlansDisjoint",
-                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\ExecutionPlanService::findPlansReusable"
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\ExecutionPlanService::findDisjointTopK",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\ExecutionPlanService::findReusableTopK"
             ]
         },
         "Break_": {
             "ignore": [
-                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\ExecutionPlanService::findPlansDisjoint",
-                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\ExecutionPlanService::findPlansReusable"
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\ExecutionPlanService::findDisjointTopK",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\ExecutionPlanService::findReusableTopK"
             ]
         },
         "Foreach_": {

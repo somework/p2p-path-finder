@@ -7,6 +7,7 @@ namespace SomeWork\P2PPathFinder\Application\PathSearch\Engine;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 /**
  * Outcome of an execution plan search operation.
@@ -44,6 +45,8 @@ final class ExecutionPlanSearchOutcome
      * Creates a successful outcome with complete raw fills.
      *
      * @param list<array{order: Order, spend: Money, sequence: int}> $rawFills
+     *
+     * @throws InvalidInput when $rawFills is empty
      */
     public static function complete(
         array $rawFills,
@@ -51,6 +54,10 @@ final class ExecutionPlanSearchOutcome
         string $sourceCurrency,
         string $targetCurrency,
     ): self {
+        if ([] === $rawFills) {
+            throw new InvalidInput('Complete outcome requires at least one raw fill.');
+        }
+
         return new self($rawFills, $guardReport, true, $sourceCurrency, $targetCurrency);
     }
 
@@ -58,6 +65,8 @@ final class ExecutionPlanSearchOutcome
      * Creates a partial outcome when fills do not satisfy the full amount.
      *
      * @param list<array{order: Order, spend: Money, sequence: int}> $rawFills
+     *
+     * @throws InvalidInput when $rawFills is empty
      */
     public static function partial(
         array $rawFills,
@@ -65,6 +74,10 @@ final class ExecutionPlanSearchOutcome
         string $sourceCurrency,
         string $targetCurrency,
     ): self {
+        if ([] === $rawFills) {
+            throw new InvalidInput('Partial outcome requires at least one raw fill.');
+        }
+
         return new self($rawFills, $guardReport, false, $sourceCurrency, $targetCurrency);
     }
 

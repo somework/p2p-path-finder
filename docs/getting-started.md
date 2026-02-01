@@ -160,7 +160,7 @@ foreach ($bestPlan->steps() as $step) {
 
 **Expected output**:
 
-```
+```text
 Best execution plan found!
   Source: USD
   Target: BTC

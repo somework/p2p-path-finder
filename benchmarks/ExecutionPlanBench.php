@@ -308,12 +308,13 @@ class ExecutionPlanBench
     public function benchGraphFiltering(array $params): void
     {
         $orderBook = $this->buildTopKOrderBook($params['orderCount']);
-        $graph = (new GraphBuilder())->build($orderBook->all());
+        $orders = iterator_to_array($orderBook);
+        $graph = (new GraphBuilder())->build($orders);
 
         // Collect order IDs to exclude
         $excludedIds = [];
         $count = 0;
-        foreach ($orderBook->all() as $order) {
+        foreach ($orders as $order) {
             if ($count >= $params['excludeCount']) {
                 break;
             }
@@ -383,7 +384,7 @@ class ExecutionPlanBench
             ->withSpendAmount(self::money('SRC', '1000.00', 2))
             ->withToleranceBounds('0.00', '0.50')
             ->withHopLimits(1, 4)
-            ->withSearchGuards($params['maxExpansions'], $params['maxVisited'], $params['timeBudget'])
+            ->withSearchGuards($params['maxVisited'], $params['maxExpansions'], $params['timeBudget'])
             ->build();
 
         $request = new PathSearchRequest($orderBook, $config, 'DST');

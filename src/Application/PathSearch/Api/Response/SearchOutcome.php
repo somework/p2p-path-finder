@@ -14,9 +14,10 @@ use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchResultInterface;
  * Immutable response DTO describing the outcome of a path search.
  *
  * Carries discovered {@see Path} or {@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionPlan}
- * instances built from hop-centric DTOs ({@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHop}
- * / {@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHopCollection})
- * alongside guard rail metrics.
+ * instances. Execution-plan outcomes use step-centric DTOs
+ * ({@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionStep}
+ * / {@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionStepCollection});
+ * path outcomes may use hop-centric DTOs (PathHop / PathHopCollection).
  *
  * @template-covariant TPath of SearchResultInterface
  *
