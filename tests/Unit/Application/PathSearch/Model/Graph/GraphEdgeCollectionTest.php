@@ -638,12 +638,12 @@ final class GraphEdgeCollectionTest extends TestCase
         $result = $collection->withOrderPenalties($usageCounts, '0.15');
 
         $resultEdges = $result->toArray();
-        $usdResult = $resultEdges[1]->order()->assetPair()->quote() === 'USD' ? $resultEdges[1] : $resultEdges[0];
-        $eurResult = $resultEdges[1]->order()->assetPair()->quote() === 'EUR' ? $resultEdges[1] : $resultEdges[0];
+        $usdResult = 'USD' === $resultEdges[1]->order()->assetPair()->quote() ? $resultEdges[1] : $resultEdges[0];
+        $eurResult = 'EUR' === $resultEdges[1]->order()->assetPair()->quote() ? $resultEdges[1] : $resultEdges[0];
 
         // Edge with usageCount 2 should have lower max than original
-        $usdOriginal = $edge1->order()->assetPair()->quote() === 'USD' ? $edge1 : $edge2;
-        $eurOriginal = $edge1->order()->assetPair()->quote() === 'EUR' ? $edge1 : $edge2;
+        $usdOriginal = 'USD' === $edge1->order()->assetPair()->quote() ? $edge1 : $edge2;
+        $eurOriginal = 'EUR' === $edge1->order()->assetPair()->quote() ? $edge1 : $edge2;
         self::assertTrue($usdResult->baseCapacity()->max()->lessThan($usdOriginal->baseCapacity()->max()));
         // Edge with usageCount 0 unchanged (same capacity)
         self::assertTrue($eurResult->baseCapacity()->max()->equals($eurOriginal->baseCapacity()->max()));
