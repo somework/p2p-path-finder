@@ -22,6 +22,30 @@ use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 #[CoversClass(Order::class)]
 final class OrderTest extends TestCase
 {
+    public function test_is_transfer_delegates_to_asset_pair_transfer_true(): void
+    {
+        $order = OrderFactory::createOrder(
+            OrderSide::BUY,
+            'BTC',
+            'BTC',
+            '0.01',
+            '1.0',
+            '1',
+            2,
+            2,
+            null,
+        );
+
+        self::assertTrue($order->isTransfer());
+    }
+
+    public function test_is_transfer_delegates_to_asset_pair_transfer_false(): void
+    {
+        $order = OrderFactory::buy();
+
+        self::assertFalse($order->isTransfer());
+    }
+
     public function test_constructor_rejects_order_bounds_currency_mismatch(): void
     {
         $assetPair = AssetPair::fromString('BTC', 'USD');

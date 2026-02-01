@@ -34,11 +34,11 @@ The library follows a three-layer architecture with strict dependency rules.
 
 ### Layer Overview
 
-| Layer           | Responsibility                               | Example Components                                                  |
-|-----------------|----------------------------------------------|---------------------------------------------------------------------|
-| **Domain**      | Business entities, value objects, invariants | `Money`, `Order`, `ExchangeRate`, `FeePolicy`                       |
-| **Application** | Use cases, algorithms, orchestration         | `ExecutionPlanSearchEngine`, `GraphBuilder`, `SearchGuards`         |
-| **Public API**  | Entry points, request/response DTOs          | `ExecutionPlanService`, `SearchOutcome`, `ExecutionPlan`, `ExecutionStep` |
+| Layer | Responsibility | Example Components |
+|:------|:---------------|:-------------------|
+| **Domain** | Business entities, value objects, invariants | `Money`, `Order`, `ExchangeRate`, `FeePolicy` |
+| **Application** | Use cases, algorithms, orchestration | `ExecutionPlanSearchEngine`, `GraphBuilder`, `SearchGuards` |
+| **Public API** | Entry points, request/response DTOs | `ExecutionPlanService`, `SearchOutcome`, `ExecutionPlan`, `ExecutionStep` |
 
 ### Dependency Rule
 
@@ -50,7 +50,7 @@ The library follows a three-layer architecture with strict dependency rules.
 
 ### Component Interaction
 
-```
+```text
 User Code
     ↓
 ExecutionPlanService (Public API)
@@ -181,7 +181,7 @@ computed from step data. Steps include `sequenceNumber()` for execution ordering
 
 The `ExecutionPlanSearchEngine` uses a **successive shortest augmenting paths** algorithm:
 
-```
+```text
 1. Initialize PortfolioState with source currency balance
 2. While balance remains in non-target currencies AND guards allow:
    a. Find cheapest augmenting path (Dijkstra from all currencies with balance)
@@ -204,7 +204,7 @@ The `ExecutionPlanSearchEngine` uses a **successive shortest augmenting paths** 
 
 ### Split/Merge Flow Diagram
 
-```
+```text
 Split at Source (A → B and A → C):
 ┌─────┐     ┌─────┐
 │  A  │────▶│  B  │

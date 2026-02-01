@@ -46,6 +46,25 @@ use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 // =============================================================================
 
 /**
+ * Infers decimal scale (digits after decimal point) from numeric strings.
+ * Used so Money/OrderBounds use the correct precision for currencies like BTC.
+ *
+ * @param numeric-string $minBase
+ * @param numeric-string $maxBase
+ */
+function inferDecimalScale(string $minBase, string $maxBase): int
+{
+    $scale = 0;
+    foreach ([$minBase, $maxBase] as $value) {
+        $pos = strpos($value, '.');
+        if (false !== $pos) {
+            $scale = max($scale, strlen($value) - $pos - 1);
+        }
+    }
+    return $scale;
+}
+
+/**
  * Creates a SELL order (maker sells base for quote).
  * Taker perspective: spends quote, receives base.
  * Edge direction: quote → base.
@@ -67,12 +86,13 @@ function createSellOrder(
     string $maxBase,
     string $rate,
 ): Order {
+    $scale = inferDecimalScale($minBase, $maxBase);
     return new Order(
         OrderSide::SELL,
         AssetPair::fromString($base, $quote),
         OrderBounds::from(
-            Money::fromString($base, $minBase, 2),
-            Money::fromString($base, $maxBase, 2),
+            Money::fromString($base, $minBase, $scale),
+            Money::fromString($base, $maxBase, $scale),
         ),
         ExchangeRate::fromString($base, $quote, $rate, 6),
     );
@@ -100,12 +120,13 @@ function createBuyOrder(
     string $maxBase,
     string $rate,
 ): Order {
+    $scale = inferDecimalScale($minBase, $maxBase);
     return new Order(
         OrderSide::BUY,
         AssetPair::fromString($base, $quote),
         OrderBounds::from(
-            Money::fromString($base, $minBase, 2),
-            Money::fromString($base, $maxBase, 2),
+            Money::fromString($base, $minBase, $scale),
+            Money::fromString($base, $maxBase, $scale),
         ),
         ExchangeRate::fromString($base, $quote, $rate, 6),
     );

@@ -61,6 +61,46 @@ final class PortfolioStateTest extends TestCase
         self::assertSame('0.05', $newState->totalCost()->__toString());
     }
 
+    public function test_can_execute_order_throws_for_sell_order(): void
+    {
+        $state = PortfolioState::initial(Money::fromString('EUR', '100.00', 2));
+        $sellOrder = new Order(
+            OrderSide::SELL,
+            AssetPair::fromString('USD', 'EUR'),
+            OrderBounds::from(
+                Money::fromString('USD', '10.00', 2),
+                Money::fromString('USD', '100.00', 2),
+            ),
+            ExchangeRate::fromString('USD', 'EUR', '1.10', 8),
+        );
+        $spendAmount = Money::fromString('EUR', '50.00', 2);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('canExecuteOrder assumes BUY direction; use canExecuteOrderWithSide() for SELL orders.');
+
+        $state->canExecuteOrder($sellOrder, $spendAmount);
+    }
+
+    public function test_execute_order_throws_for_sell_order(): void
+    {
+        $state = PortfolioState::initial(Money::fromString('EUR', '100.00', 2));
+        $sellOrder = new Order(
+            OrderSide::SELL,
+            AssetPair::fromString('USD', 'EUR'),
+            OrderBounds::from(
+                Money::fromString('USD', '10.00', 2),
+                Money::fromString('USD', '100.00', 2),
+            ),
+            ExchangeRate::fromString('USD', 'EUR', '1.10', 8),
+        );
+        $spendAmount = Money::fromString('EUR', '50.00', 2);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('executeOrder assumes BUY direction; use executeOrderWithSide() for SELL orders.');
+
+        $state->executeOrder($sellOrder, $spendAmount, BigDecimal::zero());
+    }
+
     public function test_cannot_execute_with_insufficient_balance(): void
     {
         $state = PortfolioState::initial(Money::fromString('USD', '50.00', 2));
@@ -416,7 +456,7 @@ final class PortfolioStateTest extends TestCase
         string $maxFill,
     ): Order {
         return new Order(
-            OrderSide::SELL,
+            OrderSide::BUY,
             AssetPair::fromString($baseCurrency, $quoteCurrency),
             OrderBounds::from(
                 Money::fromString($baseCurrency, $minFill, 2),

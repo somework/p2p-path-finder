@@ -678,7 +678,7 @@ foreach ($plan->steps() as $step) {
 ### Understanding ExecutionPlan Structure
 
 | Property | Description |
-|----------|-------------|
+|:---------|:------------|
 | `steps()` | `ExecutionStepCollection` - ordered execution steps |
 | `stepCount()` | Number of steps in the plan |
 | `sourceCurrency()` | Source currency (uppercase) |

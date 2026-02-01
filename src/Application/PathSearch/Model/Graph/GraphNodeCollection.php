@@ -128,12 +128,12 @@ final class GraphNodeCollection implements Countable, IteratorAggregate
     /**
      * Returns a new collection excluding edges whose orders are in the exclusion set.
      *
-     * Each node is filtered to remove edges referencing excluded orders. Nodes
-     * that become empty (no remaining edges) are removed from the collection.
+     * Edges referencing excluded orders are removed from each node. Nodes that
+     * end up with no edges are retained (they may still be needed as targets).
      *
      * @param array<int, true> $excludedOrderIds Order object IDs to exclude (spl_object_id)
      *
-     * @return self New collection without the excluded orders
+     * @return self New collection with excluded-order edges removed; empty nodes retained
      */
     public function withoutOrders(array $excludedOrderIds): self
     {

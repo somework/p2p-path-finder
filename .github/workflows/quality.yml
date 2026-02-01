@@ -125,7 +125,7 @@ jobs:
                     workflow: quality.yml
                     branch: main
                     name: phpbench-baseline-storage
-                    path: .
+                    path: .phpbench
                     if_no_artifact_found: ignore
 
             -   name: Run PhpBench (with baseline comparison if available)
@@ -176,7 +176,7 @@ jobs:
                     workflow: quality.yml
                     branch: main
                     name: phpbench-baseline-storage
-                    path: .
+                    path: .phpbench
                     if_no_artifact_found: ignore
 
             -   name: Prepare PhpBench artefact bundle

@@ -304,8 +304,15 @@ final class ExecutionPlanBenchTest extends TestCase
     }
 
     // ========================================================================
-    // ORDER BOOK GENERATORS (same as benchmark class)
+    // ORDER BOOK GENERATORS
     // ========================================================================
+    //
+    // Intentional divergence from benchmarks/ExecutionPlanBench::buildLinearOrderBook:
+    // - This test uses hops capped at 9 and multiple orders per hop (ordersPerHop)
+    //   to exercise different topologies and keep test runs fast.
+    // - The benchmark uses hops = orderCount - 1 with one Order per hop and a
+    //   different rate formula (e.g. $i % 100). Tests validate scenario correctness
+    //   rather than mirroring the benchmark topology exactly.
 
     private function buildLinearOrderBook(int $orderCount): OrderBook
     {

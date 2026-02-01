@@ -103,7 +103,6 @@ final class ExecutionPlanMaterializer
         }
 
         $pair = $order->assetPair();
-        $spendCurrency = $spend->currency();
 
         // Determine direction based on order side
         // BUY order: taker spends base, receives quote

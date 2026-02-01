@@ -203,6 +203,7 @@ try {
 
         $orderUsage = [];
         $planOrders = [];
+        $hasDuplicate = false;
 
         foreach ($outcome->paths() as $rank => $plan) {
             $planOrders[$rank] = [];
@@ -211,14 +212,20 @@ try {
                 $planOrders[$rank][] = $orderId;
 
                 if (isset($orderUsage[$orderId])) {
+                    $hasDuplicate = true;
                     echo "   WARNING: Order used in multiple plans!\n";
                 }
                 $orderUsage[$orderId] = $rank;
             }
         }
 
-        echo "   ✓ All plans use disjoint order sets\n";
-        echo "   Total unique orders used: ".count($orderUsage)."\n\n";
+        if ($hasDuplicate) {
+            echo "   ✗ Some plans share orders (disjoint check failed)\n";
+            echo "   Total unique orders used: ".count($orderUsage)."\n\n";
+        } else {
+            echo "   ✓ All plans use disjoint order sets\n";
+            echo "   Total unique orders used: ".count($orderUsage)."\n\n";
+        }
     }
 
     // ============================================================

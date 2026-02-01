@@ -12,10 +12,11 @@ use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 
 use function array_filter;
 use function array_keys;
-use function count;
 use function implode;
 use function spl_object_id;
 use function sprintf;
+
+use const SORT_NUMERIC;
 
 /**
  * Immutable representation of a multi-currency portfolio state for split/merge execution planning.
@@ -137,14 +138,24 @@ final class PortfolioState
     /**
      * Checks if the given order can be executed with the specified spend amount.
      *
+     * This method assumes BUY direction (taker spends base, receives quote). For SELL
+     * orders use {@see canExecuteOrderWithSide()} with the correct side.
+     *
      * Validates:
+     * - Order side is BUY (throws if SELL)
      * - Sufficient balance in source currency
      * - Order not already used
      * - Target currency is receivable (not visited unless has balance)
      * - Transfer orders: Skip backtracking check since source === target
+     *
+     * @throws InvalidArgumentException when order side is not BUY
      */
     public function canExecuteOrder(Order $order, Money $spendAmount): bool
     {
+        if (OrderSide::BUY !== $order->side()) {
+            throw new InvalidArgumentException('canExecuteOrder assumes BUY direction; use canExecuteOrderWithSide() for SELL orders.');
+        }
+
         $sourceCurrency = $order->assetPair()->base();
         $targetCurrency = $order->assetPair()->quote();
 
@@ -240,6 +251,9 @@ final class PortfolioState
     /**
      * Executes an order, returning a new portfolio state with updated balances.
      *
+     * This method assumes BUY direction (taker spends base, receives quote). For SELL
+     * orders use {@see executeOrderWithSide()} with the correct side and amounts.
+     *
      * Operations:
      * 1. Deducts spendAmount from source currency
      * 2. Adds received amount to target currency
@@ -250,10 +264,14 @@ final class PortfolioState
      * Transfer orders (A→A) don't mark the currency as visited since we're
      * not leaving it - we're just moving funds between exchanges.
      *
-     * @throws InvalidArgumentException when the order cannot be executed
+     * @throws InvalidArgumentException when order side is not BUY or the order cannot be executed
      */
     public function executeOrder(Order $order, Money $spendAmount, BigDecimal $cost): self
     {
+        if (OrderSide::BUY !== $order->side()) {
+            throw new InvalidArgumentException('executeOrder assumes BUY direction; use executeOrderWithSide() for SELL orders.');
+        }
+
         if (!$this->canExecuteOrder($order, $spendAmount)) {
             throw new InvalidArgumentException('Cannot execute order: insufficient balance, order already used, or target currency not receivable.');
         }
@@ -448,9 +466,10 @@ final class PortfolioState
     /**
      * Generates a deterministic signature for state registry deduplication.
      *
-     * Format: balances:CURRENCY=AMOUNT,...|visited:CURRENCY,...|orders:COUNT
+     * Format: balances:CURRENCY=AMOUNT,...|visited:CURRENCY,...|orders:ID1,ID2,...|cost:VALUE
      *
-     * Sorted alphabetically for determinism.
+     * Used order IDs are sorted for determinism so distinct states (different orders used)
+     * produce distinct signatures. Sorted alphabetically for balances and visited.
      */
     public function signature(): string
     {
@@ -468,13 +487,15 @@ final class PortfolioState
         $visitedKeys = array_keys($this->visited);
         sort($visitedKeys);
 
-        // Build sorted used orders signature (count only for performance)
-        $usedOrdersCount = count($this->usedOrders);
+        // Build sorted used orders signature (order IDs for collision-resistant fingerprint)
+        $usedOrderIds = array_keys($this->usedOrders);
+        sort($usedOrderIds, SORT_NUMERIC);
+        $ordersPart = implode(',', $usedOrderIds);
 
         $segments = [
             'balances:'.implode(',', $balancesParts),
             'visited:'.implode(',', $visitedKeys),
-            'orders:'.$usedOrdersCount,
+            'orders:'.$ordersPart,
             'cost:'.$this->totalCost->__toString(),
         ];
 

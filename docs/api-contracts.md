@@ -286,23 +286,34 @@ $simpleArray = $collection->toArray(); // For debugging
 
 **Purpose**: Container for search results and guard metrics.
 
-**Important**: `ExecutionPlanService::findBestPlans()` returns at most **one** optimal execution plan. The `paths()` collection will contain either 0 or 1 entries.
+**Important**: `ExecutionPlanService::findBestPlans()` supports **Top-K** results. The number of plans returned is controlled by `PathSearchConfig::resultLimit()` (default 1). The `paths()` collection may contain 0 to `resultLimit` entries. Use `bestPath()` for the single best plan, or iterate `paths()` for all returned plans.
 
 ```php
 $result = $service->findBestPlans($request);
 
-// Access the single plan (recommended approach)
-$hasPaths = $result->hasPaths();     // true if a plan was found
-$bestPath = $result->bestPath();     // ExecutionPlan or null
-$result->paths()->count();           // 0 or 1
+// Check if any plan was found
+$hasPaths = $result->hasPaths();     // true if at least one plan was found
+$bestPath = $result->bestPath();     // Best ExecutionPlan or null (same as paths()->first())
+$result->paths()->count();           // 0 up to resultLimit
+
+// To obtain only the best plan, use resultLimit=1 (default) or call bestPath()
+$config = PathSearchConfig::builder()
+    ->withResultLimit(1)   // single plan (default)
+    // ... other options
+    ->build();
 
 // Access guard report
 $guards = $result->guardLimits();    // SearchGuardReport object
 
-// Process the single optimal plan
+// Process the best plan (or first of Top-K)
 if (null !== $bestPath) {
     echo "Plan has {$bestPath->stepCount()} steps\n";
     echo "Is linear: " . ($bestPath->isLinear() ? 'yes' : 'no') . "\n";
+}
+
+// Process all returned plans (when resultLimit > 1)
+foreach ($result->paths() as $plan) {
+    // ...
 }
 
 // Check for guard breaches
@@ -311,10 +322,10 @@ if ($guards->anyLimitReached()) {
 }
 ```
 
-**Why single plan?**: The algorithm optimizes for a single global optimum that may include split/merge execution. For alternative routes, run separate searches with different constraints (modified tolerance bounds, different spend amounts, or filtered order books).
+**Top-K and resultLimit**: Configure `PathSearchConfig::withResultLimit(int)` to request multiple plans (e.g. for fallbacks or comparison). With `resultLimit=1` (default), `paths()->count()` is 0 or 1; with a higher limit, multiple disjoint or reusable plans may be returned depending on `disjointPlans()`.
 
 **Properties**:
-- **paths**: PathResultSet object containing 0 or 1 ExecutionPlan
+- **paths**: PathResultSet object containing 0 to resultLimit ExecutionPlan instances
 - **guardLimits**: SearchGuardReport object (search performance metrics)
 
 **Notes**:
