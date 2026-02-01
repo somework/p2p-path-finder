@@ -1,0 +1,20 @@
+---
+description: Objects assertions in tests
+alwaysApply: false
+---
+
+When comparing objects in PHPUnit tests:
+
+❌ NEVER use assertSame() or assertEquals() on objects
+✅ ALWAYS compare specific properties using assertSame() on primitives
+
+Reason: assertSame() checks object identity (same instance), which can be unpredictable
+with immutable objects. assertEquals() may not work reliably with complex objects.
+
+Examples:
+✅ self::assertSame($obj1->id(), $obj2->id()); // Compare primitive properties
+✅ self::assertSame($money1->amount(), $money2->amount()); // Compare Money properties
+✅ self::assertSame($money1->currency(), $money2->currency()); // Compare Money properties
+
+❌ self::assertSame($money1, $money2); // Wrong - object identity
+❌ self::assertEquals($money1, $money2); // Wrong - may not work reliably
