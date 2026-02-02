@@ -185,7 +185,13 @@ final class ExecutionPlanSearchEngine
             }
 
             // Execute flow along path and collect raw fills
-            $flowResult = $this->executeFlow($path, $portfolio, $bottleneck, $startCurrency, $sequenceNumber);
+            $flowResult = $this->executeFlow($path, $portfolio, $bottleneck, $sequenceNumber);
+            if (isset($flowResult['viable']) && !$flowResult['viable']) {
+                foreach ($path as $edge) {
+                    $portfolio = $portfolio->markOrderUsed($edge->order());
+                }
+                continue;
+            }
             $portfolio = $flowResult['portfolio'];
             /** @var list<array{order: Order, spend: Money, sequence: int}> $newFills */
             $newFills = $flowResult['fills'];
@@ -314,7 +320,11 @@ final class ExecutionPlanSearchEngine
             }
 
             // Execute the transfer and collect raw fills
-            $flowResult = $this->executeFlow([$bestEdge], $portfolio, $bottleneck, $currency, $sequenceNumber);
+            $flowResult = $this->executeFlow([$bestEdge], $portfolio, $bottleneck, $sequenceNumber);
+            if (isset($flowResult['viable']) && !$flowResult['viable']) {
+                $portfolio = $portfolio->markOrderUsed($bestEdge->order());
+                continue;
+            }
             $portfolio = $flowResult['portfolio'];
             /** @var list<array{order: Order, spend: Money, sequence: int}> $newFills */
             $newFills = $flowResult['fills'];
@@ -352,7 +362,7 @@ final class ExecutionPlanSearchEngine
     {
         $nonZeroBalances = $portfolio->nonZeroBalances();
 
-        foreach ($nonZeroBalances as $currency => $balance) {
+        foreach (array_keys($nonZeroBalances) as $currency) {
             if ($currency !== $targetCurrency) {
                 return true;
             }
@@ -718,16 +728,17 @@ final class ExecutionPlanSearchEngine
      *
      * Returns raw fill data (order, spend amount, sequence) that can be materialized
      * into ExecutionStep objects by the ExecutionPlanMaterializer.
+     * When spend falls below an edge's minimum, returns viable=false so the caller
+     * can skip this path (mirrors calculateBottleneck non-viable behavior).
      *
      * @param list<GraphEdge> $path
      *
-     * @return array{portfolio: PortfolioState, fills: list<array{order: Order, spend: Money, sequence: int}>, sequenceNumber: int}
+     * @return array{portfolio: PortfolioState, fills: list<array{order: Order, spend: Money, sequence: int}>, sequenceNumber: int, viable?: bool}
      */
     private function executeFlow(
         array $path,
         PortfolioState $portfolio,
         Money $bottleneck,
-        string $startCurrency,
         int $sequenceNumber,
     ): array {
         /** @var list<array{order: Order, spend: Money, sequence: int}> $fills */
@@ -756,8 +767,13 @@ final class ExecutionPlanSearchEngine
             }
 
             if ($spendAmount->lessThan($boundsMin)) {
-                // Use minimum if below
-                $spendAmount = $boundsMin;
+                // Path not viable (below minimum); do not clamp to avoid overspend
+                return [
+                    'portfolio' => $portfolio,
+                    'fills' => [],
+                    'sequenceNumber' => $sequenceNumber,
+                    'viable' => false,
+                ];
             }
 
             // Calculate received amount based on order side (needed for portfolio update)

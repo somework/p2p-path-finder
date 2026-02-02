@@ -279,6 +279,78 @@ final class GraphNodeTest extends TestCase
         self::assertSame($filtered1, $filtered2);
     }
 
+    // ========================================================================
+    // withOrderPenalties() Tests
+    // ========================================================================
+
+    #[TestDox('withOrderPenalties returns same instance when usageCounts is empty')]
+    public function test_with_order_penalties_returns_same_instance_when_usage_empty(): void
+    {
+        $order = OrderFactory::buy(base: 'BTC', quote: 'USD');
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $this->edge($graph, 'BTC', 0);
+
+        $node = new GraphNode('BTC', [$edge]);
+        $result = $node->withOrderPenalties([], '1.5');
+
+        self::assertSame($node, $result);
+    }
+
+    #[TestDox('withOrderPenalties returns same instance when penalty factor applied to non-matching order id')]
+    public function test_with_order_penalties_returns_same_instance_when_no_edges_match(): void
+    {
+        $order = OrderFactory::buy(base: 'BTC', quote: 'USD');
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $this->edge($graph, 'BTC', 0);
+
+        $node = new GraphNode('BTC', [$edge]);
+        $result = $node->withOrderPenalties([999999999 => 2], '1.5');
+
+        self::assertSame($node, $result);
+    }
+
+    #[TestDox('withOrderPenalties returns new instance when edges are penalized')]
+    public function test_with_order_penalties_returns_new_instance_when_changed(): void
+    {
+        $order = OrderFactory::buy(base: 'BTC', quote: 'USD');
+        $graph = (new GraphBuilder())->build([$order]);
+        $edge = $this->edge($graph, 'BTC', 0);
+
+        $node = new GraphNode('BTC', [$edge]);
+        $result = $node->withOrderPenalties([spl_object_id($order) => 1], '1.5');
+
+        self::assertNotSame($node, $result);
+        self::assertSame('BTC', $result->currency());
+        self::assertSame(1, $result->edges()->count());
+    }
+
+    #[TestDox('withOrderPenalties preserves edge order')]
+    public function test_with_order_penalties_preserves_edge_order(): void
+    {
+        $order1 = OrderFactory::buy(base: 'BTC', quote: 'USD');
+        $order2 = OrderFactory::buy(base: 'BTC', quote: 'EUR');
+        $graph = (new GraphBuilder())->build([$order1, $order2]);
+        $edge1 = $this->edge($graph, 'BTC', 0);
+        $edge2 = $this->edge($graph, 'BTC', 1);
+
+        $node = new GraphNode('BTC', [$edge1, $edge2]);
+        $result = $node->withOrderPenalties([spl_object_id($order1) => 1], '2.0');
+
+        self::assertSame(2, $result->edges()->count());
+        // Order of edges is preserved: same order at each index as in original node
+        self::assertSame($node->edges()->at(0)->order(), $result->edges()->at(0)->order());
+        self::assertSame($node->edges()->at(1)->order(), $result->edges()->at(1)->order());
+    }
+
+    #[TestDox('withOrderPenalties returns same instance when node has no edges')]
+    public function test_with_order_penalties_returns_same_instance_when_no_edges(): void
+    {
+        $node = new GraphNode('USD');
+        $result = $node->withOrderPenalties([12345 => 2], '1.5');
+
+        self::assertSame($node, $result);
+    }
+
     private function edge(Graph $graph, string $currency, int $index): \SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\GraphEdge
     {
         $node = $graph->node($currency);

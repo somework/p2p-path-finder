@@ -414,21 +414,21 @@ Demonstrates ExecutionPlanService's ability to handle complex path-finding scena
 
 ### File Statistics
 
-| Example                            | Lines      | Status      | Scenarios | Key Features                        |
-|------------------------------------|------------|-------------|-----------|-------------------------------------|
-| **execution-plan-basic.php**       | 170+       | Production  | 1         | ExecutionPlanService basics         |
-| **execution-plan-split-merge.php** | 260+       | Production  | 4         | Split/merge, diamond patterns       |
-| **top-k-execution-plans.php**      | 230+       | Production  | 7         | Top-K discovery, disjoint orders    |
-| **top-k-reusable-orders.php**      | 250+       | Production  | 7         | Top-K reusable mode, rate compare   |
-| **custom-order-filter.php**        | 397        | Production  | 5         | 4 filters, composition pattern      |
-| **custom-ordering-strategy.php**   | 527        | Production  | 4         | 3 strategies, determinism test      |
-| **custom-fee-policy.php**          | 570        | Production  | 6         | 5 policies, realistic models        |
-| **error-handling.php**             | 473        | Production  | 7         | All exceptions, production pattern  |
-| **performance-optimization.php**   | 507        | Production  | 12        | 4 techniques, benchmarks            |
-| **guarded-search-example.php**     | Varies     | Production  | 1         | Complete workflow                   |
-| **bybit-p2p-integration.php**      | 600+       | Production  | 5         | API integration, real-world example |
-| **advanced-search-strategies.php** | 400+       | Production  | 8         | Multi-order, split/merge, diamond   |
-| **TOTAL**                          | **~4,450** | **12 files** | **67+**  | **Comprehensive coverage**          |
+| Example                              | Lines       | Status     | Scenarios | Key Features                         |
+|--------------------------------------|-------------|------------|-----------|--------------------------------------|
+| **execution-plan-basic.php**         | 170+        | Production | 1         | ExecutionPlanService basics          |
+| **execution-plan-split-merge.php**   | 260+        | Production | 4         | Split/merge, diamond patterns       |
+| **top-k-execution-plans.php**        | 230+        | Production | 7         | Top-K discovery, disjoint orders     |
+| **top-k-reusable-orders.php**        | 250+        | Production | 7         | Top-K reusable mode, rate compare    |
+| **custom-order-filter.php**          | 397         | Production | 5         | 4 filters, composition pattern       |
+| **custom-ordering-strategy.php**     | 527         | Production | 4         | 3 strategies, determinism test      |
+| **custom-fee-policy.php**            | 570         | Production | 6         | 5 policies, realistic models         |
+| **error-handling.php**               | 473         | Production | 7         | All exceptions, production pattern   |
+| **performance-optimization.php**     | 507         | Production | 12        | 4 techniques, benchmarks             |
+| **guarded-search-example.php**      | Varies      | Production | 1         | Complete workflow                    |
+| **bybit-p2p-integration.php**       | 600+        | Production | 5         | API integration, real-world example  |
+| **advanced-search-strategies.php**  | 400+        | Production | 8         | Multi-order, split/merge, diamond    |
+| **TOTAL**                            | **~4,450**   | **12 files** | **67+** | **Comprehensive coverage**          |
 
 ### Example Categories
 

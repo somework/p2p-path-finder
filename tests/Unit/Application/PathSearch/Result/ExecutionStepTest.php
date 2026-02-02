@@ -232,4 +232,71 @@ final class ExecutionStepTest extends TestCase
 
         self::assertSame(999999, $step->sequenceNumber());
     }
+
+    public function test_normalize_asset_trims_and_uppercases(): void
+    {
+        $step = new ExecutionStep(
+            '  usd  ',
+            '  btc  ',
+            Money::fromString('USD', '100.00', 2),
+            Money::fromString('BTC', '0.00250000', 8),
+            OrderFactory::sell('USD', 'BTC'),
+            MoneyMap::empty(),
+            1,
+        );
+
+        self::assertSame('USD', $step->from());
+        self::assertSame('BTC', $step->to());
+    }
+
+    public function test_from_path_hop_throws_for_sequence_zero(): void
+    {
+        $hop = new PathHop(
+            'USD',
+            'EUR',
+            Money::fromString('USD', '50.00', 2),
+            Money::fromString('EUR', '45.00', 2),
+            OrderFactory::sell('USD', 'EUR'),
+            MoneyMap::empty(),
+        );
+
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Execution step sequence number must be at least 1.');
+
+        ExecutionStep::fromPathHop($hop, 0);
+    }
+
+    public function test_to_array_returns_expected_keys_and_money_amounts(): void
+    {
+        $spent = Money::fromString('USD', '100.00', 2);
+        $received = Money::fromString('BTC', '0.00250000', 8);
+        $fees = MoneyMap::fromList([
+            Money::fromString('USD', '1.00', 2),
+        ]);
+
+        $step = new ExecutionStep(
+            'USD',
+            'BTC',
+            $spent,
+            $received,
+            OrderFactory::sell('USD', 'BTC'),
+            $fees,
+            2,
+        );
+
+        $array = $step->toArray();
+
+        self::assertArrayHasKey('from', $array);
+        self::assertArrayHasKey('to', $array);
+        self::assertArrayHasKey('spent', $array);
+        self::assertArrayHasKey('received', $array);
+        self::assertArrayHasKey('fees', $array);
+        self::assertArrayHasKey('sequence', $array);
+        self::assertSame('USD', $array['from']);
+        self::assertSame('BTC', $array['to']);
+        self::assertSame('100.00', $array['spent']);
+        self::assertSame('0.00250000', $array['received']);
+        self::assertSame(2, $array['sequence']);
+        self::assertSame(['USD' => '1.00'], $array['fees']);
+    }
 }

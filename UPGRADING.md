@@ -120,7 +120,7 @@ use SomeWork\P2PPathFinder\Domain\Money\Money;
 **Difficulty**: Medium  
 **Estimated Time**: 1-2 hours
 
-Version 2.0 introduces `ExecutionPlanService` as the sole API for path finding. The deprecated `PathSearchService` and its underlying `PathSearchEngine` have been removed. This version also removes deprecated methods from `ExecutionPlanSearchOutcome`.
+Version 2.0 makes `ExecutionPlanService` the sole API for path finding by deprecating and removing `PathSearchService` (which existed in 1.x). `ExecutionPlanService` was introduced earlier as the rename from `PathFinderService` in 1.0. The deprecated `PathSearchService` and its underlying `PathSearchEngine` have been removed. This version also removes deprecated methods from `ExecutionPlanSearchOutcome`.
 
 #### Summary of Changes
 

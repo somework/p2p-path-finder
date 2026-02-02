@@ -71,10 +71,11 @@ This document defines the public API surface that remains stable across minor an
 |                      | `PathSearchConfigBuilder` | Fluent configuration builder         |
 |                      | `SearchGuardConfig`       | Guard limit configuration            |
 | **Results**          | `SearchOutcome`           | Search results + guard report        |
-|                      | `PathResultSet`           | Immutable collection of paths        |
+|                      | `ExecutionPlan`           | Materialized plan with steps/fees   |
+|                      | `PathResultSet`           | Immutable collection of paths      |
 |                      | `Path`                    | Hop-centric path with derived totals |
-|                      | `ExecutionStep`           | Single execution step with `Order`   |
-|                      | `SearchGuardReport`       | Guard metrics and breach status      |
+|                      | `ExecutionStep`           | Single execution step with `Order`  |
+|                      | `SearchGuardReport`       | Guard metrics and breach status     |
 | **Order Management** | `OrderBook`               | Order collection with filtering      |
 | **Domain**           | `Money`                   | Monetary amount with currency        |
 |                      | `ExchangeRate`            | Conversion rate between currencies   |
@@ -140,7 +141,7 @@ if ($outcome->guardLimits()->anyLimitReached()) {
 }
 ```
 
-**Guarantee**: This pattern will work across all 2.x versions.
+**Guarantee**: This pattern will work across all 2.x versions. The document uses **2.x** as the primary series for guarantees; see [Version Compatibility Matrix](#version-compatibility-matrix) for 1.x vs 2.x.
 
 ### Domain Objects (Always Stable)
 
@@ -180,7 +181,7 @@ class MyCustomFilter implements OrderFilterInterface
 $filtered = $orderBook->filter(new MyCustomFilter());
 ```
 
-**Guarantee**: `OrderFilterInterface`, `PathOrderStrategy`, and `FeePolicy` interfaces will not change in 1.x.
+**Guarantee**: `OrderFilterInterface`, `PathOrderStrategy`, and `FeePolicy` interfaces will not change in 2.x.
 
 ---
 
@@ -230,7 +231,7 @@ use SomeWork\P2PPathFinder\Application\PathSearch\Engine\State\PortfolioState;
 
 **Interface**: `Application\Filter\OrderFilterInterface`
 
-**Stability**: Public, stable in 1.x
+**Stability**: Public, stable in 2.x
 
 ```php
 interface OrderFilterInterface
@@ -256,7 +257,7 @@ class MinimumLiquidityFilter implements OrderFilterInterface
 
 **Interface**: `Application\PathSearch\Engine\Ordering\PathOrderStrategy`
 
-**Stability**: Public, stable in 1.x
+**Stability**: Public, stable in 2.x
 
 ```php
 interface PathOrderStrategy
@@ -280,7 +281,7 @@ class MinimizeHopsStrategy implements PathOrderStrategy
 
 **Interface**: `Domain\Order\FeePolicy`
 
-**Stability**: Public, stable in 1.x
+**Stability**: Public, stable in 2.x
 
 ```php
 interface FeePolicy
@@ -377,24 +378,24 @@ set_error_handler(function ($errno, $errstr) {
 
 | Your Code Uses       | Compatible Library Versions | Notes                         |
 |----------------------|-----------------------------|-------------------------------|
-| Public API only      | Any 1.x version             | ✅ Fully compatible            |
-| Extension interfaces | Any 1.x version             | ✅ Interfaces stable           |
+| Public API only      | Any 2.x version             | ✅ Fully compatible           |
+| Extension interfaces | Any 2.x version             | ✅ Interfaces stable           |
 | Internal classes     | Same MINOR version only     | ⚠️ May break in MINOR updates |
-| `@internal` classes  | Exact version only          | ❌ No compatibility guarantee  |
+| `@internal` classes  | Exact version only          | ❌ No compatibility guarantee |
 
 ### Upgrade Safety
 
-**PATCH upgrades** (1.5.2 → 1.5.3):
+**PATCH upgrades** (2.5.2 → 2.5.3):
 - ✅ Always safe for public API
 - ⚠️ May affect internal API
 
-**MINOR upgrades** (1.5.x → 1.6.0):
+**MINOR upgrades** (2.5.x → 2.6.0):
 - ✅ Safe for public API
 - ✅ New features may be added
 - ⚠️ Internal API may change
 - ⚠️ Check for deprecation warnings
 
-**MAJOR upgrades** (1.x → 2.0):
+**MAJOR upgrades** (2.x → 3.0):
 - ⚠️ May have breaking changes
 - ⚠️ Read UPGRADING.md before upgrading
 - ⚠️ Deprecated features removed
@@ -441,12 +442,12 @@ Lock to MAJOR version to avoid breaking changes:
 ```json
 {
     "require": {
-        "somework/p2p-path-finder": "^1.0"
+        "somework/p2p-path-finder": "^2.0"
     }
 }
 ```
 
-This allows MINOR and PATCH updates (1.0.0 → 1.9.9) but prevents MAJOR updates (2.0.0).
+This allows MINOR and PATCH updates (2.0.0 → 2.9.9) but prevents MAJOR updates (3.0.0).
 
 ---
 

@@ -101,12 +101,12 @@ The library uses `ExecutionPlanService` which returns `ExecutionPlan` objects su
 |---------|-------------|
 | Service | `ExecutionPlanService` |
 | Method | `findBestPlans()` |
-| Results | 0 or 1 (single optimal plan) |
+| Results | Default: 0 or 1 (use `PathSearchConfig::withResultLimit(K)` for up to K plans, optionally disjoint via `disjointPlans()`) |
 | Splits | Yes |
 | Merges | Yes |
 | Linear paths | Yes (via `isLinear()`) |
 
-> **Important**: `ExecutionPlanService` returns at most **ONE** optimal execution plan. The `paths()` collection will contain 0 or 1 entries. For alternative routes, run separate searches with different constraints.
+> **Important**: By default, `ExecutionPlanService::findBestPlans()` returns **0 or 1** plan (`resultLimit=1`). For up to K distinct plans, use `PathSearchConfig::withResultLimit(K)`; use `disjointPlans()` to request disjoint alternatives. Separate searches are unnecessary when using `withResultLimit` for alternatives.
 
 **Supported execution patterns:**
 - Multiple orders for same direction (USD→BTC via two market makers)

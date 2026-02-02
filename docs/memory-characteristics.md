@@ -861,7 +861,7 @@ Based on profiling with PHP 8.3:
 - Memory share: ~40-60% of peak
 - Optimization: Memoized ExchangeRate instances shared across orders
 
-**Result materialization** (`LegMaterializer`):
+**Result materialization** (`ExecutionPlanMaterializer`):
 - Allocation pattern: Stack-allocated candidate DTOs that materialize `ExecutionPlan` headers and `ExecutionStep` collections
 - Memory share: ~5-10% of peak, scaling primarily with step count per plan
 - Optimization: Buffers reused across expansions, allocations deferred until tolerance passes so most `ExecutionStep` snapshots only materialize for viable plans
