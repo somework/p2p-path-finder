@@ -66,49 +66,56 @@ final class ReusableTopKTest extends TestCase
     #[TestDox('Reusable mode produces more alternatives than disjoint mode')]
     public function test_reusable_mode_produces_more_alternatives(): void
     {
-        // Limited order book - disjoint mode will find fewer alternatives
-        $order1 = OrderFactory::sell('USDT', 'RUB', '10.00', '2000.00', '95.00', 2, 2);
-        $order2 = OrderFactory::sell('USDT', 'RUB', '10.00', '2000.00', '97.00', 2, 2);
+        // Multi-hop order book: two intermediary currencies sharing a common first-hop order.
+        // Disjoint mode cannot reuse the shared first-hop order across plans,
+        // so it finds fewer alternatives than reusable mode.
+        $rubToUsdt = OrderFactory::sell('USDT', 'RUB', '10.00', '5000.00', '95.00', 2, 2);
+        $usdtToEur1 = OrderFactory::buy('USDT', 'EUR', '10.00', '5000.00', '0.92', 2, 2);
+        $usdtToEur2 = OrderFactory::buy('USDT', 'EUR', '10.00', '5000.00', '0.90', 2, 2);
 
-        $orderBook = new OrderBook([$order1, $order2]);
+        $orderBook = new OrderBook([$rubToUsdt, $usdtToEur1, $usdtToEur2]);
 
-        $spendAmount = Money::fromString('RUB', '1900.00', 2);
+        $spendAmount = Money::fromString('RUB', '950.00', 2);
 
-        // Disjoint mode
+        // Disjoint mode - each order can only appear in one plan
         $disjointConfig = PathSearchConfig::builder()
             ->withSpendAmount($spendAmount)
-            ->withToleranceBounds('0.0', '0.50')
-            ->withHopLimits(1, 3)
+            ->withToleranceBounds('0.0', '0.90')
+            ->withHopLimits(1, 4)
             ->withResultLimit(5)
             ->withDisjointPlans(true)
             ->build();
 
         $disjointOutcome = $this->service->findBestPlans(
-            new PathSearchRequest($orderBook, $disjointConfig, 'USDT')
+            new PathSearchRequest($orderBook, $disjointConfig, 'EUR')
         );
 
-        // Reusable mode
+        // Reusable mode - orders can be shared across plans
         $reusableConfig = PathSearchConfig::builder()
             ->withSpendAmount($spendAmount)
-            ->withToleranceBounds('0.0', '0.50')
-            ->withHopLimits(1, 3)
+            ->withToleranceBounds('0.0', '0.90')
+            ->withHopLimits(1, 4)
             ->withResultLimit(5)
             ->withDisjointPlans(false)
             ->build();
 
         $reusableOutcome = $this->service->findBestPlans(
-            new PathSearchRequest($orderBook, $reusableConfig, 'USDT')
+            new PathSearchRequest($orderBook, $reusableConfig, 'EUR')
         );
 
         // Both should find plans
         self::assertTrue($disjointOutcome->hasPaths());
         self::assertTrue($reusableOutcome->hasPaths());
 
-        // Disjoint mode can use each order only once - max 2 plans
-        self::assertLessThanOrEqual(2, $disjointOutcome->paths()->count());
-
         // Reusable mode might find the same or more (with duplicates filtered)
         self::assertGreaterThanOrEqual(1, $reusableOutcome->paths()->count());
+
+        // Verify reusable mode produces at least as many alternatives
+        self::assertGreaterThanOrEqual(
+            $disjointOutcome->paths()->count(),
+            $reusableOutcome->paths()->count(),
+            'Reusable mode should produce at least as many alternatives as disjoint mode'
+        );
     }
 
     #[TestDox('Reusable mode avoids exact duplicates')]

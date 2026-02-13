@@ -322,7 +322,7 @@ if ($guards->anyLimitReached()) {
 }
 ```
 
-**Top-K and resultLimit**: Configure `PathSearchConfig::withResultLimit(int)` to request multiple plans (e.g. for fallbacks or comparison). With `resultLimit=1` (default), `paths()->count()` is 0 or 1; with a higher limit, multiple disjoint or reusable plans may be returned depending on `disjointPlans()`.
+**Top-K and resultLimit**: Configure `PathSearchConfig::withResultLimit(int)` to request multiple plans (e.g. for fallbacks or comparison). With `resultLimit=1` (default), `paths()->count()` is 0 or 1; with a higher limit, multiple disjoint or reusable plans may be returned depending on `disjointPlans()` (disjoint plans share no common orders; reusable plans may share orders with penalty-based diversification).
 
 **Properties**:
 - **paths**: PathResultSet object containing 0 to resultLimit ExecutionPlan instances

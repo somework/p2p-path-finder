@@ -141,7 +141,7 @@ if ($outcome->guardLimits()->anyLimitReached()) {
 }
 ```
 
-**Guarantee**: This pattern will work across all 2.x versions. The document uses **2.x** as the primary series for guarantees; see [Version Compatibility Matrix](#version-compatibility-matrix) for 1.x vs 2.x.
+**Guarantee**: This pattern will work across all 2.x versions. The document uses **2.x** as the primary series for guarantees; see [Version Compatibility Matrix](#version-compatibility-matrix) for supported guarantees.
 
 ### Domain Objects (Always Stable)
 

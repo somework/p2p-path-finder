@@ -418,6 +418,97 @@ final class GraphNodeCollectionTest extends TestCase
         self::assertSame(0, $filtered->get('EUR')->edges()->count());
     }
 
+    // ========================================================================
+    // withOrderPenalties() Tests
+    // ========================================================================
+
+    #[TestDox('withOrderPenalties returns same instance when usageCounts is empty')]
+    public function test_with_order_penalties_returns_same_instance_when_usage_empty(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.00', '100.00', '0.92', 2, 2);
+        $edge = $this->createEdge('USD', 'EUR', $order);
+
+        $node = new GraphNode('USD', [$edge]);
+        $collection = GraphNodeCollection::fromArray([$node]);
+
+        $result = $collection->withOrderPenalties([], '1.5');
+
+        self::assertSame($collection, $result);
+    }
+
+    #[TestDox('withOrderPenalties returns same instance when collection is empty')]
+    public function test_with_order_penalties_returns_same_instance_when_collection_empty(): void
+    {
+        $collection = GraphNodeCollection::empty();
+
+        $result = $collection->withOrderPenalties([12345 => 2], '1.5');
+
+        self::assertSame($collection, $result);
+    }
+
+    #[TestDox('withOrderPenalties penalizes nodes when usage counts match')]
+    public function test_with_order_penalties_penalizes_matching_nodes(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.00', '100.00', '0.92', 2, 2);
+        $edge = $this->createEdge('USD', 'EUR', $order);
+
+        $node = new GraphNode('USD', [$edge]);
+        $collection = GraphNodeCollection::fromArray([$node]);
+
+        $usageCounts = [spl_object_id($order) => 1];
+        $result = $collection->withOrderPenalties($usageCounts, '1.5');
+
+        self::assertNotSame($collection, $result);
+        self::assertSame(1, $result->count());
+        self::assertTrue($result->has('USD'));
+
+        $resultNode = $result->get('USD');
+        self::assertNotNull($resultNode);
+        self::assertSame(1, $resultNode->edges()->count());
+    }
+
+    #[TestDox('withOrderPenalties returns same instance when no node changes occur')]
+    public function test_with_order_penalties_returns_same_when_no_match(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.00', '100.00', '0.92', 2, 2);
+        $edge = $this->createEdge('USD', 'EUR', $order);
+
+        $node = new GraphNode('USD', [$edge]);
+        $collection = GraphNodeCollection::fromArray([$node]);
+
+        $result = $collection->withOrderPenalties([999999999 => 2], '1.5');
+
+        self::assertSame($collection, $result);
+    }
+
+    #[TestDox('withOrderPenalties replaces only changed nodes when some match')]
+    public function test_with_order_penalties_replaces_only_changed_nodes(): void
+    {
+        $order1 = OrderFactory::buy('USD', 'EUR', '10.00', '100.00', '0.92', 2, 2);
+        $order2 = OrderFactory::buy('GBP', 'EUR', '10.00', '100.00', '0.85', 2, 2);
+        $edge1 = $this->createEdge('USD', 'EUR', $order1);
+        $edge2 = $this->createEdge('GBP', 'EUR', $order2);
+
+        $node1 = new GraphNode('USD', [$edge1]);
+        $node2 = new GraphNode('GBP', [$edge2]);
+        $node3 = new GraphNode('EUR');
+        $collection = GraphNodeCollection::fromArray([$node1, $node2, $node3]);
+
+        // Only penalize order1
+        $usageCounts = [spl_object_id($order1) => 1];
+        $result = $collection->withOrderPenalties($usageCounts, '1.5');
+
+        self::assertNotSame($collection, $result);
+        self::assertSame(3, $result->count());
+
+        // USD node should be replaced (it had the matching order)
+        self::assertNotSame($node1, $result->get('USD'));
+        // GBP node should be the same instance (no matching order)
+        self::assertSame($node2, $result->get('GBP'));
+        // EUR node should be the same instance (no edges)
+        self::assertSame($node3, $result->get('EUR'));
+    }
+
     #[TestDox('fromArray with empty array returns functional empty collection')]
     public function test_from_array_empty_returns_functional(): void
     {
