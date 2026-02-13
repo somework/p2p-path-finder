@@ -5,5 +5,5 @@
         "benchmarks"
     ],
     "runner.retry_threshold": 5,
-    "runner.subject_pattern": "benchFind.*"
+    "runner.subject_pattern": "bench.*"
 }

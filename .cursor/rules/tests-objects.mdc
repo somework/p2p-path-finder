@@ -1,0 +1,58 @@
+---
+description: How to run tests (Docker Compose) and object assertions in tests
+alwaysApply: false
+---
+
+# Running tests and checks
+
+Use **Docker Compose** so the same PHP and extensions as CI are used. From the project root (`p2p-path-finder/`):
+
+1. **Install dependencies** (once or after composer.json/composer.lock changes):
+   ```bash
+   docker compose run --rm php composer install --no-interaction
+   ```
+
+2. **Run the full test suite**:
+   ```bash
+   docker compose run --rm php vendor/bin/phpunit
+   ```
+
+3. **Run a subset of tests**:
+   ```bash
+   # One test file
+   docker compose run --rm php vendor/bin/phpunit tests/Unit/Application/PathSearch/Config/PathSearchConfigTest.php
+
+   # One test method (--filter)
+   docker compose run --rm php vendor/bin/phpunit tests/Unit/Application/PathSearch/Model/Graph/GraphEdgeTest.php --filter test_with_capacity_penalty_caps_at_maximum_divisor
+   ```
+
+4. **Other checks** (optional):
+   ```bash
+   docker compose run --rm php vendor/bin/phpstan analyse
+   docker compose run --rm php vendor/bin/psalm --config=psalm.xml.dist --show-info=false
+   docker compose run --rm php composer phpbench   # benchmarks (see composer.json scripts)
+   ```
+
+Configuration: `docker-compose.yml` mounts the project into the container; the `php` service uses `working_dir: /var/www/html/p2p-path-finder`. PHPUnit config is `phpunit.xml.dist` (testsuites: Unit, Integration, Helpers, Fixture).
+
+---
+
+# Object assertions in tests
+
+When comparing objects in PHPUnit tests:
+
+- **Do not** use `assertSame()` or `assertEquals()` on whole objects.
+- **Do** compare specific properties with `assertSame()` on primitives (or domain equality methods like `Money::equals()`).
+
+Reason: `assertSame()` checks object identity (same instance), which can be unreliable with immutable/value objects. `assertEquals()` may not behave consistently for complex types.
+
+Examples:
+
+- `self::assertSame($obj1->id(), $obj2->id());`
+- `self::assertSame($money1->amount(), $money2->amount());` and `self::assertSame($money1->currency(), $money2->currency());`
+- `self::assertTrue($money1->equals($money2));` when the type provides `equals()`.
+
+Avoid:
+
+- `self::assertSame($money1, $money2);`
+- `self::assertEquals($money1, $money2);`

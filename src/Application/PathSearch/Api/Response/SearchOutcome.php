@@ -8,20 +8,22 @@ use SomeWork\P2PPathFinder\Application\PathSearch\Config\SearchGuardConfig;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\Path;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\PathResultSet;
 use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchGuardReport;
+use SomeWork\P2PPathFinder\Application\PathSearch\Result\SearchResultInterface;
 
 /**
  * Immutable response DTO describing the outcome of a path search.
  *
- * Carries discovered {@see Path}
- * instances built from hop-centric DTOs ({@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHop}
- * / {@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHopCollection})
- * alongside guard rail metrics.
+ * Carries discovered {@see Path} or {@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionPlan}
+ * instances. Execution-plan outcomes use step-centric DTOs
+ * ({@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionStep}
+ * / {@see \SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionStepCollection});
+ * path outcomes may use hop-centric DTOs (PathHop / PathHopCollection).
  *
- * @template-covariant TPath of Path
+ * @template-covariant TPath of SearchResultInterface
  *
- * @phpstan-template-covariant TPath of Path
+ * @phpstan-template-covariant TPath of SearchResultInterface
  *
- * @psalm-template-covariant TPath as Path
+ * @psalm-template-covariant TPath as SearchResultInterface
  *
  * @see PathResultSet For the paths collection
  * @see SearchGuardReport For guard metrics and limits
@@ -62,13 +64,13 @@ final class SearchOutcome
     /**
      * Create a SearchOutcome from an existing set of discovered paths and its guard report.
      *
-     * @template TOutcome of Path
+     * @template TOutcome of SearchResultInterface
      *
-     * @phpstan-template TOutcome of Path
+     * @phpstan-template TOutcome of SearchResultInterface
      *
-     * @psalm-template TOutcome as Path
+     * @psalm-template TOutcome as SearchResultInterface
      *
-     * @param PathResultSet<TOutcome> $paths       discovered Path instances to include in the outcome
+     * @param PathResultSet<TOutcome> $paths       discovered Path or ExecutionPlan instances to include in the outcome
      * @param SearchGuardReport       $guardLimits guard metrics and limits produced during the search
      *
      * @phpstan-param PathResultSet<TOutcome> $paths
@@ -91,21 +93,18 @@ final class SearchOutcome
      *
      * @param SearchGuardReport $guardLimits guard-rail metrics and limits to include in the outcome
      *
-     * @return self<Path> a SearchOutcome containing an empty PathResultSet and the given guard limits
+     * @return self<SearchResultInterface> a SearchOutcome containing an empty PathResultSet and the given guard limits
      *
-     * @phpstan-return self<Path>
+     * @phpstan-return self<SearchResultInterface>
      *
-     * @psalm-return self<Path>
+     * @psalm-return self<SearchResultInterface>
      */
     public static function empty(SearchGuardReport $guardLimits): self
     {
-        /** @var PathResultSet<Path> $emptyPaths */
+        /** @var PathResultSet<SearchResultInterface> $emptyPaths */
         $emptyPaths = PathResultSet::empty();
 
-        /** @var self<Path> $empty */
-        $empty = self::fromResultSet($emptyPaths, $guardLimits);
-
-        return $empty;
+        return self::fromResultSet($emptyPaths, $guardLimits);
     }
 
     /**
@@ -129,7 +128,7 @@ final class SearchOutcome
      *
      * @psalm-return TPath|null
      */
-    public function bestPath(): ?Path
+    public function bestPath(): ?SearchResultInterface
     {
         return $this->paths->first();
     }

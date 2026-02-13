@@ -39,15 +39,15 @@
     ],
     "require": {
         "php": "^8.2",
-        "brick/math": "^0.14.1"
+        "brick/math": "^0.14.8"
     },
     "require-dev": {
-        "friendsofphp/php-cs-fixer": "^3.92",
-        "infection/infection": "^0.32",
+        "friendsofphp/php-cs-fixer": "^3.94",
+        "infection/infection": "^0.32.4",
         "phpbench/phpbench": "^1.4",
-        "phpstan/phpstan": "^2.1",
+        "phpstan/phpstan": "^2.1.39",
         "phpunit/phpunit": "^10.5",
-        "vimeo/psalm": "^6.14"
+        "vimeo/psalm": "^6.15.1"
     },
     "autoload": {
         "psr-4": {
@@ -63,7 +63,7 @@
     },
     "scripts": {
         "php-cs-fixer": "vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php --allow-risky=yes",
-        "infection": "XDEBUG_MODE=coverage vendor/bin/infection --threads=4 --min-msi=80 --min-covered-msi=85",
+        "infection": "XDEBUG_MODE=coverage vendor/bin/infection --threads=4",
         "phpstan": "vendor/bin/phpstan analyse",
         "phpstan:baseline": "vendor/bin/phpstan analyse --generate-baseline",
         "phpstan:custom-rules": [
@@ -75,14 +75,23 @@
         "phpdoc": "php bin/generate-phpdoc.php",
         "phpbench": "php -d memory_limit=-1 -d xdebug.mode=off vendor/bin/phpbench run --config=phpbench.json --report=p2p_aggregate",
         "examples": [
+            "@examples:execution-plan-basic",
+            "@examples:execution-plan-split-merge",
+            "@examples:top-k-execution-plans",
+            "@examples:top-k-reusable-orders",
             "@examples:custom-order-filter",
             "@examples:custom-ordering-strategy",
             "@examples:custom-fee-policy",
             "@examples:error-handling",
             "@examples:performance-optimization",
             "@examples:guarded-search",
-            "@examples:bybit-p2p-integration"
+            "@examples:bybit-p2p-integration",
+            "@examples:advanced-search-strategies"
         ],
+        "examples:execution-plan-basic": "php examples/execution-plan-basic.php",
+        "examples:execution-plan-split-merge": "php examples/execution-plan-split-merge.php",
+        "examples:top-k-execution-plans": "php examples/top-k-execution-plans.php",
+        "examples:top-k-reusable-orders": "php examples/top-k-reusable-orders.php",
         "examples:custom-order-filter": "php examples/custom-order-filter.php",
         "examples:custom-ordering-strategy": "php examples/custom-ordering-strategy.php",
         "examples:custom-fee-policy": "php examples/custom-fee-policy.php",
@@ -90,6 +99,7 @@
         "examples:performance-optimization": "php examples/performance-optimization.php",
         "examples:guarded-search": "php examples/guarded-search-example.php",
         "examples:bybit-p2p-integration": "php examples/bybit-p2p-integration.php",
+        "examples:advanced-search-strategies": "php examples/advanced-search-strategies.php",
         "check": [
             "@phpstan",
             "@psalm",

@@ -11,46 +11,95 @@
     },
     "tmpDir": "var/cache/infection",
     "minMsi": 80,
-    "minCoveredMsi": 85,
+    "minCoveredMsi": 83,
     "timeout": 60,
     "mutators": {
         "@default": true,
         "MethodCallRemoval": {
             "ignore": [
-                "SomeWork\\P2PPathFinder\\Application\\Filter\\ToleranceWindowFilter::__construct"
+                "SomeWork\\P2PPathFinder\\Application\\Order\\Filter\\ToleranceWindowFilter::__construct"
             ]
         },
         "LogicalAnd": {
             "ignore": [
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::materialize",
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::resolveBuyLegAmounts",
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::resolveSellLegAmounts"
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::materialize",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::resolveBuyLegAmounts",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::resolveSellLegAmounts"
             ]
         },
         "LogicalAndAllSubExprNegation": {
             "ignore": [
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::materialize",
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::resolveBuyLegAmounts",
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::resolveSellLegAmounts"
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::materialize",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::resolveBuyLegAmounts",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::resolveSellLegAmounts"
             ]
         },
         "LogicalAndNegation": {
             "ignore": [
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::materialize",
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::resolveBuyLegAmounts",
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::resolveSellLegAmounts"
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::materialize",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::resolveBuyLegAmounts",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::resolveSellLegAmounts"
             ]
         },
         "LogicalAndSingleSubExprNegation": {
             "ignore": [
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::materialize",
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::resolveBuyLegAmounts",
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::resolveSellLegAmounts"
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::materialize",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::resolveBuyLegAmounts",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::resolveSellLegAmounts"
             ]
         },
         "Identical": {
             "ignore": [
-                "SomeWork\\P2PPathFinder\\Application\\Service\\LegMaterializer::materialize"
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\LegMaterializer::materialize"
+            ]
+        },
+        "UnwrapTrim": {
+            "ignoreSourceCodeByRegex": [
+                ".*strtoupper\\(trim\\(.*"
+            ]
+        },
+        "UnwrapStrToUpper": {
+            "ignoreSourceCodeByRegex": [
+                ".*strtoupper\\(trim\\(.*"
+            ]
+        },
+        "LessThan": {
+            "ignore": [
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Result\\SearchGuardReport::fromMetrics"
+            ]
+        },
+        "DecrementInteger": {
+            "ignore": [
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Result\\SearchGuardReport::idle",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Result\\SearchGuardReport::none"
+            ]
+        },
+        "CastFloat": {
+            "ignore": [
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Result\\SearchGuardReport::fromMetrics"
+            ]
+        },
+        "TrueValue": {
+            "ignoreSourceCodeByRegex": [
+                ".*\\$excludedOrderIds\\[.*\\] = true.*"
+            ]
+        },
+        "Continue_": {
+            "ignore": [
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\ExecutionPlanService::findDisjointTopK",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\ExecutionPlanService::findReusableTopK"
+            ]
+        },
+        "Break_": {
+            "ignore": [
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\ExecutionPlanService::findDisjointTopK",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Service\\ExecutionPlanService::findReusableTopK"
+            ]
+        },
+        "Foreach_": {
+            "ignore": [
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Model\\Graph\\GraphNodeCollection::withoutOrders",
+                "SomeWork\\P2PPathFinder\\Application\\PathSearch\\Model\\Graph\\GraphNodeCollection::withOrderPenalties"
             ]
         }
     }

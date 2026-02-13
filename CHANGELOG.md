@@ -7,6 +7,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Top-K Execution Plan Discovery**: `ExecutionPlanService::findBestPlans()` now returns up to K distinct execution plans
+  - Configure via `PathSearchConfig::withResultLimit(K)` (default: 1 for backward compatibility)
+  - **Disjoint mode** (default, `withDisjointPlans(true)`): each plan uses completely disjoint order sets — no order appears in multiple plans
+  - **Reusable mode** (`withDisjointPlans(false)`): plans may share orders with penalty-based diversification, useful for rate comparison scenarios
+  - Plans are ranked by cost (best/cheapest first)
+  - If fewer than K alternatives exist, returns as many as found
+  - Guard metrics (expansions, visited states, elapsed time) are aggregated across all K iterations
+  - See [UPGRADING.md](UPGRADING.md#top-k-execution-plan-discovery) for usage examples
+  - New example: `examples/top-k-execution-plans.php`
+
+- **Graph filtering**: `Graph::withoutOrders(array $excludedOrderIds)` for immutable graph filtering
+  - Filters edges by order ID (via `spl_object_id`)
+  - Returns new graph instance if changes occur, same instance if no changes
+  - Propagates through `GraphNodeCollection`, `GraphNode`, `GraphEdgeCollection`
+
+- **SearchGuardReport aggregation**: `SearchGuardReport::aggregate(array $reports)` combines metrics from multiple searches
+  - Sums numerical metrics (expansions, visitedStates, elapsedMilliseconds)
+  - Uses logical OR for boolean "reached" flags
+  - Takes limits from first report
+
+- **Top-K benchmarks**: New benchmark scenarios in `ExecutionPlanBench.php`
+  - `benchFindTopKPlans`: Varying K values with different order book sizes
+  - `benchGraphFiltering`: Graph filtering performance with varying exclusion set sizes
+
+### Changed
+- TBD
+
+### Removed
+- TBD
+
+---
+
+## [2.0.0] - TBD
+
+**⚠️ BREAKING CHANGES**: This version removes deprecated APIs and introduces `ExecutionPlanService` as the sole public API for path finding. See [UPGRADING.md](UPGRADING.md#upgrading-from-1x-to-20) for complete migration guide.
+
+### Added
+- **ExecutionPlanService**: New recommended service for path finding that supports split/merge execution
+  - `ExecutionPlanService::findBestPlans()` - Returns `ExecutionPlan` objects
+  - Supports multi-order same direction (multiple orders for USD→BTC)
+  - Supports split execution (input split across parallel routes)
+  - Supports merge execution (routes converging at target)
+  - See [Getting Started Guide](docs/getting-started.md#executionplanservice-recommended)
+
+- **ExecutionPlan result type**: Complete execution plan that can express both linear and split/merge topologies
+  - `steps()` - Returns `ExecutionStepCollection`
+  - `isLinear()` - Check if plan is a simple linear path
+  - `asLinearPath()` - Convert to legacy `Path` format (returns null if non-linear)
+  - `sourceCurrency()` / `targetCurrency()` - Source and target currencies
+  - `stepCount()` - Number of execution steps
+  - See [API Contracts](docs/api-contracts.md#executionplan)
+
+- **ExecutionStep**: Single step in an execution plan with sequence ordering
+  - `sequenceNumber()` - Execution order (1-based)
+  - `from()` / `to()` - Source and destination currencies
+  - `spent()` / `received()` - Monetary amounts
+  - `order()` / `fees()` - Order reference and fees
+  - See [API Contracts](docs/api-contracts.md#executionstep)
+
+- **ExecutionStepCollection**: Immutable ordered collection sorted by sequence number
+  - `fromList()` - Create from array of steps
+  - `all()` / `at()` / `first()` / `last()` - Access steps
+  - Automatic sorting by sequence number
+
+- **PortfolioState** (internal): Multi-currency balance tracking for split/merge execution
+  - Tracks balances across multiple currencies simultaneously
+  - Prevents backtracking (cannot return to fully spent currency)
+  - Each order used only once per portfolio state
+  - See [Architecture Guide](docs/architecture.md#executionplansearchengine-algorithm-recommended)
+
+- **ExecutionPlanSearchEngine** (internal): Successive shortest augmenting paths algorithm
+  - Finds optimal execution plans considering all available liquidity
+  - Uses Dijkstra-based path finding with portfolio state tracking
+  - Supports complex topologies (splits, merges, diamond patterns)
+
+- **New examples**:
+  - `examples/execution-plan-basic.php` - Basic ExecutionPlanService usage
+  - `examples/execution-plan-split-merge.php` - Split/merge execution patterns
+  - Updated `examples/advanced-search-strategies.php` with ExecutionPlanService
+
 ### Changed
 - **Major namespace refactoring**: Reorganized entire codebase for better structure and maintainability
   - `Application/Graph/` → `Application/PathSearch/Model/Graph/`
@@ -18,15 +100,139 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Eliminated `JsonSerializable` implementations from core classes
   - Removed serialization-specific traits and logic
   - Updated examples to use direct object APIs
+- **Documentation overhaul**: All documentation now uses `ExecutionPlanService` exclusively as the primary API
+  - `getting-started.md`: Updated all examples to use `ExecutionPlanService`, removed legacy migration section
+  - `architecture.md`: Updated component diagrams and flow descriptions, removed legacy `PathSearchService` flow
+  - `api-contracts.md`: Removed deprecated `Path`, `PathHop`, `PathSearchService` sections
+  - `api/index.md`: Removed `PathSearchService` API documentation
+  - `memory-characteristics.md`: Removed legacy comparison section
+  - `api-stability.md`: Updated entry point references to `ExecutionPlanService`
+  - `exceptions.md`: Updated all example code to use `ExecutionPlanService`
+  - `decimal-strategy.md`: Updated service and DTO references
+  - `releases-and-support.md`: Updated BC break examples
+
+### Removed
+
+#### Public API Removals
+
+- **`PathSearchService` class**: Removed deprecated service class
+  - **Replacement**: Use `ExecutionPlanService::findBestPlans()` instead
+  - **Migration**: See [UPGRADING.md](UPGRADING.md#step-1-update-service-instantiation)
+
+- **`ExecutionPlanSearchOutcome::hasPlan()` method**: Removed deprecated method
+  - **Replacement**: Use `hasRawFills()` instead
+  - **Migration**: See [UPGRADING.md](UPGRADING.md#step-4-update-executionplansearchoutcome-usage)
+
+- **`ExecutionPlanSearchOutcome::plan()` method**: Removed deprecated method
+  - **Replacement**: Use `rawFills()` + `ExecutionPlanMaterializer::materialize()` instead
+  - **Migration**: See [UPGRADING.md](UPGRADING.md#step-4-update-executionplansearchoutcome-usage)
+
+#### Internal API Removals
+
+- **`PathSearchEngine` class** (~1128 lines): Removed legacy best-first search engine
+  - Replaced by `ExecutionPlanSearchEngine` with successive augmenting paths algorithm
+  - Internal class, not part of public API
+  
+- **`CandidateSearchOutcome` class**: Removed internal DTO (no longer needed)
+
+- **Legacy State classes** (in `Engine/State/`):
+  - `SearchState`, `SearchStateRecord`, `SearchStateRecordCollection`
+  - `SearchStatePriority`, `SearchStatePriorityQueue`
+  - `SearchStateRegistry`, `SearchStateSignature`, `SearchStateSignatureFormatter`
+  - `SearchQueueEntry`, `SearchBootstrap`, `SegmentPruner`, `InsertionOrderCounter`
+  
+- **Legacy Queue classes** (in `Engine/Queue/`):
+  - `CandidateHeapEntry`, `CandidatePriority`, `CandidatePriorityQueue`
+  - `CandidateResultHeap`, `StatePriorityQueue`
+
+- **Legacy benchmarks**: Removed `PathFinderBench.php` and `LegacyComparisonBench.php`
+
+- **Orphaned test helpers** (MUL-21):
+  - `PathFinderScenarioGenerator` - generator used by removed legacy engine tests
+  - `PathFinderScenarioGeneratorTest` - tests for the orphaned generator
 
 ### Breaking Changes
-- **Namespace changes**: All public class namespaces have changed (breaking change for library consumers)
-- **Simplified APIs**: Classes now provide direct object access methods
+
+#### Removed Classes
+
+- **`PathSearchService`**: Removed in favor of `ExecutionPlanService`
+  - **Impact**: All code using `PathSearchService` must migrate
+  - **Replacement**: `ExecutionPlanService::findBestPlans()`
+  - **Migration**: See [UPGRADING.md](UPGRADING.md#step-1-update-service-instantiation)
+
+#### Removed Methods
+
+- **`ExecutionPlanSearchOutcome::hasPlan()`**: Removed in favor of `hasRawFills()`
+  - **Impact**: Code checking for plan existence must update
+  - **Replacement**: `hasRawFills()`
+  - **Migration**: See [UPGRADING.md](UPGRADING.md#step-4-update-executionplansearchoutcome-usage)
+
+- **`ExecutionPlanSearchOutcome::plan()`**: Removed in favor of materialization pattern
+  - **Impact**: Code accessing plans directly must use materializer
+  - **Replacement**: `rawFills()` + `ExecutionPlanMaterializer::materialize()`
+  - **Migration**: See [UPGRADING.md](UPGRADING.md#step-4-update-executionplansearchoutcome-usage)
+
+#### Changed Behavior
+
+- **Execution plan return (2.0.0)**: In 2.0.0, `ExecutionPlanService::findBestPlans()` returns at most **one**
+  execution plan; the `paths()` collection contains 0 or 1 entries. **Top-K support** (multiple ranked plans)
+  is introduced in the Unreleased version: `findBestPlans()` returns multiple ranked `ExecutionPlan` entries
+  (up to K) in the `paths()` collection when configured via `PathSearchConfig::withResultLimit(K)`.
+  The return type remains `SearchOutcome<ExecutionPlan>` in both cases.
+  - **Impact**: Code written for 2.0.0 single-plan behavior remains valid; use `bestPath()` or iterate `paths()`
+  - **Migration**: For Top-K, set `withResultLimit(K)` and iterate `paths()` for alternatives
+
+- **Result type change**: `findBestPlans()` returns `SearchOutcome<ExecutionPlan>` instead of `SearchOutcome<Path>`
+  - **Impact**: Code iterating over results must update from `Path` to `ExecutionPlan`
+  - **Migration**: Replace `hops()` with `steps()`, see [UPGRADING.md](UPGRADING.md#step-3-update-result-processing)
 
 ### Migration Guide
-- Update all import statements to use new namespace paths
-- Use direct object API methods for accessing data
-- See updated documentation for new API usage patterns
+
+For comprehensive migration instructions, see [UPGRADING.md](UPGRADING.md#upgrading-from-1x-to-20).
+
+**Quick Migration Checklist**:
+1. Replace `PathSearchService` with `ExecutionPlanService`
+2. Replace `findBestPaths()` with `findBestPlans()`
+3. Replace `ExecutionPlanSearchOutcome::hasPlan()` with `hasRawFills()`
+4. Replace `ExecutionPlanSearchOutcome::plan()` with `rawFills()` + `ExecutionPlanMaterializer`
+5. Replace `Path` result handling with `ExecutionPlan`
+6. Replace `hops()` iteration with `steps()` iteration
+7. Use `bestPath()` instead of iterating over `paths()` (returns 0 or 1 plan)
+8. Use `isLinear()` and `asLinearPath()` for backward compatibility if needed
+
+### Test Suite Changes (MUL-12, MUL-21)
+- **Final test count**: 1622 tests, 35683 assertions (reduced from 1625 tests after legacy cleanup)
+  
+- **Removed legacy PathSearchEngine tests**: Tests that relied on PathSearchEngine-specific behavior
+  have been removed or updated since PathSearchService now delegates to ExecutionPlanService.
+  
+- **Removed multi-path tests** (intentional behavioral change):
+  - `test_it_returns_multiple_paths_ordered_by_cost` - ExecutionPlanService returns single optimal plan
+  - `test_it_preserves_result_insertion_order_when_costs_are_identical` - Same reason
+  
+- **Removed tolerance-specific tests** (engine behavior changed):
+  - Tests for PathSearchEngine tolerance clamping, underspend calculation, order minimum scaling
+  - Tolerance evaluation now handled by ToleranceEvaluator with different behavior
+  
+- **Removed fee materialization tests** (moved to unit tests):
+  - PathSearchEngine-specific fee materialization tests removed from FeesPathSearchServiceTest
+  - Fee handling tested at unit level (LegMaterializerTest) and integration level (ExecutionPlanServiceTest::test_fee_aggregation)
+  
+- **Removed edge case tests** (equivalent coverage exists):
+  - PathSearchServiceEdgeCasesTest tests replaced by ExecutionPlanServiceTest guard limit tests
+  
+- **Updated hop limit tests** (behavioral clarification):
+  - Documented that ExecutionPlanService finds optimal plans regardless of minimum hop config
+  - Hop filtering is applied at PathSearchService level (backward compatibility layer)
+  
+- **Added equivalent coverage to ExecutionPlanServiceTest**:
+  - `test_capacity_constrained_order_selection` - Capacity evaluation
+  - `test_rate_selection_with_sufficient_capacity` - Rate preference
+  - `test_tolerance_rejection_when_exceeded` - Tolerance enforcement
+  - `test_tolerance_acceptance_within_bounds` - Tolerance acceptance
+  
+- **Kept with documentation**:
+  - `test_plan_to_path_throws_for_non_linear` - API contract documented, will activate when split/merge produces non-linear plans
 
 ## [0.1.0] - TBD
 
@@ -197,5 +403,6 @@ Each version should follow this structure:
 
 ### Version Comparison Links
 
-[Unreleased]: https://github.com/somework/p2p-path-finder/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/somework/p2p-path-finder/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/somework/p2p-path-finder/compare/v0.1.0...v2.0.0
 [0.1.0]: https://github.com/somework/p2p-path-finder/releases/tag/v0.1.0

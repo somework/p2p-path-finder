@@ -5,10 +5,17 @@ declare(strict_types=1);
 namespace SomeWork\P2PPathFinder\Tests\Unit\Application\PathSearch\Model\Graph;
 
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
+use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\EdgeCapacity;
+use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\GraphEdge;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\GraphNode;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\GraphNodeCollection;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
+use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
+use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
 #[CoversClass(GraphNodeCollection::class)]
 final class GraphNodeCollectionTest extends TestCase
@@ -190,5 +197,380 @@ final class GraphNodeCollectionTest extends TestCase
         }
 
         self::assertSame([], $nodes);
+    }
+
+    // ========================================================================
+    // withoutOrders() Tests - Top-K Support
+    // ========================================================================
+
+    #[TestDox('withoutOrders returns same instance when exclusion array is empty')]
+    public function test_without_orders_returns_same_instance_when_exclusion_empty(): void
+    {
+        $node = new GraphNode('USD');
+        $collection = GraphNodeCollection::fromArray([$node]);
+
+        $filtered = $collection->withoutOrders([]);
+
+        self::assertSame($collection, $filtered);
+    }
+
+    #[TestDox('withoutOrders returns same instance when collection is empty')]
+    public function test_without_orders_returns_same_instance_when_collection_empty(): void
+    {
+        $collection = GraphNodeCollection::empty();
+
+        $filtered = $collection->withoutOrders([12345 => true]);
+
+        self::assertSame($collection, $filtered);
+    }
+
+    #[TestDox('withoutOrders filters edges from nodes')]
+    public function test_without_orders_filters_edges_from_nodes(): void
+    {
+        $order1 = OrderFactory::buy('USD', 'EUR', '10.00', '100.00', '0.92', 2, 2);
+        $order2 = OrderFactory::buy('USD', 'GBP', '10.00', '100.00', '0.85', 2, 2);
+        $edge1 = $this->createEdge('USD', 'EUR', $order1);
+        $edge2 = $this->createEdge('USD', 'GBP', $order2);
+
+        $node = new GraphNode('USD', [$edge1, $edge2]);
+        $collection = GraphNodeCollection::fromArray([$node]);
+
+        $excludedIds = [spl_object_id($order1) => true];
+        $filtered = $collection->withoutOrders($excludedIds);
+
+        self::assertNotSame($collection, $filtered);
+        $filteredNode = $filtered->get('USD');
+        self::assertNotNull($filteredNode);
+        self::assertSame(1, $filteredNode->edges()->count());
+    }
+
+    #[TestDox('withoutOrders preserves all nodes even when edges are removed')]
+    public function test_without_orders_preserves_nodes(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.00', '100.00', '0.92', 2, 2);
+        $edge = $this->createEdge('USD', 'EUR', $order);
+
+        $nodeWithEdge = new GraphNode('USD', [$edge]);
+        $nodeWithoutEdge = new GraphNode('EUR');
+        $collection = GraphNodeCollection::fromArray([$nodeWithEdge, $nodeWithoutEdge]);
+
+        $excludedIds = [spl_object_id($order) => true];
+        $filtered = $collection->withoutOrders($excludedIds);
+
+        // Both nodes should still exist
+        self::assertSame(2, $filtered->count());
+        self::assertTrue($filtered->has('USD'));
+        self::assertTrue($filtered->has('EUR'));
+    }
+
+    #[TestDox('withoutOrders returns same instance when no orders match')]
+    public function test_without_orders_returns_same_when_no_match(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.00', '100.00', '0.92', 2, 2);
+        $edge = $this->createEdge('USD', 'EUR', $order);
+
+        $node = new GraphNode('USD', [$edge]);
+        $collection = GraphNodeCollection::fromArray([$node]);
+
+        // Use a non-existent ID
+        $filtered = $collection->withoutOrders([999999999 => true]);
+
+        self::assertSame($collection, $filtered);
+    }
+
+    #[TestDox('withoutOrders filters edges across multiple nodes')]
+    public function test_without_orders_filters_across_multiple_nodes(): void
+    {
+        $order1 = OrderFactory::buy('USD', 'EUR', '10.00', '100.00', '0.92', 2, 2);
+        $order2 = OrderFactory::buy('EUR', 'GBP', '10.00', '100.00', '0.85', 2, 2);
+        $edge1 = $this->createEdge('USD', 'EUR', $order1);
+        $edge2 = $this->createEdge('EUR', 'GBP', $order2);
+
+        $nodeUsd = new GraphNode('USD', [$edge1]);
+        $nodeEur = new GraphNode('EUR', [$edge2]);
+        $collection = GraphNodeCollection::fromArray([$nodeUsd, $nodeEur]);
+
+        // Exclude both orders
+        $excludedIds = [
+            spl_object_id($order1) => true,
+            spl_object_id($order2) => true,
+        ];
+        $filtered = $collection->withoutOrders($excludedIds);
+
+        // Both nodes should exist but with no edges
+        self::assertSame(2, $filtered->count());
+        self::assertSame(0, $filtered->get('USD')->edges()->count());
+        self::assertSame(0, $filtered->get('EUR')->edges()->count());
+    }
+
+    #[TestDox('withoutOrders preserves insertion order')]
+    public function test_without_orders_preserves_insertion_order(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.00', '100.00', '0.92', 2, 2);
+        $edge = $this->createEdge('USD', 'EUR', $order);
+
+        $node1 = new GraphNode('BTC');
+        $node2 = new GraphNode('USD', [$edge]);
+        $node3 = new GraphNode('EUR');
+        $collection = GraphNodeCollection::fromArray([$node1, $node2, $node3]);
+
+        $excludedIds = [spl_object_id($order) => true];
+        $filtered = $collection->withoutOrders($excludedIds);
+
+        $currencies = [];
+        foreach ($filtered as $currency => $node) {
+            $currencies[] = $currency;
+        }
+
+        self::assertSame(['BTC', 'USD', 'EUR'], $currencies);
+    }
+
+    #[TestDox('withoutOrders returns new instance when any node changes')]
+    public function test_without_orders_returns_new_instance_when_changed(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.00', '100.00', '0.92', 2, 2);
+        $edge = $this->createEdge('USD', 'EUR', $order);
+
+        $node = new GraphNode('USD', [$edge]);
+        $collection = GraphNodeCollection::fromArray([$node]);
+
+        $excludedIds = [spl_object_id($order) => true];
+        $filtered = $collection->withoutOrders($excludedIds);
+
+        self::assertNotSame($collection, $filtered);
+    }
+
+    #[TestDox('withoutOrders is idempotent for same exclusion set')]
+    public function test_without_orders_idempotent(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.00', '100.00', '0.92', 2, 2);
+        $edge = $this->createEdge('USD', 'EUR', $order);
+
+        $node = new GraphNode('USD', [$edge]);
+        $collection = GraphNodeCollection::fromArray([$node]);
+
+        $excludedIds = [spl_object_id($order) => true];
+        $filtered1 = $collection->withoutOrders($excludedIds);
+        $filtered2 = $filtered1->withoutOrders($excludedIds);
+
+        // Second call should return same instance
+        self::assertSame($filtered1, $filtered2);
+    }
+
+    #[TestDox('withoutOrders handles nodes without edges')]
+    public function test_without_orders_handles_nodes_without_edges(): void
+    {
+        $node1 = new GraphNode('USD');
+        $node2 = new GraphNode('EUR');
+        $collection = GraphNodeCollection::fromArray([$node1, $node2]);
+
+        $filtered = $collection->withoutOrders([12345 => true]);
+
+        // Should return same instance - nothing to filter
+        self::assertSame($collection, $filtered);
+    }
+
+    #[TestDox('withoutOrders with empty nodes and non-empty exclusion returns same')]
+    public function test_without_orders_empty_nodes_non_empty_exclusion(): void
+    {
+        $collection = GraphNodeCollection::fromArray([]);
+
+        $filtered = $collection->withoutOrders([12345 => true, 67890 => true]);
+
+        self::assertSame($collection, $filtered);
+        self::assertSame(0, $filtered->count());
+    }
+
+    #[TestDox('withoutOrders with non-empty nodes and empty exclusion returns same')]
+    public function test_without_orders_non_empty_nodes_empty_exclusion(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.00', '100.00', '0.92', 2, 2);
+        $edge = $this->createEdge('USD', 'EUR', $order);
+        $node = new GraphNode('USD', [$edge]);
+        $collection = GraphNodeCollection::fromArray([$node]);
+
+        $filtered = $collection->withoutOrders([]);
+
+        self::assertSame($collection, $filtered);
+    }
+
+    #[TestDox('withoutOrders filters correctly when only some nodes have matching edges')]
+    public function test_without_orders_partial_node_match(): void
+    {
+        $order1 = OrderFactory::buy('USD', 'EUR', '10.00', '100.00', '0.92', 2, 2);
+        $order2 = OrderFactory::buy('GBP', 'EUR', '10.00', '100.00', '0.85', 2, 2);
+        $edge1 = $this->createEdge('USD', 'EUR', $order1);
+        $edge2 = $this->createEdge('GBP', 'EUR', $order2);
+
+        $node1 = new GraphNode('USD', [$edge1]);
+        $node2 = new GraphNode('GBP', [$edge2]);
+        $node3 = new GraphNode('EUR'); // No edges
+        $collection = GraphNodeCollection::fromArray([$node1, $node2, $node3]);
+
+        // Only exclude order1
+        $excludedIds = [spl_object_id($order1) => true];
+        $filtered = $collection->withoutOrders($excludedIds);
+
+        self::assertNotSame($collection, $filtered);
+        self::assertSame(3, $filtered->count());
+        self::assertSame(0, $filtered->get('USD')->edges()->count());
+        self::assertSame(1, $filtered->get('GBP')->edges()->count());
+        self::assertSame(0, $filtered->get('EUR')->edges()->count());
+    }
+
+    // ========================================================================
+    // withOrderPenalties() Tests
+    // ========================================================================
+
+    #[TestDox('withOrderPenalties returns same instance when usageCounts is empty')]
+    public function test_with_order_penalties_returns_same_instance_when_usage_empty(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.00', '100.00', '0.92', 2, 2);
+        $edge = $this->createEdge('USD', 'EUR', $order);
+
+        $node = new GraphNode('USD', [$edge]);
+        $collection = GraphNodeCollection::fromArray([$node]);
+
+        $result = $collection->withOrderPenalties([], '1.5');
+
+        self::assertSame($collection, $result);
+    }
+
+    #[TestDox('withOrderPenalties returns same instance when collection is empty')]
+    public function test_with_order_penalties_returns_same_instance_when_collection_empty(): void
+    {
+        $collection = GraphNodeCollection::empty();
+
+        $result = $collection->withOrderPenalties([12345 => 2], '1.5');
+
+        self::assertSame($collection, $result);
+    }
+
+    #[TestDox('withOrderPenalties penalizes nodes when usage counts match')]
+    public function test_with_order_penalties_penalizes_matching_nodes(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.00', '100.00', '0.92', 2, 2);
+        $edge = $this->createEdge('USD', 'EUR', $order);
+
+        $node = new GraphNode('USD', [$edge]);
+        $collection = GraphNodeCollection::fromArray([$node]);
+
+        $usageCounts = [spl_object_id($order) => 1];
+        $result = $collection->withOrderPenalties($usageCounts, '1.5');
+
+        self::assertNotSame($collection, $result);
+        self::assertSame(1, $result->count());
+        self::assertTrue($result->has('USD'));
+
+        $resultNode = $result->get('USD');
+        self::assertNotNull($resultNode);
+        self::assertSame(1, $resultNode->edges()->count());
+    }
+
+    #[TestDox('withOrderPenalties returns same instance when no node changes occur')]
+    public function test_with_order_penalties_returns_same_when_no_match(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.00', '100.00', '0.92', 2, 2);
+        $edge = $this->createEdge('USD', 'EUR', $order);
+
+        $node = new GraphNode('USD', [$edge]);
+        $collection = GraphNodeCollection::fromArray([$node]);
+
+        $result = $collection->withOrderPenalties([999999999 => 2], '1.5');
+
+        self::assertSame($collection, $result);
+    }
+
+    #[TestDox('withOrderPenalties replaces only changed nodes when some match')]
+    public function test_with_order_penalties_replaces_only_changed_nodes(): void
+    {
+        $order1 = OrderFactory::buy('USD', 'EUR', '10.00', '100.00', '0.92', 2, 2);
+        $order2 = OrderFactory::buy('GBP', 'EUR', '10.00', '100.00', '0.85', 2, 2);
+        $edge1 = $this->createEdge('USD', 'EUR', $order1);
+        $edge2 = $this->createEdge('GBP', 'EUR', $order2);
+
+        $node1 = new GraphNode('USD', [$edge1]);
+        $node2 = new GraphNode('GBP', [$edge2]);
+        $node3 = new GraphNode('EUR');
+        $collection = GraphNodeCollection::fromArray([$node1, $node2, $node3]);
+
+        // Only penalize order1
+        $usageCounts = [spl_object_id($order1) => 1];
+        $result = $collection->withOrderPenalties($usageCounts, '1.5');
+
+        self::assertNotSame($collection, $result);
+        self::assertSame(3, $result->count());
+
+        // USD node should be replaced (it had the matching order)
+        self::assertNotSame($node1, $result->get('USD'));
+        // GBP node should be the same instance (no matching order)
+        self::assertSame($node2, $result->get('GBP'));
+        // EUR node should be the same instance (no edges)
+        self::assertSame($node3, $result->get('EUR'));
+    }
+
+    #[TestDox('fromArray with empty array returns functional empty collection')]
+    public function test_from_array_empty_returns_functional(): void
+    {
+        $collection = GraphNodeCollection::fromArray([]);
+
+        // Kill ReturnRemoval mutant - verify the return value is usable
+        self::assertSame(0, $collection->count());
+        self::assertFalse($collection->has('USD'));
+        self::assertNull($collection->get('USD'));
+
+        // Can iterate without error
+        $count = 0;
+        foreach ($collection as $node) {
+            ++$count;
+        }
+        self::assertSame(0, $count);
+    }
+
+    #[TestDox('withoutOrders with empty exclusion on non-empty collection returns same instance')]
+    public function test_without_orders_empty_exclusion_returns_same(): void
+    {
+        $order = OrderFactory::buy('USD', 'EUR', '10.00', '100.00', '0.92', 2, 2);
+        $edge = $this->createEdge('USD', 'EUR', $order);
+        $node = new GraphNode('USD', [$edge]);
+        $collection = GraphNodeCollection::fromArray([$node]);
+
+        // Kill the || to && mutation by testing empty exclusion separately
+        $result = $collection->withoutOrders([]);
+
+        self::assertSame($collection, $result);
+        self::assertSame(1, $result->count());
+    }
+
+    #[TestDox('withoutOrders on empty collection with exclusions returns same instance')]
+    public function test_without_orders_empty_collection_returns_same(): void
+    {
+        $collection = GraphNodeCollection::fromArray([]);
+
+        // Kill the || to && mutation by testing empty collection separately
+        $result = $collection->withoutOrders([12345 => true]);
+
+        self::assertSame($collection, $result);
+        self::assertSame(0, $result->count());
+    }
+
+    /**
+     * Helper to create a GraphEdge for testing.
+     */
+    private function createEdge(string $from, string $to, Order $order): GraphEdge
+    {
+        $minMoney = Money::fromString($from, '10.00', 2);
+        $maxMoney = Money::fromString($from, '1000.00', 2);
+
+        return new GraphEdge(
+            $from,
+            $to,
+            OrderSide::BUY,
+            $order,
+            $order->effectiveRate(),
+            new EdgeCapacity($minMoney, $maxMoney),
+            new EdgeCapacity($minMoney, $maxMoney),
+            new EdgeCapacity($minMoney, $maxMoney),
+        );
     }
 }

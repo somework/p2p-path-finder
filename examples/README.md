@@ -54,6 +54,10 @@ Run examples using composer scripts for convenience:
 composer examples
 
 # Run individual examples
+composer examples:execution-plan-basic
+composer examples:execution-plan-split-merge
+composer examples:top-k-execution-plans
+composer examples:top-k-reusable-orders
 composer examples:custom-order-filter
 composer examples:custom-ordering-strategy
 composer examples:custom-fee-policy
@@ -61,6 +65,7 @@ composer examples:error-handling
 composer examples:performance-optimization
 composer examples:guarded-search
 composer examples:bybit-p2p-integration
+composer examples:advanced-search-strategies
 ```
 
 **Benefits of using composer scripts**:
@@ -82,6 +87,108 @@ docker compose exec php composer examples
 ```
 
 ## Examples by Topic
+
+### ExecutionPlanService (Recommended)
+
+These examples demonstrate the recommended `ExecutionPlanService` API for path finding.
+
+#### 1. Basic ExecutionPlanService Usage
+**File**: [`execution-plan-basic.php`](execution-plan-basic.php)
+
+Demonstrates the basic usage of `ExecutionPlanService` for finding optimal execution plans.
+
+**What you'll learn**:
+- Creating an order book
+- Configuring search parameters
+- Using `ExecutionPlanService::findBestPlans()`
+- Processing `ExecutionPlan` results
+- Understanding `ExecutionStep` sequence numbers
+- Converting linear plans to legacy `Path` format
+
+**When to use**:
+- Starting a new project with the library
+- Learning the recommended API
+
+**Related docs**:
+- [Getting Started Guide](../docs/getting-started.md#executionplanservice-recommended)
+- [API Contracts](../docs/api-contracts.md#executionplan)
+
+---
+
+#### 2. Split/Merge Execution Patterns
+**File**: [`execution-plan-split-merge.php`](execution-plan-split-merge.php)
+
+Demonstrates advanced execution plan capabilities exclusive to `ExecutionPlanService`.
+
+**What you'll learn**:
+- Multi-order same direction (multiple orders for USD→BTC)
+- Split execution (input split across parallel routes)
+- Merge execution (routes converging at target)
+- Diamond patterns (combined split and merge)
+- Using `isLinear()` and `asLinearPath()` for migration
+
+**When to use**:
+- P2P trading platforms with multiple market makers
+- Multi-currency arbitrage detection
+- Optimal liquidity routing across fragmented markets
+- Exchange aggregation requiring split/merge execution
+
+**Related docs**:
+- [Architecture Guide](../docs/architecture.md#executionplansearchengine-algorithm-recommended)
+- [UPGRADING.md](../UPGRADING.md#upgrading-from-1x-to-20)
+
+---
+
+#### 3. Top-K Execution Plans (Disjoint Mode)
+**File**: [`top-k-execution-plans.php`](top-k-execution-plans.php)
+
+Demonstrates how to find multiple alternative execution plans with disjoint order sets (each plan uses different orders).
+
+**What you'll learn**:
+- Configuring `resultLimit` for Top-K search
+- Understanding iterative exclusion algorithm
+- Verifying disjoint order sets across plans
+- Aggregated guard reports across K searches
+- Ranking plans by cost (best first)
+- Fallback strategy patterns
+
+**When to use**:
+- Fallback options if primary plan fails during execution
+- Risk diversification across multiple execution strategies
+- When each alternative must be independently executable
+
+**Related docs**:
+- [UPGRADING.md](../UPGRADING.md#top-k-execution-plan-discovery)
+
+---
+
+#### 4. Top-K Reusable Orders Mode
+**File**: [`top-k-reusable-orders.php`](top-k-reusable-orders.php)
+
+Demonstrates the order-reusable Top-K mode, where alternative plans CAN share orders.
+
+**What you'll learn**:
+- Configuring `withDisjointPlans(false)` for reusable mode
+- Understanding penalty-based diversification algorithm
+- Comparing disjoint vs reusable mode results
+- Duplicate detection via signatures and cost comparison
+- Rate comparison use cases
+- Order reuse statistics
+
+**When to use**:
+- Rate comparison scenarios ("what if I aggregate differently")
+- Getting more alternatives from limited liquidity
+- Strategy exploration using the same orders
+- When only ONE plan will actually be executed
+
+**Key difference from disjoint mode**:
+- Disjoint: Each plan uses completely different orders (independent fallbacks)
+- Reusable: Plans can share orders (more alternatives, but not independent)
+
+**Related docs**:
+- [UPGRADING.md](../UPGRADING.md#top-k-execution-plan-discovery)
+
+---
 
 ### Customization & Extension
 
@@ -229,11 +336,11 @@ These examples demonstrate complete end-to-end workflows.
 #### 6. Guarded Search Example
 **File**: [`guarded-search-example.php`](guarded-search-example.php)
 
-Complete workflow demonstrating path search with guard rails and result interpretation.
+Complete workflow demonstrating execution plan search with guard rails and result interpretation.
 
 **What you'll learn**:
 - Complete PathSearchConfig setup
-- Running searches with guard limits
+- Running searches with guard limits using `ExecutionPlanService`
 - Interpreting SearchOutcome and guard reports
 - Checking for guard limit breaches
 - Understanding when results may be incomplete
@@ -276,52 +383,99 @@ Real-world integration example showing how to fetch P2P trading data from Bybit'
 
 ---
 
+#### 8. Advanced Search Strategies
+**File**: [`advanced-search-strategies.php`](advanced-search-strategies.php)
+
+Demonstrates ExecutionPlanService's ability to handle complex path-finding scenarios including multi-order aggregation, split/merge patterns, and diamond topologies.
+
+**What you'll learn**:
+- Multi-Order Same Direction: Multiple A→B orders with automatic best-rate selection
+- Split at Source: A→B and A→C patterns (source distributing to routes)
+- Merge at Target: B→D and C→D patterns (routes converging at target)
+- Diamond Pattern: A→B, A→C, B→D, C→D (combined split and merge)
+- Complex Real-World Graphs: Multi-layer currency networks
+- Step-by-step execution flow visualization
+- Performance metrics and guard limit handling
+
+**When to use**:
+- P2P trading platforms with multiple market makers
+- Multi-currency arbitrage detection
+- Optimal liquidity routing across fragmented markets
+- Exchange aggregation requiring split/merge execution
+- Understanding how the search engine selects optimal paths
+
+**Related docs**:
+- [Getting Started Guide](../docs/getting-started.md)
+- [Architecture Guide](../docs/architecture.md)
+
+---
+
 ## Example Details
 
 ### File Statistics
 
-| Example                          | Lines      | Status      | Scenarios | Key Features                        |
-|----------------------------------|------------|-------------|-----------|-------------------------------------|
-| **custom-order-filter.php**      | 397        | Production  | 5         | 4 filters, composition pattern      |
-| **custom-ordering-strategy.php** | 527        | Production  | 4         | 3 strategies, determinism test      |
-| **custom-fee-policy.php**        | 570        | Production  | 6         | 5 policies, realistic models        |
-| **error-handling.php**           | 473        | Production  | 7         | All exceptions, production pattern  |
-| **performance-optimization.php** | 507        | Production  | 12        | 4 techniques, benchmarks            |
-| **guarded-search-example.php**   | Varies     | Production  | 1         | Complete workflow                   |
-| **bybit-p2p-integration.php**    | 600+       | Production  | 5         | API integration, real-world example |
-| **TOTAL**                        | **~3,100** | **7 files** | **40+**   | **Comprehensive coverage**          |
+| Example                              | Lines       | Status     | Scenarios | Key Features                         |
+|--------------------------------------|-------------|------------|-----------|--------------------------------------|
+| **execution-plan-basic.php**         | 170+        | Production | 1         | ExecutionPlanService basics          |
+| **execution-plan-split-merge.php**   | 260+        | Production | 4         | Split/merge, diamond patterns       |
+| **top-k-execution-plans.php**        | 230+        | Production | 7         | Top-K discovery, disjoint orders     |
+| **top-k-reusable-orders.php**        | 250+        | Production | 7         | Top-K reusable mode, rate compare    |
+| **custom-order-filter.php**          | 397         | Production | 5         | 4 filters, composition pattern       |
+| **custom-ordering-strategy.php**     | 527         | Production | 4         | 3 strategies, determinism test      |
+| **custom-fee-policy.php**            | 570         | Production | 6         | 5 policies, realistic models         |
+| **error-handling.php**               | 473         | Production | 7         | All exceptions, production pattern   |
+| **performance-optimization.php**     | 507         | Production | 12        | 4 techniques, benchmarks             |
+| **guarded-search-example.php**      | Varies      | Production | 1         | Complete workflow                    |
+| **bybit-p2p-integration.php**       | 600+        | Production | 5         | API integration, real-world example  |
+| **advanced-search-strategies.php**  | 400+        | Production | 8         | Multi-order, split/merge, diamond    |
+| **TOTAL**                            | **~4,450**   | **12 files** | **67+** | **Comprehensive coverage**          |
 
 ### Example Categories
 
 #### By Difficulty Level
 
 **Beginner** (Start here):
-1. `guarded-search-example.php` - Complete basic workflow
-2. `custom-order-filter.php` - Simple filter implementations
+1. `execution-plan-basic.php` - **Recommended** starting point with ExecutionPlanService
+2. `guarded-search-example.php` - Complete basic workflow with guard rails
+3. `custom-order-filter.php` - Simple filter implementations
 
 **Intermediate**:
-3. `custom-fee-policy.php` - Realistic fee modeling
-4. `custom-ordering-strategy.php` - Custom ranking logic
-5. `bybit-p2p-integration.php` - Real-world API integration
+4. `execution-plan-split-merge.php` - Split/merge execution patterns
+5. `top-k-execution-plans.php` - Top-K alternative plan discovery (disjoint mode)
+6. `top-k-reusable-orders.php` - Top-K with order reuse (reusable mode)
+7. `custom-fee-policy.php` - Realistic fee modeling
+8. `custom-ordering-strategy.php` - Custom ranking logic
+9. `bybit-p2p-integration.php` - Real-world API integration
+10. `advanced-search-strategies.php` - Multi-order, split, merge patterns
 
 **Advanced**:
-6. `error-handling.php` - Production error handling
-7. `performance-optimization.php` - Performance tuning
+11. `error-handling.php` - Production error handling
+12. `performance-optimization.php` - Performance tuning
 
 #### By Use Case
 
 **If you want to...**
 
-| Goal                           | Example                        |
-|--------------------------------|--------------------------------|
-| Filter orders before search    | `custom-order-filter.php`      |
-| Change how paths are ranked    | `custom-ordering-strategy.php` |
-| Model realistic exchange fees  | `custom-fee-policy.php`        |
-| Handle errors in production    | `error-handling.php`           |
-| Optimize search performance    | `performance-optimization.php` |
-| See a complete basic workflow  | `guarded-search-example.php`   |
-| Integrate with Bybit P2P API   | `bybit-p2p-integration.php`    |
-| Build a real-world trading app | `bybit-p2p-integration.php`    |
+| Goal                                 | Example                          |
+|--------------------------------------|----------------------------------|
+| Learn the recommended API            | `execution-plan-basic.php`       |
+| Get started quickly                  | `guarded-search-example.php`     |
+| Handle split/merge execution         | `execution-plan-split-merge.php` |
+| Multi-order liquidity aggregation    | `execution-plan-split-merge.php` |
+| Find alternative execution plans     | `top-k-execution-plans.php`      |
+| Fallback strategies (disjoint)       | `top-k-execution-plans.php`      |
+| Rate comparison across strategies    | `top-k-reusable-orders.php`      |
+| More alternatives from limited orders| `top-k-reusable-orders.php`      |
+| Filter orders before search          | `custom-order-filter.php`        |
+| Change how paths are ranked          | `custom-ordering-strategy.php`   |
+| Model realistic exchange fees        | `custom-fee-policy.php`          |
+| Handle errors in production          | `error-handling.php`             |
+| Optimize search performance          | `performance-optimization.php`   |
+| Understand guard rails               | `guarded-search-example.php`     |
+| Integrate with Bybit P2P API         | `bybit-p2p-integration.php`      |
+| Build a real-world trading app       | `bybit-p2p-integration.php`      |
+| Handle multi-order/split/merge paths | `advanced-search-strategies.php` |
+| Understand complex path topologies   | `advanced-search-strategies.php` |
 
 ## Related Documentation
 
@@ -413,14 +567,20 @@ If examples don't answer your question:
 ## Summary
 
 This examples directory provides:
-- ✅ **7 comprehensive examples** covering all major use cases
-- ✅ **3,100+ lines** of production-ready code
-- ✅ **40+ demonstration scenarios** showing different patterns
+- ✅ **12 comprehensive examples** covering all major use cases
+- ✅ **4,450+ lines** of production-ready code
+- ✅ **67+ demonstration scenarios** showing different patterns
+- ✅ **All examples use ExecutionPlanService** - the recommended API
+- ✅ **Split/merge patterns** demonstrating advanced execution topologies
+- ✅ **Top-K modes** - both disjoint and reusable order strategies
 - ✅ **Complete workflows** from configuration to result handling
 - ✅ **Real-world integrations** with external APIs (Bybit P2P)
 - ✅ **Measurable improvements** via benchmarks and comparisons
+- ✅ **ExecutionPlanService** - the recommended API for path finding
 
-Start with `guarded-search-example.php` for a basic workflow, then explore customization and optimization examples based on your needs. Check out `bybit-p2p-integration.php` for a complete real-world API integration example.
+**Start with `execution-plan-basic.php`** for the recommended API, then explore `execution-plan-split-merge.php` for advanced execution patterns. For alternative plan discovery, see `top-k-execution-plans.php` (disjoint mode) or `top-k-reusable-orders.php` (reusable mode for rate comparison). Check out `bybit-p2p-integration.php` for a complete real-world API integration example.
+
+**Note**: All examples now use `ExecutionPlanService`, which is the recommended API for all path-finding operations.
 
 **Happy coding!** 🚀
 

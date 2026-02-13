@@ -23,8 +23,8 @@ use SomeWork\P2PPathFinder\Application\Order\Filter\MinimumAmountFilter;
 use SomeWork\P2PPathFinder\Application\Order\Filter\ToleranceWindowFilter;
 use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
 use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
 use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
 use SomeWork\P2PPathFinder\Domain\Money\AssetPair;
 use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
@@ -154,17 +154,17 @@ try {
         ->withSearchGuards(50000, 100000)
         ->build();
 
-    $service = new PathSearchService(new GraphBuilder());
+    $service = new ExecutionPlanService(new GraphBuilder());
 
     // Benchmark 1a: Without pre-filtering
     echo "Scenario 1a: Without pre-filtering (baseline)\n";
     $baseline = measurePerformance(static function () use ($orderBook, $config, $service) {
         $request = new PathSearchRequest($orderBook, $config, 'EUR');
 
-        return $service->findBestPaths($request);
+        return $service->findBestPlans($request);
     });
 
-    echo '  Paths found: '.($baseline['result']->hasPaths() ? count($baseline['result']->paths()) : 0)."\n";
+    echo '  Plans found: '.($baseline['result']->hasPaths() ? count($baseline['result']->paths()) : 0)."\n";
     echo "  Time: {$baseline['time_ms']}ms\n";
     echo "  Memory: {$baseline['memory_mb']}MB\n";
 
@@ -185,10 +185,10 @@ try {
 
         $request = new PathSearchRequest($filteredBook, $config, 'EUR');
 
-        return $service->findBestPaths($request);
+        return $service->findBestPlans($request);
     });
 
-    echo '  Paths found: '.($amountFiltered['result']->hasPaths() ? count($amountFiltered['result']->paths()) : 0)."\n";
+    echo '  Plans found: '.($amountFiltered['result']->hasPaths() ? count($amountFiltered['result']->paths()) : 0)."\n";
     echo "  Time: {$amountFiltered['time_ms']}ms\n";
     echo "  Memory: {$amountFiltered['memory_mb']}MB\n";
 
@@ -213,10 +213,10 @@ try {
 
         $request = new PathSearchRequest($filteredBook, $config, 'EUR');
 
-        return $service->findBestPaths($request);
+        return $service->findBestPlans($request);
     });
 
-    echo '  Paths found: '.($fullyFiltered['result']->hasPaths() ? count($fullyFiltered['result']->paths()) : 0)."\n";
+    echo '  Plans found: '.($fullyFiltered['result']->hasPaths() ? count($fullyFiltered['result']->paths()) : 0)."\n";
     echo "  Time: {$fullyFiltered['time_ms']}ms\n";
     echo "  Memory: {$fullyFiltered['memory_mb']}MB\n";
 
@@ -257,11 +257,11 @@ try {
     $conservative = measurePerformance(static function () use ($optimizedOrderBook, $conservativeConfig, $service) {
         $request = new PathSearchRequest($optimizedOrderBook, $conservativeConfig, 'EUR');
 
-        return $service->findBestPaths($request);
+        return $service->findBestPlans($request);
     });
 
     $guardReport = $conservative['result']->guardLimits();
-    echo '  Paths found: '.($conservative['result']->hasPaths() ? count($conservative['result']->paths()) : 0)."\n";
+    echo '  Plans found: '.($conservative['result']->hasPaths() ? count($conservative['result']->paths()) : 0)."\n";
     echo "  Time: {$conservative['time_ms']}ms\n";
     echo "  Memory: {$conservative['memory_mb']}MB\n";
     echo "  Expansions: {$guardReport->expansions()} / {$guardReport->expansionLimit()}\n";
@@ -281,11 +281,11 @@ try {
     $moderate = measurePerformance(static function () use ($optimizedOrderBook, $moderateConfig, $service) {
         $request = new PathSearchRequest($optimizedOrderBook, $moderateConfig, 'EUR');
 
-        return $service->findBestPaths($request);
+        return $service->findBestPlans($request);
     });
 
     $guardReport = $moderate['result']->guardLimits();
-    echo '  Paths found: '.($moderate['result']->hasPaths() ? count($moderate['result']->paths()) : 0)."\n";
+    echo '  Plans found: '.($moderate['result']->hasPaths() ? count($moderate['result']->paths()) : 0)."\n";
     echo "  Time: {$moderate['time_ms']}ms\n";
     echo "  Memory: {$moderate['memory_mb']}MB\n";
     echo "  Expansions: {$guardReport->expansions()} / {$guardReport->expansionLimit()}\n";
@@ -305,11 +305,11 @@ try {
     $aggressive = measurePerformance(static function () use ($optimizedOrderBook, $aggressiveConfig, $service) {
         $request = new PathSearchRequest($optimizedOrderBook, $aggressiveConfig, 'EUR');
 
-        return $service->findBestPaths($request);
+        return $service->findBestPlans($request);
     });
 
     $guardReport = $aggressive['result']->guardLimits();
-    echo '  Paths found: '.($aggressive['result']->hasPaths() ? count($aggressive['result']->paths()) : 0)."\n";
+    echo '  Plans found: '.($aggressive['result']->hasPaths() ? count($aggressive['result']->paths()) : 0)."\n";
     echo "  Time: {$aggressive['time_ms']}ms\n";
     echo "  Memory: {$aggressive['memory_mb']}MB\n";
     echo "  Expansions: {$guardReport->expansions()} / {$guardReport->expansionLimit()}\n";
@@ -344,10 +344,10 @@ try {
     $narrowTolerance = measurePerformance(static function () use ($optimizedOrderBook, $narrowConfig, $service) {
         $request = new PathSearchRequest($optimizedOrderBook, $narrowConfig, 'EUR');
 
-        return $service->findBestPaths($request);
+        return $service->findBestPlans($request);
     });
 
-    echo '  Paths found: '.($narrowTolerance['result']->hasPaths() ? count($narrowTolerance['result']->paths()) : 0)."\n";
+    echo '  Plans found: '.($narrowTolerance['result']->hasPaths() ? count($narrowTolerance['result']->paths()) : 0)."\n";
     echo "  Time: {$narrowTolerance['time_ms']}ms\n";
     echo "  Memory: {$narrowTolerance['memory_mb']}MB\n";
 
@@ -364,10 +364,10 @@ try {
     $mediumTolerance = measurePerformance(static function () use ($optimizedOrderBook, $mediumConfig, $service) {
         $request = new PathSearchRequest($optimizedOrderBook, $mediumConfig, 'EUR');
 
-        return $service->findBestPaths($request);
+        return $service->findBestPlans($request);
     });
 
-    echo '  Paths found: '.($mediumTolerance['result']->hasPaths() ? count($mediumTolerance['result']->paths()) : 0)."\n";
+    echo '  Plans found: '.($mediumTolerance['result']->hasPaths() ? count($mediumTolerance['result']->paths()) : 0)."\n";
     echo "  Time: {$mediumTolerance['time_ms']}ms\n";
     echo "  Memory: {$mediumTolerance['memory_mb']}MB\n";
 
@@ -384,10 +384,10 @@ try {
     $wideTolerance = measurePerformance(static function () use ($optimizedOrderBook, $wideConfig, $service) {
         $request = new PathSearchRequest($optimizedOrderBook, $wideConfig, 'EUR');
 
-        return $service->findBestPaths($request);
+        return $service->findBestPlans($request);
     });
 
-    echo '  Paths found: '.($wideTolerance['result']->hasPaths() ? count($wideTolerance['result']->paths()) : 0)."\n";
+    echo '  Plans found: '.($wideTolerance['result']->hasPaths() ? count($wideTolerance['result']->paths()) : 0)."\n";
     echo "  Time: {$wideTolerance['time_ms']}ms\n";
     echo "  Memory: {$wideTolerance['memory_mb']}MB\n";
 
@@ -421,11 +421,11 @@ try {
     $shortHops = measurePerformance(static function () use ($optimizedOrderBook, $shortConfig, $service) {
         $request = new PathSearchRequest($optimizedOrderBook, $shortConfig, 'EUR');
 
-        return $service->findBestPaths($request);
+        return $service->findBestPlans($request);
     });
 
     $guardReport = $shortHops['result']->guardLimits();
-    echo '  Paths found: '.($shortHops['result']->hasPaths() ? count($shortHops['result']->paths()) : 0)."\n";
+    echo '  Plans found: '.($shortHops['result']->hasPaths() ? count($shortHops['result']->paths()) : 0)."\n";
     echo "  Time: {$shortHops['time_ms']}ms\n";
     echo "  Memory: {$shortHops['memory_mb']}MB\n";
     echo "  Expansions: {$guardReport->expansions()}\n";
@@ -443,11 +443,11 @@ try {
     $mediumHops = measurePerformance(static function () use ($optimizedOrderBook, $mediumHopsConfig, $service) {
         $request = new PathSearchRequest($optimizedOrderBook, $mediumHopsConfig, 'EUR');
 
-        return $service->findBestPaths($request);
+        return $service->findBestPlans($request);
     });
 
     $guardReport = $mediumHops['result']->guardLimits();
-    echo '  Paths found: '.($mediumHops['result']->hasPaths() ? count($mediumHops['result']->paths()) : 0)."\n";
+    echo '  Plans found: '.($mediumHops['result']->hasPaths() ? count($mediumHops['result']->paths()) : 0)."\n";
     echo "  Time: {$mediumHops['time_ms']}ms\n";
     echo "  Memory: {$mediumHops['memory_mb']}MB\n";
     echo "  Expansions: {$guardReport->expansions()}\n";
@@ -465,11 +465,11 @@ try {
     $longHops = measurePerformance(static function () use ($optimizedOrderBook, $longHopsConfig, $service) {
         $request = new PathSearchRequest($optimizedOrderBook, $longHopsConfig, 'EUR');
 
-        return $service->findBestPaths($request);
+        return $service->findBestPlans($request);
     });
 
     $guardReport = $longHops['result']->guardLimits();
-    echo '  Paths found: '.($longHops['result']->hasPaths() ? count($longHops['result']->paths()) : 0)."\n";
+    echo '  Plans found: '.($longHops['result']->hasPaths() ? count($longHops['result']->paths()) : 0)."\n";
     echo "  Time: {$longHops['time_ms']}ms\n";
     echo "  Memory: {$longHops['memory_mb']}MB\n";
     echo "  Expansions: {$guardReport->expansions()}\n";

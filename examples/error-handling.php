@@ -20,8 +20,8 @@ require __DIR__.'/../vendor/autoload.php';
 
 use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
 use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
 use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
 use SomeWork\P2PPathFinder\Domain\Money\AssetPair;
 use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
@@ -150,8 +150,8 @@ try {
 
     try {
         $request = new PathSearchRequest($validOrderBook, $validConfig, ''); // Empty target!
-        $service = new PathSearchService(new GraphBuilder());
-        $outcome = $service->findBestPaths($request);
+        $service = new ExecutionPlanService(new GraphBuilder());
+        $outcome = $service->findBestPlans($request);
         echo "✗ Unexpectedly succeeded\n";
     } catch (InvalidInput $e) {
         echo "✓ Caught InvalidInput: {$e->getMessage()}\n";
@@ -208,9 +208,9 @@ try {
 
     echo "Attempting search with tight guard limits (100 states, 200 expansions)...\n";
     try {
-        $service = new PathSearchService(new GraphBuilder());
+        $service = new ExecutionPlanService(new GraphBuilder());
         $request = new PathSearchRequest($complexOrderBook, $tightConfig, 'ABB');
-        $outcome = $service->findBestPaths($request);
+        $outcome = $service->findBestPlans($request);
         echo "✗ Search completed without hitting guards (increase complexity or lower limits)\n";
     } catch (GuardLimitExceeded $e) {
         echo "✓ Caught GuardLimitExceeded: {$e->getMessage()}\n";
@@ -245,9 +245,9 @@ try {
         ->build();
 
     echo "Running search with guard limits in metadata mode...\n";
-    $service = new PathSearchService(new GraphBuilder());
+    $service = new ExecutionPlanService(new GraphBuilder());
     $request = new PathSearchRequest($complexOrderBook, $metadataConfig, 'ABB');
-    $outcome = $service->findBestPaths($request);
+    $outcome = $service->findBestPlans($request);
 
     echo "✓ Search completed (no exception thrown)\n";
     echo '  Paths found: '.($outcome->hasPaths() ? count($outcome->paths()) : 0)."\n";
@@ -308,9 +308,9 @@ try {
         ->build();
 
     echo "Searching for USD -> GBP path (no such path exists)...\n";
-    $service = new PathSearchService(new GraphBuilder());
+    $service = new ExecutionPlanService(new GraphBuilder());
     $request = new PathSearchRequest($disconnectedBook, $searchConfig, 'GBP');
-    $outcome = $service->findBestPaths($request);
+    $outcome = $service->findBestPlans($request);
 
     echo "✓ Search completed successfully (no exception)\n";
     echo '  Paths found: '.($outcome->hasPaths() ? 'YES' : 'NO')."\n";
@@ -379,20 +379,20 @@ try {
     echo "This demonstrates a complete, production-ready error handling pattern\n";
     echo "that covers all exception types and empty results.\n\n";
 
-    function findBestPathsWithErrorHandling(
+    function findBestPlansWithErrorHandling(
         OrderBook $orderBook,
         PathSearchConfig $config,
         string $targetAsset
     ): void {
-        $service = new PathSearchService(new GraphBuilder());
+        $service = new ExecutionPlanService(new GraphBuilder());
 
         try {
             $request = new PathSearchRequest($orderBook, $config, $targetAsset);
-            $outcome = $service->findBestPaths($request);
+            $outcome = $service->findBestPlans($request);
 
             // Check for empty results (NOT an error)
             if (!$outcome->hasPaths()) {
-                echo "ℹ No paths found to {$targetAsset}\n";
+                echo "ℹ No execution plans found to {$targetAsset}\n";
                 echo "  - Check if liquidity is available\n";
                 echo "  - Try widening tolerance window\n";
                 echo "  - Try increasing hop limits\n";
@@ -411,13 +411,13 @@ try {
             }
 
             // Process results
-            $paths = $outcome->paths();
-            echo '✓ Found '.count($paths)." path(s)\n";
+            $plans = $outcome->paths();
+            echo '✓ Found '.count($plans)." execution plan(s)\n";
 
-            foreach ($paths as $idx => $path) {
+            foreach ($plans as $idx => $plan) {
                 $num = $idx + 1;
-                echo "  Path #{$num}: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()} ".
-                     "→ {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
+                echo "  Plan #{$num}: {$plan->totalSpent()->amount()} {$plan->totalSpent()->currency()} ".
+                     "→ {$plan->totalReceived()->amount()} {$plan->totalReceived()->currency()}\n";
             }
         } catch (InvalidInput $e) {
             // Programmer error - should not happen in production if inputs are validated
@@ -448,7 +448,7 @@ try {
     }
 
     echo "Example: Production error handling with valid inputs\n";
-    findBestPathsWithErrorHandling(
+    findBestPlansWithErrorHandling(
         $validOrderBook,
         $validConfig,
         'EUR'
@@ -488,7 +488,7 @@ try {
 
     echo "Production Checklist:\n";
     echo "  ✓ Validate user input before constructing domain objects\n";
-    echo "  ✓ Use try-catch blocks for all PathFinderService calls\n";
+    echo "  ✓ Use try-catch blocks for all ExecutionPlanService calls\n";
     echo "  ✓ Always check outcome.hasPaths() before accessing results\n";
     echo "  ✓ Always check outcome.guardLimits() for limit breaches\n";
     echo "  ✓ Log all exceptions with context for monitoring\n";

@@ -740,6 +740,86 @@ final class PathSearchConfigTest extends TestCase
         self::assertSame('1000.00200000', $config->maximumSpendAmount()->amount());
     }
 
+    // ==================== Disjoint Plans Configuration Tests ====================
+
+    public function test_disjoint_plans_defaults_to_true(): void
+    {
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+            ->withToleranceBounds('0.0', '0.1')
+            ->withHopLimits(1, 3)
+            ->build();
+
+        self::assertTrue($config->disjointPlans());
+    }
+
+    public function test_disjoint_plans_can_be_set_to_false(): void
+    {
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+            ->withToleranceBounds('0.0', '0.1')
+            ->withHopLimits(1, 3)
+            ->withDisjointPlans(false)
+            ->build();
+
+        self::assertFalse($config->disjointPlans());
+    }
+
+    public function test_disjoint_plans_can_be_explicitly_set_to_true(): void
+    {
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '100.00', 2))
+            ->withToleranceBounds('0.0', '0.1')
+            ->withHopLimits(1, 3)
+            ->withDisjointPlans(true)
+            ->build();
+
+        self::assertTrue($config->disjointPlans());
+    }
+
+    public function test_disjoint_plans_via_constructor_defaults_to_true(): void
+    {
+        $config = new PathSearchConfig(
+            Money::fromString('EUR', '100.00', 2),
+            ToleranceWindow::fromStrings('0.1', '0.2'),
+            1,
+            3,
+        );
+
+        self::assertTrue($config->disjointPlans());
+    }
+
+    public function test_disjoint_plans_via_constructor_can_be_set_to_false(): void
+    {
+        $config = new PathSearchConfig(
+            Money::fromString('EUR', '100.00', 2),
+            ToleranceWindow::fromStrings('0.1', '0.2'),
+            1,
+            3,
+            disjointPlans: false,
+        );
+
+        self::assertFalse($config->disjointPlans());
+    }
+
+    public function test_builder_preserves_disjoint_plans_setting_with_other_options(): void
+    {
+        $config = PathSearchConfig::builder()
+            ->withSpendAmount(Money::fromString('USD', '500.00', 2))
+            ->withToleranceBounds('0.05', '0.15')
+            ->withHopLimits(1, 4)
+            ->withResultLimit(5)
+            ->withSearchGuards(1000, 5000)
+            ->withDisjointPlans(false)
+            ->withGuardLimitException(true)
+            ->build();
+
+        self::assertFalse($config->disjointPlans());
+        self::assertSame(5, $config->resultLimit());
+        self::assertSame(5000, $config->pathFinderMaxExpansions());
+        self::assertTrue($config->throwOnGuardLimit());
+    }
+
     // ==================== Spend Bounds Computation Tests (0002.10) ====================
 
     public function test_spend_bounds_computation_zero_tolerance(): void

@@ -65,16 +65,17 @@ This document defines the public API surface that remains stable across minor an
 
 | Category             | Class                     | Purpose                              |
 |----------------------|---------------------------|--------------------------------------|
-| **Entry Point**      | `PathSearchService`       | Main facade for path finding         |
+| **Entry Point**      | `ExecutionPlanService`    | Main facade for path finding         |
 |                      | `PathSearchRequest`       | Request DTO with order book + config |
 | **Configuration**    | `PathSearchConfig`        | Immutable search configuration       |
 |                      | `PathSearchConfigBuilder` | Fluent configuration builder         |
 |                      | `SearchGuardConfig`       | Guard limit configuration            |
 | **Results**          | `SearchOutcome`           | Search results + guard report        |
-|                      | `PathResultSet`           | Immutable collection of paths        |
+|                      | `ExecutionPlan`           | Materialized plan with steps/fees   |
+|                      | `PathResultSet`           | Immutable collection of paths      |
 |                      | `Path`                    | Hop-centric path with derived totals |
-|                      | `PathHop`                 | Single conversion hop with `Order`   |
-|                      | `SearchGuardReport`       | Guard metrics and breach status      |
+|                      | `ExecutionStep`           | Single execution step with `Order`  |
+|                      | `SearchGuardReport`       | Guard metrics and breach status     |
 | **Order Management** | `OrderBook`               | Order collection with filtering      |
 | **Domain**           | `Money`                   | Monetary amount with currency        |
 |                      | `ExchangeRate`            | Conversion rate between currencies   |
@@ -101,7 +102,11 @@ This document defines the public API surface that remains stable across minor an
 ### Basic Usage (Always Stable)
 
 ```php
-use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;use SomeWork\P2PPathFinder\Domain\Money\Money;
+use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
 
 // Configuration
 $config = PathSearchConfig::builder()
@@ -114,18 +119,19 @@ $config = PathSearchConfig::builder()
 $request = new PathSearchRequest($orderBook, $config, 'BTC');
 
 // Execute
-$service = new PathSearchService($graphBuilder);
-$outcome = $service->findBestPaths($request);
+$service = new ExecutionPlanService(new GraphBuilder());
+$outcome = $service->findBestPlans($request);
 
 // Access results
-foreach ($outcome->paths() as $path) {
-    echo $path->totalSpent()->amount();
-    echo $path->totalReceived()->amount();
-    echo $path->residualTolerance()->percentage();
+$plan = $outcome->bestPath();
+if (null !== $plan) {
+    echo $plan->totalSpent()->amount();
+    echo $plan->totalReceived()->amount();
+    echo $plan->residualTolerance()->percentage();
 
-    foreach ($path->hops() as $hop) {
-        echo $hop->from() . ' -> ' . $hop->to();
-        echo $hop->order()->assetPair()->base();
+    foreach ($plan->steps() as $step) {
+        echo $step->from() . ' -> ' . $step->to();
+        echo $step->order()->assetPair()->base();
     }
 }
 
@@ -135,7 +141,7 @@ if ($outcome->guardLimits()->anyLimitReached()) {
 }
 ```
 
-**Guarantee**: This pattern will work across all 1.x versions.
+**Guarantee**: This pattern will work across all 2.x versions. The document uses **2.x** as the primary series for guarantees; see [Version Compatibility Matrix](#version-compatibility-matrix) for supported guarantees.
 
 ### Domain Objects (Always Stable)
 
@@ -175,7 +181,7 @@ class MyCustomFilter implements OrderFilterInterface
 $filtered = $orderBook->filter(new MyCustomFilter());
 ```
 
-**Guarantee**: `OrderFilterInterface`, `PathOrderStrategy`, and `FeePolicy` interfaces will not change in 1.x.
+**Guarantee**: `OrderFilterInterface`, `PathOrderStrategy`, and `FeePolicy` interfaces will not change in 2.x.
 
 ---
 
@@ -196,9 +202,9 @@ Classes and namespaces marked `@internal` or in these packages:
 - Not intended for direct consumer use
 
 **Example Internal Classes** (may change without notice):
-- `GraphBuilder` - Implementation detail (use `PathSearchService` instead)
-- `PathFinder` - Search algorithm (use `PathSearchService` instead)
-- `SearchState` - Internal state representation
+- `GraphBuilder` - Implementation detail (use `ExecutionPlanService` instead)
+- `ExecutionPlanSearchEngine` - Search algorithm (use `ExecutionPlanService` instead)
+- `PortfolioState` - Internal multi-currency balance tracking
 - `EdgeSegment` - Graph representation detail
 
 ### Safe vs Unsafe Dependencies
@@ -213,7 +219,7 @@ Classes and namespaces marked `@internal` or in these packages:
 **❌ Unsafe** (Internal API):
 
 ```php
-use SomeWork\P2PPathFinder\Application\PathSearch\Engine\SearchState;
+use SomeWork\P2PPathFinder\Application\PathSearch\Engine\State\PortfolioState;
 
 ```
 
@@ -225,7 +231,7 @@ use SomeWork\P2PPathFinder\Application\PathSearch\Engine\SearchState;
 
 **Interface**: `Application\Filter\OrderFilterInterface`
 
-**Stability**: Public, stable in 1.x
+**Stability**: Public, stable in 2.x
 
 ```php
 interface OrderFilterInterface
@@ -251,7 +257,7 @@ class MinimumLiquidityFilter implements OrderFilterInterface
 
 **Interface**: `Application\PathSearch\Engine\Ordering\PathOrderStrategy`
 
-**Stability**: Public, stable in 1.x
+**Stability**: Public, stable in 2.x
 
 ```php
 interface PathOrderStrategy
@@ -275,7 +281,7 @@ class MinimizeHopsStrategy implements PathOrderStrategy
 
 **Interface**: `Domain\Order\FeePolicy`
 
-**Stability**: Public, stable in 1.x
+**Stability**: Public, stable in 2.x
 
 ```php
 interface FeePolicy
@@ -372,24 +378,24 @@ set_error_handler(function ($errno, $errstr) {
 
 | Your Code Uses       | Compatible Library Versions | Notes                         |
 |----------------------|-----------------------------|-------------------------------|
-| Public API only      | Any 1.x version             | ✅ Fully compatible            |
-| Extension interfaces | Any 1.x version             | ✅ Interfaces stable           |
+| Public API only      | Any 2.x version             | ✅ Fully compatible           |
+| Extension interfaces | Any 2.x version             | ✅ Interfaces stable           |
 | Internal classes     | Same MINOR version only     | ⚠️ May break in MINOR updates |
-| `@internal` classes  | Exact version only          | ❌ No compatibility guarantee  |
+| `@internal` classes  | Exact version only          | ❌ No compatibility guarantee |
 
 ### Upgrade Safety
 
-**PATCH upgrades** (1.5.2 → 1.5.3):
+**PATCH upgrades** (2.5.2 → 2.5.3):
 - ✅ Always safe for public API
 - ⚠️ May affect internal API
 
-**MINOR upgrades** (1.5.x → 1.6.0):
+**MINOR upgrades** (2.5.x → 2.6.0):
 - ✅ Safe for public API
 - ✅ New features may be added
 - ⚠️ Internal API may change
 - ⚠️ Check for deprecation warnings
 
-**MAJOR upgrades** (1.x → 2.0):
+**MAJOR upgrades** (2.x → 3.0):
 - ⚠️ May have breaking changes
 - ⚠️ Read UPGRADING.md before upgrading
 - ⚠️ Deprecated features removed
@@ -414,7 +420,7 @@ set_error_handler(function ($errno, $errstr) {
 
 ```php
 // ❌ These imports may break in MINOR versions
-use SomeWork\P2PPathFinder\Application\PathSearch\Engine\SearchState;
+use SomeWork\P2PPathFinder\Application\PathSearch\Engine\State\PortfolioState;
 
 ```
 
@@ -436,12 +442,12 @@ Lock to MAJOR version to avoid breaking changes:
 ```json
 {
     "require": {
-        "somework/p2p-path-finder": "^1.0"
+        "somework/p2p-path-finder": "^2.0"
     }
 }
 ```
 
-This allows MINOR and PATCH updates (1.0.0 → 1.9.9) but prevents MAJOR updates (2.0.0).
+This allows MINOR and PATCH updates (2.0.0 → 2.9.9) but prevents MAJOR updates (3.0.0).
 
 ---
 
@@ -450,18 +456,18 @@ This allows MINOR and PATCH updates (1.0.0 → 1.9.9) but prevents MAJOR updates
 ### Quick Reference
 
 **✅ Safe to use** (public API):
-- `PathSearchService`
+- `ExecutionPlanService`
 - `PathSearchConfig` / `PathSearchConfigBuilder`
 - `PathSearchRequest`
-- `SearchOutcome` / `PathResultSet` / `Path` / `PathHop`
+- `SearchOutcome` / `PathResultSet` / `ExecutionPlan` / `ExecutionStep`
 - All domain classes (`Money`, `ExchangeRate`, `Order`, etc.)
 - All exceptions (`InvalidInput`, `GuardLimitExceeded`, etc.)
 - Extension interfaces (`OrderFilterInterface`, `PathOrderStrategy`, `FeePolicy`)
 
 **⚠️ Avoid** (internal API):
 - `GraphBuilder`
-- `PathFinder`
-- `SearchState`
+- `ExecutionPlanSearchEngine`
+- `PortfolioState`
 - Classes marked `@internal`
 - Anything in `Application\PathSearch\*` (except public API namespaces)
 
@@ -469,7 +475,7 @@ This allows MINOR and PATCH updates (1.0.0 → 1.9.9) but prevents MAJOR updates
 1. Only import from public API namespaces
 2. Use extension interfaces for customization
 3. Check for `@deprecated` warnings
-4. Lock to `^1.0` in composer.json
+4. Lock to `^2.0` in composer.json
 5. Read CHANGELOG.md before upgrading
 6. Test after MINOR version upgrades
 

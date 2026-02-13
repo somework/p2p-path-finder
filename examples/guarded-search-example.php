@@ -6,8 +6,8 @@ require __DIR__.'/../vendor/autoload.php';
 
 use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
 use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
 use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
 use SomeWork\P2PPathFinder\Domain\Money\AssetPair;
 use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
@@ -45,15 +45,15 @@ try {
         ->withSearchGuards(20000, 50000)
         ->build();
 
-    $service = new PathSearchService(new GraphBuilder());
+    $service = new ExecutionPlanService(new GraphBuilder());
     $request = new PathSearchRequest($orderBook, $config, 'BTC');
-    $result = $service->findBestPaths($request);
+    $result = $service->findBestPlans($request);
 
-    foreach ($result->paths() as $path) {
+    foreach ($result->paths() as $plan) {
         printf(
-            "Found path with residual tolerance %s%% and %d segments\n",
-            $path->residualTolerancePercentage(),
-            count($path->hops()),
+            "Found execution plan with residual tolerance %s%% and %d steps\n",
+            $plan->residualTolerance()->percentage(),
+            $plan->stepCount(),
         );
     }
 

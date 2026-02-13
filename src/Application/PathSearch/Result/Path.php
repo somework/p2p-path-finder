@@ -19,7 +19,7 @@ use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
  *
  * @api
  */
-final class Path
+final class Path implements SearchResultInterface
 {
     private readonly Money $totalSpent;
 

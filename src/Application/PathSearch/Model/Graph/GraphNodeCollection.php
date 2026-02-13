@@ -124,4 +124,89 @@ final class GraphNodeCollection implements Countable, IteratorAggregate
 
         return $ordered;
     }
+
+    /**
+     * Returns a new collection excluding edges whose orders are in the exclusion set.
+     *
+     * Edges referencing excluded orders are removed from each node. Nodes that
+     * end up with no edges are retained (they may still be needed as targets).
+     *
+     * @param array<int, true> $excludedOrderIds Order object IDs to exclude (spl_object_id)
+     *
+     * @return self New collection with excluded-order edges removed; empty nodes retained
+     */
+    public function withoutOrders(array $excludedOrderIds): self
+    {
+        if ([] === $excludedOrderIds || [] === $this->nodes) {
+            return $this;
+        }
+
+        /** @var array<string, GraphNode> $filteredNodes */
+        $filteredNodes = [];
+        /** @var list<string> $filteredOrder */
+        $filteredOrder = [];
+        $changed = false;
+
+        foreach ($this->order as $currency) {
+            $node = $this->nodes[$currency];
+            $filteredNode = $node->withoutOrders($excludedOrderIds);
+
+            if ($filteredNode !== $node) {
+                $changed = true;
+            }
+
+            // Keep the node even if it has no edges - it might still be needed as a target
+            $filteredNodes[$currency] = $filteredNode;
+            $filteredOrder[] = $currency;
+        }
+
+        if (!$changed) {
+            return $this;
+        }
+
+        if ([] === $filteredNodes) {
+            return self::empty();
+        }
+
+        return new self($filteredNodes, $filteredOrder);
+    }
+
+    /**
+     * Returns a new collection with capacity penalties applied to specified orders.
+     *
+     * @param array<int, int> $usageCounts   Order object ID => usage count
+     * @param string          $penaltyFactor Penalty multiplier per usage
+     *
+     * @return self New collection with penalized edges
+     */
+    public function withOrderPenalties(array $usageCounts, string $penaltyFactor): self
+    {
+        if ([] === $usageCounts || [] === $this->nodes) {
+            return $this;
+        }
+
+        /** @var array<string, GraphNode> $penalizedNodes */
+        $penalizedNodes = [];
+        /** @var list<string> $penalizedOrder */
+        $penalizedOrder = [];
+        $changed = false;
+
+        foreach ($this->order as $currency) {
+            $node = $this->nodes[$currency];
+            $penalizedNode = $node->withOrderPenalties($usageCounts, $penaltyFactor);
+
+            if ($penalizedNode !== $node) {
+                $changed = true;
+            }
+
+            $penalizedNodes[$currency] = $penalizedNode;
+            $penalizedOrder[] = $currency;
+        }
+
+        if (!$changed) {
+            return $this;
+        }
+
+        return new self($penalizedNodes, $penalizedOrder);
+    }
 }

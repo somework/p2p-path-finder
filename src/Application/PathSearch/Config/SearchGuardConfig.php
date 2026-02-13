@@ -7,7 +7,7 @@ namespace SomeWork\P2PPathFinder\Application\PathSearch\Config;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 /**
- * Immutable guard limits used by the {@see \SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService} guard mechanism.
+ * Immutable guard limits used by the {@see \SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService} guard mechanism.
  *
  * These limits control both computational cost and memory usage during path search.
  */

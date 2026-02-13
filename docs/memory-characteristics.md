@@ -12,7 +12,7 @@ Based on benchmark profiling with PHP 8.3:
 - **Per-graph-edge memory:** ~2-3 KB (graph representation with segments and capacity bounds)
 - **Per-search-state memory:** ~0.8-1.2 KB (visited state tracking in registry)
 - **Registry overhead:** ~1 KB per 10 unique visited states
-- **Result materialization:** ~3-5 KB per hop (`PathHop` snapshots plus `Path` header built by `LegMaterializer`)
+- **Result materialization:** ~3-5 KB per step (`ExecutionStep` snapshots plus `ExecutionPlan` header built by `ExecutionPlanMaterializer`)
 
 ### Baseline Memory Usage
 
@@ -72,7 +72,7 @@ Where D = hop depth, S = states per hop
 Where K = resultLimit, H = average hops per path
 
 - **Result limit impact:** Minimal (default K = 1-10)
-- **Per-path overhead:** ~1 KB `Path` header managed by `LegMaterializer` + (3-5 KB × hop count for serialized `PathHop` entries)
+- **Per-plan overhead:** ~1 KB `ExecutionPlan` header managed by `ExecutionPlanMaterializer` + (3-5 KB × step count for serialized `ExecutionStep` entries)
 - **Example:** 10 results × (1 KB + 3 hops × 4 KB) ≈ 130 KB (hop storage dominates)
 
 ## Practical Limits and Recommendations
@@ -287,7 +287,7 @@ $filtered = $orderBook->filter(
 
 ```php
 // No filtering, full order book
-$service->findBestPaths(new PathSearchRequest($orderBook, $config, $target));
+$service->findBestPlans(new PathSearchRequest($orderBook, $config, $target));
 
 // Expected: 0% reduction, complete path discovery
 ```
@@ -314,7 +314,7 @@ Use the minimum viable limits for your use case. See "Guard Limit Decision Tree"
 
 ```php
 // Monitor actual usage
-$outcome = $service->findBestPaths($request);
+$outcome = $service->findBestPlans($request);
 $metrics = $outcome->guardLimits()->metrics();
 
 if ($metrics['visited_states'] > 0.8 * $config->searchGuards()->maxVisitedStates()) {
@@ -484,7 +484,7 @@ $config = PathSearchConfig::builder()
 After deploying with your calculated limits, monitor these metrics:
 
 ```php
-$outcome = $service->findBestPaths($request);
+$outcome = $service->findBestPlans($request);
 $report = $outcome->guardLimits();
 $metrics = $report->expansions(); // Access metrics directly
 
@@ -652,7 +652,7 @@ For most production use cases:
 ### Check Guard Metrics
 
 ```php
-$outcome = $service->findBestPaths($request);
+$outcome = $service->findBestPlans($request);
 $report = $outcome->guardLimits();
 
 $metrics = [
@@ -805,7 +805,7 @@ Track these metrics to understand memory behavior:
 
 ```php
 $startMemory = memory_get_usage(true);
-$outcome = $service->findBestPaths($request);
+$outcome = $service->findBestPlans($request);
 $peakMemory = memory_get_peak_usage(true);
 $report = $outcome->guardLimits();
 $metrics = [
@@ -851,21 +851,20 @@ Based on profiling with PHP 8.3:
 - Memory share: ~10-20% of peak (depending on order count)
 - Optimization: Reuses zero-value `Money` instances, reducing allocations by ~40%
 
-**Search state tracking** (`SearchStateRegistry`):
-- Allocation pattern: Hash-based registry for visited states
+**Search state tracking** (`PortfolioState`):
+- Allocation pattern: Multi-currency balance tracking for split/merge execution
 - Memory share: ~15-25% of peak (scales with hop depth and graph density)
-- Typical size: 1,000-20,000 states for moderate graphs
-- Per-state cost: ~1 KB (includes path history, cost, currency trail)
+- Per-state cost: ~1 KB (includes balance map, order usage tracking)
 
 **Order book and domain objects**:
 - Allocation pattern: Immutable value objects (Money, ExchangeRate, OrderBounds)
 - Memory share: ~40-60% of peak
 - Optimization: Memoized ExchangeRate instances shared across orders
 
-**Result materialization** (`LegMaterializer`):
-- Allocation pattern: Stack-allocated candidate DTOs that materialize `Path` headers and `PathHop` collections
-- Memory share: ~5-10% of peak, scaling primarily with hop count per path rather than resultLimit
-- Optimization: Buffers reused across expansions, allocations deferred until tolerance passes so most `PathHop` snapshots only materialize for viable paths
+**Result materialization** (`ExecutionPlanMaterializer`):
+- Allocation pattern: Stack-allocated candidate DTOs that materialize `ExecutionPlan` headers and `ExecutionStep` collections
+- Memory share: ~5-10% of peak, scaling primarily with step count per plan
+- Optimization: Buffers reused across expansions, allocations deferred until tolerance passes so most `ExecutionStep` snapshots only materialize for viable plans
 
 ### Memory Growth Patterns
 
@@ -883,6 +882,107 @@ Based on profiling with PHP 8.3:
 - Memory dominated by search state (visited states × ~1 KB)
 - Guard limits essential to prevent runaway growth
 - Example: Dense 4×4 graph (hop-5) with 20,000 state limit → ~20-40 MB for search state alone
+
+## ExecutionPlanSearchEngine Performance
+
+The `ExecutionPlanSearchEngine` (introduced in version 2.0) implements a successive shortest augmenting paths algorithm that supports split/merge routes. This section provides performance characteristics and tuning recommendations specific to this engine.
+
+### Performance Targets
+
+| Metric | Target | Acceptable |
+|--------|--------|------------|
+| Linear path (100 orders) | < 10ms | < 50ms |
+| Linear path (1000 orders) | < 100ms | < 500ms |
+| Split/merge (100 orders) | < 50ms | < 200ms |
+| Split/merge (1000 orders) | < 500ms | < 2000ms |
+| Memory (1000 orders) | < 10MB | < 50MB |
+
+### Recommended Guard Limits by Order Book Size
+
+| Orders | maxExpansions | timeBudgetMs | maxVisitedStates | Expected Memory |
+|--------|---------------|--------------|------------------|-----------------|
+| < 100  | 5,000         | 1,000        | 10,000           | 10-20 MB        |
+| 100-500| 10,000        | 3,000        | 25,000           | 20-50 MB        |
+| 500-1k | 20,000        | 5,000        | 50,000           | 50-100 MB       |
+| > 1k   | 50,000        | 10,000       | 100,000          | 100-250 MB      |
+
+### Split/Merge Impact on Performance
+
+The `ExecutionPlanSearchEngine` finds optimal execution plans that may include:
+
+- **Linear paths**: Traditional A → B → C → D chains
+- **Multi-order same direction**: Multiple orders for A → B combined
+- **Split routes**: Source distributes across multiple routes
+- **Merge routes**: Multiple routes converge at target
+
+**State Space Impact:**
+
+- Split routes increase state space by approximately **2-5x** compared to linear paths
+- Memory scales linearly with `maxVisitedStates` setting
+- Time complexity scales with graph connectivity (edges per node)
+
+**Example configuration for split/merge scenarios:**
+
+```php
+// For order books with 500-1000 orders expecting split/merge routes
+$config = PathSearchConfig::builder()
+    ->withSpendAmount($amount)
+    ->withToleranceBounds('0.0', '0.10')
+    ->withHopLimits(1, 5)
+    ->withSearchGuards(20000, 50000, 5000)  // expansions, visited, timeMs
+    ->build();
+
+$service = new ExecutionPlanService(new GraphBuilder());
+$outcome = $service->findBestPlans(new PathSearchRequest($orderBook, $config, $target));
+```
+
+### Optimization Tips
+
+1. **Filter irrelevant orders before search**
+   ```php
+   $filtered = $orderBook->filter(
+       new MinimumAmountFilter($amount->multipliedBy('0.1')),
+       new MaximumAmountFilter($amount->multipliedBy('10.0')),
+   );
+   ```
+
+2. **Use appropriate guard limits for order book size**
+   - Start with conservative limits from the table above
+   - Monitor `SearchGuardReport` metrics
+   - Increase only if searches frequently hit limits
+
+3. **For large order books, consider splitting requests**
+   - Pre-filter by relevant currency pairs
+   - Run separate searches for different target amounts
+   - Combine results post-search
+
+4. **Monitor guard metrics for tuning**
+   ```php
+   $outcome = $service->findBestPlans($request);
+   $report = $outcome->guardLimits();
+   
+   // Check utilization
+   $expansionUtil = $report->expansions() / $config->pathFinderMaxExpansions();
+   $visitedUtil = $report->visitedStates() / $config->pathFinderMaxVisitedStates();
+   
+   // Tune based on utilization (see Guard Limit Decision Tree section)
+   ```
+
+### Benchmark Reference
+
+Run benchmarks to validate performance on your hardware:
+
+```bash
+# Run all ExecutionPlanService benchmarks
+vendor/bin/phpbench run benchmarks/ExecutionPlanBench.php --report=aggregate
+
+# Run specific group
+vendor/bin/phpbench run --group=linear --report=aggregate
+vendor/bin/phpbench run --group=split_merge --report=aggregate
+
+# Memory profiling
+vendor/bin/phpbench run --group=memory --report=default
+```
 
 ## Related Documentation
 

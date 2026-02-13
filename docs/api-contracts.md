@@ -122,78 +122,92 @@ if ($tolerance->isGreaterThanOrEqual('0.03')) {
 
 ---
 
-## Path Results
+## Execution Plan Results (Recommended)
 
-### Path
+### ExecutionPlan
 
-**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\Path`
+**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionPlan`
 
-**Purpose**: Aggregated representation of a discovered conversion path derived from hops.
+**Purpose**: Represents a complete execution plan that can express both linear paths and split/merge execution.
 
 **API Methods**:
 
 ```php
-// Access hops
-$hops = $path->hops();            // PathHopCollection object
-$hopArray = $path->hopsAsArray(); // list<PathHop>
+// Access steps
+$steps = $plan->steps();            // ExecutionStepCollection object
+$stepCount = $plan->stepCount();    // int
 
 // Access totals
-$totalSpent = $path->totalSpent();        // Money object
-$totalReceived = $path->totalReceived();  // Money object
+$totalSpent = $plan->totalSpent();        // Money object
+$totalReceived = $plan->totalReceived();  // Money object
+
+// Access currencies
+$source = $plan->sourceCurrency();    // "USD"
+$target = $plan->targetCurrency();    // "BTC"
 
 // Access tolerance
-$tolerance = $path->residualTolerance();          // DecimalTolerance object
-$percentage = $path->residualTolerancePercentage(2); // "1.23"
+$tolerance = $plan->residualTolerance();  // DecimalTolerance object
 
 // Access fees
-$feeBreakdown = $path->feeBreakdown();    // MoneyMap object
-$allFees = $path->feeBreakdownAsArray();  // array<string, Money>
+$feeBreakdown = $plan->feeBreakdown();    // MoneyMap object
 
-// Convenience method (returns array of key properties)
-$summary = $path->toArray();              // For debugging/internal use
+// Check linearity
+$isLinear = $plan->isLinear();            // bool
+$path = $plan->asLinearPath();            // Path|null (null if non-linear)
+
+// Convenience method
+$summary = $plan->toArray();              // For debugging/internal use
 ```
 
 **Properties**:
-- **hops**: PathHopCollection object (individual conversion steps)
-- **totalSpent**: Money object derived from the first hop's `spent()` amount
-- **totalReceived**: Money object derived from the last hop's `received()` amount
+- **steps**: ExecutionStepCollection object (individual execution steps)
+- **sourceCurrency**: Source currency code (uppercase)
+- **targetCurrency**: Target currency code (uppercase)
+- **totalSpent**: Money object (sum of spends from source currency)
+- **totalReceived**: Money object (sum of receives into target currency)
 - **residualTolerance**: DecimalTolerance object (remaining acceptable slippage)
-- **feeBreakdown**: MoneyMap object that merges fees across all hops by currency
+- **feeBreakdown**: MoneyMap object (aggregated fees across all steps)
 
 **Notes**:
-- Paths are always built from at least one hop
-- `feeBreakdown` aggregates hop fees deterministically by currency
-- `hopsAsArray()` preserves hop ordering for serialization-friendly scenarios
-- Derived totals stay in sync with the hop collection supplied at construction
+- Plans contain at least one step
+- `totalSpent()` sums amounts spent in the source currency
+- `totalReceived()` sums amounts received in the target currency
+- `isLinear()` returns true if the plan is a simple chain (no splits/merges)
+- `asLinearPath()` converts to `Path` only if linear, otherwise returns null
+
+**Version History**:
+- 2.0.0: Initial introduction
 
 ---
 
-### PathHop
+### ExecutionStep
 
-**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHop`
+**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionStep`
 
-**Purpose**: Describes a single conversion hop in a path and the order that produced it.
+**Purpose**: Describes a single execution step in an execution plan with sequence ordering.
 
 **API Methods**:
 
 ```php
 // Asset information
-$from = $hop->from();     // "USD"
-$to = $hop->to();         // "GBP"
+$from = $step->from();     // "USD"
+$to = $step->to();         // "EUR"
 
 // Monetary amounts
-$spent = $hop->spent();       // Money object (USD 100.00)
-$received = $hop->received(); // Money object (GBP 79.60)
+$spent = $step->spent();       // Money object (USD 100.00)
+$received = $step->received(); // Money object (EUR 90.91)
 
 // Fees
-$fees = $hop->fees();             // MoneyMap object
-$feeArray = $hop->feesAsArray();  // array<string, Money>
+$fees = $step->fees();             // MoneyMap object
 
-// Associated order (the same instance you supplied to the order book)
-$order = $hop->order();
+// Associated order
+$order = $step->order();           // Domain Order instance
+
+// Execution sequence
+$sequence = $step->sequenceNumber();  // int (1-based)
 
 // Convenience method
-$summary = $hop->toArray();       // For debugging/internal use
+$summary = $step->toArray();          // For debugging/internal use
 ```
 
 **Properties**:
@@ -201,57 +215,66 @@ $summary = $hop->toArray();       // For debugging/internal use
 - **to**: Destination asset symbol (uppercase)
 - **spent**: Money object (amount spent)
 - **received**: Money object (amount received, after fees)
-- **fees**: MoneyMap object (fees charged for this hop)
-- **order**: Domain `Order` instance used to fill the hop
+- **fees**: MoneyMap object (fees charged for this step)
+- **order**: Domain `Order` instance used to fill the step
+- **sequenceNumber**: Execution order (1-based integer)
 
 **Constraints**:
 - `spent.currency` always equals `from`
 - `received.currency` always equals `to`
 - `fees` keys are either `from` or `to` currencies
 - All asset symbols are uppercase
+- `sequenceNumber` is at least 1
 
 **Notes**:
 - The `received` amount reflects fees already deducted
-- Fees may be charged in source or destination currency; multi-currency fees are supported
-- Use `order()` to access your upstream order metadata (IDs, venue references, etc.). Because the exact identifier shape is application-specific, attach IDs to your `Order` instances or map them externally (for example, via `spl_object_id($hop->order())`).
+- `sequenceNumber` indicates execution order within the plan
+- Use `order()` to access order metadata (IDs, venue references, etc.)
+
+**Version History**:
+- 2.0.0: Initial introduction
 
 ---
 
-### PathHopCollection
+### ExecutionStepCollection
 
-**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\PathHopCollection`
+**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Result\ExecutionStepCollection`
 
-**Purpose**: Ordered collection of path hops representing a conversion path.
+**Purpose**: Immutable ordered collection of execution steps sorted by sequence number.
 
 **API Methods**:
 
 ```php
-$collection = PathHopCollection::fromList([$hop1, $hop2]);
+$collection = ExecutionStepCollection::fromList([$step1, $step2]);
 
-// Access hops
+// Access steps
 $count = $collection->count();
-$firstHop = $collection->first();
-$specificHop = $collection->at(0);  // Zero-indexed
+$isEmpty = $collection->isEmpty();
+$firstStep = $collection->first();
+$lastStep = $collection->last();
+$specificStep = $collection->at(0);  // Zero-indexed
 
 // Iterate
-foreach ($collection as $hop) {
-    echo "Convert {$hop->from()} to {$hop->to()}\n";
+foreach ($collection as $step) {
+    echo "Step {$step->sequenceNumber()}: {$step->from()} to {$step->to()}\n";
 }
 
 // Get as array
-$hopArray = $collection->all();      // list of PathHop objects
+$stepArray = $collection->all();      // list of ExecutionStep objects
 $simpleArray = $collection->toArray(); // For debugging
 ```
 
 **Structure**:
-- Immutable ordered collection of PathHop objects
-- Hops are ordered by path sequence
-- Empty collection available via `PathHopCollection::empty()`
+- Immutable ordered collection of ExecutionStep objects
+- Steps are sorted by sequence number
+- Empty collection available via `ExecutionStepCollection::empty()`
 
 **Notes**:
-- First hop's `from` is the path's source asset
-- Last hop's `to` is the path's destination asset
-- Each hop's `to` matches the next hop's `from` (if any)
+- Steps are automatically sorted by `sequenceNumber()` on creation
+- Deterministic iteration order based on sequence numbers
+
+**Version History**:
+- 2.0.0: Initial introduction
 
 ---
 
@@ -263,22 +286,34 @@ $simpleArray = $collection->toArray(); // For debugging
 
 **Purpose**: Container for search results and guard metrics.
 
-**API Methods**:
+**Important**: `ExecutionPlanService::findBestPlans()` supports **Top-K** results. The number of plans returned is controlled by `PathSearchConfig::resultLimit()` (default 1). The `paths()` collection may contain 0 to `resultLimit` entries. Use `bestPath()` for the single best plan, or iterate `paths()` for all returned plans.
 
 ```php
-$result = $service->findBestPaths($request);
+$result = $service->findBestPlans($request);
 
-// Access paths
-$paths = $result->paths();           // PathResultSet object
-$hasPaths = $result->hasPaths();     // boolean
-$bestPath = $result->bestPath();     // Path|null
+// Check if any plan was found
+$hasPaths = $result->hasPaths();     // true if at least one plan was found
+$bestPath = $result->bestPath();     // Best ExecutionPlan or null (same as paths()->first())
+$result->paths()->count();           // 0 up to resultLimit
+
+// To obtain only the best plan, use resultLimit=1 (default) or call bestPath()
+$config = PathSearchConfig::builder()
+    ->withResultLimit(1)   // single plan (default)
+    // ... other options
+    ->build();
 
 // Access guard report
 $guards = $result->guardLimits();    // SearchGuardReport object
 
-// Iterate through paths
-foreach ($result->paths() as $path) {
-    echo "Path has {$path->hops()->count()} hops\n";
+// Process the best plan (or first of Top-K)
+if (null !== $bestPath) {
+    echo "Plan has {$bestPath->stepCount()} steps\n";
+    echo "Is linear: " . ($bestPath->isLinear() ? 'yes' : 'no') . "\n";
+}
+
+// Process all returned plans (when resultLimit > 1)
+foreach ($result->paths() as $plan) {
+    // ...
 }
 
 // Check for guard breaches
@@ -287,17 +322,18 @@ if ($guards->anyLimitReached()) {
 }
 ```
 
+**Top-K and resultLimit**: Configure `PathSearchConfig::withResultLimit(int)` to request multiple plans (e.g. for fallbacks or comparison). With `resultLimit=1` (default), `paths()->count()` is 0 or 1; with a higher limit, multiple disjoint or reusable plans may be returned depending on `disjointPlans()` (disjoint plans share no common orders; reusable plans may share orders with penalty-based diversification).
+
 **Properties**:
-- **paths**: PathResultSet object (found conversion paths)
+- **paths**: PathResultSet object containing 0 to resultLimit ExecutionPlan instances
 - **guardLimits**: SearchGuardReport object (search performance metrics)
 
 **Notes**:
-- Paths are ordered by configured strategy (default: cost, then hops, then route signature)
-- Number of paths limited by `PathSearchConfig.resultLimit`
 - Guard report provides diagnostic information about search limits and performance
 
 **Version History**:
 - 1.0.0: Initial structure
+- 2.0.0: Returns single optimal ExecutionPlan only
 
 ---
 
@@ -391,40 +427,78 @@ $pathArray = $paths->toArray();
 
 ---
 
-## Usage Examples
+---
 
-### Working with Search Results
+## Service Contracts
 
-Here's how to work with a complete `SearchOutcome` containing paths and guard metrics:
+### ExecutionPlanService (Recommended)
+
+**Class**: `SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService`
+
+**Purpose**: Service for finding optimal execution plans that may include split/merge routes.
+
+**API Methods**:
 
 ```php
-$outcome = $service->findBestPaths($request);
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+
+// Construction
+$service = new ExecutionPlanService(new GraphBuilder());
+
+// With custom ordering strategy
+$service = new ExecutionPlanService(new GraphBuilder(), $customOrderingStrategy);
+
+// Execute search
+$outcome = $service->findBestPlans($request);  // SearchOutcome<ExecutionPlan>
+```
+
+**Capabilities**:
+- Multiple orders for same currency direction
+- Split execution (input split across parallel routes)
+- Merge execution (routes converging at target)
+- Linear paths (single chain from source to target)
+
+**Version History**:
+- 2.0.0: Initial introduction
+
+---
+
+## Usage Examples
+
+### Working with Search Results (ExecutionPlanService)
+
+Here's how to work with a complete `SearchOutcome` from `ExecutionPlanService`:
+
+```php
+$outcome = $service->findBestPlans($request);
 
 // Access guard metrics
 $guards = $outcome->guardLimits();
 echo "Search took: {$guards->elapsedMilliseconds()}ms\n";
 echo "Expansions: {$guards->expansions()}\n";
 
-echo "Paths: {$outcome->paths()->count()}\n";
+echo "Plans: {$outcome->paths()->count()}\n";
 
-// Process found paths
-foreach ($outcome->paths() as $path) {
-    echo "Spent: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()}\n";
-    echo "Received: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
-    echo "Tolerance remaining: {$path->residualTolerance()->percentage(2)}\n";
+// Process found plans
+foreach ($outcome->paths() as $plan) {
+    echo "Spent: {$plan->totalSpent()->amount()} {$plan->totalSpent()->currency()}\n";
+    echo "Received: {$plan->totalReceived()->amount()} {$plan->totalReceived()->currency()}\n";
+    echo "Tolerance remaining: {$plan->residualTolerance()->percentage(2)}\n";
+    echo "Is Linear: " . ($plan->isLinear() ? 'yes' : 'no') . "\n";
 
     // Process aggregated fees
-    foreach ($path->feeBreakdown() as $currency => $fee) {
+    foreach ($plan->feeBreakdown() as $currency => $fee) {
         echo "Fee in $currency: {$fee->amount()}\n";
     }
 
-    // Process hops and related orders
-    foreach ($path->hops() as $hop) {
-        echo "  {$hop->from()} -> {$hop->to()}: ";
-        echo "spent {$hop->spent()->amount()}, received {$hop->received()->amount()}\n";
+    // Process steps with sequence numbers
+    foreach ($plan->steps() as $step) {
+        echo "  Step {$step->sequenceNumber()}: {$step->from()} -> {$step->to()}: ";
+        echo "spent {$step->spent()->amount()}, received {$step->received()->amount()}\n";
 
-        // Order reference: use your own identifiers on the supplied order instances
-        $order = $hop->order();
+        // Order reference
+        $order = $step->order();
         echo "  Filled order across {$order->assetPair()->base()} / {$order->assetPair()->quote()}\n";
     }
 }
@@ -435,11 +509,6 @@ if ($guards->anyLimitReached()) {
 }
 ```
 
-This example demonstrates:
-- Paths composed of ordered hops with deterministic totals
-- Fees in multiple currencies aggregated at the path level
-- Hop-by-hop access to the originating orders for downstream reconciliation
-- Guard metrics showing the search completed within limits
 
 ### Type Safety
 
@@ -455,5 +524,5 @@ All APIs use strongly-typed domain objects with PHPDoc annotations. This provide
 
 ---
 
-**Document Version**: 1.1.0
-**Last Updated**: April 2025
+**Document Version**: 2.0.0
+**Last Updated**: January 2026

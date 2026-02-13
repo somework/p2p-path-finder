@@ -14,9 +14,8 @@ use SomeWork\P2PPathFinder\Exception\InvalidInput;
 /**
  * Represents a candidate path discovered by the search algorithm.
  *
- * This class is used internally by PathSearchService and is not exposed to consumers.
- * The callback that receives CandidatePath instances is created inside PathSearchService
- * and never passed to consumer code. Consumers interact with Path instead.
+ * This class is used internally by the search engine and is not exposed to consumers.
+ * Consumers interact with ExecutionPlan instead.
  *
  * @internal This is an internal value object and may change without notice
  */
@@ -58,7 +57,7 @@ final class CandidatePath
     public function cost(): string
     {
         /** @var numeric-string $value */
-        $value = $this->cost->toScale(18, \Brick\Math\RoundingMode::HALF_UP)->__toString();
+        $value = $this->cost->toScale(18, \Brick\Math\RoundingMode::HalfUp)->__toString();
 
         return $value;
     }
@@ -74,7 +73,7 @@ final class CandidatePath
     public function product(): string
     {
         /** @var numeric-string $value */
-        $value = $this->product->toScale(18, \Brick\Math\RoundingMode::HALF_UP)->__toString();
+        $value = $this->product->toScale(18, \Brick\Math\RoundingMode::HalfUp)->__toString();
 
         return $value;
     }

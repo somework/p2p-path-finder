@@ -1,7 +1,7 @@
 # Getting Started with P2P Path Finder
 
-**Version**: 1.0  
-**Last Updated**: 2024-11-22
+**Version**: 2.0  
+**Last Updated**: 2026-01-26
 
 This guide will help you get started with the P2P Path Finder library in just a few minutes.
 
@@ -14,6 +14,7 @@ This guide will help you get started with the P2P Path Finder library in just a 
 - [Understanding the Results](#understanding-the-results)
 - [Working with Orders](#working-with-orders)
 - [Customizing the Search](#customizing-the-search)
+- [Split/Merge Execution Plans](#splitmerge-execution-plans)
 - [Next Steps](#next-steps)
 
 ---
@@ -50,7 +51,12 @@ Let's find the best path to convert **USD to BTC** through a simple order book.
 
 require 'vendor/autoload.php';
 
-use SomeWork\P2PPathFinder\Domain\Money\AssetPair;use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;use SomeWork\P2PPathFinder\Domain\Order\Order;use SomeWork\P2PPathFinder\Domain\Order\OrderBook;use SomeWork\P2PPathFinder\Domain\Order\OrderBounds;use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
+use SomeWork\P2PPathFinder\Domain\Money\AssetPair;
+use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
+use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBook;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBounds;
+use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 
 // Create a simple order book with one order
 $orders = [
@@ -75,7 +81,8 @@ $orderBook = new OrderBook($orders);
 ### Step 2: Configure the Search
 
 ```php
-use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;use SomeWork\P2PPathFinder\Domain\Money\Money;
+use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
 
 // Spend $1,000 USD
 $spendAmount = Money::fromString('USD', '1000.00', 2);
@@ -98,12 +105,12 @@ $config = PathSearchConfig::builder()
 
 ```php
 use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
 use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
 
-// Create the path search service
+// Create the execution plan service
 $graphBuilder = new GraphBuilder();
-$pathSearchService = new PathSearchService($graphBuilder);
+$planService = new ExecutionPlanService($graphBuilder);
 
 // Create the search request
 $request = new PathSearchRequest(
@@ -112,71 +119,57 @@ $request = new PathSearchRequest(
     'BTC'  // Target currency
 );
 
-// Find the best paths
-$outcome = $pathSearchService->findBestPaths($request);
+// Find the best execution plan
+$outcome = $planService->findBestPlans($request);
 ```
 
 **What's happening here?**
 
-- We create a **`PathSearchService`** with a `GraphBuilder`
+- We create an **`ExecutionPlanService`** with a `GraphBuilder`
 - We create a **`PathSearchRequest`** specifying the order book, configuration, and target currency (BTC)
-- We call **`findBestPaths()`** to search for optimal paths
+- We call **`findBestPlans()`** to search for the optimal execution plan
 
 ### Step 4: Display the Results
 
 ```php
-// Check if any paths were found
-if ($outcome->paths()->isEmpty()) {
-    echo "No paths found.\n";
+// Check if a plan was found
+$bestPlan = $outcome->bestPath();
+if (null === $bestPlan) {
+    echo "No execution plan found.\n";
     exit;
 }
 
-// Get the best path
-/** @var SomeWork\P2PPathFinder\Application\PathSearch\Result\Path $bestPath */
-$bestPath = $outcome->paths()->first();
+// Display totals and plan information
+echo "Best execution plan found!\n";
+echo "  Source: {$bestPlan->sourceCurrency()}\n";
+echo "  Target: {$bestPlan->targetCurrency()}\n";
+echo "  Spend: {$bestPlan->totalSpent()->amount()} {$bestPlan->totalSpent()->currency()}\n";
+echo "  Receive: {$bestPlan->totalReceived()->amount()} {$bestPlan->totalReceived()->currency()}\n";
+echo "  Residual tolerance: {$bestPlan->residualTolerance()->percentage()}%\n";
+echo "  Steps: {$bestPlan->stepCount()}\n";
+echo "  Is linear: " . ($bestPlan->isLinear() ? 'yes' : 'no') . "\n";
 
-// Build a human-friendly route using hopsAsArray()
-// Use hopsAsArray() when you need a plain list (e.g., for serialization or string building).
-// Use hops() when you want lazy, collection-style iteration without materializing an array.
-$route = [];
-foreach ($bestPath->hopsAsArray() as $index => $hop) {
-    if (0 === $index) {
-        $route[] = $hop->from();
-    }
-
-    $route[] = $hop->to();
-}
-$routeString = implode('->', $route);
-
-// Display totals, tolerance headroom, and fees derived from hops
-echo "Best path found!\n";
-echo "  Route: {$routeString}\n";
-echo "  Spend: {$bestPath->totalSpent()->amount()} {$bestPath->totalSpent()->currency()}\n";
-echo "  Receive: {$bestPath->totalReceived()->amount()} {$bestPath->totalReceived()->currency()}\n";
-echo "  Residual tolerance: {$bestPath->residualTolerance()->percentage()}%\n";
-echo "  Fees: " . json_encode($bestPath->feeBreakdownAsArray()) . "\n";
-echo "  Hops: {$bestPath->hops()->count()}\n";
-
-// Inspect hop-level Orders and amounts
-foreach ($bestPath->hops() as $hop) {
-    echo "  Hop: {$hop->from()} -> {$hop->to()}\n";
-    echo "    Order pair: {$hop->order()->assetPair()->base()}/{$hop->order()->assetPair()->quote()}\n";
-    echo "    Spent: {$hop->spent()->amount()} {$hop->spent()->currency()}\n";
-    echo "    Received: {$hop->received()->amount()} {$hop->received()->currency()}\n";
+// Inspect step-level Orders and amounts
+foreach ($bestPlan->steps() as $step) {
+    echo "  Step {$step->sequenceNumber()}: {$step->from()} -> {$step->to()}\n";
+    echo "    Order pair: {$step->order()->assetPair()->base()}/{$step->order()->assetPair()->quote()}\n";
+    echo "    Spent: {$step->spent()->amount()} {$step->spent()->currency()}\n";
+    echo "    Received: {$step->received()->amount()} {$step->received()->currency()}\n";
 }
 ```
 
 **Expected output**:
 
-```
-Best path found!
-  Route: USD->BTC
+```text
+Best execution plan found!
+  Source: USD
+  Target: BTC
   Spend: 1000.00 USD
   Receive: 0.03333333 BTC
   Residual tolerance: 5.00%
-  Fees: []
-  Hops: 1
-  Hop: USD -> BTC
+  Steps: 1
+  Is linear: yes
+  Step 1: USD -> BTC
     Order pair: BTC/USD
     Spent: 1000.00 USD
     Received: 0.03333333 BTC
@@ -186,34 +179,38 @@ Best path found!
 
 ## Understanding the Results
 
-### Path Structure
+### ExecutionPlan Structure
 
-A **`Path`** contains:
+An **`ExecutionPlan`** contains:
 
-- **`hops()`**: Ordered collection of hop objects (`PathHopCollection`)
-- **`hopsAsArray()`**: List-friendly representation of hops for serialization
-- **`totalSpent()`**: Derived from the first hop's `spent()` amount (Money object)
-- **`totalReceived()`**: Derived from the last hop's `received()` amount (Money object)
-- **`residualTolerance()`**: Remaining tolerance after applying the path (DecimalTolerance)
-- **`feeBreakdown()`**: Aggregated fees across all hops (MoneyMap)
+- **`steps()`**: Ordered collection of execution steps (`ExecutionStepCollection`)
+- **`stepCount()`**: Number of steps in the plan
+- **`sourceCurrency()`**: The source currency (uppercase)
+- **`targetCurrency()`**: The target currency (uppercase)
+- **`totalSpent()`**: Sum of amounts spent from the source currency (Money object)
+- **`totalReceived()`**: Sum of amounts received in the target currency (Money object)
+- **`residualTolerance()`**: Remaining tolerance after applying the plan (DecimalTolerance)
+- **`feeBreakdown()`**: Aggregated fees across all steps (MoneyMap)
+- **`isLinear()`**: Whether the plan is a simple linear path (no splits/merges)
+- **`asLinearPath()`**: Convert to `Path` format for linear plans (returns null if non-linear)
 
-### Path Hops
+### Execution Steps
 
-Each **hop** represents one conversion step and exposes the associated order:
+Each **step** represents one conversion step with sequence ordering:
 
 ```php
-foreach ($bestPath->hops() as $hop) {
-    echo "Hop: {$hop->from()} -> {$hop->to()}\n";
-    echo "  Spent: {$hop->spent()->amount()} {$hop->spent()->currency()}\n";
-    echo "  Received: {$hop->received()->amount()} {$hop->received()->currency()}\n";
+foreach ($bestPlan->steps() as $step) {
+    echo "Step {$step->sequenceNumber()}: {$step->from()} -> {$step->to()}\n";
+    echo "  Spent: {$step->spent()->amount()} {$step->spent()->currency()}\n";
+    echo "  Received: {$step->received()->amount()} {$step->received()->currency()}\n";
 
-    // Fees for this hop
-    foreach ($hop->fees() as $currency => $fee) {
+    // Fees for this step
+    foreach ($step->fees() as $currency => $fee) {
         echo "    Fee: {$fee->amount()} {$currency}\n";
     }
 
     // Access the originating order for reconciliation or ID lookup
-    $order = $hop->order();
+    $order = $step->order();
     echo "  Order asset pair: {$order->assetPair()->base()} / {$order->assetPair()->quote()}\n";
     // If your Order implementation carries custom IDs, read them here or map via spl_object_id($order)
 }
@@ -308,7 +305,8 @@ The path finder will automatically discover that `USD->EUR->BTC` might be better
 Orders can have fees that reduce the received amount:
 
 ```php
-use SomeWork\P2PPathFinder\Domain\Order\Fee\FeeBreakdown;use SomeWork\P2PPathFinder\Domain\Order\Fee\FeePolicy;
+use SomeWork\P2PPathFinder\Domain\Order\Fee\FeeBreakdown;
+use SomeWork\P2PPathFinder\Domain\Order\Fee\FeePolicy;
 
 // Create a fee policy (1% fee on quote amount)
 $feePolicy = new class implements FeePolicy {
@@ -341,33 +339,43 @@ $orderWithFees = Order::buy(
 
 ## Customizing the Search
 
-### Requesting Multiple Paths
+### Understanding Search Results
 
-By default, the search returns up to 5 paths. You can request more:
+`ExecutionPlanService::findBestPlans()` returns at most **ONE** optimal execution plan. The algorithm optimizes for a single global optimum that may include split/merge execution.
 
 ```php
-$config = PathSearchConfig::builder()
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+
+$planService = new ExecutionPlanService(new GraphBuilder());
+$outcome = $planService->findBestPlans($request);
+
+$plan = $outcome->bestPath();  // Single optimal plan or null
+if (null !== $plan) {
+    echo "Spend: {$plan->totalSpent()->amount()} {$plan->totalSpent()->currency()}\n";
+    echo "Receive: {$plan->totalReceived()->amount()} {$plan->totalReceived()->currency()}\n";
+}
+
+// Note: $outcome->paths()->count() will be 0 or 1
+```
+
+**Getting alternatives**: If you need alternative routes, run separate searches with different constraints:
+
+```php
+// Alternative 1: Different tolerance bounds
+$strictConfig = PathSearchConfig::builder()
     ->withSpendAmount($spendAmount)
-    ->withToleranceBounds('0.0', '0.10')
-    ->withHopLimits(1, 3)
-    ->withTopK(10)  // Request top 10 paths
+    ->withToleranceBounds('0.0', '0.05')  // Tighter tolerance
     ->build();
 
-// Iterate through all paths
-foreach ($outcome->paths() as $path) {
-    $route = [];
-    foreach ($path->hopsAsArray() as $index => $hop) {
-        if (0 === $index) {
-            $route[] = $hop->from();
-        }
+// Alternative 2: Different spend amount
+$smallerConfig = PathSearchConfig::builder()
+    ->withSpendAmount(Money::fromString('USD', '500.00', 2))  // Smaller amount
+    ->build();
 
-        $route[] = $hop->to();
-    }
-
-    echo "Path: " . implode(' -> ', $route) . "\n";
-    echo "  Spend: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()}\n";
-    echo "  Receive: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
-}
+// Alternative 3: Filtered order book
+$filteredBook = new OrderBook($filteredOrders);
+$filteredRequest = new PathSearchRequest($filteredBook, $config, 'BTC');
 ```
 
 ### Adjusting Tolerance
@@ -448,7 +456,9 @@ $config = PathSearchConfig::builder()
 You can pre-filter the order book before searching:
 
 ```php
-use SomeWork\P2PPathFinder\Application\Order\Filter\MaximumAmountFilter;use SomeWork\P2PPathFinder\Application\Order\Filter\MinimumAmountFilter;use SomeWork\P2PPathFinder\Application\Order\Filter\ToleranceWindowFilter;
+use SomeWork\P2PPathFinder\Application\Order\Filter\MaximumAmountFilter;
+use SomeWork\P2PPathFinder\Application\Order\Filter\MinimumAmountFilter;
+use SomeWork\P2PPathFinder\Application\Order\Filter\ToleranceWindowFilter;
 
 // Filter by amount range
 $minFilter = new MinimumAmountFilter(
@@ -468,7 +478,7 @@ $filteredBook = new OrderBook(iterator_to_array($filteredOrders));
 
 // Search on filtered book
 $request = new PathSearchRequest($filteredBook, $config, 'BTC');
-$outcome = $pathSearchService->findBestPaths($request);
+$outcome = $planService->findBestPlans($request);
 ```
 
 ---
@@ -482,7 +492,17 @@ Here's a complete working example you can run:
 
 require 'vendor/autoload.php';
 
-use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;use SomeWork\P2PPathFinder\Domain\Money\AssetPair;use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;use SomeWork\P2PPathFinder\Domain\Money\Money;use SomeWork\P2PPathFinder\Domain\Order\Order;use SomeWork\P2PPathFinder\Domain\Order\OrderBook;use SomeWork\P2PPathFinder\Domain\Order\OrderBounds;use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
+use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+use SomeWork\P2PPathFinder\Domain\Money\AssetPair;
+use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
+use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBook;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBounds;
+use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 
 // 1. Create order book
 $orders = [
@@ -518,53 +538,41 @@ $config = PathSearchConfig::builder()
     ->withSpendAmount($spendAmount)
     ->withToleranceBounds('0.0', '0.10')
     ->withHopLimits(1, 3)
-    ->withTopK(5)
     ->build();
 
 // 3. Run search
 $graphBuilder = new GraphBuilder();
-$pathSearchService = new PathSearchService($graphBuilder);
+$planService = new ExecutionPlanService($graphBuilder);
 
 $request = new PathSearchRequest($orderBook, $config, 'BTC');
-$outcome = $pathSearchService->findBestPaths($request);
+$outcome = $planService->findBestPlans($request);
 
 // 4. Display results
-echo "=== Path Search Results ===\n\n";
+echo "=== Execution Plan Search Results ===\n\n";
 
-if ($outcome->paths()->isEmpty()) {
-    echo "No paths found.\n";
+$bestPlan = $outcome->bestPath();
+if (null === $bestPlan) {
+    echo "No execution plan found.\n";
     exit;
 }
 
-echo "Found {$outcome->paths()->count()} path(s):\n\n";
+echo "Optimal Execution Plan:\n";
+echo "  Source: {$bestPlan->sourceCurrency()}\n";
+echo "  Target: {$bestPlan->targetCurrency()}\n";
+echo "  Spend: {$bestPlan->totalSpent()->amount()} {$bestPlan->totalSpent()->currency()}\n";
+echo "  Receive: {$bestPlan->totalReceived()->amount()} {$bestPlan->totalReceived()->currency()}\n";
+echo "  Residual tolerance: {$bestPlan->residualTolerance()->percentage()}%\n";
+echo "  Steps: {$bestPlan->stepCount()}\n";
+echo "  Is linear: " . ($bestPlan->isLinear() ? 'yes' : 'no') . "\n";
 
-foreach ($outcome->paths() as $i => $path) {
-    echo "Path " . ($i + 1) . ":\n";
-    $route = [];
-    foreach ($path->hopsAsArray() as $index => $hop) {
-        if (0 === $index) {
-            $route[] = $hop->from();
-        }
-
-        $route[] = $hop->to();
-    }
-
-    echo "  Route: " . implode(' -> ', $route) . "\n";
-    echo "  Spend: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()}\n";
-    echo "  Receive: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
-    echo "  Residual tolerance: {$path->residualTolerance()->percentage()}%\n";
-    echo "  Fees: " . json_encode($path->feeBreakdownAsArray()) . "\n";
-    echo "  Hops: {$path->hops()->count()}\n";
-
-    echo "  Hops detail:\n";
-    foreach ($path->hops() as $hop) {
-        echo "    {$hop->from()} -> {$hop->to()}: ";
-        echo "Spend {$hop->spent()->amount()} {$hop->spent()->currency()}, ";
-        echo "Receive {$hop->received()->amount()} {$hop->received()->currency()} ";
-        echo "via {$hop->order()->assetPair()->base()}/{$hop->order()->assetPair()->quote()}\n";
-    }
-    echo "\n";
+echo "\n  Steps detail:\n";
+foreach ($bestPlan->steps() as $step) {
+    echo "    Step {$step->sequenceNumber()}: {$step->from()} -> {$step->to()}: ";
+    echo "Spend {$step->spent()->amount()} {$step->spent()->currency()}, ";
+    echo "Receive {$step->received()->amount()} {$step->received()->currency()} ";
+    echo "via {$step->order()->assetPair()->base()}/{$step->order()->assetPair()->quote()}\n";
 }
+echo "\n";
 
 // 5. Display search metadata
 $guardReport = $outcome->guardLimits();
@@ -574,6 +582,111 @@ echo "  Visited states: {$guardReport->visitedStates()}\n";
 echo "  Time: {$guardReport->elapsedMilliseconds()}ms\n";
 echo "  Any limit reached: " . ($guardReport->anyLimitReached() ? 'yes' : 'no') . "\n";
 ```
+
+---
+
+## Split/Merge Execution Plans
+
+The `ExecutionPlanService` can find optimal execution plans that include complex topologies beyond simple linear paths:
+
+- **Multi-order same direction**: Multiple orders for USD→BTC combined
+- **Split execution**: Input split across parallel routes
+- **Merge execution**: Routes converging at target currency
+
+### Split/Merge Example
+
+Here's an example with multiple orders that can be used for split/merge execution:
+
+```php
+<?php
+
+use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
+use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
+use SomeWork\P2PPathFinder\Domain\Money\AssetPair;
+use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
+use SomeWork\P2PPathFinder\Domain\Money\Money;
+use SomeWork\P2PPathFinder\Domain\Order\Order;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBook;
+use SomeWork\P2PPathFinder\Domain\Order\OrderBounds;
+use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
+
+// Create orders for a diamond pattern: USD → EUR → BTC and USD → GBP → BTC
+$orders = [
+    // USD -> EUR
+    Order::buy(
+        AssetPair::fromString('EUR/USD'),
+        OrderBounds::fromStrings('100', '5000', 2),
+        ExchangeRate::fromString('EUR', 'USD', '1.10', 4),
+        OrderSide::BUY
+    ),
+    // USD -> GBP (alternative route)
+    Order::buy(
+        AssetPair::fromString('GBP/USD'),
+        OrderBounds::fromStrings('100', '5000', 2),
+        ExchangeRate::fromString('GBP', 'USD', '1.25', 4),
+        OrderSide::BUY
+    ),
+    // EUR -> BTC
+    Order::buy(
+        AssetPair::fromString('BTC/EUR'),
+        OrderBounds::fromStrings('0.01', '1.0', 8),
+        ExchangeRate::fromString('BTC', 'EUR', '27000', 2),
+        OrderSide::BUY
+    ),
+    // GBP -> BTC (merge at target)
+    Order::buy(
+        AssetPair::fromString('BTC/GBP'),
+        OrderBounds::fromStrings('0.01', '1.0', 8),
+        ExchangeRate::fromString('BTC', 'GBP', '23500', 2),
+        OrderSide::BUY
+    ),
+];
+
+$orderBook = new OrderBook($orders);
+
+// Configure and run search
+$spendAmount = Money::fromString('USD', '10000.00', 2);
+$config = PathSearchConfig::builder()
+    ->withSpendAmount($spendAmount)
+    ->withToleranceBounds('0.0', '0.10')
+    ->withHopLimits(1, 4)
+    ->build();
+
+$request = new PathSearchRequest($orderBook, $config, 'BTC');
+
+// Search will find the optimal plan, which may split USD across EUR and GBP routes
+$planService = new ExecutionPlanService(new GraphBuilder());
+$outcome = $planService->findBestPlans($request);
+
+$plan = $outcome->bestPath();
+
+// Check if the plan is linear (single path) or has splits/merges
+if ($plan->isLinear()) {
+    echo "Linear execution plan (single path)\n";
+} else {
+    echo "Complex execution plan with splits/merges\n";
+}
+
+echo "Steps: {$plan->stepCount()}\n";
+foreach ($plan->steps() as $step) {
+    echo "  Step {$step->sequenceNumber()}: {$step->from()} -> {$step->to()}\n";
+}
+```
+
+### Understanding ExecutionPlan Structure
+
+| Property | Description |
+|:---------|:------------|
+| `steps()` | `ExecutionStepCollection` - ordered execution steps |
+| `stepCount()` | Number of steps in the plan |
+| `sourceCurrency()` | Source currency (uppercase) |
+| `targetCurrency()` | Target currency (uppercase) |
+| `totalSpent()` | Sum of amounts spent from source |
+| `totalReceived()` | Sum of amounts received in target |
+| `isLinear()` | True if plan is a simple linear path |
+| `asLinearPath()` | Convert to `Path` (returns null if non-linear) |
 
 ---
 
@@ -608,8 +721,8 @@ Check out the [`examples/`](../examples/) directory for more:
 ### Performance Optimization
 
 - Pre-filter order books before searching
-- Use reasonable `topK` values (10-20)
-- Set appropriate guard rails
+- Set appropriate guard rails (expansions, visited states, time budget)
+- Use reasonable hop limits (1-4 for most use cases)
 - Profile with `SearchGuardReport` metrics
 
 ### Testing
@@ -634,25 +747,27 @@ $config = PathSearchConfig::builder()
     ->build();
 
 $request = new PathSearchRequest($orderBook, $config, 'BTC');
-$outcome = $service->findBestPaths($request);
+$outcome = $planService->findBestPlans($request);
 ```
 
 **Check for results**:
 ```php
-if ($outcome->paths()->isEmpty()) {
-    // No paths found
+$bestPlan = $outcome->bestPath();
+if (null === $bestPlan) {
+    // No execution plan found
 }
 ```
 
-**Get best path**:
+**Process the execution plan**:
 ```php
-$bestPath = $outcome->paths()->first();
-```
-
-**Iterate all paths**:
-```php
-foreach ($outcome->paths() as $path) {
-    // Process path
+$bestPlan = $outcome->bestPath();
+if (null !== $bestPlan) {
+    echo "Spend: {$bestPlan->totalSpent()->amount()}\n";
+    echo "Receive: {$bestPlan->totalReceived()->amount()}\n";
+    
+    foreach ($bestPlan->steps() as $step) {
+        echo "{$step->from()} -> {$step->to()}\n";
+    }
 }
 ```
 
@@ -710,4 +825,3 @@ $config = PathSearchConfig::builder()
 ---
 
 **Happy path finding!** 🚀
-

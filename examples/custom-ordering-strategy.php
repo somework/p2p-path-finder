@@ -20,8 +20,8 @@ use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
 use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathOrderKey;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\PathOrderStrategy;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
 use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
 use SomeWork\P2PPathFinder\Domain\Money\AssetPair;
 use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
@@ -374,7 +374,7 @@ function demonstrateStrategy(string $name, PathOrderStrategy $strategy): void
 
     $orderBook = createSampleOrderBook();
     $graphBuilder = new GraphBuilder();
-    $service = new PathSearchService($graphBuilder, $strategy);
+    $service = new ExecutionPlanService($graphBuilder, $strategy);
 
     $config = PathSearchConfig::builder()
         ->withSpendAmount(Money::fromString('USD', '100.00', 2))
@@ -385,40 +385,39 @@ function demonstrateStrategy(string $name, PathOrderStrategy $strategy): void
 
     $request = new PathSearchRequest($orderBook, $config, 'EUR');
 
-    $resultSet = $service->findBestPaths($request);
+    $resultSet = $service->findBestPlans($request);
 
     if (!$resultSet->hasPaths()) {
-        echo "No paths found.\n";
+        echo "No execution plans found.\n";
 
         return;
     }
 
-    $pathResultSet = $resultSet->paths();
-    echo 'Found '.count($pathResultSet)." path(s):\n\n";
+    $planResultSet = $resultSet->paths();
+    echo 'Found '.count($planResultSet)." execution plan(s):\n\n";
 
     $position = 1;
-    foreach ($pathResultSet as $path) {
-        $hops = $path->hops();
-        $hopCount = count($hops);
+    foreach ($planResultSet as $plan) {
+        $stepCount = $plan->stepCount();
 
-        if (0 === $hopCount) {
+        if (0 === $stepCount) {
             continue;
         }
 
-        // Build signature from hops
-        $hopArray = $hops->all();
-        $firstHop = $hopArray[0];
-        $fullSignature = $firstHop->from();
-        foreach ($hopArray as $hop) {
-            $fullSignature .= ' -> '.$hop->to();
+        // Build signature from steps
+        $steps = iterator_to_array($plan->steps());
+        $firstStep = $steps[0];
+        $fullSignature = $firstStep->from();
+        foreach ($steps as $step) {
+            $fullSignature .= ' -> '.$step->to();
         }
 
-        $totalSpent = $path->totalSpent();
-        $totalReceived = $path->totalReceived();
-        $residualTolerance = $path->residualTolerancePercentage(4);
+        $totalSpent = $plan->totalSpent();
+        $totalReceived = $plan->totalReceived();
+        $residualTolerance = $plan->residualTolerance()->percentage(4);
 
         echo "  [{$position}] Route: {$fullSignature}\n";
-        echo "      - Hops: {$hopCount}\n";
+        echo "      - Steps: {$stepCount}\n";
         echo "      - Spent: {$totalSpent->amount()} {$totalSpent->currency()}\n";
         echo "      - Received: {$totalReceived->amount()} {$totalReceived->currency()}\n";
         echo "      - Residual Tolerance: {$residualTolerance}%\n";
@@ -479,7 +478,7 @@ try {
     $orderBook = createSampleOrderBook();
     $graphBuilder = new GraphBuilder();
     $strategy = new MinimizeHopsStrategy(6);
-    $service = new PathSearchService($graphBuilder, $strategy);
+    $service = new ExecutionPlanService($graphBuilder, $strategy);
 
     $config = PathSearchConfig::builder()
         ->withSpendAmount(Money::fromString('USD', '100.00', 2))
@@ -491,17 +490,17 @@ try {
     $results = [];
     for ($run = 1; $run <= 3; ++$run) {
         $request = new PathSearchRequest($orderBook, $config, 'EUR');
-        $resultSet = $service->findBestPaths($request);
+        $resultSet = $service->findBestPlans($request);
         $signatures = [];
-        $pathResultSet = $resultSet->paths();
-        foreach ($pathResultSet as $path) {
-            $hops = $path->hops();
-            if (count($hops) > 0) {
-                $hopArray = $hops->all();
-                $firstHop = $hopArray[0];
-                $signature = $firstHop->from();
-                foreach ($hopArray as $hop) {
-                    $signature .= ' -> '.$hop->to();
+        $planResultSet = $resultSet->paths();
+        foreach ($planResultSet as $plan) {
+            $stepCount = $plan->stepCount();
+            if ($stepCount > 0) {
+                $steps = iterator_to_array($plan->steps());
+                $firstStep = $steps[0];
+                $signature = $firstStep->from();
+                foreach ($steps as $step) {
+                    $signature .= ' -> '.$step->to();
                 }
                 $signatures[] = $signature;
             }

@@ -34,11 +34,11 @@ The library follows a three-layer architecture with strict dependency rules.
 
 ### Layer Overview
 
-| Layer           | Responsibility                               | Example Components                                        |
-|-----------------|----------------------------------------------|-----------------------------------------------------------|
-| **Domain**      | Business entities, value objects, invariants | `Money`, `Order`, `ExchangeRate`, `FeePolicy`             |
-| **Application** | Use cases, algorithms, orchestration         | `PathFinder`, `GraphBuilder`, `SearchGuards`              |
-| **Public API**  | Entry points, request/response DTOs          | `PathSearchService`, `SearchOutcome`, `Path`, `PathHop`   |
+| Layer | Responsibility | Example Components |
+|:------|:---------------|:-------------------|
+| **Domain** | Business entities, value objects, invariants | `Money`, `Order`, `ExchangeRate`, `FeePolicy` |
+| **Application** | Use cases, algorithms, orchestration | `ExecutionPlanSearchEngine`, `GraphBuilder`, `SearchGuards` |
+| **Public API** | Entry points, request/response DTOs | `ExecutionPlanService`, `SearchOutcome`, `ExecutionPlan`, `ExecutionStep` |
 
 ### Dependency Rule
 
@@ -50,18 +50,18 @@ The library follows a three-layer architecture with strict dependency rules.
 
 ### Component Interaction
 
-```
+```text
 User Code
     ↓
-PathSearchService (Public API)
+ExecutionPlanService (Public API)
     ↓
-┌────────────────────────────────┐
-│ 1. GraphBuilder                │ → Builds graph from OrderBook
-│ 2. PathFinder                  │ → Searches for optimal paths  
-│ 3. LegMaterializer             │ → Converts results to DTOs
-└────────────────────────────────┘
+┌────────────────────────────────────────────┐
+│ 1. GraphBuilder                            │ → Builds graph from OrderBook
+│ 2. ExecutionPlanSearchEngine               │ → Finds optimal execution plan  
+│ 3. ExecutionPlanMaterializer               │ → Converts results to DTOs
+└────────────────────────────────────────────┘
     ↓
-SearchOutcome (paths + guard report)
+SearchOutcome<ExecutionPlan> (plan + guard report)
 ```
 
 ---
@@ -94,9 +94,10 @@ See [Domain Invariants](domain-invariants.md) for complete specifications.
 ### Application Layer
 
 **Service Layer**:
-- `PathSearchService` - Main facade coordinating search
+- `ExecutionPlanService` - Public API facade for execution plan search
 - `PathSearchRequest` - Request DTO with order book + config
-- `LegMaterializer` - Converts search results to domain DTOs
+- `ExecutionPlanMaterializer` - Converts engine results to ExecutionPlan
+- `LegMaterializer` - Converts raw fills to execution steps
 - `ToleranceEvaluator` - Validates path tolerance compliance
 
 **Graph Construction**:
@@ -106,27 +107,24 @@ See [Domain Invariants](domain-invariants.md) for complete specifications.
 - `GraphEdge` - Represents order with capacity and segments
 
 **Search Algorithm** (Internal):
-- `PathFinder` - Dijkstra-like tolerance-aware search
-- `SearchState` - Immutable frontier state representation
-- `SearchStateRegistry` - Tracks visited states, dominance filtering
+- `ExecutionPlanSearchEngine` - Successive shortest augmenting paths algorithm
+- `PortfolioState` - Multi-currency balance tracking for split/merge
 - `SearchGuards` - Enforces resource limits (expansions, states, time)
-- `CandidateSearchOutcome` - Internal DTO for engine-to-service layer communication
 
 **Key Algorithm Features**:
-- Priority queue for cost-based exploration
-- State registry prevents cycles and dominance filtering  
+- Dijkstra-based augmenting path search
 - Guard rails prevent runaway searches
-- Segment pruning for fee optimization
+- **PortfolioState** enables multi-currency tracking for splits/merges
 
 ### Public API Layer
 
 **Entry Point**:
 ```php
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
 use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
 
-$service = new PathSearchService(new GraphBuilder());
-$outcome = $service->findBestPaths($request);
+$service = new ExecutionPlanService(new GraphBuilder());
+$outcome = $service->findBestPlans($request);
 ```
 
 **Configuration**:
@@ -141,26 +139,31 @@ $config = PathSearchConfig::builder()
 
 **Results**:
 ```php
-foreach ($outcome->paths() as $path) {
-    $path->totalSpent();           // Derived from first hop's spent amount
-    $path->totalReceived();        // Derived from last hop's received amount
-    $path->residualTolerance();    // Remaining tolerance headroom
-    $path->feeBreakdown();         // Aggregated MoneyMap across hops
+$plan = $outcome->bestPath();  // Single optimal ExecutionPlan or null
 
-    foreach ($path->hops() as $hop) {
-        $hop->from();              // Asset symbol
-        $hop->to();                // Asset symbol
-        $hop->order();             // Original Order driving this hop
-        $hop->fees();              // MoneyMap for hop-level fees
+if (null !== $plan) {
+    $plan->totalSpent();           // Sum of spends from source currency
+    $plan->totalReceived();        // Sum of receives into target currency
+    $plan->residualTolerance();    // Remaining tolerance headroom
+    $plan->feeBreakdown();         // Aggregated MoneyMap across steps
+    $plan->isLinear();             // Check if plan is a simple linear path
+    $plan->stepCount();            // Number of execution steps
+
+    foreach ($plan->steps() as $step) {
+        $step->from();             // Asset symbol
+        $step->to();               // Asset symbol
+        $step->order();            // Original Order driving this step
+        $step->fees();             // MoneyMap for step-level fees
+        $step->sequenceNumber();   // Execution order (1-based)
     }
 }
 
 $outcome->guardLimits()->anyLimitReached();  // Check guard status
 ```
 
-**Hop-centric model**: Each `Path` is derived from an ordered `PathHopCollection`. Totals (`totalSpent()`, `totalReceived()`),
-aggregated fees (`feeBreakdown()`), and remaining tolerance (`residualTolerance()`) are computed from the hop data, while each
-hop retains its originating `Order` for reconciliation.
+**Step-centric model**: Each `ExecutionPlan` is derived from an ordered `ExecutionStepCollection`. 
+Totals (`totalSpent()`, `totalReceived()`), aggregated fees (`feeBreakdown()`), and remaining tolerance are 
+computed from step data. Steps include `sequenceNumber()` for execution ordering and support split/merge topologies.
 
 ---
 
@@ -169,28 +172,71 @@ hop retains its originating `Order` for reconciliation.
 ### High-Level Flow
 
 1. **Graph Construction** - `GraphBuilder` converts `OrderBook` to graph
-2. **Search Initialization** - Create initial state at source currency
-3. **Search Loop** - Dijkstra-like expansion until target reached or limits hit
-4. **Result Materialization** - `LegMaterializer` converts paths to DTOs
+2. **Search Initialization** - Create `PortfolioState` with source currency balance
+3. **Augmenting Path Loop** - Find successive shortest paths until balance exhausted
+4. **Result Materialization** - `ExecutionPlanMaterializer` converts to `ExecutionPlan`
 5. **Outcome Assembly** - Combine results with guard report
 
-### Search Algorithm Steps
+### ExecutionPlanSearchEngine Algorithm
 
+The `ExecutionPlanSearchEngine` uses a **successive shortest augmenting paths** algorithm:
+
+```text
+1. Initialize PortfolioState with source currency balance
+2. While balance remains in non-target currencies AND guards allow:
+   a. Find cheapest augmenting path (Dijkstra from all currencies with balance)
+   b. Calculate bottleneck (maximum flow through path)
+   c. Execute flow along path:
+      - Deduct spent amounts from source currencies
+      - Add received amounts to target currencies
+      - Mark currencies as visited when depleted
+      - Record execution steps
+3. Return ExecutionPlanSearchOutcome with raw fills + guard report
+4. Service layer validates tolerance and creates SearchOutcome
 ```
-1. Initialize priority queue with start state
-2. While queue not empty and guards allow:
-   a. Dequeue state with lowest cost
-   b. If reached target:
-      - Create candidate path
-      - Add to result heap (top-K)
-   c. For each outgoing edge:
-      - Check feasibility (constraints, capacity)
-      - Calculate next state
-      - Check if dominated (registry)
-      - Enqueue if not dominated
-3. Return CandidateSearchOutcome with candidate paths + guard report
-4. Service layer materializes candidates to full `Path` objects
-5. Return SearchOutcome with materialized results + guard report
+
+**PortfolioState Invariants**:
+- Non-negative balances: All balances >= 0
+- Visited marking: Currency marked visited when balance depleted through spending
+- No backtracking: Cannot receive into visited currency (prevents cycles)
+- Order uniqueness: Each order used only once per portfolio state
+- Immutability: All operations return new instances
+
+### Split/Merge Flow Diagram
+
+```text
+Split at Source (A → B and A → C):
+┌─────┐     ┌─────┐
+│  A  │────▶│  B  │
+│(USD)│     │(EUR)│
+└──┬──┘     └─────┘
+   │
+   │        ┌─────┐
+   └───────▶│  C  │
+            │(GBP)│
+            └─────┘
+
+Merge at Target (B → D and C → D):
+┌─────┐     ┌─────┐
+│  B  │────▶│     │
+│(EUR)│     │  D  │
+└─────┘     │(BTC)│
+            │     │
+┌─────┐     │     │
+│  C  │────▶│     │
+│(GBP)│     └─────┘
+└─────┘
+
+Diamond Pattern (Split + Merge):
+           ┌─────┐
+      ┌───▶│  B  │───┐
+      │    │(EUR)│   │
+┌─────┤    └─────┘   ├──▶┌─────┐
+│  A  │              │   │  D  │
+│(USD)│    ┌─────┐   │   │(BTC)│
+└─────┤    │  C  │   │   └─────┘
+      └───▶│(GBP)│───┘
+           └─────┘
 ```
 
 ### Engine-to-Service Layer Communication
@@ -198,13 +244,12 @@ hop retains its originating `Order` for reconciliation.
 The search algorithm operates at two levels of abstraction to maintain clean separation of concerns:
 
 **Engine Layer** (`@internal`):
-- Works with `CandidatePath` objects containing raw search data (cost, product, hops, edge sequence)
-- Returns `CandidateSearchOutcome` - lightweight DTO for internal communication
+- Returns raw fill data (order, spend amount, sequence number)
 - Focus: Pure algorithmic search without domain object materialization
 
 **Service Layer** (Public API):
-- Consumes `CandidateSearchOutcome` from engine
-- Materializes `CandidatePath` objects into full `Path` objects with `PathHopCollection`
+- Consumes raw fill data from engine
+- Materializes fills into full `ExecutionPlan` objects with `ExecutionStepCollection`
 - Applies domain rules (fee calculation, tolerance validation, order reconciliation)
 - Returns `SearchOutcome` - public API DTO with complete domain objects
 
@@ -212,7 +257,6 @@ The search algorithm operates at two levels of abstraction to maintain clean sep
 - Engine remains focused on algorithmic efficiency (no domain object overhead)
 - Service layer handles complex domain logic (fees, materialization, validation)
 - Clear contract between layers enables independent testing and evolution
-- Internal `CandidateSearchOutcome` can change without breaking public API
 
 ### Key Optimizations
 
@@ -281,11 +325,12 @@ final readonly class Money
 **Used for**: Simplify complex subsystem
 
 ```php
-class PathSearchService  // Facade
+class ExecutionPlanService  // Facade
 {
-    public function findBestPaths(PathSearchRequest $request): SearchOutcome
+    public function findBestPlans(PathSearchRequest $request): SearchOutcome
     {
-        // Coordinates GraphBuilder, PathFinder, LegMaterializer, ToleranceEvaluator
+        // Coordinates GraphBuilder, ExecutionPlanSearchEngine, 
+        // ExecutionPlanMaterializer, ToleranceEvaluator
     }
 }
 ```
@@ -303,10 +348,7 @@ class OrderBook  // In-memory repository
 
 ### 6. Priority Queue Pattern
 
-**Used for**: Efficient best-first search
-
-- `SearchStatePriorityQueue` - Dijkstra-like lowest cost first
-- `CandidateResultHeap` - Top-K best paths
+**Used for**: Efficient best-first search in the execution plan engine
 
 ---
 
@@ -362,7 +404,7 @@ class MinimizeHopsStrategy implements PathOrderStrategy
 }
 
 // Use strategy
-$service = new PathSearchService($graphBuilder, new MinimizeHopsStrategy());
+$service = new ExecutionPlanService($graphBuilder, new MinimizeHopsStrategy());
 ```
 
 **Use cases**:
@@ -470,7 +512,6 @@ $config = PathSearchConfig::builder()
 
 **Avoid depending on**:
 - `Application\PathSearch\*` (except public API namespaces) - Search algorithm internals
-- `CandidateSearchOutcome` - Internal DTO for engine-to-service communication
 - Classes marked `@internal`
 
 **Why**: Internal APIs may change in MINOR versions for performance or implementation improvements.

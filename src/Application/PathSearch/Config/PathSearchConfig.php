@@ -7,7 +7,7 @@ namespace SomeWork\P2PPathFinder\Application\PathSearch\Config;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
-use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Tolerance\ToleranceWindow;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
@@ -16,7 +16,7 @@ use SomeWork\P2PPathFinder\Exception\PrecisionViolation;
 use function max;
 
 /**
- * Immutable configuration carrying constraints used by {@see PathSearchService}.
+ * Immutable configuration carrying constraints used by {@see ExecutionPlanService}.
  *
  * ## Invariants
  *
@@ -70,6 +70,7 @@ final class PathSearchConfig
         ?SearchGuardConfig $searchGuards = null,
         ?string $pathFinderToleranceOverride = null,
         bool $throwOnGuardLimit = false,
+        private readonly bool $disjointPlans = true,
     ) {
         if ($minimumHops < 1) {
             throw new InvalidInput('Minimum hops must be at least one.');
@@ -244,6 +245,21 @@ final class PathSearchConfig
     }
 
     /**
+     * Returns whether Top-K plans must use disjoint (non-overlapping) order sets.
+     *
+     * - true (default): Each plan uses completely different orders (independent fallbacks)
+     * - false: Plans can share orders (more alternatives, but not independent)
+     *
+     * When disabled (false), the algorithm uses penalty-based diversification to
+     * encourage variety while allowing order reuse across plans. This is useful
+     * for rate comparison scenarios where only one plan will actually execute.
+     */
+    public function disjointPlans(): bool
+    {
+        return $this->disjointPlans;
+    }
+
+    /**
      * @throws InvalidInput|PrecisionViolation when the override value does not represent a valid tolerance
      *
      * @return array{0: BigDecimal, 1: 'override'|'minimum'|'maximum'}
@@ -285,7 +301,7 @@ final class PathSearchConfig
     private static function decimalToString(BigDecimal $decimal, int $scale): string
     {
         /** @var numeric-string $result */
-        $result = $decimal->toScale($scale, RoundingMode::HALF_UP)->__toString();
+        $result = $decimal->toScale($scale, RoundingMode::HalfUp)->__toString();
 
         return $result;
     }

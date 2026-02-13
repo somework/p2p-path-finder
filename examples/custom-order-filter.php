@@ -18,8 +18,8 @@ require __DIR__.'/../vendor/autoload.php';
 
 use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
 use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
 use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
 use SomeWork\P2PPathFinder\Domain\Money\AssetPair;
 use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
@@ -336,11 +336,11 @@ echo 'Orders passing all filters: '.count($filteredOrders4)."\n";
 echo "  (Only orders meeting ALL criteria)\n\n";
 
 // ============================================================================
-// SCENARIO 5: Using filters with PathFinderService
+// SCENARIO 5: Using filters with ExecutionPlanService
 // ============================================================================
 
-echo "--- Scenario 5: Integration with PathFinderService ---\n";
-echo "Finding best path using fee-free orders only...\n\n";
+echo "--- Scenario 5: Integration with ExecutionPlanService ---\n";
+echo "Finding best execution plan using fee-free orders only...\n\n";
 
 // Pre-filter the order book
 $filteredForPathFinding = iterator_to_array($unfilteredBook->filter($feeFreeFilter));
@@ -352,30 +352,30 @@ $config = PathSearchConfig::builder()
     ->withHopLimits(1, 3)
     ->build();
 
-$service = new PathSearchService(new GraphBuilder());
+$service = new ExecutionPlanService(new GraphBuilder());
 $request = new PathSearchRequest($filteredBook, $config, 'EUR');
 
 try {
-    $outcome = $service->findBestPaths($request);
+    $outcome = $service->findBestPlans($request);
 
     if ($outcome->hasPaths()) {
-        $paths = $outcome->paths();
-        echo 'Found '.$paths->count()." path(s) using fee-free orders\n";
+        $plans = $outcome->paths();
+        echo 'Found '.$plans->count()." execution plan(s) using fee-free orders\n";
 
-        foreach ($paths as $idx => $path) {
+        foreach ($plans as $idx => $plan) {
             $num = $idx + 1;
-            echo "\nPath #{$num}:\n";
-            echo "  Spent: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()}\n";
-            echo "  Received: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
-            echo '  Hops: '.count($path->hopsAsArray())."\n";
+            echo "\nPlan #{$num}:\n";
+            echo "  Spent: {$plan->totalSpent()->amount()} {$plan->totalSpent()->currency()}\n";
+            echo "  Received: {$plan->totalReceived()->amount()} {$plan->totalReceived()->currency()}\n";
+            echo "  Steps: {$plan->stepCount()}\n";
 
-            foreach ($path->hopsAsArray() as $hopIdx => $hop) {
-                $hopNum = $hopIdx + 1;
-                echo "    Hop #{$hopNum}: {$hop->from()} -> {$hop->to()}\n";
+            foreach ($plan->steps() as $stepIdx => $step) {
+                $stepNum = $stepIdx + 1;
+                echo "    Step #{$stepNum}: {$step->from()} -> {$step->to()}\n";
             }
         }
     } else {
-        echo "No paths found with current filters.\n";
+        echo "No execution plans found with current filters.\n";
     }
 
     $guardReport = $outcome->guardLimits();
@@ -395,7 +395,7 @@ echo "1. Filters should be simple, focused, and stateless\n";
 echo "2. Always handle currency and scale normalization properly\n";
 echo "3. Use early returns for performance and clarity\n";
 echo "4. Compose multiple simple filters rather than one complex filter\n";
-echo "5. Filters integrate seamlessly with OrderBook and PathFinderService\n";
+echo "5. Filters integrate seamlessly with OrderBook and ExecutionPlanService\n";
 echo "6. Pre-filtering reduces graph size and improves search performance\n";
 
 exit(0); // Success

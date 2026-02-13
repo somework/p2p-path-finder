@@ -102,6 +102,6 @@ final class ToleranceWindowFilter implements OrderFilterInterface
     {
         self::assertScale($scale);
 
-        return $decimal->toScale($scale, RoundingMode::HALF_UP);
+        return $decimal->toScale($scale, RoundingMode::HalfUp);
     }
 }

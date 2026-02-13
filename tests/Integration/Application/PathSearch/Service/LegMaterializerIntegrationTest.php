@@ -64,7 +64,8 @@ final class LegMaterializerIntegrationTest extends TestCase
         self::assertSame('EUR', $materialized['totalSpent']->currency());
         self::assertSame('100.000', $materialized['totalSpent']->amount());
         self::assertSame('JPY', $materialized['totalReceived']->currency());
-        self::assertSame('16665.000', $materialized['totalReceived']->amount());
+        // 100 / 0.9 = 111.111 USD (at scale 3) * 150 = 16666.650 JPY (improved precision with direct division)
+        self::assertSame('16666.650', $materialized['totalReceived']->amount());
         self::assertCount(2, $materialized['hops']);
         self::assertSame('100.000', $materialized['toleranceSpent']->amount());
     }

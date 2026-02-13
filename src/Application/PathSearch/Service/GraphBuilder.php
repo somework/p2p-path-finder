@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathSearch\Service;
 
-use SomeWork\P2PPathFinder\Application\PathSearch\Engine\PathSearchEngine;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\EdgeCapacity;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\EdgeSegment;
 use SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph\Graph;
@@ -26,8 +25,7 @@ use function sort;
  * Converts a collection of domain orders into a weighted directed graph representation.
  *
  * @see Graph For the resulting graph structure
- * @see PathSearchEngine For how the graph is traversed
- * @see PathSearchService For orchestration
+ * @see ExecutionPlanService For orchestration
  *
  * @api
  */

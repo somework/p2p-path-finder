@@ -322,6 +322,209 @@ final class GraphEdgeTest extends TestCase
         );
     }
 
+    // ========================================================================
+    // withCapacityPenalty TESTS
+    // ========================================================================
+
+    public function test_with_capacity_penalty_returns_self_for_zero_usage_count(): void
+    {
+        $fixture = $this->createEdgeFixture();
+        $edge = $fixture['edge'];
+
+        $penalized = $edge->withCapacityPenalty(0, '0.15');
+
+        self::assertSame($edge, $penalized);
+    }
+
+    public function test_with_capacity_penalty_returns_self_for_negative_usage_count(): void
+    {
+        $fixture = $this->createEdgeFixture();
+        $edge = $fixture['edge'];
+
+        $penalized = $edge->withCapacityPenalty(-1, '0.15');
+
+        self::assertSame($edge, $penalized);
+    }
+
+    public function test_with_capacity_penalty_reduces_max_capacity(): void
+    {
+        $fixture = $this->createEdgeFixture();
+        $edge = $fixture['edge'];
+
+        // Original max: 5.000 USD
+        // Penalty factor: 0.15 (15%)
+        // Usage count: 1
+        // Divisor = 1 + (1 * 0.15) = 1.15
+        // Penalized max = 5.000 / 1.15 ≈ 4.348
+
+        $penalized = $edge->withCapacityPenalty(1, '0.15');
+
+        self::assertNotSame($edge, $penalized);
+
+        // Max should be reduced
+        $originalMax = $edge->baseCapacity()->max()->decimal();
+        $penalizedMax = $penalized->baseCapacity()->max()->decimal();
+        self::assertTrue($penalizedMax->isLessThan($originalMax));
+
+        // Min should be unchanged
+        self::assertTrue($penalized->baseCapacity()->min()->equals($edge->baseCapacity()->min()));
+    }
+
+    public function test_with_capacity_penalty_preserves_order_reference(): void
+    {
+        $fixture = $this->createEdgeFixture();
+        $edge = $fixture['edge'];
+
+        $penalized = $edge->withCapacityPenalty(1, '0.15');
+
+        // Order reference should be the same object
+        self::assertSame($edge->order(), $penalized->order());
+    }
+
+    public function test_with_capacity_penalty_preserves_rate(): void
+    {
+        $fixture = $this->createEdgeFixture();
+        $edge = $fixture['edge'];
+
+        $penalized = $edge->withCapacityPenalty(1, '0.15');
+
+        // Rate should be unchanged
+        self::assertSame($edge->rate(), $penalized->rate());
+    }
+
+    public function test_with_capacity_penalty_preserves_from_to(): void
+    {
+        $fixture = $this->createEdgeFixture();
+        $edge = $fixture['edge'];
+
+        $penalized = $edge->withCapacityPenalty(1, '0.15');
+
+        self::assertSame($edge->from(), $penalized->from());
+        self::assertSame($edge->to(), $penalized->to());
+    }
+
+    public function test_with_capacity_penalty_increases_with_usage_count(): void
+    {
+        $fixture = $this->createEdgeFixture();
+        $edge = $fixture['edge'];
+
+        $penalized1 = $edge->withCapacityPenalty(1, '0.15');
+        $penalized2 = $edge->withCapacityPenalty(2, '0.15');
+        $penalized3 = $edge->withCapacityPenalty(3, '0.15');
+
+        $max1 = $penalized1->baseCapacity()->max()->decimal();
+        $max2 = $penalized2->baseCapacity()->max()->decimal();
+        $max3 = $penalized3->baseCapacity()->max()->decimal();
+
+        // Higher usage count = more penalty = lower max
+        self::assertTrue($max1->isGreaterThan($max2));
+        self::assertTrue($max2->isGreaterThan($max3));
+    }
+
+    public function test_with_capacity_penalty_caps_at_maximum_divisor(): void
+    {
+        // Edge where min is low enough that originalMax/10 is still >= min,
+        // so we can verify divisor is capped at 10 (penalized max = original max / 10)
+        $order = OrderFactory::sell(
+            base: 'USD',
+            quote: 'EUR',
+            minAmount: '0.100',
+            maxAmount: '5.000',
+            rate: '0.900',
+            amountScale: 3,
+            rateScale: 3,
+        );
+        $edge = new GraphEdge(
+            from: 'USD',
+            to: 'EUR',
+            orderSide: OrderSide::SELL,
+            order: $order,
+            rate: $order->effectiveRate(),
+            baseCapacity: new EdgeCapacity(
+                Money::fromString('USD', '0.100', 3),
+                Money::fromString('USD', '5.000', 3),
+            ),
+            quoteCapacity: new EdgeCapacity(
+                Money::fromString('EUR', '0.090', 3),
+                Money::fromString('EUR', '4.500', 3),
+            ),
+            grossBaseCapacity: new EdgeCapacity(
+                Money::fromString('USD', '0.100', 3),
+                Money::fromString('USD', '5.000', 3),
+            ),
+        );
+
+        // usageCount=100, factor=0.15 -> divisor = 1 + 15 = 16 > 10, capped at 10
+        $penalized = $edge->withCapacityPenalty(100, '0.15');
+
+        $originalMax = $edge->baseCapacity()->max()->decimal();
+        $penalizedMax = $penalized->baseCapacity()->max()->decimal();
+        $expectedCappedMax = $originalMax->dividedBy(10, 3); // 5.000 / 10 = 0.5
+
+        // Divisor is capped at 10: penalized max should equal original max / 10
+        self::assertTrue($penalizedMax->isEqualTo($expectedCappedMax));
+        self::assertTrue($penalizedMax->isGreaterThanOrEqualTo($edge->baseCapacity()->min()->decimal()));
+    }
+
+    public function test_with_capacity_penalty_does_not_go_below_min(): void
+    {
+        // Create an edge where severe penalty would push max below min
+        $order = OrderFactory::sell(
+            base: 'USD',
+            quote: 'EUR',
+            minAmount: '4.000',  // High min
+            maxAmount: '5.000',  // Low max
+            rate: '0.900',
+            amountScale: 3,
+            rateScale: 3,
+        );
+
+        $edge = new GraphEdge(
+            from: 'USD',
+            to: 'EUR',
+            orderSide: OrderSide::SELL,
+            order: $order,
+            rate: $order->effectiveRate(),
+            baseCapacity: new EdgeCapacity(
+                Money::fromString('USD', '4.000', 3),  // Min close to max
+                Money::fromString('USD', '5.000', 3),
+            ),
+            quoteCapacity: new EdgeCapacity(
+                Money::fromString('EUR', '3.600', 3),
+                Money::fromString('EUR', '4.500', 3),
+            ),
+            grossBaseCapacity: new EdgeCapacity(
+                Money::fromString('USD', '4.000', 3),
+                Money::fromString('USD', '5.000', 3),
+            ),
+        );
+
+        // Apply heavy penalty that would theoretically push max below min
+        $penalized = $edge->withCapacityPenalty(10, '0.50');
+
+        // Max should be clamped to min, not go below
+        $penalizedMax = $penalized->baseCapacity()->max();
+        $originalMin = $edge->baseCapacity()->min();
+
+        self::assertTrue(
+            $penalizedMax->greaterThan($originalMin) || $penalizedMax->equals($originalMin),
+            'Penalized max should be >= original min'
+        );
+    }
+
+    public function test_with_capacity_penalty_affects_all_capacity_types(): void
+    {
+        $fixture = $this->createEdgeFixture();
+        $edge = $fixture['edge'];
+
+        $penalized = $edge->withCapacityPenalty(1, '0.15');
+
+        // All capacity types should be penalized
+        self::assertTrue($penalized->baseCapacity()->max()->lessThan($edge->baseCapacity()->max()));
+        self::assertTrue($penalized->quoteCapacity()->max()->lessThan($edge->quoteCapacity()->max()));
+        self::assertTrue($penalized->grossBaseCapacity()->max()->lessThan($edge->grossBaseCapacity()->max()));
+    }
+
     /**
      * @return array{
      *     edge: GraphEdge,

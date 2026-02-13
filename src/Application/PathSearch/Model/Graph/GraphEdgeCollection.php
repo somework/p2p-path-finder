@@ -157,6 +157,74 @@ final class GraphEdgeCollection implements Countable, IteratorAggregate
     }
 
     /**
+     * Returns a new collection excluding edges whose orders are in the exclusion set.
+     *
+     * @param array<int, true> $excludedOrderIds Order object IDs to exclude (spl_object_id)
+     *
+     * @return self New collection without the excluded edges
+     */
+    public function withoutOrders(array $excludedOrderIds): self
+    {
+        if ([] === $excludedOrderIds || [] === $this->edges) {
+            return $this;
+        }
+
+        $filtered = [];
+        foreach ($this->edges as $edge) {
+            $orderId = spl_object_id($edge->order());
+            if (!isset($excludedOrderIds[$orderId])) {
+                $filtered[] = $edge;
+            }
+        }
+
+        if ([] === $filtered) {
+            return self::empty();
+        }
+
+        if (count($filtered) === count($this->edges)) {
+            return $this;
+        }
+
+        return new self($filtered, $this->originCurrency, $this->comparator);
+    }
+
+    /**
+     * Returns a new collection with capacity penalties applied to specified orders.
+     *
+     * @param array<int, int> $usageCounts   Order object ID => usage count
+     * @param string          $penaltyFactor Penalty multiplier per usage
+     *
+     * @return self New collection with penalized edges
+     */
+    public function withOrderPenalties(array $usageCounts, string $penaltyFactor): self
+    {
+        if ([] === $usageCounts || [] === $this->edges) {
+            return $this;
+        }
+
+        $penalized = [];
+        $changed = false;
+
+        foreach ($this->edges as $edge) {
+            $orderId = spl_object_id($edge->order());
+            $usageCount = $usageCounts[$orderId] ?? 0;
+
+            if ($usageCount > 0) {
+                $penalized[] = $edge->withCapacityPenalty($usageCount, $penaltyFactor);
+                $changed = true;
+            } else {
+                $penalized[] = $edge;
+            }
+        }
+
+        if (!$changed) {
+            return $this;
+        }
+
+        return new self($penalized, $this->originCurrency, $this->comparator);
+    }
+
+    /**
      * Canonical comparator ordering edges by quote currency, serialized order payload, then side.
      *
      * @return Closure(GraphEdge, GraphEdge): int

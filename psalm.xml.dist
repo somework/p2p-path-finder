@@ -5,7 +5,6 @@
     resolveFromConfigFile="true"
     findUnusedPsalmSuppress="true"
     findUnusedBaselineEntry="true"
-    totallyTyped="true"
     findUnusedCode="false"
     autoloader="vendor/autoload.php"
 >

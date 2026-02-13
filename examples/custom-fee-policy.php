@@ -20,8 +20,8 @@ require __DIR__.'/../vendor/autoload.php';
 
 use SomeWork\P2PPathFinder\Application\PathSearch\Api\Request\PathSearchRequest;
 use SomeWork\P2PPathFinder\Application\PathSearch\Config\PathSearchConfig;
+use SomeWork\P2PPathFinder\Application\PathSearch\Service\ExecutionPlanService;
 use SomeWork\P2PPathFinder\Application\PathSearch\Service\GraphBuilder;
-use SomeWork\P2PPathFinder\Application\PathSearch\Service\PathSearchService;
 use SomeWork\P2PPathFinder\Domain\Money\AssetPair;
 use SomeWork\P2PPathFinder\Domain\Money\ExchangeRate;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
@@ -401,7 +401,7 @@ function demonstrateFeePolicy(string $name, FeePolicy $feePolicy): void
 
     $orderBook = createOrderBookWithFees($feePolicy);
     $graphBuilder = new GraphBuilder();
-    $service = new PathSearchService($graphBuilder);
+    $service = new ExecutionPlanService($graphBuilder);
 
     $config = PathSearchConfig::builder()
         ->withSpendAmount(Money::fromString('USD', '100.00', 2))
@@ -411,45 +411,48 @@ function demonstrateFeePolicy(string $name, FeePolicy $feePolicy): void
         ->build();
 
     $request = new PathSearchRequest($orderBook, $config, 'EUR');
-    $resultSet = $service->findBestPaths($request);
+    $resultSet = $service->findBestPlans($request);
 
     if (!$resultSet->hasPaths()) {
-        echo "No paths found.\n";
+        echo "No execution plans found.\n";
 
         return;
     }
 
-    $pathResultSet = $resultSet->paths();
-    echo 'Found '.count($pathResultSet)." path(s):\n\n";
+    $planResultSet = $resultSet->paths();
+    echo 'Found '.count($planResultSet)." execution plan(s):\n\n";
 
     $position = 1;
-    foreach ($pathResultSet as $path) {
-        $hopArray = $path->hopsAsArray();
+    foreach ($planResultSet as $plan) {
+        $stepCount = $plan->stepCount();
 
-        if (empty($hopArray)) {
+        if (0 === $stepCount) {
             continue;
         }
 
-        // Build route signature
-        $firstHop = $hopArray[0];
-        $signature = $firstHop->from();
-        foreach ($hopArray as $hop) {
-            $signature .= ' -> '.$hop->to();
+        // Build route signature from steps
+        $steps = iterator_to_array($plan->steps());
+        $firstStep = $steps[0];
+        $signature = $firstStep->from();
+        foreach ($steps as $step) {
+            $signature .= ' -> '.$step->to();
         }
 
-        // Calculate total fees
-        $totalFees = $path->feeBreakdownAsArray();
+        // Calculate total fees from steps
         $feeStrings = [];
-        foreach ($totalFees as $currency => $moneyObject) {
-            if (!$moneyObject->isZero()) {
-                $feeStrings[] = sprintf('%s %s', $moneyObject->amount(), $currency);
+        foreach ($steps as $step) {
+            $fees = $step->fees();
+            foreach ($fees as $currency => $fee) {
+                if (!$fee->isZero()) {
+                    $feeStrings[] = sprintf('%s %s', $fee->amount(), $currency);
+                }
             }
         }
 
         echo "  [{$position}] Route: {$signature}\n";
-        echo '      - Hops: '.count($hopArray)."\n";
-        echo "      - Spent: {$path->totalSpent()->amount()} {$path->totalSpent()->currency()}\n";
-        echo "      - Received: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
+        echo "      - Steps: {$stepCount}\n";
+        echo "      - Spent: {$plan->totalSpent()->amount()} {$plan->totalSpent()->currency()}\n";
+        echo "      - Received: {$plan->totalReceived()->amount()} {$plan->totalReceived()->currency()}\n";
         echo '      - Total Fees: '.(empty($feeStrings) ? 'None' : implode(', ', $feeStrings))."\n";
         echo "\n";
 
@@ -491,7 +494,7 @@ try {
         ),
     ]);
 
-    $service = new PathSearchService(new GraphBuilder());
+    $service = new ExecutionPlanService(new GraphBuilder());
     $config = PathSearchConfig::builder()
         ->withSpendAmount(Money::fromString('USD', '100.00', 2))
         ->withToleranceBounds('0.00', '0.05')
@@ -500,11 +503,11 @@ try {
         ->build();
 
     $request = new PathSearchRequest($orderBookNoFees, $config, 'EUR');
-    $resultSet = $service->findBestPaths($request);
+    $resultSet = $service->findBestPlans($request);
 
     if ($resultSet->hasPaths()) {
-        $path = iterator_to_array($resultSet->paths())[0];
-        echo "Received: {$path->totalReceived()->amount()} {$path->totalReceived()->currency()}\n";
+        $plan = iterator_to_array($resultSet->paths())[0];
+        echo "Received: {$plan->totalReceived()->amount()} {$plan->totalReceived()->currency()}\n";
         echo "(This is the baseline amount without any fees)\n";
     }
 

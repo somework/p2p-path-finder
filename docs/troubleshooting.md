@@ -34,7 +34,7 @@ Quick solutions to common issues when using the P2P Path Finder library.
 
 **Diagnostic Steps**:
 ```php
-$outcome = $service->findBestPaths($request);
+$outcome = $service->findBestPlans($request);
 $report = $outcome->guardLimits();
 
 echo "Expansions: {$report->expansions()}\n";
@@ -167,7 +167,7 @@ $config = PathSearchConfig::builder()
 **Diagnostic**:
 ```php
 $start = microtime(true);
-$outcome = $service->findBestPaths($request);
+$outcome = $service->findBestPlans($request);
 $elapsed = (microtime(true) - $start) * 1000;
 
 echo "Time: {$elapsed}ms\n";
@@ -364,7 +364,7 @@ echo "Currencies: " . implode(', ', $uniqueCurrencies) . "\n";
 
 ### 4. Enable Verbose Logging
 ```php
-$outcome = $service->findBestPaths($request);
+$outcome = $service->findBestPlans($request);
 $report = $outcome->guardLimits();
 
 error_log(json_encode([
@@ -399,7 +399,7 @@ $config = PathSearchConfig::builder()
     ->build();
 
 $request = new PathSearchRequest($orderBook, $config, 'BTC');
-$outcome = $service->findBestPaths($request);
+$outcome = $service->findBestPlans($request);
 
 // Should find exactly 1 path
 assert($outcome->paths()->count() === 1);

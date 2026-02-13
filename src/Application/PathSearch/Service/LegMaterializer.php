@@ -206,15 +206,29 @@ final class LegMaterializer
         $bounds = $order->bounds();
 
         if (null === $order->feePolicy()) {
-            $rate = $order->effectiveRate()->invert();
-            $scale = max(
+            // For SELL: taker spends quote (e.g., RUB), receives base (e.g., USDT)
+            // received = spent / rate (where rate is base/quote, e.g., USDT/RUB = 95)
+            // Using direct division preserves precision (rate inversion can lose precision)
+            $rate = $order->effectiveRate();
+
+            // Output scale matches input precision requirements
+            $outputScale = max(
                 $targetEffectiveQuote->scale(),
                 $bounds->min()->scale(),
                 $rate->scale(),
             );
 
-            $spent = $targetEffectiveQuote->withScale($scale);
-            $received = $rate->convert($spent, $scale);
+            // Working scale uses higher precision for accurate calculation
+            $workingScale = max($outputScale, self::SELL_RESOLUTION_COMPARISON_SCALE);
+
+            $spent = $targetEffectiveQuote->withScale($outputScale);
+            // Direct division: base_amount = quote_amount / rate (use high precision, then scale result)
+            $receivedDecimal = $targetEffectiveQuote->decimal()->dividedBy($rate->decimal(), $workingScale, RoundingMode::HalfUp);
+            $received = Money::fromString(
+                $order->assetPair()->base(),
+                self::decimalToString($receivedDecimal, $outputScale),
+                $outputScale
+            );
 
             if (!$bounds->contains($received->withScale(max($received->scale(), $bounds->min()->scale())))) {
                 // Received amount falls outside order bounds
@@ -418,7 +432,7 @@ final class LegMaterializer
             }
 
             $divisionScale = $ratioScale + self::BUY_ADJUSTMENT_RATIO_EXTRA_SCALE;
-            $ratio = $ceilingDecimal->dividedBy($grossDecimal, $divisionScale, RoundingMode::HALF_UP);
+            $ratio = $ceilingDecimal->dividedBy($grossDecimal, $divisionScale, RoundingMode::HalfUp);
 
             if ($ratio->isZero()) {
                 // Adjustment ratio collapsed to zero - cannot make progress
@@ -555,7 +569,7 @@ final class LegMaterializer
 
         $difference = $actualDecimal->minus($targetDecimal)->abs();
         $relativeScale = $comparisonScale + self::SELL_RESOLUTION_RATIO_EXTRA_SCALE;
-        $relative = $difference->dividedBy($targetDecimal->abs(), $relativeScale, RoundingMode::HALF_UP);
+        $relative = $difference->dividedBy($targetDecimal->abs(), $relativeScale, RoundingMode::HalfUp);
 
         $tolerance = self::scaleDecimal(
             BigDecimal::of(self::SELL_RESOLUTION_RELATIVE_TOLERANCE),
@@ -587,7 +601,7 @@ final class LegMaterializer
         }
 
         $ratioScale = $scale + self::SELL_RESOLUTION_RATIO_EXTRA_SCALE;
-        $ratio = $targetDecimal->dividedBy($actualDecimal, $ratioScale, RoundingMode::HALF_UP);
+        $ratio = $targetDecimal->dividedBy($actualDecimal, $ratioScale, RoundingMode::HalfUp);
 
         return self::decimalToString($ratio, $ratioScale);
     }
