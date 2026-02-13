@@ -22,7 +22,11 @@ use function array_key_exists;
 use function array_keys;
 use function array_push;
 use function array_reverse;
+use function str_pad;
 use function strtoupper;
+use function strtr;
+
+use const STR_PAD_LEFT;
 
 /**
  * Execution plan search engine implementing successive shortest augmenting paths algorithm.
@@ -300,7 +304,7 @@ final class ExecutionPlanSearchEngine
                     continue;
                 }
 
-                if (null === $bestCost || $edgeCost->isGreaterThan($bestCost)) {
+                if (null === $bestCost || $edgeCost->isLessThan($bestCost)) {
                     $bestCost = $edgeCost;
                     $bestEdge = $edge;
                 }
@@ -406,8 +410,10 @@ final class ExecutionPlanSearchEngine
         /** @var array<string, string> $startCurrencyMap */
         $startCurrencyMap = [];
 
-        // Priority queue: [cost, currency, insertOrder]
-        /** @var \SplPriorityQueue<array{0: int, 1: int}, string> $queue */
+        // Priority queue: [costString, insertOrder]
+        // SplPriorityQueue is a max-heap; we invert cost via string complement
+        // to achieve min-heap behavior without integer overflow.
+        /** @var \SplPriorityQueue<array{0: string, 1: int}, string> $queue */
         $queue = new \SplPriorityQueue();
         $queue->setExtractFlags(\SplPriorityQueue::EXTR_BOTH);
 
@@ -419,9 +425,8 @@ final class ExecutionPlanSearchEngine
             $prev[$currency] = null;
             $startCurrencyMap[$currency] = $currency;
 
-            // Priority is negative cost (SplPriorityQueue is max-heap)
-            // Use array [-cost_major, -insertOrder] for tie-breaking
-            $queue->insert($currency, [-1, -$insertOrder++]);
+            // Use string complement for min-heap: lower cost → higher complement → extracted first
+            $queue->insert($currency, [self::costToMinHeapKey(BigDecimal::one()), -$insertOrder++]);
         }
 
         $bestPath = null;
@@ -432,7 +437,7 @@ final class ExecutionPlanSearchEngine
         $visited = [];
 
         while (!$queue->isEmpty()) {
-            /** @var array{priority: array{0: int, 1: int}, data: string} $extracted */
+            /** @var array{priority: array{0: string, 1: int}, data: string} $extracted */
             $extracted = $queue->extract();
             $current = $extracted['data'];
 
@@ -511,12 +516,8 @@ final class ExecutionPlanSearchEngine
                     $prev[$nextCurrency] = ['edge' => $edge, 'prev' => $current];
                     $startCurrencyMap[$nextCurrency] = $startCurrencyMap[$current] ?? $current;
 
-                    // Insert with negative cost for min-heap behavior
-                    // Use floor to avoid rounding issues
-                    $costForPriority = $newCost->multipliedBy(BigDecimal::of(1000000))
-                        ->toScale(0, RoundingMode::Floor);
-                    $costInt = $costForPriority->toInt();
-                    $queue->insert($nextCurrency, [-$costInt, -$insertOrder++]);
+                    // Use string complement for min-heap: lower cost → higher complement → extracted first
+                    $queue->insert($nextCurrency, [self::costToMinHeapKey($newCost), -$insertOrder++]);
                 }
             }
         }
@@ -821,5 +822,32 @@ final class ExecutionPlanSearchEngine
             $spent->decimal()->dividedBy($received->decimal(), self::SCALE, RoundingMode::HalfUp),
             self::SCALE
         );
+    }
+
+    /**
+     * Converts a BigDecimal cost to a string key for min-heap ordering in SplPriorityQueue.
+     *
+     * SplPriorityQueue is a max-heap, so we produce a 9's complement of the cost
+     * scaled to a fixed-width integer string. Lower costs produce higher complement
+     * values and are therefore extracted first.
+     *
+     * This avoids the integer overflow that occurs when converting large BigDecimal
+     * values to PHP int via toInt().
+     */
+    private static function costToMinHeapKey(BigDecimal $cost): string
+    {
+        // Scale to a fixed-precision integer string (SCALE decimal digits → integer of that width)
+        $scaled = $cost->multipliedBy(BigDecimal::ten()->power(self::SCALE))
+            ->toScale(0, RoundingMode::Floor);
+
+        // Zero-pad to fixed width so lexicographic order matches numeric order.
+        // 36 + SCALE digits covers costs up to 10^36 which is far beyond any realistic value.
+        $width = 36 + self::SCALE;
+        $padded = str_pad($scaled->__toString(), $width, '0', STR_PAD_LEFT);
+
+        // 9's complement: invert each digit so that lower cost → higher string → extracted first
+        $complement = strtr($padded, '0123456789', '9876543210');
+
+        return $complement;
     }
 }
