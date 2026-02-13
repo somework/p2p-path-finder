@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Top-K Execution Plan Discovery**: `ExecutionPlanService::findBestPlans()` now returns up to K distinct execution plans
   - Configure via `PathSearchConfig::withResultLimit(K)` (default: 1 for backward compatibility)
-  - Each plan uses **completely disjoint order sets** - no order appears in multiple plans
+  - **Disjoint mode** (default, `withDisjointPlans(true)`): each plan uses completely disjoint order sets — no order appears in multiple plans
+  - **Reusable mode** (`withDisjointPlans(false)`): plans may share orders with penalty-based diversification, useful for rate comparison scenarios
   - Plans are ranked by cost (best/cheapest first)
   - If fewer than K alternatives exist, returns as many as found
   - Guard metrics (expansions, visited states, elapsed time) are aggregated across all K iterations
