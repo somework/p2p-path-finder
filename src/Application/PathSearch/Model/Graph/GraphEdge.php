@@ -162,9 +162,12 @@ final class GraphEdge implements IteratorAggregate
             $penalizedMaxDecimal = $minDecimal;
         }
 
+        /** @var numeric-string $penalizedAmount */
+        $penalizedAmount = $penalizedMaxDecimal->toScale($originalMax->scale(), RoundingMode::HalfUp)->__toString();
+
         $penalizedMax = Money::fromString(
             $originalMax->currency(),
-            $penalizedMaxDecimal->toScale($originalMax->scale(), RoundingMode::HalfUp)->__toString(),
+            $penalizedAmount,
             $originalMax->scale()
         );
 

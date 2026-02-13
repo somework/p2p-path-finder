@@ -370,8 +370,6 @@ final class Money
     /**
      * @psalm-mutation-free
      *
-     * @psalm-suppress ImpureMethodCall BigDecimal is immutable, __toString returns string representation
-     *
      * @return numeric-string
      */
     private static function decimalToString(BigDecimal $decimal, int $scale): string
