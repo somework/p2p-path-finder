@@ -13,6 +13,7 @@ use SomeWork\P2PPathFinder\Application\PathSearch\Service\LegMaterializer;
 use SomeWork\P2PPathFinder\Application\PathSearch\Support\OrderFillEvaluator;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Tolerance\DecimalTolerance;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use SomeWork\P2PPathFinder\Tests\Fixture\FeePolicyFactory;
 use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
@@ -243,65 +244,69 @@ final class ExecutionPlanMaterializerTest extends TestCase
         self::assertSame(7, $steps[1]->sequenceNumber());
     }
 
-    public function test_returns_null_for_invalid_currency(): void
+    public function test_throws_for_invalid_currency(): void
     {
         // BUY order expects spend in base currency (USDT), but we provide wrong currency (RUB)
         $order = OrderFactory::buy('USDT', 'RUB', '10.00', '1000.00', '90.00', 2, 2);
         $wrongSpend = Money::fromString('RUB', '9000.00', 2);
 
-        $result = $this->materializer->materialize(
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Spend currency "RUB" does not match expected source currency "USDT" for BUY order.');
+
+        $this->materializer->materialize(
             [['order' => $order, 'spend' => $wrongSpend, 'sequence' => 1]],
             'RUB',
             'USDT',
             DecimalTolerance::fromNumericString('0.01'),
         );
-
-        self::assertNull($result);
     }
 
-    public function test_returns_null_for_zero_spend(): void
+    public function test_throws_for_zero_spend(): void
     {
         $order = OrderFactory::buy('USDT', 'RUB', '10.00', '1000.00', '90.00', 2, 2);
         $zeroSpend = Money::fromString('USDT', '0.00', 2);
 
-        $result = $this->materializer->materialize(
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Cannot process order fill with zero spend amount.');
+
+        $this->materializer->materialize(
             [['order' => $order, 'spend' => $zeroSpend, 'sequence' => 1]],
             'USDT',
             'RUB',
             DecimalTolerance::fromNumericString('0.01'),
         );
-
-        self::assertNull($result);
     }
 
-    public function test_returns_null_for_invalid_sequence(): void
+    public function test_throws_for_invalid_sequence(): void
     {
         $order = OrderFactory::buy('USDT', 'RUB', '10.00', '1000.00', '90.00', 2, 2);
         $spend = Money::fromString('USDT', '100.00', 2);
 
-        $result = $this->materializer->materialize(
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Execution step sequence number must be at least 1, got: 0');
+
+        $this->materializer->materialize(
             [['order' => $order, 'spend' => $spend, 'sequence' => 0]],
             'USDT',
             'RUB',
             DecimalTolerance::fromNumericString('0.01'),
         );
-
-        self::assertNull($result);
     }
 
-    public function test_returns_null_for_negative_sequence(): void
+    public function test_throws_for_negative_sequence(): void
     {
         $order = OrderFactory::buy('USDT', 'RUB', '10.00', '1000.00', '90.00', 2, 2);
         $spend = Money::fromString('USDT', '100.00', 2);
 
-        $result = $this->materializer->materialize(
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Execution step sequence number must be at least 1, got: -1');
+
+        $this->materializer->materialize(
             [['order' => $order, 'spend' => $spend, 'sequence' => -1]],
             'USDT',
             'RUB',
             DecimalTolerance::fromNumericString('0.01'),
         );
-
-        self::assertNull($result);
     }
 
     public function test_aggregates_fees_correctly(): void
@@ -515,7 +520,7 @@ final class ExecutionPlanMaterializerTest extends TestCase
         self::assertTrue($result->isLinear());
     }
 
-    public function test_returns_null_when_any_fill_fails(): void
+    public function test_throws_when_any_fill_has_currency_mismatch(): void
     {
         // First fill is valid
         $order1 = OrderFactory::buy('USD', 'BTC', '50.00', '500.00', '0.00002', 2, 8);
@@ -528,14 +533,15 @@ final class ExecutionPlanMaterializerTest extends TestCase
             ['order' => $order2, 'spend' => Money::fromString('USDT', '80.00', 2), 'sequence' => 2],
         ];
 
-        $result = $this->materializer->materialize(
+        $this->expectException(InvalidInput::class);
+        $this->expectExceptionMessage('Spend currency "USDT" does not match expected source currency "BTC" for BUY order.');
+
+        $this->materializer->materialize(
             $fills,
             'USD',
             'USDT',
             DecimalTolerance::fromNumericString('0.01'),
         );
-
-        self::assertNull($result);
     }
 
     public function test_high_precision_amounts(): void

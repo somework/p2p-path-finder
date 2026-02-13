@@ -14,8 +14,10 @@ use SomeWork\P2PPathFinder\Domain\Order\Fee\FeeBreakdown;
 use SomeWork\P2PPathFinder\Domain\Order\Order;
 use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Domain\Tolerance\DecimalTolerance;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 use function max;
+use function sprintf;
 
 /**
  * Materializes raw order fills from the search engine into a structured ExecutionPlan.
@@ -47,7 +49,7 @@ final class ExecutionPlanMaterializer
      * @param string                                                 $targetCurrency the destination currency of the path
      * @param DecimalTolerance                                       $tolerance      residual tolerance for the plan
      *
-     * @throws \SomeWork\P2PPathFinder\Exception\InvalidInput when steps don't match source/target currencies
+     * @throws InvalidInput when steps don't match source/target currencies
      *
      * @return ExecutionPlan|null null if fills are empty or any fill cannot be materialized
      */
@@ -95,11 +97,11 @@ final class ExecutionPlanMaterializer
     private function processOrderFill(Order $order, Money $spend, int $sequence): ?ExecutionStep
     {
         if ($sequence < 1) {
-            return null;
+            throw new InvalidInput(sprintf('Execution step sequence number must be at least 1, got: %d', $sequence));
         }
 
         if ($spend->isZero()) {
-            return null;
+            throw new InvalidInput('Cannot process order fill with zero spend amount.');
         }
 
         $pair = $order->assetPair();
@@ -128,7 +130,7 @@ final class ExecutionPlanMaterializer
 
         // Validate spend currency matches expected source for BUY orders
         if ($spendCurrency !== $expectedFrom) {
-            return null;
+            throw new InvalidInput(sprintf('Spend currency "%s" does not match expected source currency "%s" for BUY order.', $spendCurrency, $expectedFrom));
         }
 
         // For BUY orders, we need to validate and compute amounts using the fill evaluator
@@ -175,7 +177,7 @@ final class ExecutionPlanMaterializer
 
         // Validate spend currency matches expected source for SELL orders
         if ($spendCurrency !== $expectedFrom) {
-            return null;
+            throw new InvalidInput(sprintf('Spend currency "%s" does not match expected source currency "%s" for SELL order.', $spendCurrency, $expectedFrom));
         }
 
         // For SELL orders, use LegMaterializer to resolve amounts

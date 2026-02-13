@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Application\PathSearch\Model\Graph;
 
+use Brick\Math\BigDecimal;
+use Brick\Math\Exception\MathException;
 use IteratorAggregate;
+use SomeWork\P2PPathFinder\Exception\InvalidInput;
 use Traversable;
+
+use function sprintf;
 
 /**
  * Directed multigraph representation keyed by asset symbol.
@@ -97,6 +102,16 @@ final class Graph implements IteratorAggregate
      */
     public function withOrderPenalties(array $usageCounts, string $penaltyFactor): self
     {
+        try {
+            $penalty = BigDecimal::of($penaltyFactor);
+        } catch (MathException $exception) {
+            throw new InvalidInput(sprintf('Penalty factor "%s" is not a valid numeric value.', $penaltyFactor), 0, $exception);
+        }
+
+        if (!$penalty->isPositive()) {
+            throw new InvalidInput(sprintf('Penalty factor must be positive. Got: "%s".', $penaltyFactor));
+        }
+
         if ([] === $usageCounts) {
             return $this;
         }

@@ -9,6 +9,7 @@ use Brick\Math\RoundingMode;
 use SomeWork\P2PPathFinder\Domain\Money\Money;
 use SomeWork\P2PPathFinder\Domain\Money\MoneyMap;
 use SomeWork\P2PPathFinder\Domain\Tolerance\DecimalTolerance;
+use SomeWork\P2PPathFinder\Domain\ValueObject\DecimalHelperTrait;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
 
 use function count;
@@ -35,6 +36,10 @@ use function trim;
  */
 final class ExecutionPlan implements SearchResultInterface
 {
+    use DecimalHelperTrait;
+
+    private const INFINITE_COST = '999999999999999999';
+
     public function __construct(
         private readonly ExecutionStepCollection $steps,
         private readonly string $sourceCurrency,
@@ -325,12 +330,12 @@ final class ExecutionPlan implements SearchResultInterface
     private function calculateEffectiveCost(): BigDecimal
     {
         if ($this->totalReceived->isZero()) {
-            return BigDecimal::of('999999999999999999');
+            return BigDecimal::of(self::INFINITE_COST);
         }
 
         return $this->totalSpent->decimal()->dividedBy(
             $this->totalReceived->decimal(),
-            18,
+            self::CANONICAL_SCALE,
             RoundingMode::HalfUp
         );
     }
