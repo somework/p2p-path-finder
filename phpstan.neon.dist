@@ -9,3 +9,5 @@ parameters:
     tmpDir: var/cache/phpstan
     scanDirectories:
         - phpstan
+    parallel:
+        maximumNumberOfProcesses: 4
