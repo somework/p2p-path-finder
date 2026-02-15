@@ -67,7 +67,7 @@ This document provides step-by-step instructions for upgrading between major ver
 
 ### Upgrading from 0.x to 1.0
 
-**Status**: ⏳ Pre-1.0 (in development)
+**Status**: ✅ Released (superseded by 2.0)
 
 Version 1.0 will be the first stable release with major architectural improvements including comprehensive namespace reorganization.
 
@@ -105,18 +105,13 @@ use SomeWork\P2PPathFinder\Domain\Money\Money;
 - Exception hierarchy remains stable
 - Domain object behavior is unchanged
 
-**Timeline**:
-- 0.1.0: Initial pre-release (current)
-- 1.0.0-rc.1: Release candidate with final API (planned)
-- 1.0.0: First stable release (planned)
-
 ---
 
 ### Upgrading from 1.x to 2.0
 
 **Status**: ✅ Ready
 
-**Release Date**: TBD  
+**Release Date**: 2025-11-21  
 **Difficulty**: Medium  
 **Estimated Time**: 1-2 hours
 
