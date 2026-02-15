@@ -51,6 +51,7 @@ LICENSE text eol=lf
 /psalm.xml.dist export-ignore
 
 # Project-specific development files
+/AGENT.md export-ignore
 /CLAUDE.md export-ignore
 /Dockerfile export-ignore
 /docker-compose.yml export-ignore
