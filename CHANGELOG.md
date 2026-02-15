@@ -34,14 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `benchGraphFiltering`: Graph filtering performance with varying exclusion set sizes
 
 ### Changed
-- TBD
 
 ### Removed
-- TBD
 
 ---
 
-## [2.0.0] - TBD
+## [2.0.0] - 2025-11-21
 
 **⚠️ BREAKING CHANGES**: This version removes deprecated APIs and introduces `ExecutionPlanService` as the sole public API for path finding. See [UPGRADING.md](UPGRADING.md#upgrading-from-1x-to-20) for complete migration guide.
 
@@ -234,7 +232,7 @@ For comprehensive migration instructions, see [UPGRADING.md](UPGRADING.md#upgrad
 - **Kept with documentation**:
   - `test_plan_to_path_throws_for_non_linear` - API contract documented, will activate when split/merge produces non-linear plans
 
-## [0.1.0] - TBD
+## [0.1.0] - 2025-10-01
 
 **First tagged pre-release** - This version represents the initial BigDecimal migration and establishes the foundation for the 1.0.0 stable release.
 
