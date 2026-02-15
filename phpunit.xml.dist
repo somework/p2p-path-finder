@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit bootstrap="vendor/autoload.php" 
-         colors="true" 
+<phpunit bootstrap="vendor/autoload.php"
+         colors="true"
          cacheDirectory=".phpunit.cache"
          executionOrder="default"
-         resolveDependencies="true">
+         resolveDependencies="true"
+         failOnRisky="true"
+         failOnWarning="true"
+         failOnDeprecation="true"
+         beStrictAboutTestsThatDoNotTestAnything="true">
   <testsuites>
     <testsuite name="Unit Tests">
       <directory>tests/Unit</directory>

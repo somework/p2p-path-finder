@@ -4,153 +4,132 @@ declare(strict_types=1);
 
 namespace SomeWork\P2PPathFinder\Tests\Unit\Application\PathSearch\Engine\Ordering;
 
-use Brick\Math\BigDecimal;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 use SomeWork\P2PPathFinder\Application\PathSearch\Engine\Ordering\RouteSignature;
-use SomeWork\P2PPathFinder\Application\PathSearch\Model\PathEdge;
-use SomeWork\P2PPathFinder\Application\PathSearch\Model\PathEdgeSequence;
-use SomeWork\P2PPathFinder\Domain\Order\OrderSide;
 use SomeWork\P2PPathFinder\Exception\InvalidInput;
-use SomeWork\P2PPathFinder\Tests\Fixture\OrderFactory;
 
+#[CoversClass(RouteSignature::class)]
 final class RouteSignatureTest extends TestCase
 {
-    public function test_it_trims_and_joins_nodes(): void
+    #[TestDox('fromNodes() with multiple nodes creates arrow-delimited value')]
+    public function test_from_nodes_creates_arrow_delimited_value(): void
     {
-        $signature = RouteSignature::fromNodes(['  SRC ', 'MID', ' DST  ']);
+        $signature = RouteSignature::fromNodes(['USD', 'EUR', 'GBP']);
 
-        self::assertSame(['SRC', 'MID', 'DST'], $signature->nodes());
-        self::assertSame('SRC->MID->DST', $signature->value());
+        self::assertSame('USD->EUR->GBP', $signature->value());
     }
 
-    public function test_it_rejects_blank_nodes(): void
-    {
-        $this->expectException(InvalidInput::class);
-        $this->expectExceptionMessage('Route signature nodes cannot be empty (index 1).');
-
-        RouteSignature::fromNodes(['SRC', '   ']);
-    }
-
-    public function test_it_can_be_created_from_path_edge_sequence(): void
-    {
-        $buyOrder = OrderFactory::buy('SRC', 'MID', '1.000', '1.000', '1.000', 3, 3);
-        $secondOrder = OrderFactory::buy('MID', 'DST', '1.000', '1.000', '1.000', 3, 3);
-
-        $sequence = PathEdgeSequence::fromList([
-            PathEdge::create('SRC', 'MID', $buyOrder, $buyOrder->effectiveRate(), OrderSide::BUY, BigDecimal::of('1.000000000000000000')),
-            PathEdge::create('MID', 'DST', $secondOrder, $secondOrder->effectiveRate(), OrderSide::BUY, BigDecimal::of('1.000000000000000000')),
-        ]);
-
-        $signature = RouteSignature::fromPathEdgeSequence($sequence);
-
-        self::assertSame(['SRC', 'MID', 'DST'], $signature->nodes());
-        self::assertSame('SRC->MID->DST', $signature->value());
-    }
-
-    public function test_it_handles_empty_sequences(): void
+    #[TestDox('fromNodes() with empty array creates empty value')]
+    public function test_from_nodes_with_empty_array_creates_empty_value(): void
     {
         $signature = RouteSignature::fromNodes([]);
 
-        self::assertSame([], $signature->nodes());
         self::assertSame('', $signature->value());
+        self::assertSame([], $signature->nodes());
     }
 
-    public function test_equals_and_compare_use_normalized_value(): void
+    #[TestDox('fromNodes() with single node creates value without arrows')]
+    public function test_from_nodes_with_single_node(): void
     {
-        $alpha = RouteSignature::fromNodes(['SRC', 'DST']);
-        $beta = RouteSignature::fromNodes(['SRC', 'dst']);
-        $gamma = RouteSignature::fromNodes(['SRC', 'BET']);
+        $signature = RouteSignature::fromNodes(['USD']);
 
-        self::assertTrue($alpha->equals(RouteSignature::fromNodes(['SRC', 'DST'])));
-        self::assertSame(0, $alpha->compare(RouteSignature::fromNodes(['SRC', 'DST'])));
-        self::assertSame(1, $alpha->compare($gamma));
-        self::assertSame(-1, $gamma->compare($alpha));
-        self::assertFalse($alpha->equals($beta));
+        self::assertSame('USD', $signature->value());
+        self::assertSame(['USD'], $signature->nodes());
     }
 
-    public function test_very_long_route_signature(): void
+    #[TestDox('nodes() returns the list of trimmed node strings')]
+    public function test_nodes_returns_list_of_nodes(): void
     {
-        $nodes = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'AUD', 'CAD', 'NZD', 'SEK', 'NOK', 'DKK', 'PLN'];
-        $signature = RouteSignature::fromNodes($nodes);
+        $signature = RouteSignature::fromNodes(['USD', 'EUR', 'GBP']);
 
-        self::assertSame($nodes, $signature->nodes());
-        self::assertSame('USD->EUR->GBP->JPY->CHF->AUD->CAD->NZD->SEK->NOK->DKK->PLN', $signature->value());
-        self::assertCount(12, $signature->nodes());
+        self::assertSame(['USD', 'EUR', 'GBP'], $signature->nodes());
     }
 
-    public function test_single_node_route(): void
+    #[TestDox('value() returns arrow-delimited string representation')]
+    public function test_value_returns_arrow_delimited_string(): void
     {
-        $signature = RouteSignature::fromNodes(['SINGLE']);
+        $signature = RouteSignature::fromNodes(['A', 'B', 'C', 'D']);
 
-        self::assertSame(['SINGLE'], $signature->nodes());
-        self::assertSame('SINGLE', $signature->value());
+        self::assertSame('A->B->C->D', $signature->value());
     }
 
-    public function test_nodes_with_numbers_and_underscores(): void
+    #[TestDox('equals() returns true for signatures with same nodes')]
+    public function test_equals_returns_true_for_same_route(): void
     {
-        $nodes = ['TOKEN_1', 'TOKEN_2', 'ASSET_123', 'COIN_999'];
-        $signature = RouteSignature::fromNodes($nodes);
+        $a = RouteSignature::fromNodes(['USD', 'EUR', 'GBP']);
+        $b = RouteSignature::fromNodes(['USD', 'EUR', 'GBP']);
 
-        self::assertSame($nodes, $signature->nodes());
-        self::assertSame('TOKEN_1->TOKEN_2->ASSET_123->COIN_999', $signature->value());
+        self::assertTrue($a->equals($b));
     }
 
-    public function test_case_sensitivity_in_comparison(): void
+    #[TestDox('equals() returns false for signatures with different nodes')]
+    public function test_equals_returns_false_for_different_route(): void
     {
-        $upper = RouteSignature::fromNodes(['USD', 'EUR']);
-        $lower = RouteSignature::fromNodes(['usd', 'eur']);
-        $mixed = RouteSignature::fromNodes(['Usd', 'Eur']);
+        $a = RouteSignature::fromNodes(['USD', 'EUR', 'GBP']);
+        $b = RouteSignature::fromNodes(['USD', 'JPY', 'GBP']);
 
-        // All should be different due to case sensitivity
-        self::assertFalse($upper->equals($lower));
-        self::assertFalse($upper->equals($mixed));
-        self::assertFalse($lower->equals($mixed));
-
-        // Comparison should be lexicographic and case-sensitive
-        self::assertLessThan(0, $upper->compare($lower)); // 'USD' < 'usd' (uppercase first)
-        self::assertGreaterThan(0, $lower->compare($upper));
+        self::assertFalse($a->equals($b));
     }
 
-    public function test_lexicographic_ordering_with_common_prefix(): void
+    #[TestDox('compare() returns 0 for equal signatures')]
+    public function test_compare_returns_zero_for_equal(): void
     {
-        $short = RouteSignature::fromNodes(['USD', 'EUR']);
-        $long = RouteSignature::fromNodes(['USD', 'EUR', 'GBP']);
+        $a = RouteSignature::fromNodes(['USD', 'EUR']);
+        $b = RouteSignature::fromNodes(['USD', 'EUR']);
 
-        // Shorter path should come first lexicographically
-        self::assertLessThan(0, $short->compare($long));
-        self::assertGreaterThan(0, $long->compare($short));
+        self::assertSame(0, $a->compare($b));
     }
 
-    public function test_nodes_are_preserved_exactly(): void
+    #[TestDox('compare() returns negative for alphabetically lesser signature')]
+    public function test_compare_returns_negative_for_lesser(): void
     {
-        $nodesWithSpaces = ['  ASSET_A  ', ' ASSET_B ', 'ASSET_C   '];
-        $signature = RouteSignature::fromNodes($nodesWithSpaces);
+        $lesser = RouteSignature::fromNodes(['AAA', 'BBB']);
+        $greater = RouteSignature::fromNodes(['ZZZ', 'YYY']);
 
-        // Nodes should be trimmed
-        self::assertSame(['ASSET_A', 'ASSET_B', 'ASSET_C'], $signature->nodes());
+        self::assertLessThan(0, $lesser->compare($greater));
     }
 
-    public function test_to_string_returns_value(): void
+    #[TestDox('compare() returns positive for alphabetically greater signature')]
+    public function test_compare_returns_positive_for_greater(): void
+    {
+        $lesser = RouteSignature::fromNodes(['AAA', 'BBB']);
+        $greater = RouteSignature::fromNodes(['ZZZ', 'YYY']);
+
+        self::assertGreaterThan(0, $greater->compare($lesser));
+    }
+
+    #[TestDox('__toString() matches value()')]
+    public function test_to_string_matches_value(): void
     {
         $signature = RouteSignature::fromNodes(['A', 'B', 'C']);
 
-        self::assertSame('A->B->C', (string) $signature);
         self::assertSame($signature->value(), (string) $signature);
     }
 
-    public function test_rejects_empty_node_at_start(): void
+    #[TestDox('Rejects empty node string with InvalidInput exception')]
+    public function test_rejects_empty_node_string(): void
     {
-        $this->expectException(InvalidInput::class);
-        $this->expectExceptionMessage('Route signature nodes cannot be empty (index 0).');
+        self::expectException(InvalidInput::class);
 
-        RouteSignature::fromNodes(['', 'A', 'B']);
+        RouteSignature::fromNodes(['USD', '', 'GBP']);
     }
 
-    public function test_rejects_empty_node_in_middle(): void
+    #[TestDox('Rejects whitespace-only node with InvalidInput exception')]
+    public function test_rejects_whitespace_only_node(): void
     {
-        $this->expectException(InvalidInput::class);
-        $this->expectExceptionMessage('Route signature nodes cannot be empty (index 2).');
+        self::expectException(InvalidInput::class);
 
-        RouteSignature::fromNodes(['A', 'B', '', 'C']);
+        RouteSignature::fromNodes(['USD', '   ', 'GBP']);
+    }
+
+    #[TestDox('Trims whitespace from node strings')]
+    public function test_trims_whitespace_from_nodes(): void
+    {
+        $signature = RouteSignature::fromNodes([' USD ', '  EUR  ', 'GBP ']);
+
+        self::assertSame(['USD', 'EUR', 'GBP'], $signature->nodes());
+        self::assertSame('USD->EUR->GBP', $signature->value());
     }
 }

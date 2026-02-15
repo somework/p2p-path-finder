@@ -121,5 +121,7 @@
     },
     "suggest": {
         "ext-mbstring": "Improves string handling performance"
-    }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
 }
