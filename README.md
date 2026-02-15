@@ -358,7 +358,7 @@ composer check  # PHPStan + Psalm + CS Fixer
 **Mutation testing**:
 
 ```bash
-INFECTION=1 XDEBUG_MODE=coverage vendor/bin/infection
+composer infection
 ```
 
 ---
@@ -371,7 +371,7 @@ We welcome contributions! Please read:
 - **[Code of Conduct](CODE_OF_CONDUCT.md)** – Community expectations
 - **[Security Policy](SECURITY.md)** – Responsible vulnerability disclosure
 
-Track progress toward `1.0.0-rc` in the [Changelog](CHANGELOG.md).
+See the [Changelog](CHANGELOG.md) for version history.
 
 ---
 
