@@ -8,29 +8,31 @@ PHP 8.2+ library for deterministic peer-to-peer path finding across order-driven
 
 ## Commands
 
-All commands run via Docker Compose to match CI environment:
+A `Makefile` wraps all Docker Compose commands. Run `make help` for the full list.
 
 ```bash
 # Tests
-docker compose run --rm php vendor/bin/phpunit                    # full suite (1814 tests)
-docker compose run --rm php vendor/bin/phpunit tests/Unit/.../FooTest.php  # single file
-docker compose run --rm php vendor/bin/phpunit --filter test_name # single method
+make test                                    # full suite (1814 tests)
+make test ARGS="tests/Unit/.../FooTest.php"  # single file
+make test ARGS="--filter test_name"          # single method
 
 # Static analysis (both must pass with zero errors)
-docker compose run --rm php vendor/bin/phpstan analyse --no-progress
-docker compose run --rm php vendor/bin/psalm --no-progress
+make phpstan
+make psalm
 
 # Code style
-docker compose run --rm php vendor/bin/php-cs-fixer fix --dry-run --diff  # check
-docker compose run --rm php vendor/bin/php-cs-fixer fix                   # auto-fix
+make cs-check   # check (dry-run)
+make cs-fix     # auto-fix
 
-# Composer shortcuts
-docker compose run --rm php composer check       # PHPStan + Psalm + CS Fixer dry-run
-docker compose run --rm php composer check:full  # above + PHPUnit + Infection
-docker compose run --rm php composer examples    # run all examples
+# Combined checks
+make check       # PHPStan + Psalm + CS Fixer dry-run
+make check-full  # above + PHPUnit + Infection
 
-# Benchmarks (only for performance changes)
-docker compose run --rm php composer phpbench
+# Other
+make infection   # mutation testing
+make bench       # benchmarks (only for performance changes)
+make examples    # run all examples
+make shell       # open bash in PHP container
 ```
 
 ## Architecture
@@ -70,7 +72,7 @@ The service finds up to K best execution plans (`withResultLimit(K)`):
 
 ## Testing Conventions
 
-- Run via Docker: `docker compose run --rm php vendor/bin/phpunit`
+- Run via Makefile: `make test` (or `make test ARGS="--filter test_name"`)
 - Test suites: Unit, Integration, Helpers, Fixture (configured in `phpunit.xml.dist`)
 - Do **not** use `assertSame()` or `assertEquals()` on whole objects — compare specific properties or use domain equality methods like `Money::equals()`
 - Use `#[TestDox('...')]` attributes on test methods
@@ -87,4 +89,4 @@ The service finds up to K best execution plans (`withResultLimit(K)`):
 
 ## CI Pipeline
 
-GitHub Actions runs on every push: PHPStan (max + custom rules), Psalm (strict), PHP-CS-Fixer, PHPUnit (PHP 8.2 + 8.3), Infection mutation testing, PhpBench, example validation, and custom PHPStan rules verification. All must pass.
+GitHub Actions runs on every push: PHPStan (max + custom rules), Psalm (strict), PHP-CS-Fixer, PHPUnit (PHP 8.2 + 8.3 + 8.4), Infection mutation testing, PhpBench, example validation, and custom PHPStan rules verification. All must pass.
