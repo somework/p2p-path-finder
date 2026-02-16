@@ -19,7 +19,7 @@ jobs:
 
         steps:
             -   name: Checkout repository
-                uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+                uses: actions/checkout@v6
 
             -   name: Install dependencies
                 uses: ./.github/actions/composer-install
@@ -34,7 +34,7 @@ jobs:
                     vendor/bin/phpunit --coverage-clover=coverage/clover.xml
 
             -   name: Upload coverage artifact
-                uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+                uses: actions/upload-artifact@v6
                 with:
                     name: coverage-php${{ matrix.php-version }}
                     path: coverage/clover.xml
